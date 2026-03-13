@@ -1,0 +1,41 @@
+import { fallbackAnalyzeDocument } from "@/lib/analysis/fallback";
+import {
+  analyzeRisksWithLlm,
+  generateSummaryWithLlm,
+  hasLlmKey
+} from "@/lib/analysis/llm";
+import type { DocumentAnalysisResult, DocumentKind } from "@/lib/types";
+
+export async function analyzeDocument(
+  text: string,
+  options?: { fileName?: string; documentKindHint?: DocumentKind | null }
+): Promise<DocumentAnalysisResult> {
+  const fallback = fallbackAnalyzeDocument(text, options);
+
+  if (!hasLlmKey()) {
+    return fallback;
+  }
+
+  try {
+    const riskFlags = await analyzeRisksWithLlm(
+      text,
+      fallback.classification.documentKind,
+      fallback.extraction,
+      fallback.riskFlags,
+      "pending-document"
+    );
+    const summary = await generateSummaryWithLlm(
+      fallback.extraction,
+      riskFlags,
+      fallback.summary
+    );
+
+    return {
+      ...fallback,
+      riskFlags,
+      summary
+    };
+  } catch {
+    return fallback;
+  }
+}

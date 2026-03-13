@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String @id
+  email       String @unique
+  displayName String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile       Profile?
+  intakeSessions IntakeSession[]
+  deals       Deal[]
+}
+
+model Deal {
+  id                  String   @id @default(uuid())
+  userId              String
+  brandName           String
+  campaignName        String
+  status              String
+  paymentStatus       String
+  countersignStatus   String
+  summary             String?
+  legalDisclaimer     String
+  nextDeliverableDate DateTime?
+  analyzedAt          DateTime?
+  confirmedAt         DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intakeSession     IntakeSession?
+  paymentRecord     PaymentRecord?
+  documents         Document[]
+  terms             DealTerms?
+  riskFlags         RiskFlag[]
+  emailDrafts       EmailDraft[]
+  jobs              Job[]
+  summaries         Summary[]
+}
+
+model Document {
+  id                       String   @id @default(uuid())
+  dealId                   String
+  userId                   String
+  fileName                 String
+  mimeType                 String
+  storagePath              String
+  processingStatus         String
+  rawText                  String?
+  normalizedText           String?
+  documentKind             String
+  classificationConfidence Float?
+  sourceType               String
+  errorMessage             String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  deal              Deal                 @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  sections          DocumentSection[]
+  extractionResult  ExtractionResult?
+  evidence          ExtractionEvidence[]
+  summaries         Summary[]
+  jobs              Job[]
+
+  @@index([dealId])
+}
+
+model DocumentSection {
+  id         String   @id @default(uuid())
+  documentId String
+  title      String
+  content    String
+  chunkIndex Int
+  pageRange  String?
+  createdAt  DateTime @default(now())
+
+  document Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  evidence ExtractionEvidence[]
+
+  @@index([documentId, chunkIndex])
+}
+
+model ExtractionResult {
+  id            String   @id @default(uuid())
+  documentId    String   @unique
+  schemaVersion String
+  model         String
+  data          Json
+  confidence    Float?
+  conflicts     Json
+  createdAt     DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model ExtractionEvidence {
+  id         String   @id @default(uuid())
+  documentId String
+  fieldPath  String
+  snippet    String
+  sectionId  String?
+  confidence Float?
+  createdAt  DateTime @default(now())
+
+  document Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  section  DocumentSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+}
+
+model Summary {
+  id         String   @id @default(uuid())
+  dealId     String
+  documentId String?
+  body       String
+  version    String
+  createdAt  DateTime @default(now())
+
+  deal     Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([dealId])
+}
+
+model DealTerms {
+  id                        String   @id @default(uuid())
+  dealId                    String   @unique
+  brandName                 String?
+  agencyName                String?
+  creatorName               String?
+  campaignName              String?
+  paymentAmount             Float?
+  currency                  String?
+  paymentTerms              String?
+  paymentStructure          String?
+  netTermsDays              Int?
+  paymentTrigger            String?
+  deliverables              Json
+  usageRights               String?
+  usageRightsOrganicAllowed Boolean?
+  usageRightsPaidAllowed    Boolean?
+  whitelistingAllowed       Boolean?
+  usageDuration             String?
+  usageTerritory            String?
+  usageChannels             Json
+  exclusivity               String?
+  exclusivityApplies        Boolean?
+  exclusivityCategory       String?
+  exclusivityDuration       String?
+  exclusivityRestrictions   String?
+  revisions                 String?
+  revisionRounds            Int?
+  termination               String?
+  terminationAllowed        Boolean?
+  terminationNotice         String?
+  terminationConditions     String?
+  governingLaw              String?
+  notes                     String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model RiskFlag {
+  id               String   @id @default(uuid())
+  dealId           String
+  category         String
+  title            String
+  detail           String
+  severity         String
+  suggestedAction  String?
+  evidence         Json
+  sourceDocumentId String?
+  createdAt        DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}
+
+model EmailDraft {
+  id        String   @id @default(uuid())
+  dealId    String
+  intent    String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@unique([dealId, intent])
+}
+
+model Job {
+  id            String   @id @default(uuid())
+  dealId        String
+  documentId    String
+  type          String
+  status        String
+  attemptCount  Int      @default(0)
+  failureReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, documentId])
+}
+
+model Profile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  displayName        String?
+  creatorLegalName   String?
+  businessName       String?
+  contactEmail       String?
+  preferredSignature String?
+  payoutDetails      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model IntakeSession {
+  id          String   @id @default(uuid())
+  userId      String
+  dealId      String   @unique
+  status      String
+  errorMessage String?
+  inputSource String?
+  completedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal      Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  documents IntakeDocument[]
+
+  @@index([userId, status])
+}
+
+model IntakeDocument {
+  id              String   @id @default(uuid())
+  intakeSessionId String
+  documentId      String   @unique
+  createdAt       DateTime @default(now())
+
+  intakeSession IntakeSession @relation(fields: [intakeSessionId], references: [id], onDelete: Cascade)
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([intakeSessionId])
+}
+
+model PaymentRecord {
+  id          String   @id @default(uuid())
+  dealId      String   @unique
+  amount      Float?
+  currency    String?
+  invoiceDate DateTime?
+  dueDate     DateTime?
+  paidDate    DateTime?
+  status      String
+  notes       String?
+  source      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,10 @@
+.next
+node_modules
+.env
+.env.local
+.runtime
+coverage
+dist
+build
+.DS_Store
+.npmrc

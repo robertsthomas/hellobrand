@@ -1,0 +1,238 @@
+@custom-variant dark (&:is(.dark *));
+
+/* HelloBrand Design System Theme
+   Creator-first, premium, modern, calm, trustworthy, editorial
+   Warm neutrals + Deep Forest Green + Warm Coral
+*/
+
+:root {
+  --font-size: 16px;
+  
+  /* Brand Colors - Warm Sand/Off-White */
+  --background: #FAF8F5;
+  --foreground: #2A2823;
+  --card: #FFFFFF;
+  --card-foreground: #2A2823;
+  --popover: #FFFFFF;
+  --popover-foreground: #2A2823;
+  
+  /* Primary - Deep Ocean Green */
+  --primary: #1A4D3E;
+  --primary-foreground: #FFFFFF;
+  
+  /* Secondary - Soft Warm Background */
+  --secondary: #F5F3F0;
+  --secondary-foreground: #2A2823;
+  
+  /* Muted - Soft Warm Gray */
+  --muted: #E8E3DC;
+  --muted-foreground: #6B6761;
+  
+  /* Accent - Clay/Coral */
+  --accent: #E07A5F;
+  --accent-foreground: #FFFFFF;
+  
+  /* Sage Green - Secondary Accent */
+  --sage: #81B29A;
+  --sage-foreground: #FFFFFF;
+  
+  /* Success - Sage Green */
+  --success: #81B29A;
+  --success-foreground: #FFFFFF;
+  
+  /* Warning - Clay */
+  --warning: #E07A5F;
+  --warning-foreground: #2A2823;
+  
+  /* Destructive - Warm Red */
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  
+  /* Borders and Inputs */
+  --border: #E8E3DC;
+  --input: #E8E3DC;
+  --input-background: #FAF8F5;
+  --switch-background: #D1CDC5;
+  --ring: #1A4D3E;
+  
+  /* Chart Colors - Warm Editorial Palette */
+  --chart-1: #1A4D3E;
+  --chart-2: #E07A5F;
+  --chart-3: #81B29A;
+  --chart-4: #F4A261;
+  --chart-5: #8B7355;
+  
+  /* Font Weights */
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+  
+  /* Border Radius - Large Rounded Panels */
+  --radius: 1.25rem; /* 20px */
+  --radius-lg: 1.75rem; /* 28px */
+  --radius-xl: 2rem; /* 32px */
+  
+  /* Sidebar */
+  --sidebar: #F5F3F0;
+  --sidebar-foreground: #2A2823;
+  --sidebar-primary: #1A4D3E;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FFFFFF;
+  --sidebar-accent-foreground: #2A2823;
+  --sidebar-border: #E8E3DC;
+  --sidebar-ring: #1A4D3E;
+}
+
+.dark {
+  --background: #1A1816;
+  --foreground: #F5F1ED;
+  --card: #252320;
+  --card-foreground: #F5F1ED;
+  --popover: #252320;
+  --popover-foreground: #F5F1ED;
+  --primary: #3D8B73;
+  --primary-foreground: #FDFCFB;
+  --secondary: #2F2C28;
+  --secondary-foreground: #F5F1ED;
+  --muted: #3A3632;
+  --muted-foreground: #A8A39B;
+  --accent: #FF8A6E;
+  --accent-foreground: #1A1816;
+  --success: #3D8B73;
+  --success-foreground: #FDFCFB;
+  --warning: #FDB022;
+  --warning-foreground: #1A1816;
+  --destructive: #EF4444;
+  --destructive-foreground: #FDFCFB;
+  --border: #3A3632;
+  --input: #3A3632;
+  --input-background: #252320;
+  --switch-background: #4A4742;
+  --ring: #3D8B73;
+  --chart-1: #3D8B73;
+  --chart-2: #FF8A6E;
+  --chart-3: #50A684;
+  --chart-4: #FDB022;
+  --chart-5: #A68B6E;
+  --sidebar: #252320;
+  --sidebar-foreground: #F5F1ED;
+  --sidebar-primary: #3D8B73;
+  --sidebar-primary-foreground: #FDFCFB;
+  --sidebar-accent: #2F2C28;
+  --sidebar-accent-foreground: #F5F1ED;
+  --sidebar-border: #3A3632;
+  --sidebar-ring: #3D8B73;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  /**
+  * Default typography styles for HTML elements (h1-h4, p, label, button, input).
+  * Editorial-inspired typography with generous spacing
+  */
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  p {
+    line-height: 1.7;
+  }
+
+  label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  input {
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+}
