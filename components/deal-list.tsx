@@ -20,7 +20,7 @@ export function DealList({
           href="/app/intake/new"
           className="mt-6 inline-flex rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white"
         >
-          Start intake
+          Upload documents
         </Link>
       </div>
     );

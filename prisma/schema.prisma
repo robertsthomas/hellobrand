@@ -69,6 +69,7 @@ model Document {
   evidence          ExtractionEvidence[]
   summaries         Summary[]
   jobs              Job[]
+  intakeDocument    IntakeDocument?
 
   @@index([dealId])
 }

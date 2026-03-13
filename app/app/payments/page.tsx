@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { savePaymentAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import { requireViewer } from "@/lib/auth";
 import { listPaymentsForViewer } from "@/lib/payments";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -86,6 +87,14 @@ export default async function PaymentsPage() {
                     <span>Due: {formatDate(payment.dueDate)}</span>
                     <span>Paid: {formatDate(payment.paidDate)}</span>
                   </div>
+                  <div className="mt-4">
+                    <Link
+                      href={`/app/deals/${deal.id}`}
+                      className="text-sm font-semibold text-ocean underline-offset-4 hover:underline"
+                    >
+                      Open workspace
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
@@ -157,9 +166,12 @@ export default async function PaymentsPage() {
                     />
                   </label>
                   <div className="md:col-span-2 flex justify-end">
-                    <button className="rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white">
+                    <SubmitButton
+                      pendingLabel="Saving payment..."
+                      className="rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                       Save payment
-                    </button>
+                    </SubmitButton>
                   </div>
                 </div>
               </form>

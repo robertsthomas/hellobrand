@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { IntakeAutoRefresh } from "@/components/intake-auto-refresh";
+import { SubmitButton } from "@/components/submit-button";
 import {
   confirmIntakeSessionAction,
   retryIntakeSessionAction
@@ -8,6 +10,16 @@ import {
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { formatCurrency, humanizeToken } from "@/lib/utils";
+
+function evidenceForField(
+  fieldPath: string,
+  entries: Array<{
+    fieldPath: string;
+    snippet: string;
+  }>
+) {
+  return entries.find((entry) => entry.fieldPath === fieldPath) ?? null;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +30,10 @@ export default async function IntakeSessionPage({
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
-  const { session, aggregate } = await getIntakeSessionForViewer(viewer, sessionId);
+  const { session, aggregate, profileDefaults } = await getIntakeSessionForViewer(
+    viewer,
+    sessionId
+  );
 
   if (session.status === "completed" && aggregate) {
     redirect(`/app/deals/${aggregate.deal.id}`);
@@ -27,8 +42,26 @@ export default async function IntakeSessionPage({
   const terms = aggregate?.terms;
   const paymentAmount = terms?.paymentAmount ?? aggregate?.paymentRecord?.amount ?? null;
   const evidence = aggregate?.extractionEvidence.slice(0, 6) ?? [];
+  const brandEvidence = evidenceForField("brandName", aggregate?.extractionEvidence ?? []);
+  const campaignEvidence = evidenceForField(
+    "campaignName",
+    aggregate?.extractionEvidence ?? []
+  );
+  const agencyEvidence = evidenceForField("agencyName", aggregate?.extractionEvidence ?? []);
+  const paymentEvidence = evidenceForField(
+    "paymentAmount",
+    aggregate?.extractionEvidence ?? []
+  );
+  const noteSeed = [
+    terms?.notes?.trim() || null,
+    aggregate?.currentSummary?.body?.trim() || null
+  ].find(Boolean);
   const showConfirmation =
     session.status === "ready_for_confirmation" || session.status === "failed";
+  const analysisRunning = ["uploading", "processing"].includes(session.status);
+  const fieldLocked = analysisRunning;
+  const fieldClassName =
+    "rounded-[1.25rem] border border-black/10 bg-sand/40 px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]";
 
   return (
     <div className="p-8">
@@ -53,9 +86,11 @@ export default async function IntakeSessionPage({
                 <div>
                   <h2 className="text-2xl font-semibold text-ink">Processing state</h2>
                   <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-                    Status updates are based on your uploaded documents. Refresh
-                    this page after a minute if analysis is still running.
+                    Status updates are based on your uploaded documents.
                   </p>
+                  <div className="mt-2">
+                    <IntakeAutoRefresh status={session.status} />
+                  </div>
                 </div>
                 <Link
                   href={`/app/intake/${session.id}`}
@@ -94,9 +129,12 @@ export default async function IntakeSessionPage({
               {session.status === "failed" ? (
                 <form action={retryIntakeSessionAction} className="mt-5">
                   <input type="hidden" name="sessionId" value={session.id} />
-                  <button className="rounded-full bg-clay px-5 py-3 text-sm font-semibold text-white">
+                  <SubmitButton
+                    pendingLabel="Retrying analysis..."
+                    className="rounded-full bg-clay px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
                     Retry analysis
-                  </button>
+                  </SubmitButton>
                 </form>
               ) : null}
             </div>
@@ -168,9 +206,11 @@ export default async function IntakeSessionPage({
             <div className="rounded-[1.75rem] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
               <h2 className="text-2xl font-semibold text-ink">Confirm this deal</h2>
               <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-                {showConfirmation
-                  ? "Review the extracted values, make corrections, and create the live deal workspace."
-                  : "Confirmation unlocks when all uploaded documents are ready. If a document fails, you can still correct the fields manually and continue."}
+                {analysisRunning
+                  ? "Fields below update automatically while analysis runs. Editing unlocks once HelloBrand has enough data to confirm."
+                  : showConfirmation
+                    ? "Review the extracted values, make corrections, and create the live deal workspace."
+                    : "Confirmation unlocks when all uploaded documents are ready. If a document fails, you can still correct the fields manually and continue."}
               </p>
 
               <form action={confirmIntakeSessionAction} className="mt-6 grid gap-4">
@@ -178,54 +218,136 @@ export default async function IntakeSessionPage({
                 <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                   Brand name
                   <input
-                    className="rounded-[1.25rem] border border-black/10 bg-sand/40 px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]"
+                    className={fieldClassName}
                     name="brandName"
                     defaultValue={terms?.brandName ?? aggregate?.deal.brandName ?? ""}
+                    placeholder="Analyzing brand details..."
+                    readOnly={fieldLocked}
+                    aria-disabled={fieldLocked}
                     required
                   />
+                  <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    {brandEvidence
+                      ? `Source: ${brandEvidence.snippet}`
+                      : "No direct source line found yet."}
+                  </span>
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                   Campaign name
                   <input
-                    className="rounded-[1.25rem] border border-black/10 bg-sand/40 px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]"
+                    className={fieldClassName}
                     name="campaignName"
                     defaultValue={terms?.campaignName ?? aggregate?.deal.campaignName ?? ""}
+                    placeholder="Analyzing campaign details..."
+                    readOnly={fieldLocked}
+                    aria-disabled={fieldLocked}
                     required
                   />
+                  <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    {campaignEvidence
+                      ? `Source: ${campaignEvidence.snippet}`
+                      : "No direct source line found yet."}
+                  </span>
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                   Agency name
                   <input
-                    className="rounded-[1.25rem] border border-black/10 bg-sand/40 px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]"
+                    className={fieldClassName}
                     name="agencyName"
                     defaultValue={terms?.agencyName ?? ""}
+                    placeholder="Analyzing agency details..."
+                    readOnly={fieldLocked}
+                    aria-disabled={fieldLocked}
                   />
+                  <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    {agencyEvidence
+                      ? `Source: ${agencyEvidence.snippet}`
+                      : "Optional. Leave blank if no agency is involved."}
+                  </span>
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                   Primary payment amount
                   <input
-                    className="rounded-[1.25rem] border border-black/10 bg-sand/40 px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]"
+                    className={fieldClassName}
                     name="paymentAmount"
                     type="number"
                     step="0.01"
                     defaultValue={paymentAmount ?? ""}
+                    placeholder="Analyzing payment..."
+                    readOnly={fieldLocked}
+                    aria-disabled={fieldLocked}
                   />
+                  <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    {paymentEvidence
+                      ? `Source: ${paymentEvidence.snippet}`
+                      : "If payment was not extracted cleanly, enter it manually."}
+                  </span>
                 </label>
                 <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                   Notes
                   <textarea
                     className="min-h-28 rounded-[1.5rem] border border-black/10 bg-sand/40 px-4 py-4 dark:border-white/12 dark:bg-white/[0.04]"
                     name="notes"
-                    defaultValue={terms?.notes ?? ""}
+                    defaultValue={noteSeed ?? ""}
+                    placeholder="Notes will stay editable after analysis finishes."
+                    readOnly={fieldLocked}
+                    aria-disabled={fieldLocked}
                   />
+                  <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    Carry forward anything you already know about open questions,
+                    negotiated changes, or missing context.
+                  </span>
                 </label>
-                <button
+                {analysisRunning ? (
+                  <div className="rounded-[1.25rem] border border-black/5 bg-sand/40 px-4 py-3 text-sm text-black/60 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65">
+                    Analysis is still running. This screen auto-refreshes and the
+                    extracted fields above will populate as each document step completes.
+                  </div>
+                ) : null}
+                <SubmitButton
+                  pendingLabel="Creating workspace..."
                   className="rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={!showConfirmation}
                 >
                   Create deal workspace
-                </button>
+                </SubmitButton>
               </form>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+              <h2 className="text-2xl font-semibold text-ink">Profile defaults</h2>
+              <p className="mt-2 text-sm text-black/60 dark:text-white/65">
+                These creator details are available to downstream drafts and
+                intake confirmations when extracted values are missing.
+              </p>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-[1.25rem] bg-sand/50 p-4 dark:bg-white/[0.04]">
+                  <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                    Creator
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-ink">
+                    {profileDefaults?.creatorLegalName ??
+                      profileDefaults?.displayName ??
+                      viewer.displayName}
+                  </div>
+                </div>
+                <div className="rounded-[1.25rem] bg-sand/50 p-4 dark:bg-white/[0.04]">
+                  <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                    Business
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-ink">
+                    {profileDefaults?.businessName ?? "Not set"}
+                  </div>
+                </div>
+                <div className="rounded-[1.25rem] bg-sand/50 p-4 dark:bg-white/[0.04]">
+                  <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                    Contact
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-ink">
+                    {profileDefaults?.contactEmail ?? viewer.email}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="rounded-[1.75rem] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">

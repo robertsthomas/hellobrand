@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import {
   ClerkProvider,
-  Show,
   SignInButton,
   SignUpButton,
   UserButton
@@ -10,6 +9,7 @@ import { Inter } from "next/font/google";
 import type { ReactNode } from "react";
 
 import "@/app/globals.css";
+import { Show } from "@/components/clerk-show";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({
@@ -30,7 +30,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
-        <ClerkProvider>
+        <ClerkProvider
+          appearance={{
+            layout: {
+              showOptionalFields: false
+            }
+          }}
+        >
           <header className="sr-only">
             <Show when="signed-out">
               <SignInButton />

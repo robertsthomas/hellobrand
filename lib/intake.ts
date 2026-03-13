@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import {
@@ -59,6 +60,47 @@ function detectInputSource(files: File[], pastedText: string | null | undefined)
   return null;
 }
 
+function emptyEditableTerms(input: {
+  brandName: string;
+  campaignName: string;
+  creatorName?: string | null;
+  notes?: string | null;
+}) {
+  return {
+    brandName: input.brandName,
+    agencyName: null,
+    creatorName: input.creatorName ?? null,
+    campaignName: input.campaignName,
+    paymentAmount: null,
+    currency: null,
+    paymentTerms: null,
+    paymentStructure: null,
+    netTermsDays: null,
+    paymentTrigger: null,
+    deliverables: [],
+    usageRights: null,
+    usageRightsOrganicAllowed: null,
+    usageRightsPaidAllowed: null,
+    whitelistingAllowed: null,
+    usageDuration: null,
+    usageTerritory: null,
+    usageChannels: [],
+    exclusivity: null,
+    exclusivityApplies: null,
+    exclusivityCategory: null,
+    exclusivityDuration: null,
+    exclusivityRestrictions: null,
+    revisions: null,
+    revisionRounds: null,
+    termination: null,
+    terminationAllowed: null,
+    terminationNotice: null,
+    terminationConditions: null,
+    governingLaw: null,
+    notes: input.notes ?? null
+  };
+}
+
 function editableTermsFromAggregate(aggregate: DealAggregate | null) {
   if (aggregate?.terms) {
     return {
@@ -110,6 +152,9 @@ export async function createIntakeSessionForViewer(
     files?: File[];
   }
 ) {
+  const profile = process.env.DATABASE_URL
+    ? await getProfileForViewer(viewer).catch(() => null)
+    : null;
   const files = (input.files ?? []).filter((file) => file.size > 0);
   const pastedText = input.pastedText?.trim() ?? null;
 
@@ -144,39 +189,16 @@ export async function createIntakeSessionForViewer(
 
   if (input.notes?.trim()) {
     await updateTermsForViewer(viewer, draftDeal.id, {
-      ...(editableTermsFromAggregate(aggregate) ?? {
-        brandName: input.brandName?.trim() || draftDeal.brandName,
-        agencyName: null,
-        creatorName: null,
-        campaignName: input.campaignName?.trim() || draftDeal.campaignName,
-        paymentAmount: null,
-        currency: null,
-        paymentTerms: null,
-        paymentStructure: null,
-        netTermsDays: null,
-        paymentTrigger: null,
-        deliverables: [],
-        usageRights: null,
-        usageRightsOrganicAllowed: null,
-        usageRightsPaidAllowed: null,
-        whitelistingAllowed: null,
-        usageDuration: null,
-        usageTerritory: null,
-        usageChannels: [],
-        exclusivity: null,
-        exclusivityApplies: null,
-        exclusivityCategory: null,
-        exclusivityDuration: null,
-        exclusivityRestrictions: null,
-        revisions: null,
-        revisionRounds: null,
-        termination: null,
-        terminationAllowed: null,
-        terminationNotice: null,
-        terminationConditions: null,
-        governingLaw: null,
-        notes: null
-      }),
+      ...(editableTermsFromAggregate(aggregate) ??
+        emptyEditableTerms({
+          brandName: input.brandName?.trim() || draftDeal.brandName,
+          campaignName: input.campaignName?.trim() || draftDeal.campaignName,
+          creatorName:
+            profile?.creatorLegalName?.trim() ||
+            profile?.displayName?.trim() ||
+            viewer.displayName,
+          notes: null
+        })),
       notes: input.notes.trim()
     });
   }
@@ -207,6 +229,13 @@ export async function getIntakeSessionForViewer(
 ): Promise<{
   session: IntakeSessionRecord;
   aggregate: DealAggregate | null;
+  profileDefaults: {
+    displayName: string | null;
+    creatorLegalName: string | null;
+    businessName: string | null;
+    contactEmail: string | null;
+    preferredSignature: string | null;
+  } | null;
 }> {
   const session = await prisma.intakeSession.findFirst({
     where: {
@@ -221,10 +250,22 @@ export async function getIntakeSessionForViewer(
 
   const synced = await syncIntakeSessionForDealId(session.dealId);
   const aggregate = await getDealForViewer(viewer, session.dealId);
+  const profile = process.env.DATABASE_URL
+    ? await getProfileForViewer(viewer).catch(() => null)
+    : null;
 
   return {
     session: synced ?? toIntakeSessionRecord(session),
-    aggregate
+    aggregate,
+    profileDefaults: profile
+      ? {
+          displayName: profile.displayName,
+          creatorLegalName: profile.creatorLegalName,
+          businessName: profile.businessName,
+          contactEmail: profile.contactEmail,
+          preferredSignature: profile.preferredSignature
+        }
+      : null
   };
 }
 
@@ -284,9 +325,28 @@ export async function confirmIntakeSessionForViewer(
   }
 
   const aggregate = await getDealForViewer(viewer, session.dealId);
+  const profile = process.env.DATABASE_URL
+    ? await getProfileForViewer(viewer).catch(() => null)
+    : null;
 
   if (!aggregate) {
     throw new Error("Draft deal not found.");
+  }
+
+  if (aggregate.deal.confirmedAt) {
+    await prisma.intakeSession.update({
+      where: { id: session.id },
+      data: {
+        status: "completed",
+        completedAt: session.completedAt ?? new Date(),
+        errorMessage: null
+      }
+    });
+    return aggregate;
+  }
+
+  if (!["ready_for_confirmation", "failed"].includes(session.status)) {
+    throw new Error("This intake session is not ready to confirm yet.");
   }
 
   await updateDealForViewer(viewer, session.dealId, {
@@ -296,43 +356,25 @@ export async function confirmIntakeSessionForViewer(
   });
 
   await updateTermsForViewer(viewer, session.dealId, {
-    ...(editableTermsFromAggregate(aggregate) ?? {
-      brandName: aggregate.deal.brandName,
-      agencyName: null,
-      creatorName: null,
-      campaignName: aggregate.deal.campaignName,
-      paymentAmount: null,
-      currency: "USD",
-      paymentTerms: null,
-      paymentStructure: null,
-      netTermsDays: null,
-      paymentTrigger: null,
-      deliverables: [],
-      usageRights: null,
-      usageRightsOrganicAllowed: null,
-      usageRightsPaidAllowed: null,
-      whitelistingAllowed: null,
-      usageDuration: null,
-      usageTerritory: null,
-      usageChannels: [],
-      exclusivity: null,
-      exclusivityApplies: null,
-      exclusivityCategory: null,
-      exclusivityDuration: null,
-      exclusivityRestrictions: null,
-      revisions: null,
-      revisionRounds: null,
-      termination: null,
-      terminationAllowed: null,
-      terminationNotice: null,
-      terminationConditions: null,
-      governingLaw: null,
-      notes: null
-    }),
+    ...(editableTermsFromAggregate(aggregate) ??
+      emptyEditableTerms({
+        brandName: aggregate.deal.brandName,
+        campaignName: aggregate.deal.campaignName,
+        creatorName:
+          profile?.creatorLegalName?.trim() ||
+          profile?.displayName?.trim() ||
+          viewer.displayName,
+        notes: null
+      })),
     brandName: input.brandName,
     campaignName: input.campaignName,
     agencyName: input.agencyName?.trim() || null,
     paymentAmount: input.paymentAmount ?? aggregate.terms?.paymentAmount ?? null,
+    creatorName:
+      aggregate.terms?.creatorName ??
+      profile?.creatorLegalName?.trim() ??
+      profile?.displayName?.trim() ??
+      viewer.displayName,
     notes: input.notes?.trim() || aggregate.terms?.notes || null
   });
 

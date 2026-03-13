@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
+import { Show } from "@/components/clerk-show";
 import { MarketingNav } from "@/components/marketing-nav";
 
 export default function LoginPage() {
@@ -11,7 +12,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
           <h1 className="text-4xl font-semibold text-ink">Continue to HelloBrand</h1>
           <p className="mt-4 text-sm text-black/60 dark:text-white/65">
-            Sign in or create an account to start an intake, confirm extracted
+            Sign in or create an account to upload documents, confirm extracted
             contract data, and manage deal workspaces.
           </p>
           <div className="mt-8 grid gap-3">

@@ -5,6 +5,7 @@ import { DealStatusPanel } from "@/components/deal-status-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { EmailDrafts } from "@/components/email-drafts";
+import { PaymentPanel } from "@/components/payment-panel";
 import { RiskFlags } from "@/components/risk-flags";
 import { SummaryCard } from "@/components/summary-card";
 import { TermsEditor } from "@/components/terms-editor";
@@ -40,6 +41,7 @@ export default async function WorkspaceDealDetailPage({
     latestDocument,
     documents,
     terms,
+    paymentRecord,
     riskFlags,
     emailDrafts,
     documentSections,
@@ -129,6 +131,7 @@ export default async function WorkspaceDealDetailPage({
               />
               <RiskFlags flags={riskFlags.slice(0, 3)} />
             </div>
+            <PaymentPanel dealId={deal.id} payment={paymentRecord} />
             <div className="grid gap-4 md:grid-cols-3">
               <SummaryCard
                 label="Rights"

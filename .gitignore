@@ -1,10 +1,25 @@
-.next
+# Dependencies
 node_modules
-.env
-.env.local
-.runtime
-coverage
+
+# Next.js / build output
+.next
 dist
 build
-.DS_Store
+coverage
+*.tsbuildinfo
+
+# Local runtime state
+.runtime
+*.log
+supabase/.temp
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local package manager / machine config
 .npmrc
+
+# OS files
+.DS_Store

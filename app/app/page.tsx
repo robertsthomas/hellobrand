@@ -187,6 +187,7 @@ export default async function WorkspaceDashboardPage() {
       label: "Active Deals",
       value: String(activeDeals),
       icon: FileText,
+      href: "/app/deals/history",
       note: `+${Math.max(activeDeals - completedDeals, 0)} this month`,
       noteClassName: "text-success",
     },
@@ -194,6 +195,7 @@ export default async function WorkspaceDashboardPage() {
       label: "Total Revenue",
       value: formatCurrency(totalRevenue),
       icon: DollarSign,
+      href: "/app/payments",
       note: `${dealRows.length} tracked deal${dealRows.length === 1 ? "" : "s"}`,
       noteClassName: "text-success",
     },
@@ -201,6 +203,7 @@ export default async function WorkspaceDashboardPage() {
       label: "Pending Payments",
       value: formatCurrency(pendingPaymentsAmount),
       icon: Clock3,
+      href: "/app/payments",
       note:
         overdueInvoices > 0
           ? `${overdueInvoices} invoice${overdueInvoices === 1 ? "" : "s"} overdue`
@@ -211,6 +214,7 @@ export default async function WorkspaceDashboardPage() {
       label: "Risk Alerts",
       value: String(riskAlertCount),
       icon: AlertTriangle,
+      href: "/app/deals/history",
       note: riskAlertCount > 0 ? "Review recommended" : "No urgent alerts",
       noteClassName: "text-muted-foreground",
     },
@@ -228,21 +232,15 @@ export default async function WorkspaceDashboardPage() {
             Upload your first brand deal to get started. HelloBrand will help you
             understand the terms and negotiate with confidence.
           </p>
-          <div className="flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href="/app/intake/new"
-              className={buttonVariants({ className: "gap-2" })}
-            >
-              <Plus className="h-4 w-4" />
-              Start intake
-            </Link>
-            <Link
-              href="/app/intake/new"
-              className={buttonVariants({ variant: "outline", className: "gap-2" })}
-            >
-              Open intake form
-            </Link>
-          </div>
+        <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          <Link
+            href="/app/intake/new"
+            className={buttonVariants({ className: "gap-2" })}
+          >
+            <Plus className="h-4 w-4" />
+            Upload documents
+          </Link>
+        </div>
         </div>
       </div>
     );
@@ -263,7 +261,7 @@ export default async function WorkspaceDashboardPage() {
           </div>
           <Link href="/app/intake/new" className={buttonVariants({ className: "gap-2" })}>
             <Plus className="h-4 w-4" />
-            New intake
+            Upload documents
           </Link>
         </div>
 
@@ -271,16 +269,18 @@ export default async function WorkspaceDashboardPage() {
           {stats.map((stat) => {
             const Icon = stat.icon;
             return (
-              <Card key={stat.label} className="border-black/5 bg-white p-8 dark:border-white/10 dark:bg-white/[0.06]">
-                <div className="mb-8 flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <p className="text-[42px] font-semibold tracking-tight text-foreground">
-                  {stat.value}
-                </p>
-                <p className={cn("mt-10 text-sm", stat.noteClassName)}>{stat.note}</p>
-              </Card>
+              <Link key={stat.label} href={stat.href}>
+                <Card className="border-black/5 bg-white p-8 transition-shadow hover:shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+                  <div className="mb-8 flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-[42px] font-semibold tracking-tight text-foreground">
+                    {stat.value}
+                  </p>
+                  <p className={cn("mt-10 text-sm", stat.noteClassName)}>{stat.note}</p>
+                </Card>
+              </Link>
             );
           })}
         </div>

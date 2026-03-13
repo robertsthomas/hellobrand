@@ -1,6 +1,6 @@
 "use client";
 
-import { Show, UserButton } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { Show } from "@/components/clerk-show";
 import { ThemeSwitch } from "@/components/theme-switch";
 import type { Viewer } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -131,7 +132,7 @@ export function AppFrame({
                   href="/app/intake/new"
                   className={buttonVariants({ size: "sm" })}
                 >
-                  New intake
+                  Upload documents
                 </Link>
               </div>
             </div>

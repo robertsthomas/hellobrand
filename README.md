@@ -27,18 +27,29 @@ HelloBrand is a creator-first deal workspace for influencers and solo creators. 
 ## Local setup
 
 1. Install Node.js 20+.
-2. Copy `.env.example` to `.env`.
-3. Set `DATABASE_URL` to your Postgres connection string. The authenticated `/app` routes expect a real database in this Phase 1 build.
-4. Set `SUPABASE_URL` plus either `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_ANON_KEY` if you want uploaded files stored in Supabase Storage. If omitted, file uploads fall back to local `.runtime/uploads`.
-5. Fill in `OPENROUTER_API_KEY` if you want live model analysis. The default model is `openrouter/free`. If omitted, the fallback parser is used.
-6. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
-7. Install dependencies:
+2. Install the Doppler CLI and link this repo to the shared dev config:
+
+```bash
+doppler setup --project hellobrand --config dev
+```
+
+3. Put your local secrets in Doppler. Use `.env.example` as the reference key list, then set values in the Doppler dashboard or upload an existing env file with:
+
+```bash
+doppler secrets upload .env --project hellobrand --config dev
+```
+
+4. Set `DATABASE_URL` to your Postgres connection string in Doppler. The authenticated `/app` routes expect a real database in this Phase 1 build.
+5. Set `SUPABASE_URL` plus either `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_ANON_KEY` in Doppler if you want uploaded files stored in Supabase Storage. If omitted, file uploads fall back to local `.runtime/uploads`.
+6. Fill in `OPENROUTER_API_KEY` in Doppler if you want live model analysis. The default model is `openrouter/free`. If omitted, the fallback parser is used.
+7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
+8. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-8. Start the app:
+9. Start the app:
 
 ```bash
 pnpm exec prisma db push
@@ -47,6 +58,17 @@ pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+`pnpm run dev` now runs `doppler run -- next dev` using the repo-scoped Doppler setup. If you need the raw Next.js command for debugging, use `pnpm run dev:next`.
+
+## Production config
+
+Production secrets should live in the `hellobrand/prd` Doppler config, not in a local `.env` file and not copied blindly from dev. After populating the `prd` config in Doppler, use:
+
+```bash
+pnpm run build:prd
+pnpm run start:prd
+```
 
 ## Environment notes
 

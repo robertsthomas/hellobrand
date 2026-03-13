@@ -1,11 +1,11 @@
 import {
-  Show,
   SignInButton,
   SignUpButton,
   UserButton
 } from "@clerk/nextjs";
 import Link from "next/link";
 
+import { Show } from "@/components/clerk-show";
 import { ThemeSwitch } from "@/components/theme-switch";
 
 export function MarketingNav() {

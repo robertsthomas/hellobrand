@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "postinstall": "prisma generate",
+    "dev": "doppler run -- next dev",
+    "dev:next": "next dev",
     "build": "next build",
+    "build:prd": "doppler run --config prd -- next build",
     "start": "next start",
+    "start:prd": "doppler run --config prd -- next start",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
