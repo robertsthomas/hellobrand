@@ -40,7 +40,7 @@ doppler secrets upload .env --project hellobrand --config dev
 ```
 
 4. Set `DATABASE_URL` to your Postgres connection string in Doppler. The authenticated `/app` routes expect a real database in this Phase 1 build.
-5. Set `SUPABASE_URL` plus either `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_ANON_KEY` in Doppler if you want uploaded files stored in Supabase Storage. If omitted, file uploads fall back to local `.runtime/uploads`.
+5. Set `SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for public Supabase clients. For server-side storage uploads, set `SUPABASE_SECRET_KEY` as well. Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` values still work as fallbacks. If omitted, file uploads fall back to local `.runtime/uploads`.
 6. Fill in `OPENROUTER_API_KEY` in Doppler if you want live model analysis. The default model is `openrouter/free`. If omitted, the fallback parser is used.
 7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
 8. Install dependencies:

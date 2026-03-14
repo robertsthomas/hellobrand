@@ -3,9 +3,15 @@ import { NextRequest } from "next/server";
 import { requireApiViewer } from "@/lib/auth";
 import { createIntakeSessionForViewer } from "@/lib/intake";
 import { fail, ok } from "@/lib/http";
+import { startServerDebug } from "@/lib/server-debug";
 import { createIntakeSessionSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
+  const debug = startServerDebug("api_intake_create", {
+    method: request.method,
+    path: "/api/intake"
+  });
+
   try {
     const viewer = await requireApiViewer();
     const formData = await request.formData();
@@ -29,10 +35,6 @@ export async function POST(request: NextRequest) {
       pastedText:
         typeof formData.get("pastedText") === "string"
           ? String(formData.get("pastedText"))
-          : null,
-      pastedTextTitle:
-        typeof formData.get("pastedTextTitle") === "string"
-          ? String(formData.get("pastedTextTitle"))
           : null
     });
 
@@ -41,8 +43,16 @@ export async function POST(request: NextRequest) {
       files
     });
 
+    debug.complete({
+      viewerId: viewer.id,
+      sessionId: session.id,
+      fileCount: files.length,
+      pastedChars: input.pastedText?.length ?? 0
+    });
+
     return ok({ session }, { status: 201 });
   } catch (error) {
+    debug.fail(error);
     const message =
       error instanceof Error ? error.message : "Could not start intake session.";
     return fail(message, message === "Unauthorized" ? 401 : 400);

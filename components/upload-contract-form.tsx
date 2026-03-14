@@ -61,21 +61,17 @@ export function UploadContractForm({
 
         <div className="grid gap-3">
           <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Paste email thread or brief text
+            Paste anything from the brand
             <textarea
               className="min-h-32 rounded-[1.5rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-4 text-sm"
               name="pastedText"
-              placeholder="Paste email clarifications, brief notes, or a plain-text agreement here."
+              placeholder="Paste a contract excerpt, email thread, brief, deliverables notes, or any other plain-text context here."
             />
           </label>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Pasted text title
-            <input
-              className="rounded-[1.25rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-3 text-sm"
-              name="pastedTextTitle"
-              placeholder="march-brand-email.txt"
-            />
-          </label>
+          <p className="text-xs text-black/45 dark:text-white/45">
+            Paste whatever you have. HelloBrand will organize contract terms,
+            email clarifications, and brand notes during analysis.
+          </p>
         </div>
       </div>
 

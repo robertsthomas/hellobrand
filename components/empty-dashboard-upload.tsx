@@ -1,0 +1,215 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+
+import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
+import { buttonVariants } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
+import { cn } from "@/lib/utils";
+
+function logClientIntake(event: string, details: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  console.info(`[client-intake] ${event}`, details);
+}
+
+export function EmptyDashboardUpload() {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const router = useRouter();
+  const isSubmitting = useIntakeUiStore((state) => state.isSubmitting);
+  const mode = useIntakeUiStore((state) => state.mode);
+  const pastedText = useIntakeUiStore((state) => state.pastedText);
+  const errorMessage = useIntakeUiStore((state) => state.errorMessage);
+  const setMode = useIntakeUiStore((state) => state.setMode);
+  const setPastedText = useIntakeUiStore((state) => state.setPastedText);
+  const setSelectedFilesFromList = useIntakeUiStore(
+    (state) => state.setSelectedFilesFromList
+  );
+  const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
+  const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
+  const reset = useIntakeUiStore((state) => state.reset);
+
+  useEffect(() => {
+    reset("upload");
+  }, [reset]);
+
+  async function startDraftSession() {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    logClientIntake("draft_session_start", {
+      mode,
+      hasPastedText: pastedText.trim().length > 0
+    });
+
+    try {
+      const response = await fetch("/api/intake/draft", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({})
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.session?.id) {
+        throw new Error(payload.error ?? "Could not start intake.");
+      }
+
+      logClientIntake("draft_session_complete", {
+        sessionId: payload.session.id
+      });
+      setIsSubmitting(false);
+      router.push(`/app/intake/${payload.session.id}`);
+      router.refresh();
+    } catch (error) {
+      logClientIntake("draft_session_failed", {
+        error: error instanceof Error ? error.message : "Could not start intake."
+      });
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not start intake."
+      );
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleFiles(files: FileList | null) {
+    const selected = Array.from(files ?? []).filter((file) => file.size > 0);
+    if (selected.length === 0) {
+      return;
+    }
+
+    logClientIntake("files_selected", {
+      fileCount: selected.length,
+      files: selected.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }))
+    });
+    setSelectedFilesFromList(files);
+    await startDraftSession();
+  }
+
+  async function handlePasteSubmit() {
+    if (!pastedText.trim()) {
+      setErrorMessage("Paste some text from the brand first.");
+      return;
+    }
+
+    logClientIntake("paste_submit", {
+      chars: pastedText.trim().length
+    });
+    await startDraftSession();
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center justify-center gap-4">
+      <input
+        ref={inputRef}
+        className="hidden"
+        type="file"
+        multiple
+        accept={ACCEPTED_DOCUMENT_TYPES}
+        onChange={(event) => {
+          void handleFiles(event.currentTarget.files);
+        }}
+      />
+
+      <div className="inline-flex rounded-full border border-black/10 bg-white/90 p-1 shadow-sm transition dark:border-white/10 dark:bg-white/[0.04]">
+        <button
+          type="button"
+          disabled={isSubmitting}
+          onClick={() => {
+            setMode("upload");
+            setErrorMessage(null);
+          }}
+          className={cn(
+            "rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200",
+            mode === "upload"
+              ? "bg-ocean text-white shadow-sm"
+              : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white",
+            isSubmitting ? "opacity-60" : ""
+          )}
+        >
+          Upload files
+        </button>
+        <button
+          type="button"
+          disabled={isSubmitting}
+          onClick={() => {
+            setMode("paste");
+            setErrorMessage(null);
+          }}
+          className={cn(
+            "rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200",
+            mode === "paste"
+              ? "bg-ocean text-white shadow-sm"
+              : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white",
+            isSubmitting ? "opacity-60" : ""
+          )}
+        >
+          Paste text instead
+        </button>
+      </div>
+
+      {mode === "upload" ? (
+        <div className="flex w-full max-w-xl flex-col items-center gap-3">
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              buttonVariants({ className: "gap-2" }),
+              isSubmitting ? "cursor-not-allowed opacity-60" : ""
+            )}
+          >
+            <Plus className="h-4 w-4" />
+            {isSubmitting ? "Uploading..." : "Upload documents"}
+          </button>
+
+          <p className="max-w-md text-center text-sm text-black/55 dark:text-white/60">
+            Start with the contract. You can add briefs, decks, invoices, or
+            email context later.
+          </p>
+        </div>
+      ) : (
+        <div className="flex w-full max-w-2xl flex-col gap-3 text-left">
+          <Textarea
+            name="pastedText"
+            value={pastedText}
+            onChange={(event) => setPastedText(event.currentTarget.value)}
+            placeholder="Paste a contract, email thread, brief, deliverables notes, or any brand context here."
+            className="min-h-44 rounded-2xl border-black/10 bg-white/90 px-5 py-4 text-sm shadow-sm transition focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]"
+          />
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <p className="max-w-xl text-sm text-black/55 dark:text-white/60">
+              Paste whatever you have. HelloBrand will organize it during
+              analysis.
+            </p>
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => void handlePasteSubmit()}
+              className={cn(
+                buttonVariants({ className: "gap-2" }),
+                isSubmitting ? "cursor-not-allowed opacity-60" : ""
+              )}
+            >
+              {isSubmitting ? "Analyzing..." : "Analyze text"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {errorMessage ? (
+        <p className="text-sm text-clay">{errorMessage}</p>
+      ) : null}
+    </div>
+  );
+}

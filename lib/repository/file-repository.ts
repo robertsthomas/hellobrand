@@ -135,6 +135,10 @@ function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(i
   );
 }
 
+function isPrimarySummaryVersion(version: string) {
+  return !version.startsWith("intake-normalized:");
+}
+
 function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
   const documents = sortNewestFirst(
     store.documents.filter((document) => document.dealId === deal.id)
@@ -142,6 +146,9 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
   const latestDocument = documents[0] ?? null;
   const summaries = sortNewestFirst(
     store.summaries.filter((summary) => summary.dealId === deal.id)
+  );
+  const primarySummaries = summaries.filter((summary) =>
+    isPrimarySummaryVersion(summary.version)
   );
 
   return {
@@ -171,7 +178,7 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
       )
     ),
     summaries,
-    currentSummary: summaries[0] ?? null
+    currentSummary: primarySummaries[0] ?? null
   };
 }
 
@@ -260,6 +267,39 @@ export class FileRepository {
     store.deals[index] = next;
     await saveStore(store);
     return next;
+  }
+
+  async deleteDeal(userId: string, dealId: string) {
+    const store = await ensureStore();
+    const deal = store.deals.find((entry) => entry.id === dealId && entry.userId === userId);
+
+    if (!deal) {
+      return false;
+    }
+
+    const documentIds = store.documents
+      .filter((entry) => entry.dealId === dealId)
+      .map((entry) => entry.id);
+
+    store.deals = store.deals.filter((entry) => entry.id !== dealId);
+    store.documents = store.documents.filter((entry) => entry.dealId !== dealId);
+    store.dealTerms = store.dealTerms.filter((entry) => entry.dealId !== dealId);
+    store.riskFlags = store.riskFlags.filter((entry) => entry.dealId !== dealId);
+    store.emailDrafts = store.emailDrafts.filter((entry) => entry.dealId !== dealId);
+    store.jobs = store.jobs.filter((entry) => entry.dealId !== dealId);
+    store.summaries = store.summaries.filter((entry) => entry.dealId !== dealId);
+    store.documentSections = store.documentSections.filter(
+      (entry) => !documentIds.includes(entry.documentId)
+    );
+    store.extractionResults = store.extractionResults.filter(
+      (entry) => !documentIds.includes(entry.documentId)
+    );
+    store.extractionEvidence = store.extractionEvidence.filter(
+      (entry) => !documentIds.includes(entry.documentId)
+    );
+
+    await saveStore(store);
+    return true;
   }
 
   async createDocument(

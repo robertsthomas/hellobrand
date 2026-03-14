@@ -15,7 +15,7 @@ export function AppShell({
 }) {
   const nav = [
     { href: "/", label: "Dashboard" },
-    { href: "/app/intake/new", label: "Upload documents" }
+    { href: "/app/intake/new?pick=1", label: "Upload documents" }
   ];
 
   return (

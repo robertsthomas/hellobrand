@@ -17,7 +17,7 @@ export function DealList({
           generate a plain-English report.
         </p>
         <Link
-          href="/app/intake/new"
+          href="/app/intake/new?pick=1"
           className="mt-6 inline-flex rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white"
         >
           Upload documents

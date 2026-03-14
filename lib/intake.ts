@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
+import { createPersistedIntakeRecord } from "@/lib/intake-normalization";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import {
   getDealForViewer,
@@ -9,7 +10,15 @@ import {
   updateTermsForViewer,
   uploadDocumentsForViewer
 } from "@/lib/deals";
-import type { DealAggregate, IntakeSessionRecord, Viewer } from "@/lib/types";
+import type {
+  DealAggregate,
+  DeliverableItem,
+  IntakeAnalyticsRecord,
+  IntakeDraftListItem,
+  IntakeSessionRecord,
+  IntakeTimelineItem,
+  Viewer
+} from "@/lib/types";
 
 function iso(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
@@ -22,6 +31,11 @@ function toIntakeSessionRecord(session: {
   status: string;
   errorMessage: string | null;
   inputSource: string | null;
+  draftBrandName: string | null;
+  draftCampaignName: string | null;
+  draftNotes: string | null;
+  draftPastedText: string | null;
+  draftPastedTextTitle: string | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -34,6 +48,11 @@ function toIntakeSessionRecord(session: {
     status: session.status as IntakeSessionRecord["status"],
     errorMessage: session.errorMessage,
     inputSource: (session.inputSource ?? null) as IntakeSessionRecord["inputSource"],
+    draftBrandName: session.draftBrandName,
+    draftCampaignName: session.draftCampaignName,
+    draftNotes: session.draftNotes,
+    draftPastedText: session.draftPastedText,
+    draftPastedTextTitle: session.draftPastedTextTitle,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: iso(session.completedAt),
@@ -148,7 +167,6 @@ export async function createIntakeSessionForViewer(
     campaignName?: string | null;
     notes?: string | null;
     pastedText?: string | null;
-    pastedTextTitle?: string | null;
     files?: File[];
   }
 ) {
@@ -177,14 +195,18 @@ export async function createIntakeSessionForViewer(
       dealId: draftDeal.id,
       status: "uploading",
       inputSource: detectInputSource(files, pastedText),
+      draftBrandName: input.brandName?.trim() || draftDeal.brandName,
+      draftCampaignName: input.campaignName?.trim() || draftDeal.campaignName,
+      draftNotes: input.notes?.trim() || null,
+      draftPastedText: pastedText,
+      draftPastedTextTitle: null,
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
     }
   });
 
   const aggregate = await uploadDocumentsForViewer(viewer, draftDeal.id, {
     files,
-    pastedText,
-    pastedTextTitle: input.pastedTextTitle?.trim() ?? null
+    pastedText
   });
 
   if (input.notes?.trim()) {
@@ -221,6 +243,258 @@ export async function createIntakeSessionForViewer(
 
   const synced = await syncIntakeSessionForDealId(draftDeal.id);
   return synced ?? toIntakeSessionRecord(session);
+}
+
+export async function createDraftIntakeSessionForViewer(
+  viewer: Viewer,
+  input?: {
+    brandName?: string | null;
+    campaignName?: string | null;
+    notes?: string | null;
+  }
+) {
+  const profile = process.env.DATABASE_URL
+    ? await getProfileForViewer(viewer).catch(() => null)
+    : null;
+
+  const draftDeal = await getRepository().createDeal(
+    viewer.id,
+    {
+      brandName: input?.brandName?.trim() || "Untitled brand",
+      campaignName: input?.campaignName?.trim() || "Untitled deal"
+    },
+    { confirmedAt: null }
+  );
+
+  if (input?.notes?.trim()) {
+    await updateTermsForViewer(viewer, draftDeal.id, {
+      ...emptyEditableTerms({
+        brandName: draftDeal.brandName,
+        campaignName: draftDeal.campaignName,
+        creatorName:
+          profile?.creatorLegalName?.trim() ||
+          profile?.displayName?.trim() ||
+          viewer.displayName,
+        notes: input.notes.trim()
+      })
+    });
+  }
+
+  const session = await prisma.intakeSession.create({
+    data: {
+      userId: viewer.id,
+      dealId: draftDeal.id,
+      status: "draft",
+      inputSource: null,
+      draftBrandName: input?.brandName?.trim() || draftDeal.brandName,
+      draftCampaignName: input?.campaignName?.trim() || draftDeal.campaignName,
+      draftNotes: input?.notes?.trim() || null,
+      draftPastedText: null,
+      draftPastedTextTitle: null,
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+    }
+  });
+
+  return toIntakeSessionRecord(session);
+}
+
+export async function appendDocumentsToIntakeSessionForViewer(
+  viewer: Viewer,
+  sessionId: string,
+  input: {
+    pastedText?: string | null;
+    files?: File[];
+  }
+) {
+  const session = await prisma.intakeSession.findFirst({
+    where: {
+      id: sessionId,
+      userId: viewer.id
+    }
+  });
+
+  if (!session) {
+    throw new Error("Intake session not found.");
+  }
+
+  if (["completed", "expired"].includes(session.status)) {
+    throw new Error("This intake session can no longer accept uploads.");
+  }
+
+  const files = (input.files ?? []).filter((file) => file.size > 0);
+  const pastedText = input.pastedText?.trim() ?? null;
+
+  if (files.length === 0 && !pastedText) {
+    throw new Error("Please upload a file or paste document text.");
+  }
+
+  await prisma.intakeSession.update({
+    where: { id: session.id },
+    data: {
+      status: "uploading",
+      inputSource: detectInputSource(files, pastedText),
+      draftPastedText: pastedText,
+      draftPastedTextTitle: null,
+      errorMessage: null
+    }
+  });
+
+  await uploadDocumentsForViewer(viewer, session.dealId, {
+    files,
+    pastedText
+  });
+
+  const documents = await getRepository().listDocuments(viewer.id, session.dealId);
+  if (documents.length > 0) {
+    await prisma.intakeDocument.createMany({
+      data: documents.map((document) => ({
+        intakeSessionId: session.id,
+        documentId: document.id
+      })),
+      skipDuplicates: true
+    });
+  }
+
+  await prisma.intakeSession.update({
+    where: { id: session.id },
+    data: { status: "processing", errorMessage: null }
+  });
+
+  const synced = await syncIntakeSessionForDealId(session.dealId);
+  return synced ?? toIntakeSessionRecord(session);
+}
+
+export async function updateIntakeDraftForViewer(
+  viewer: Viewer,
+  sessionId: string,
+  input: {
+    brandName?: string | null;
+    campaignName?: string | null;
+    notes?: string | null;
+    pastedText?: string | null;
+    inputSource?: IntakeSessionRecord["inputSource"];
+  }
+) {
+  const session = await prisma.intakeSession.findFirst({
+    where: {
+      id: sessionId,
+      userId: viewer.id
+    }
+  });
+
+  if (!session) {
+    throw new Error("Intake session not found.");
+  }
+
+  if (session.status !== "draft") {
+    return toIntakeSessionRecord(session);
+  }
+
+  const brandName = input.brandName?.trim() || session.draftBrandName || "Untitled brand";
+  const campaignName =
+    input.campaignName?.trim() || session.draftCampaignName || "Untitled deal";
+  const notes = input.notes?.trim() || null;
+  const pastedText = input.pastedText?.trim() || null;
+
+  await updateDealForViewer(viewer, session.dealId, {
+    brandName,
+    campaignName
+  });
+
+  const aggregate = await getDealForViewer(viewer, session.dealId);
+  await updateTermsForViewer(viewer, session.dealId, {
+    ...(editableTermsFromAggregate(aggregate) ??
+      emptyEditableTerms({
+        brandName,
+        campaignName,
+        creatorName: viewer.displayName,
+        notes
+      })),
+    brandName,
+    campaignName,
+    notes
+  });
+
+  const updated = await prisma.intakeSession.update({
+    where: { id: session.id },
+    data: {
+      draftBrandName: brandName,
+      draftCampaignName: campaignName,
+      draftNotes: notes,
+      draftPastedText: pastedText,
+      draftPastedTextTitle: null,
+      inputSource: input.inputSource ?? session.inputSource
+    }
+  });
+
+  return toIntakeSessionRecord(updated);
+}
+
+export async function listIntakeDraftsForViewer(
+  viewer: Viewer
+): Promise<IntakeDraftListItem[]> {
+  const sessions = await prisma.intakeSession.findMany({
+    where: {
+      userId: viewer.id,
+      status: {
+        in: ["draft", "uploading", "processing", "ready_for_confirmation", "failed"]
+      },
+      deal: {
+        confirmedAt: null
+      }
+    },
+    include: {
+      deal: true
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+
+  return sessions.map((session) => ({
+    session: toIntakeSessionRecord(session),
+    deal: {
+      id: session.deal.id,
+      brandName: session.deal.brandName,
+      campaignName: session.deal.campaignName,
+      updatedAt: session.deal.updatedAt.toISOString()
+    }
+  }));
+}
+
+export async function deleteIntakeDraftForViewer(viewer: Viewer, sessionId: string) {
+  const session = await prisma.intakeSession.findFirst({
+    where: {
+      id: sessionId,
+      userId: viewer.id
+    },
+    include: {
+      deal: {
+        select: {
+          id: true,
+          confirmedAt: true
+        }
+      }
+    }
+  });
+
+  if (!session) {
+    throw new Error("Intake session not found.");
+  }
+
+  if (session.deal.confirmedAt) {
+    throw new Error("Confirmed deals cannot be deleted as drafts.");
+  }
+
+  if (session.status === "completed") {
+    throw new Error("Completed intake sessions cannot be deleted as drafts.");
+  }
+
+  await prisma.intakeSession.delete({
+    where: { id: session.id }
+  });
+
+  await getRepository().deleteDeal(viewer.id, session.deal.id);
 }
 
 export async function getIntakeSessionForViewer(
@@ -307,9 +581,18 @@ export async function confirmIntakeSessionForViewer(
   sessionId: string,
   input: {
     brandName: string;
-    campaignName: string;
+    contractTitle: string;
     agencyName?: string | null;
+    contractSummary?: string | null;
+    primaryContactOrganizationType?: "brand" | "agency" | null;
+    primaryContactName?: string | null;
+    primaryContactTitle?: string | null;
+    primaryContactEmail?: string | null;
+    primaryContactPhone?: string | null;
     paymentAmount?: number | null;
+    deliverables?: DeliverableItem[];
+    timelineItems?: IntakeTimelineItem[];
+    analytics?: IntakeAnalyticsRecord | null;
     notes?: string | null;
   }
 ) {
@@ -351,7 +634,7 @@ export async function confirmIntakeSessionForViewer(
 
   await updateDealForViewer(viewer, session.dealId, {
     brandName: input.brandName,
-    campaignName: input.campaignName,
+    campaignName: input.contractTitle,
     confirmedAt: new Date().toISOString()
   });
 
@@ -367,15 +650,57 @@ export async function confirmIntakeSessionForViewer(
         notes: null
       })),
     brandName: input.brandName,
-    campaignName: input.campaignName,
+    campaignName: input.contractTitle,
     agencyName: input.agencyName?.trim() || null,
     paymentAmount: input.paymentAmount ?? aggregate.terms?.paymentAmount ?? null,
+    deliverables:
+      input.deliverables && input.deliverables.length > 0
+        ? input.deliverables
+        : aggregate.terms?.deliverables ?? [],
     creatorName:
       aggregate.terms?.creatorName ??
       profile?.creatorLegalName?.trim() ??
       profile?.displayName?.trim() ??
       viewer.displayName,
     notes: input.notes?.trim() || aggregate.terms?.notes || null
+  });
+
+  const contractSummary =
+    input.contractSummary?.trim() ||
+    aggregate.currentSummary?.body?.trim() ||
+    aggregate.deal.summary?.trim() ||
+    null;
+  await getRepository().saveSummary(
+    session.dealId,
+    null,
+    createPersistedIntakeRecord({
+      brandName: input.brandName,
+      agencyName: input.agencyName?.trim() || null,
+      primaryContact: {
+        organizationType:
+          input.primaryContactOrganizationType ??
+          (input.agencyName?.trim() ? "agency" : "brand"),
+        name: input.primaryContactName?.trim() || null,
+        title: input.primaryContactTitle?.trim() || null,
+        email: input.primaryContactEmail?.trim() || null,
+        phone: input.primaryContactPhone?.trim() || null
+      },
+      contractTitle: input.contractTitle,
+      contractSummary,
+      paymentAmount: input.paymentAmount ?? aggregate.terms?.paymentAmount ?? null,
+      currency: aggregate.terms?.currency ?? aggregate.paymentRecord?.currency ?? "USD",
+      deliverables:
+        input.deliverables && input.deliverables.length > 0
+          ? input.deliverables
+          : aggregate.terms?.deliverables ?? [],
+      timelineItems: input.timelineItems ?? [],
+      analytics: input.analytics ?? null,
+      notes: input.notes?.trim() || aggregate.terms?.notes || null
+    })
+  );
+
+  await updateDealForViewer(viewer, session.dealId, {
+    summary: contractSummary
   });
 
   await prisma.intakeSession.update({

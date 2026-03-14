@@ -1,0 +1,137 @@
+import { describe, expect, test } from "vitest";
+
+import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import { createSeedStore } from "@/lib/repository/seed";
+import type { DealAggregate } from "@/lib/types";
+
+function createAggregate(): DealAggregate {
+  const seed = createSeedStore();
+
+  return {
+    deal: seed.deals[0],
+    latestDocument: seed.documents[0],
+    documents: seed.documents,
+    terms: seed.dealTerms[0],
+    paymentRecord: null,
+    riskFlags: seed.riskFlags,
+    emailDrafts: seed.emailDrafts,
+    jobs: seed.jobs,
+    documentSections: seed.documentSections,
+    extractionResults: seed.extractionResults,
+    extractionEvidence: seed.extractionEvidence,
+    summaries: seed.summaries,
+    currentSummary: seed.summaries[0]
+  };
+}
+
+describe("intake normalization", () => {
+  test("cleans placeholder contract extractions with filename and payment heuristics", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Untitled brand";
+    aggregate.deal.campaignName = "Untitled deal";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "OREO Cakesters _ @therobertscasa Agreement.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          TALENT SERVICE AGREEMENT
+          Client Name Mondelez
+          Brand Name (if any) Oreo Cakesters
+          Agreed to and accepted by: $3200 Three Thousand Two Hundred USD
+        `,
+        rawText: `
+          TALENT SERVICE AGREEMENT
+          Client Name Mondelez
+          Brand Name (if any) Oreo Cakesters
+          Agreed to and accepted by: $3200 Three Thousand Two Hundred USD
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Name",
+      agencyName: "Name",
+      campaignName: "Client NameMondelez",
+      paymentAmount: 320,
+      deliverables: []
+    };
+    aggregate.extractionEvidence = [
+      {
+        ...aggregate.extractionEvidence[0],
+        fieldPath: "brandName",
+        snippet: "Brand Name (if any) Oreo Cakesters"
+      },
+      {
+        ...aggregate.extractionEvidence[0],
+        id: "payment-evidence",
+        fieldPath: "paymentAmount",
+        snippet: "Agreed to and accepted by: $3200 Three Thousand Two Hundred USD"
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toContain("OREO");
+    expect(normalized?.contractTitle).toContain("OREO Cakesters");
+    expect(normalized?.paymentAmount).toBe(3200);
+    expect(normalized?.agencyName).toBeNull();
+  });
+
+  test("extracts agency contact and timeline from campaign offer emails", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "pampers-offer-email.txt",
+        documentKind: "email_thread",
+        normalizedText: `
+          Pampers Swaddlers 360
+          Deliverables: (1) TikTok featuring Pampers Swaddlers 360
+          Timing: Video Idea/Outline Due 48 hrs after accepting campaign, video & caption drafts due for review by 6/18, and content live approx 6/24
+          Compensation: $2800 + product stipend
+
+          --
+          Amber Logan
+          Campaign Activation Manager, Media
+          Aki Technologies
+          amber.logan@inmar.com
+          312-555-0101
+        `,
+        rawText: `
+          Pampers Swaddlers 360
+          Deliverables: (1) TikTok featuring Pampers Swaddlers 360
+          Timing: Video Idea/Outline Due 48 hrs after accepting campaign, video & caption drafts due for review by 6/18, and content live approx 6/24
+          Compensation: $2800 + product stipend
+
+          --
+          Amber Logan
+          Campaign Activation Manager, Media
+          Aki Technologies
+          amber.logan@inmar.com
+          312-555-0101
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: null,
+      agencyName: null,
+      campaignName: null,
+      paymentAmount: null,
+      deliverables: []
+    };
+    aggregate.extractionEvidence = [];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toContain("Pampers");
+    expect(normalized?.primaryContact.name).toBe("Amber Logan");
+    expect(normalized?.primaryContact.email).toBe("amber.logan@inmar.com");
+    expect(normalized?.agencyName).toBe("Aki Technologies");
+    expect(normalized?.timelineItems.length).toBeGreaterThan(0);
+    expect(normalized?.paymentAmount).toBe(2800);
+  });
+});

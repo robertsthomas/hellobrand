@@ -4,19 +4,25 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 const DEFAULT_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "documents";
+const supabaseUrl =
+  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabasePublicKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.SUPABASE_ANON_KEY ??
+  "";
+const supabaseAdminKey =
+  process.env.SUPABASE_SECRET_KEY ??
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  supabasePublicKey;
 
 function hasSupabaseStorage() {
-  return Boolean(
-    process.env.SUPABASE_URL &&
-      (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)
-  );
+  return Boolean(supabaseUrl && supabaseAdminKey);
 }
 
 function supabaseAdmin() {
-  return createClient(
-    process.env.SUPABASE_URL ?? "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY ?? ""
-  );
+  return createClient(supabaseUrl, supabaseAdminKey);
 }
 
 async function ensureUploadDirectory() {

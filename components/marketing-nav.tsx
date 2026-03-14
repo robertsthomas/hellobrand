@@ -77,7 +77,7 @@ export function MarketingNav() {
             <Show when="signed-in">
               <div className="flex items-center gap-3">
                 <Link
-                  href="/app/intake/new"
+                  href="/app/intake/new?pick=1"
                   className="rounded-full bg-ocean px-6 py-3 text-[15px] font-medium text-white shadow-[0_10px_25px_rgba(26,77,62,0.18)] dark:bg-sand dark:text-[#18201d] dark:shadow-[0_12px_28px_rgba(0,0,0,0.28)]"
                 >
                   Open app

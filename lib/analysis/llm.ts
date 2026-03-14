@@ -12,6 +12,26 @@ import type {
 
 type TermsData = Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
 
+function shouldLogLlmDebug() {
+  return process.env.DEBUG_DOCUMENT_PIPELINE === "1" || process.env.NODE_ENV !== "production";
+}
+
+function logLlmDebug(
+  level: "info" | "error",
+  event: string,
+  details: Record<string, unknown>
+) {
+  if (!shouldLogLlmDebug()) {
+    return;
+  }
+
+  const logger = level === "error" ? console.error : console.info;
+  logger(`[document-llm] ${event}`, {
+    at: new Date().toISOString(),
+    ...details
+  });
+}
+
 function providerConfig() {
   if (process.env.OPENROUTER_API_KEY) {
     return {
@@ -73,24 +93,53 @@ function safeParseJson(input: string) {
   }
 }
 
-async function requestJson(systemPrompt: string, userPrompt: string) {
-  const response = await client().chat.completions.create({
-    model: getLlmModel(),
-    temperature: 0.1,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    response_format: { type: "json_object" }
-  } as never);
+async function requestJson(
+  systemPrompt: string,
+  userPrompt: string,
+  debugMeta?: Record<string, unknown>
+) {
+  const model = getLlmModel();
+  const startedAt = Date.now();
 
-  const content = response.choices[0]?.message?.content;
+  logLlmDebug("info", "request_start", {
+    model,
+    ...debugMeta
+  });
 
-  if (!content || typeof content !== "string") {
-    throw new Error("Model returned an empty response.");
+  try {
+    const response = await client().chat.completions.create({
+      model,
+      temperature: 0.1,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      response_format: { type: "json_object" }
+    } as never);
+
+    const content = response.choices?.[0]?.message?.content;
+
+    if (!content || typeof content !== "string") {
+      throw new Error("Model returned an empty response.");
+    }
+
+    logLlmDebug("info", "request_complete", {
+      model,
+      durationMs: Date.now() - startedAt,
+      responseChars: content.length,
+      ...debugMeta
+    });
+
+    return safeParseJson(content);
+  } catch (error) {
+    logLlmDebug("error", "request_failed", {
+      model,
+      durationMs: Date.now() - startedAt,
+      error: error instanceof Error ? error.message : "Unknown LLM error",
+      ...debugMeta
+    });
+    throw error;
   }
-
-  return safeParseJson(content);
 }
 
 function asString(value: unknown) {
@@ -133,23 +182,29 @@ function normalizeDeliverables(
         return null;
       }
 
-      return {
+      const status: TermsData["deliverables"][number]["status"] =
+        row.status === "pending" ||
+        row.status === "in_progress" ||
+        row.status === "completed" ||
+        row.status === "overdue"
+          ? row.status
+          : "pending";
+
+      const normalizedEntry: TermsData["deliverables"][number] = {
         id: asString(row.id) || `llm-deliverable-${index}`,
         title,
         dueDate: asString(row.dueDate),
         channel: asString(row.channel),
         quantity: asNumber(row.quantity),
-        status:
-          row.status === "pending" ||
-          row.status === "in_progress" ||
-          row.status === "completed" ||
-          row.status === "overdue"
-            ? row.status
-            : "pending",
+        status,
         description: asString(row.description)
       };
+
+      return normalizedEntry;
     })
-    .filter((entry): entry is TermsData["deliverables"][number] => Boolean(entry));
+    .filter(
+      (entry): entry is TermsData["deliverables"][number] => entry !== null
+    );
 
   return normalized.length > 0 ? normalized : fallbackDeliverables;
 }
@@ -322,7 +377,14 @@ export async function extractSectionWithLlm(
       fallback.data,
       null,
       2
-    )}\n\nReturn JSON with this shape:\n{\n  "data": { ...creator_deal_terms_fields },\n  "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }],\n  "confidence": 0.0\n}\n\nOnly include evidence snippets taken directly from this section.`
+    )}\n\nReturn JSON with this shape:\n{\n  "data": { ...creator_deal_terms_fields },\n  "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }],\n  "confidence": 0.0\n}\n\nOnly include evidence snippets taken directly from this section.`,
+    {
+      requestType: "extract_section",
+      documentKind,
+      sectionIndex: section.chunkIndex,
+      sectionTitle: section.title,
+      sectionChars: section.content.length
+    }
   );
 
   return {
@@ -352,7 +414,14 @@ export async function analyzeRisksWithLlm(
       extraction.data,
       null,
       2
-    )}\n\nFallback risks:\n${JSON.stringify(fallback, null, 2)}\n\nReturn JSON with this shape:\n{\n  "riskFlags": [\n    {\n      "category": "usage_rights",\n      "title": "Perpetual paid usage rights",\n      "detail": "plain-language explanation",\n      "severity": "high",\n      "suggestedAction": "practical negotiation step",\n      "evidence": ["quoted snippet"]\n    }\n  ]\n}`
+    )}\n\nFallback risks:\n${JSON.stringify(fallback, null, 2)}\n\nReturn JSON with this shape:\n{\n  "riskFlags": [\n    {\n      "category": "usage_rights",\n      "title": "Perpetual paid usage rights",\n      "detail": "plain-language explanation",\n      "severity": "high",\n      "suggestedAction": "practical negotiation step",\n      "evidence": ["quoted snippet"]\n    }\n  ]\n}`,
+    {
+      requestType: "analyze_risks",
+      documentKind,
+      documentId,
+      textChars: text.length,
+      fallbackRiskCount: fallback.length
+    }
   );
 
   return normalizeRiskFlags(payload.riskFlags, fallback, documentId);
@@ -369,7 +438,13 @@ export async function generateSummaryWithLlm(
       extraction.data,
       null,
       2
-    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "body": "markdown summary"\n}`
+    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "body": "markdown summary"\n}`,
+    {
+      requestType: "generate_summary",
+      riskCount: risks.length,
+      evidenceCount: extraction.evidence.length,
+      fallbackSummaryChars: fallback.body.length
+    }
   );
 
   return {

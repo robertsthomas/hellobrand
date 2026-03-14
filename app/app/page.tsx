@@ -4,11 +4,14 @@ import {
   BarChart3,
   CheckCircle2,
   Clock3,
+  Trash2,
   DollarSign,
   FileText,
   Plus,
 } from "lucide-react";
 
+import { deleteIntakeDraftAction } from "@/app/actions";
+import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { listDealsForViewer } from "@/lib/deals";
+import { listIntakeDraftsForViewer } from "@/lib/intake";
 import { getRepository } from "@/lib/repository";
 import { cn, formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -80,6 +84,7 @@ function statusBadgeClass(status: string) {
 export default async function WorkspaceDashboardPage() {
   const viewer = await requireViewer();
   const deals = await listDealsForViewer(viewer);
+  const intakeDrafts = await listIntakeDraftsForViewer(viewer);
 
   const dealRows = await Promise.all(
     deals.map(async (deal) => {
@@ -222,25 +227,76 @@ export default async function WorkspaceDashboardPage() {
 
   if (dealRows.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-8">
-        <div className="max-w-md text-center">
-          <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
-            <FileText className="h-10 w-10 text-muted-foreground" />
+      <div className="p-8">
+        <div className="mx-auto max-w-4xl space-y-10">
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <div className="max-w-md text-center">
+              <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
+                <FileText className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h2 className="mb-3 text-2xl font-semibold">No contracts yet</h2>
+              <p className="mb-8 text-muted-foreground">
+                Upload your first brand deal to get started. HelloBrand will help you
+                understand the terms and negotiate with confidence.
+              </p>
+              <EmptyDashboardUpload />
+            </div>
           </div>
-          <h2 className="mb-3 text-2xl font-semibold">No contracts yet</h2>
-          <p className="mb-8 text-muted-foreground">
-            Upload your first brand deal to get started. HelloBrand will help you
-            understand the terms and negotiate with confidence.
-          </p>
-        <div className="flex flex-col justify-center gap-3 sm:flex-row">
-          <Link
-            href="/app/intake/new"
-            className={buttonVariants({ className: "gap-2" })}
-          >
-            <Plus className="h-4 w-4" />
-            Upload documents
-          </Link>
-        </div>
+
+          {intakeDrafts.length > 0 ? (
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[24px] font-semibold tracking-tight text-foreground">
+                  Draft Intakes
+                </h2>
+              </div>
+
+              <div className="space-y-4">
+                {intakeDrafts.slice(0, 3).map(({ session, deal }) => (
+                  <Card
+                    key={session.id}
+                    className="border-black/5 bg-white p-6 transition-shadow hover:shadow-panel dark:border-white/10 dark:bg-white/[0.06]"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <Link
+                        href={
+                          session.status === "draft"
+                            ? `/app/intake/new?draft=${session.id}`
+                            : `/app/intake/${session.id}`
+                        }
+                        className="min-w-0 flex-1"
+                      >
+                        <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                          {deal.brandName}
+                        </div>
+                        <div className="mt-2 text-[22px] font-semibold tracking-tight text-foreground">
+                          {deal.campaignName}
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Last updated {formatDate(session.updatedAt)}
+                        </p>
+                      </Link>
+                      <div className="flex items-center gap-3">
+                        <Badge className={statusBadgeClass(session.status)}>
+                          {humanizeToken(session.status)}
+                        </Badge>
+                        <form action={deleteIntakeDraftAction}>
+                          <input type="hidden" name="sessionId" value={session.id} />
+                          <button
+                            type="submit"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
+                            aria-label={`Delete draft ${deal.campaignName}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       </div>
     );
@@ -259,7 +315,10 @@ export default async function WorkspaceDashboardPage() {
               with your deals.
             </p>
           </div>
-          <Link href="/app/intake/new" className={buttonVariants({ className: "gap-2" })}>
+          <Link
+            href="/app/intake/new?pick=1"
+            className={buttonVariants({ className: "gap-2" })}
+          >
             <Plus className="h-4 w-4" />
             Upload documents
           </Link>
@@ -294,6 +353,61 @@ export default async function WorkspaceDashboardPage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
+            {intakeDrafts.length > 0 ? (
+              <section>
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-[24px] font-semibold tracking-tight text-foreground">
+                    Draft Intakes
+                  </h2>
+                </div>
+
+                <div className="space-y-4">
+                {intakeDrafts.slice(0, 3).map(({ session, deal }) => (
+                    <Card
+                      key={session.id}
+                      className="border-black/5 bg-white p-6 transition-shadow hover:shadow-panel dark:border-white/10 dark:bg-white/[0.06]"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <Link
+                          href={
+                            session.status === "draft"
+                              ? `/app/intake/new?draft=${session.id}`
+                              : `/app/intake/${session.id}`
+                          }
+                          className="min-w-0 flex-1"
+                        >
+                          <div className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                            {deal.brandName}
+                          </div>
+                          <div className="mt-2 text-[22px] font-semibold tracking-tight text-foreground">
+                            {deal.campaignName}
+                          </div>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            Last updated {formatDate(session.updatedAt)}
+                          </p>
+                        </Link>
+                        <div className="flex items-center gap-3">
+                          <Badge className={statusBadgeClass(session.status)}>
+                            {humanizeToken(session.status)}
+                          </Badge>
+                          <form action={deleteIntakeDraftAction}>
+                            <input type="hidden" name="sessionId" value={session.id} />
+                            <button
+                              type="submit"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
+                              aria-label={`Delete draft ${deal.campaignName}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                    </Card>
+                ))}
+              </div>
+            </section>
+            ) : null}
+
             <section>
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-[24px] font-semibold tracking-tight text-foreground">

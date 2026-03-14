@@ -129,7 +129,7 @@ export function AppFrame({
               <div className="flex items-center gap-2">
                 <ThemeSwitch compact className="rounded-xl" />
                 <Link
-                  href="/app/intake/new"
+                  href="/app/intake/new?pick=1"
                   className={buttonVariants({ size: "sm" })}
                 >
                   Upload documents

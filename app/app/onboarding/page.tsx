@@ -65,7 +65,7 @@ export default function OnboardingPage() {
           </div>
           <div className="mt-10 flex flex-wrap gap-3">
             <Link
-              href="/app/intake/new"
+              href="/app/intake/new?pick=1"
               className="inline-flex rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white"
             >
               Upload your first documents

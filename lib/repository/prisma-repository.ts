@@ -251,6 +251,10 @@ function toSummaryRecord(summary: {
   };
 }
 
+function isPrimarySummaryVersion(version: string) {
+  return !version.startsWith("intake-normalized:");
+}
+
 function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(items: T[]) {
   return [...items].sort((left, right) =>
     (right.updatedAt ?? right.createdAt ?? "").localeCompare(
@@ -311,6 +315,9 @@ export class PrismaRepository {
 
     const documents = deal.documents.map(toDocumentRecord);
     const summaries = deal.summaries.map(toSummaryRecord);
+    const primarySummaries = summaries.filter((summary) =>
+      isPrimarySummaryVersion(summary.version)
+    );
 
     return {
       deal: toDealRecord(deal),
@@ -335,7 +342,7 @@ export class PrismaRepository {
       extractionResults: extractionResults.map(toExtractionResultRecord),
       extractionEvidence: extractionEvidence.map(toEvidenceRecord),
       summaries,
-      currentSummary: summaries[0] ?? null
+      currentSummary: primarySummaries[0] ?? null
     };
   }
 
@@ -437,6 +444,23 @@ export class PrismaRepository {
     }
 
     return toDealRecord(deal);
+  }
+
+  async deleteDeal(userId: string, dealId: string) {
+    const existing = await prisma.deal.findFirst({
+      where: { id: dealId, userId },
+      select: { id: true }
+    });
+
+    if (!existing) {
+      return false;
+    }
+
+    await prisma.deal.delete({
+      where: { id: dealId }
+    });
+
+    return true;
   }
 
   async createDocument(document: Omit<DocumentRecord, "id" | "createdAt" | "updatedAt">) {

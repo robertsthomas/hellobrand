@@ -54,7 +54,20 @@ const deliverableSchema = z.object({
   status: z
     .enum(["pending", "in_progress", "completed", "overdue"])
     .optional(),
-  description: z.string().nullable().optional()
+  description: z.string().nullable().optional(),
+  source: z.string().nullable().optional()
+});
+
+const timelineItemSchema = z.object({
+  id: z.string(),
+  label: z.string().min(1),
+  date: z.string().nullable(),
+  source: z.string().nullable(),
+  status: z.enum(["pending", "scheduled", "completed", "unknown"])
+});
+
+const analyticsSchema = z.object({
+  highlights: z.array(z.string())
 });
 
 export const dealTermsInputSchema = z.object({
@@ -105,7 +118,6 @@ export const draftIntentSchema = z.enum([
 export const documentUploadSchema = z.object({
   dealId: z.string().min(1),
   pastedText: z.string().nullable().optional(),
-  pastedTextTitle: z.string().nullable().optional(),
   documentKindHint: z.enum(documentKindValues).nullable().optional()
 });
 
@@ -123,15 +135,23 @@ export const createIntakeSessionSchema = z.object({
   brandName: z.string().max(120).nullable().optional(),
   campaignName: z.string().max(120).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
-  pastedText: z.string().max(25000).nullable().optional(),
-  pastedTextTitle: z.string().max(200).nullable().optional()
+  pastedText: z.string().max(25000).nullable().optional()
 });
 
 export const confirmIntakeSessionSchema = z.object({
   brandName: z.string().min(2).max(120),
-  campaignName: z.string().min(2).max(120),
+  contractTitle: z.string().min(2).max(160),
   agencyName: z.string().max(120).nullable().optional(),
+  contractSummary: z.string().max(12000).nullable().optional(),
+  primaryContactOrganizationType: z.enum(["brand", "agency"]).nullable().optional(),
+  primaryContactName: z.string().max(120).nullable().optional(),
+  primaryContactTitle: z.string().max(160).nullable().optional(),
+  primaryContactEmail: z.string().email().nullable().optional(),
+  primaryContactPhone: z.string().max(40).nullable().optional(),
   paymentAmount: z.number().nullable().optional(),
+  deliverables: z.array(deliverableSchema).optional().default([]),
+  timelineItems: z.array(timelineItemSchema).optional().default([]),
+  analytics: analyticsSchema.nullable().optional(),
   notes: z.string().max(5000).nullable().optional()
 });
 

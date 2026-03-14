@@ -11,6 +11,7 @@ import {
   analyzeRisksWithLlm,
   extractSectionWithLlm,
   generateSummaryWithLlm,
+  getLlmModel,
   hasLlmKey
 } from "@/lib/analysis/llm";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
@@ -114,6 +115,44 @@ function mergeTerms(
   };
 }
 
+function inferPastedTextFileName(text: string) {
+  const lower = text.toLowerCase();
+
+  if (
+    /(^|\n)\s*(from|to|subject|cc):|\b(sent from my iphone|thanks,|best,|regards,)\b/.test(
+      lower
+    )
+  ) {
+    return "pasted-email-thread.txt";
+  }
+
+  if (
+    /deliverables|posting schedule|content requirements|assets?|stories|reels|tiktok|youtube/.test(
+      lower
+    )
+  ) {
+    return "pasted-deliverables-notes.txt";
+  }
+
+  if (/invoice|payment due|net ?\d+|balance due/.test(lower)) {
+    return "pasted-invoice.txt";
+  }
+
+  if (
+    /agreement|contract|usage rights|exclusivity|term and termination|governing law|indemnif/.test(
+      lower
+    )
+  ) {
+    return "pasted-contract.txt";
+  }
+
+  if (/campaign brief|brief overview|key messaging|content pillars/.test(lower)) {
+    return "pasted-campaign-brief.txt";
+  }
+
+  return "pasted-context.txt";
+}
+
 function earliestDeliverableDate(terms: Pick<DealTermsRecord, "deliverables">) {
   return (
     [...terms.deliverables]
@@ -121,6 +160,148 @@ function earliestDeliverableDate(terms: Pick<DealTermsRecord, "deliverables">) {
       .sort((left, right) => (left.dueDate ?? "").localeCompare(right.dueDate ?? ""))[0]
       ?.dueDate ?? null
   );
+}
+
+function shouldLogDocumentPipeline() {
+  return (
+    process.env.DEBUG_DOCUMENT_PIPELINE === "1" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function logDocumentPipeline(
+  level: "info" | "error",
+  event: string,
+  details: Record<string, unknown>
+) {
+  if (!shouldLogDocumentPipeline()) {
+    return;
+  }
+
+  const logger = level === "error" ? console.error : console.info;
+  logger(`[document-pipeline] ${event}`, {
+    at: new Date().toISOString(),
+    ...details
+  });
+}
+
+function llmSectionLimits() {
+  const model = getLlmModel().toLowerCase();
+  const usingFreeModel =
+    model.includes("openrouter/free") || model.includes(":free") || model.includes("/free");
+
+  return usingFreeModel
+    ? { maxSections: 6, concurrency: 2, usingFreeModel: true }
+    : { maxSections: 12, concurrency: 4, usingFreeModel: false };
+}
+
+function scoreSectionForLlm(
+  section: { title: string; content: string; chunkIndex: number },
+  documentKind: DocumentKind
+) {
+  const title = section.title.toLowerCase();
+  const content = section.content.toLowerCase();
+  let score = Math.min(section.content.length, 4000) / 100;
+
+  if (title === "general") {
+    score -= 15;
+  }
+
+  if (section.content.length < 80) {
+    score -= 12;
+  }
+
+  const keywordGroups: Record<DocumentKind | "shared", string[]> = {
+    shared: [
+      "payment",
+      "compensation",
+      "rate",
+      "fee",
+      "deliverable",
+      "usage",
+      "rights",
+      "whitelist",
+      "exclusiv",
+      "revision",
+      "termination",
+      "campaign",
+      "brand"
+    ],
+    contract: [
+      "agreement",
+      "term",
+      "services",
+      "scope",
+      "content",
+      "payment terms"
+    ],
+    deliverables_brief: ["deliverables", "timeline", "post", "story", "reel", "tiktok"],
+    campaign_brief: ["brief", "messaging", "concept", "brand guidelines"],
+    pitch_deck: ["overview", "campaign", "deliverables", "brand"],
+    invoice: ["invoice", "amount", "total", "net", "payment", "client"],
+    email_thread: ["subject:", "from:", "usage", "rate", "deadline", "follow up"],
+    unknown: ["agreement", "campaign", "deliverables", "payment"]
+  };
+
+  for (const keyword of keywordGroups.shared) {
+    if (title.includes(keyword) || content.includes(keyword)) {
+      score += 8;
+    }
+  }
+
+  for (const keyword of keywordGroups[documentKind]) {
+    if (title.includes(keyword) || content.includes(keyword)) {
+      score += 10;
+    }
+  }
+
+  return score;
+}
+
+function selectSectionsForLlm(
+  sections: Array<{ title: string; content: string; chunkIndex: number }>,
+  documentKind: DocumentKind
+) {
+  const limits = llmSectionLimits();
+  const selected = [...sections]
+    .map((section) => ({
+      section,
+      score: scoreSectionForLlm(section, documentKind)
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limits.maxSections)
+    .sort((left, right) => left.section.chunkIndex - right.section.chunkIndex)
+    .map((entry) => entry.section);
+
+  return {
+    ...limits,
+    selected
+  };
+}
+
+async function mapWithConcurrency<TInput, TOutput>(
+  values: TInput[],
+  concurrency: number,
+  worker: (value: TInput, index: number) => Promise<TOutput>
+) {
+  const results = new Array<TOutput>(values.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < values.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(values[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () =>
+      runWorker()
+    )
+  );
+
+  return results;
 }
 
 async function runStage<T>(
@@ -138,12 +319,27 @@ async function runStage<T>(
     attemptCount: 1,
     failureReason: null
   });
+  const startedAt = Date.now();
+
+  logDocumentPipeline("info", "stage_start", {
+    dealId,
+    documentId,
+    stage: type,
+    jobId: job.id
+  });
 
   try {
     const result = await work();
     await repository.updateJob(job.id, {
       status: "ready",
       failureReason: null
+    });
+    logDocumentPipeline("info", "stage_complete", {
+      dealId,
+      documentId,
+      stage: type,
+      jobId: job.id,
+      durationMs: Date.now() - startedAt
     });
     return result;
   } catch (error) {
@@ -152,6 +348,14 @@ async function runStage<T>(
     await repository.updateJob(job.id, {
       status: "failed",
       failureReason: message
+    });
+    logDocumentPipeline("error", "stage_failed", {
+      dealId,
+      documentId,
+      stage: type,
+      jobId: job.id,
+      durationMs: Date.now() - startedAt,
+      error: message
     });
     throw error;
   }
@@ -168,6 +372,15 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
   await repository.updateDocument(document.id, {
     processingStatus: "processing",
     errorMessage: null
+  });
+  const pipelineStartedAt = Date.now();
+
+  logDocumentPipeline("info", "pipeline_start", {
+    dealId: document.dealId,
+    documentId: document.id,
+    fileName: document.fileName,
+    sourceType: document.sourceType,
+    mimeType: document.mimeType
   });
 
   try {
@@ -213,22 +426,48 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         splitIntoSections(extractionSource.normalizedText, classification.documentKind)
     );
 
+    logDocumentPipeline("info", "sections_created", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      documentKind: classification.documentKind,
+      sectionCount: sections.length,
+      normalizedChars: extractionSource.normalizedText.length
+    });
+
     const savedSections = await repository.replaceDocumentSections(document.id, sections);
+    const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
+    const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
+
+    logDocumentPipeline("info", "llm_section_plan", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      model: hasLlmKey() ? getLlmModel() : null,
+      usingFreeModel: llmPlan.usingFreeModel,
+      selectedSectionCount: llmPlan.selected.length,
+      totalSectionCount: sections.length,
+      concurrency: llmPlan.concurrency,
+      selectedSections: llmPlan.selected.map((section) => ({
+        chunkIndex: section.chunkIndex,
+        title: section.title,
+        chars: section.content.length
+      }))
+    });
 
     const partialExtractions = await runStage(
       document.dealId,
       document.id,
       "extract_fields",
       async () =>
-        Promise.all(
-          sections.map(async (section) => {
+        mapWithConcurrency(sections, llmPlan.concurrency, async (section) => {
             const fallback = extractStructuredTerms(
               section.content,
               [section],
               classification.documentKind
             );
 
-            if (!hasLlmKey()) {
+            if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
               return fallback;
             }
 
@@ -242,8 +481,16 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
               return fallback;
             }
           })
-        )
     );
+
+    logDocumentPipeline("info", "field_extraction_complete", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      sectionCount: sections.length,
+      extractionCount: partialExtractions.length,
+      usedLlm: hasLlmKey()
+    });
 
     const extraction = await runStage(
       document.dealId,
@@ -251,6 +498,16 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       "merge_results",
       async () => mergeExtractionResults(partialExtractions as ExtractionPipelineResult[])
     );
+
+    logDocumentPipeline("info", "merge_complete", {
+      dealId: document.dealId,
+      documentId: document.id,
+      evidenceCount: extraction.evidence.length,
+      deliverablesCount: extraction.data.deliverables.length,
+      hasPaymentAmount: extraction.data.paymentAmount !== null,
+      hasBrandName: Boolean(extraction.data.brandName),
+      hasCampaignName: Boolean(extraction.data.campaignName)
+    });
 
     await repository.upsertExtractionResult(document.id, extraction);
 
@@ -348,6 +605,16 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       await syncIntakeSessionForDealId(document.dealId);
     }
 
+    logDocumentPipeline("info", "pipeline_complete", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      durationMs: Date.now() - pipelineStartedAt,
+      riskCount: risks.length,
+      summaryLength: summary.body.length,
+      deliverablesCount: nextTerms.deliverables.length
+    });
+
     return repository.getDealAggregate(viewer.id, document.dealId);
   } catch (error) {
     const message =
@@ -362,6 +629,13 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     if (process.env.DATABASE_URL) {
       await syncIntakeSessionForDealId(document.dealId);
     }
+    logDocumentPipeline("error", "pipeline_failed", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      durationMs: Date.now() - pipelineStartedAt,
+      error: message
+    });
     throw error;
   }
 }
@@ -377,12 +651,25 @@ export async function enqueueDocumentProcessing(documentId: string) {
         name: "documents/process.requested",
         data: { documentId }
       });
+      logDocumentPipeline("info", "queue_enqueued", {
+        documentId,
+        mode: "inngest"
+      });
       return { mode: "inngest" as const };
     } catch {
+      logDocumentPipeline("error", "queue_failed", {
+        documentId,
+        mode: "inngest",
+        fallbackMode: "local"
+      });
       return { mode: "local" as const };
     }
   }
 
+  logDocumentPipeline("info", "queue_enqueued", {
+    documentId,
+    mode: "local"
+  });
   return { mode: "local" as const };
 }
 
@@ -395,6 +682,12 @@ export async function processDocumentById(documentId: string) {
   }
 
   const viewer = await getViewerById(document.userId);
+
+  logDocumentPipeline("info", "process_document_requested", {
+    documentId,
+    dealId: document.dealId,
+    fileName: document.fileName
+  });
 
   return processDocumentPipeline(viewer, document);
 }
@@ -472,7 +765,6 @@ export async function uploadDocumentsForViewer(
   input: {
     files?: File[];
     pastedText?: string | null;
-    pastedTextTitle?: string | null;
     documentKindHint?: DocumentKind | null;
   }
 ) {
@@ -511,7 +803,7 @@ export async function uploadDocumentsForViewer(
   }
 
   if (input.pastedText?.trim()) {
-    const title = input.pastedTextTitle?.trim() || "pasted-document.txt";
+    const title = inferPastedTextFileName(input.pastedText.trim());
     const pastedDocument = await getRepository().createDocument({
       dealId,
       userId: viewer.id,

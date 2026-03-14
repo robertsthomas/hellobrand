@@ -96,6 +96,49 @@ export interface DeliverableItem {
   quantity: number | null;
   status?: "pending" | "in_progress" | "completed" | "overdue";
   description?: string | null;
+  source?: string | null;
+}
+
+export interface IntakePrimaryContact {
+  organizationType: "brand" | "agency" | null;
+  name: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface IntakeTimelineItem {
+  id: string;
+  label: string;
+  date: string | null;
+  source: string | null;
+  status: "pending" | "scheduled" | "completed" | "unknown";
+}
+
+export interface IntakeAnalyticsRecord {
+  highlights: string[];
+}
+
+export interface IntakeEvidenceGroup {
+  id: string;
+  title: string;
+  snippets: string[];
+}
+
+export interface NormalizedIntakeRecord {
+  brandName: string | null;
+  agencyName: string | null;
+  primaryContact: IntakePrimaryContact;
+  contractTitle: string | null;
+  contractSummary: string | null;
+  paymentAmount: number | null;
+  currency: string | null;
+  deliverableCount: number;
+  deliverables: DeliverableItem[];
+  timelineItems: IntakeTimelineItem[];
+  analytics: IntakeAnalyticsRecord | null;
+  notes: string | null;
+  evidenceGroups: IntakeEvidenceGroup[];
 }
 
 export interface DealTermsRecord {
@@ -233,10 +276,20 @@ export interface IntakeSessionRecord {
   status: IntakeSessionStatus;
   errorMessage: string | null;
   inputSource: "upload" | "paste" | "mixed" | null;
+  draftBrandName: string | null;
+  draftCampaignName: string | null;
+  draftNotes: string | null;
+  draftPastedText: string | null;
+  draftPastedTextTitle: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
   expiresAt: string | null;
+}
+
+export interface IntakeDraftListItem {
+  session: IntakeSessionRecord;
+  deal: Pick<DealRecord, "id" | "brandName" | "campaignName" | "updatedAt">;
 }
 
 export interface ProfileRecord {
