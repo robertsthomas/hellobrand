@@ -134,4 +134,86 @@ describe("intake normalization", () => {
     expect(normalized?.timelineItems.length).toBeGreaterThan(0);
     expect(normalized?.paymentAmount).toBe(2800);
   });
+
+  test("filters boilerplate contract delivery clauses out of timeline items", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "oreo-agreement.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          XIV. Edit: shall refer to the refinement of visual and auditory components within the Content production to attain a polished final product.
+          submitted Content by the Talent. It shall include the reproduction of scenes, dialogue, and/or visual sequences captured in the initial filming.
+          3.1 In consideration of the payment of the Fees (Payment), Talent shall deliver the Content to the Company by the relevant Delivery Date in accordance with the brief.
+          3.2 Talent shall cooperate fully with Company and any third parties appointed by Company as necessary to deliver the Content and provide the services.
+          Services. Time is of the essence in relation to any delivery date.
+          Campaign Live date: 07/08
+          Video & caption drafts due for review by 6/18
+          Video Idea/Outline Due 48 hrs after accepting campaign
+        `,
+        rawText: `
+          XIV. Edit: shall refer to the refinement of visual and auditory components within the Content production to attain a polished final product.
+          submitted Content by the Talent. It shall include the reproduction of scenes, dialogue, and/or visual sequences captured in the initial filming.
+          3.1 In consideration of the payment of the Fees (Payment), Talent shall deliver the Content to the Company by the relevant Delivery Date in accordance with the brief.
+          3.2 Talent shall cooperate fully with Company and any third parties appointed by Company as necessary to deliver the Content and provide the services.
+          Services. Time is of the essence in relation to any delivery date.
+          Campaign Live date: 07/08
+          Video & caption drafts due for review by 6/18
+          Video Idea/Outline Due 48 hrs after accepting campaign
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      deliverables: []
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.timelineItems).toHaveLength(3);
+    expect(normalized?.timelineItems.map((item) => item.label)).toEqual([
+      "Outline due",
+      "Draft due",
+      "Go live"
+    ]);
+    expect(normalized?.timelineItems.map((item) => item.date)).toEqual([
+      "48 hrs after",
+      "6/18",
+      "07/08"
+    ]);
+  });
+
+  test("does not treat contract agency text as analytics", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "oreo-agreement.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Manager/Agency on behalf of Talent
+          Manager/Agency
+          Usage Term:
+          90 days paid and organic usage with additional organic usage on
+          Usage Platforms TikTok (Paid and organic) Meta and YT shorts (Organic)
+          Document Ref: HYTE8-UHE7G-BAWAO-PDRF4
+        `,
+        rawText: `
+          Manager/Agency on behalf of Talent
+          Manager/Agency
+          Usage Term:
+          90 days paid and organic usage with additional organic usage on
+          Usage Platforms TikTok (Paid and organic) Meta and YT shorts (Organic)
+          Document Ref: HYTE8-UHE7G-BAWAO-PDRF4
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.analytics).toBeNull();
+  });
 });

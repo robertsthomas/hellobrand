@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
+import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { IntakeDraftEditor } from "@/components/intake-draft-editor";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
@@ -63,13 +64,12 @@ export default async function NewIntakePage({
             <form action={deleteIntakeDraftAction}>
               <input type="hidden" name="sessionId" value={initialDraft.sessionId} />
               <input type="hidden" name="redirectTo" value="/app" />
-              <button
-                type="submit"
+              <DeleteDraftButton
                 className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete draft
-              </button>
+              </DeleteDraftButton>
             </form>
           ) : null}
         </section>

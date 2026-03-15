@@ -14,6 +14,10 @@ HelloBrand is a creator-first deal workspace for influencers and solo creators. 
 - API routes for intake, deals, reports, documents, drafts, payments, profile, contract alias upload, and document reprocessing
 - Prisma schema for the planned Postgres production model
 
+## Roadmap
+
+- Expand creator profile onboarding beyond the intake modal into a fuller profile setup flow with handle-first defaults, payout details, and creator identity preferences across the app
+
 ## Stack
 
 - Next.js + TypeScript
@@ -41,7 +45,12 @@ doppler secrets upload .env --project hellobrand --config dev
 
 4. Set `DATABASE_URL` to your Postgres connection string in Doppler. The authenticated `/app` routes expect a real database in this Phase 1 build.
 5. Set `SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for public Supabase clients. For server-side storage uploads, set `SUPABASE_SECRET_KEY` as well. Legacy `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` values still work as fallbacks. If omitted, file uploads fall back to local `.runtime/uploads`.
-6. Fill in `OPENROUTER_API_KEY` in Doppler if you want live model analysis. The default model is `openrouter/free`. If omitted, the fallback parser is used.
+6. Fill in `OPENROUTER_API_KEY` in Doppler if you want live model analysis. The app uses an internal OpenRouter task router:
+   - `OPENROUTER_MODEL_EXTRACT` for section extraction
+   - `OPENROUTER_MODEL_RISKS` for risk analysis
+   - `OPENROUTER_MODEL_SUMMARY` for creator-facing summaries
+   - optional `*_FALLBACKS` secrets for per-task failover
+   If the task-specific model is unset, it falls back to `OPENROUTER_MODEL`. If no provider is configured, the fallback parser is used.
 7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
 8. Install dependencies:
 

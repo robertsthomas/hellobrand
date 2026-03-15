@@ -12,6 +12,7 @@ import {
 } from "@/lib/intake";
 import {
   createDealForViewer as createDealFromDeals,
+  deleteDealForViewer as deleteDealFromDeals,
   generateDraftForViewer as generateDraftFromDeals,
   reprocessDocumentForViewer as reprocessDocumentFromDeals,
   updateDealForViewer as updateDealFromDeals,
@@ -40,6 +41,27 @@ function parseNullableString(value: FormDataEntryValue | null) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function clampString(value: string, maximum: number) {
+  const trimmed = value.trim();
+  if (trimmed.length <= maximum) {
+    return trimmed;
+  }
+
+  return trimmed.slice(0, maximum).trim();
+}
+
+function parseClampedNullableString(
+  value: FormDataEntryValue | null,
+  maximum: number
+) {
+  const parsed = parseNullableString(value);
+  if (!parsed) {
+    return null;
+  }
+
+  return clampString(parsed, maximum);
 }
 
 function parseNullableNumber(value: FormDataEntryValue | null) {
@@ -258,6 +280,7 @@ export async function retryIntakeSessionAction(formData: FormData) {
     throw error;
   }
   revalidatePath(`/app/intake/${sessionId}`);
+  revalidatePath(`/app/intake/${sessionId}/review`);
 }
 
 export async function deleteIntakeDraftAction(formData: FormData) {
@@ -286,10 +309,46 @@ export async function deleteIntakeDraftAction(formData: FormData) {
 
   revalidatePath("/app");
   revalidatePath("/app/intake/new");
+  revalidatePath(`/app/intake/${sessionId}/review`);
 
   if (redirectTo) {
     redirect(redirectTo);
   }
+}
+
+export async function deleteWorkspaceAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+  const redirectTo = String(formData.get("redirectTo") ?? "/app");
+  const debug = startServerDebug("action_delete_workspace", {
+    action: "deleteWorkspaceAction",
+    dealId,
+    redirectTo
+  });
+
+  try {
+    const deleted = await deleteDealFromDeals(viewer, dealId);
+
+    if (!deleted) {
+      throw new Error("Could not delete workspace.");
+    }
+
+    debug.complete({
+      viewerId: viewer.id,
+      dealId
+    });
+  } catch (error) {
+    debug.fail(error, {
+      viewerId: viewer.id,
+      dealId
+    });
+    throw error;
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/deals/history");
+  revalidatePath("/app/payments");
+  redirect(redirectTo);
 }
 
 export async function confirmIntakeSessionAction(formData: FormData) {
@@ -304,24 +363,27 @@ export async function confirmIntakeSessionAction(formData: FormData) {
   const timelineItemsJson = String(formData.get("timelineItemsJson") ?? "[]");
   const analyticsJson = String(formData.get("analyticsJson") ?? "null");
   const input = confirmIntakeSessionSchema.parse({
-    brandName: String(formData.get("brandName") ?? "").trim(),
-    contractTitle: String(formData.get("contractTitle") ?? "").trim(),
-    agencyName: parseNullableString(formData.get("agencyName")),
-    contractSummary: parseNullableString(formData.get("contractSummary")),
+    brandName: clampString(String(formData.get("brandName") ?? ""), 120),
+    contractTitle: clampString(String(formData.get("contractTitle") ?? ""), 160),
+    agencyName: parseClampedNullableString(formData.get("agencyName"), 120),
+    contractSummary: parseClampedNullableString(formData.get("contractSummary"), 12000),
     primaryContactOrganizationType:
       parseNullableString(formData.get("primaryContactOrganizationType")) as
         | "brand"
         | "agency"
         | null,
-    primaryContactName: parseNullableString(formData.get("primaryContactName")),
-    primaryContactTitle: parseNullableString(formData.get("primaryContactTitle")),
-    primaryContactEmail: parseNullableString(formData.get("primaryContactEmail")),
-    primaryContactPhone: parseNullableString(formData.get("primaryContactPhone")),
+    primaryContactName: parseClampedNullableString(formData.get("primaryContactName"), 120),
+    primaryContactTitle: parseClampedNullableString(
+      formData.get("primaryContactTitle"),
+      160
+    ),
+    primaryContactEmail: parseClampedNullableString(formData.get("primaryContactEmail"), 320),
+    primaryContactPhone: parseClampedNullableString(formData.get("primaryContactPhone"), 40),
     paymentAmount: parseNullableNumber(formData.get("paymentAmount")),
     deliverables: JSON.parse(deliverablesJson),
     timelineItems: JSON.parse(timelineItemsJson),
     analytics: JSON.parse(analyticsJson),
-    notes: parseNullableString(formData.get("notes"))
+    notes: parseClampedNullableString(formData.get("notes"), 5000)
   });
 
   try {

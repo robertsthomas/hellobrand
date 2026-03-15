@@ -55,7 +55,7 @@ export function IntakeSourceSwitcher({
                 : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
             )}
           >
-            Paste text instead
+            Paste text
           </button>
         </div>
       </div>
@@ -84,7 +84,7 @@ export function IntakeSourceSwitcher({
           onClick={() => setMode("paste")}
           className="font-semibold text-ocean underline-offset-4 hover:underline"
         >
-          Paste text instead
+          Paste text
         </button>
         .
       </div>

@@ -172,5 +172,9 @@ export const profileInputSchema = z.object({
   businessName: z.string().max(120).nullable(),
   contactEmail: z.string().email().nullable(),
   preferredSignature: z.string().max(200).nullable(),
-  payoutDetails: z.string().max(5000).nullable()
+  payoutDetails: z.string().max(5000).nullable(),
+  defaultCurrency: z.string().max(12).nullable().optional(),
+  reminderLeadDays: z.number().int().min(0).max(30).nullable().optional(),
+  conflictAlertsEnabled: z.boolean().optional(),
+  paymentRemindersEnabled: z.boolean().optional()
 });

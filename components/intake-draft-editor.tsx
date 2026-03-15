@@ -7,6 +7,29 @@ import { IntakeSourceSwitcher } from "@/components/intake-source-switcher";
 import { SubmitButton } from "@/components/submit-button";
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
 
+async function uploadSessionDocumentsRequest({
+  sessionId,
+  files,
+  pastedText
+}: {
+  sessionId: string;
+  files: File[];
+  pastedText: string;
+}) {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("documents", file);
+  }
+  if (pastedText) {
+    formData.append("pastedText", pastedText);
+  }
+
+  return fetch(`/api/intake/${sessionId}/documents`, {
+    method: "POST",
+    body: formData
+  });
+}
+
 export function IntakeDraftEditor({
   autoOpenPicker,
   initialMode,
@@ -42,6 +65,7 @@ export function IntakeDraftEditor({
   const setNotes = useIntakeUiStore((state) => state.setNotes);
   const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
+  const reset = useIntakeUiStore((state) => state.reset);
   const lastSavedRef = useRef("");
   const createStartedRef = useRef(false);
   const autoContinueStartedRef = useRef(false);
@@ -147,16 +171,40 @@ export function IntakeDraftEditor({
     autoContinueStartedRef.current = true;
     setIsSubmitting(true);
     setErrorMessage(null);
+    void (async () => {
+      try {
+        const response = await uploadSessionDocumentsRequest({
+          sessionId,
+          files: pendingFiles,
+          pastedText: ""
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not upload documents.");
+        }
+
+        reset("upload");
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Could not upload documents."
+        );
+        setIsSubmitting(false);
+      }
+    })();
     router.push(`/app/intake/${sessionId}`);
     router.refresh();
   }, [
     isSubmitting,
     mode,
     pendingFiles.length,
+    pendingFiles,
+    reset,
     router,
     sessionId,
     setErrorMessage,
-    setIsSubmitting
+    setIsSubmitting,
   ]);
 
   async function handleContinue() {
@@ -172,6 +220,28 @@ export function IntakeDraftEditor({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    void (async () => {
+      try {
+        const response = await uploadSessionDocumentsRequest({
+          sessionId,
+          files: pendingFiles,
+          pastedText: pastedText.trim()
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not upload documents.");
+        }
+
+        reset("upload");
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Could not upload documents."
+        );
+        setIsSubmitting(false);
+      }
+    })();
     router.push(`/app/intake/${sessionId}`);
     router.refresh();
   }

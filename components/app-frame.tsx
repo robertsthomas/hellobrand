@@ -130,6 +130,8 @@ export function AppFrame({
                 <ThemeSwitch compact className="rounded-xl" />
                 <Link
                   href="/app/intake/new?pick=1"
+                  aria-label="Upload documents for a new deal workspace"
+                  title="Start a new deal workspace"
                   className={buttonVariants({ size: "sm" })}
                 >
                   Upload documents

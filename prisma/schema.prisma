@@ -229,10 +229,28 @@ model Profile {
   contactEmail       String?
   preferredSignature String?
   payoutDetails      String?
+  defaultCurrency    String?
+  reminderLeadDays   Int?
+  conflictAlertsEnabled Boolean @default(true)
+  paymentRemindersEnabled Boolean @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents ProfileAuditEvent[]
+}
+
+model ProfileAuditEvent {
+  id           String   @id @default(uuid())
+  profileId    String
+  actorUserId  String
+  changedFields Json
+  snapshot     Json
+  createdAt    DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
 }
 
 model IntakeSession {

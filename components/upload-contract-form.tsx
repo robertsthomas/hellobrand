@@ -20,9 +20,9 @@ export function UploadContractForm({
         <div>
           <h2 className="font-serif text-3xl text-ocean">Add documents</h2>
           <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-            Upload contracts, deliverables briefs, decks, invoices, or paste an
-            email thread. HelloBrand classifies each document and extracts the
-            parts creators need most.
+            These uploads attach to this existing workspace only. Add revised
+            contracts, briefs, decks, invoices, or pasted email threads and
+            HelloBrand will update the analysis for this deal.
           </p>
           {latestDocument ? (
             <p className="mt-3 text-sm text-black/60 dark:text-white/65">
@@ -76,7 +76,7 @@ export function UploadContractForm({
       </div>
 
       <button className="mt-5 rounded-full bg-clay px-5 py-3 text-sm font-semibold text-white">
-        Process documents
+        Add to this workspace
       </button>
 
       {documents.some((document) => document.errorMessage) ? (

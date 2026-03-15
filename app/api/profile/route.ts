@@ -1,15 +1,21 @@
 import { NextRequest } from "next/server";
+import { ZodError } from "zod";
 
 import { requireApiViewer } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
-import { getProfileForViewer, updateProfileForViewer } from "@/lib/profile";
+import {
+  getProfileForViewer,
+  listProfileAuditForViewer,
+  updateProfileForViewer
+} from "@/lib/profile";
 import { profileInputSchema } from "@/lib/validation";
 
 export async function GET() {
   try {
     const viewer = await requireApiViewer();
     const profile = await getProfileForViewer(viewer);
-    return ok({ profile });
+    const recentChanges = await listProfileAuditForViewer(viewer);
+    return ok({ profile, recentChanges });
   } catch (error) {
     return fail(error instanceof Error ? error.message : "Unauthorized", 401);
   }
@@ -20,10 +26,14 @@ export async function PATCH(request: NextRequest) {
     const viewer = await requireApiViewer();
     const input = profileInputSchema.parse(await request.json());
     const profile = await updateProfileForViewer(viewer, input);
-    return ok({ profile });
+    const recentChanges = await listProfileAuditForViewer(viewer);
+    return ok({ profile, recentChanges, message: "Profile saved." });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not update profile.";
+    const message = error instanceof ZodError
+      ? error.issues[0]?.message ?? "Could not update profile."
+      : error instanceof Error
+        ? error.message
+        : "Could not update profile.";
     return fail(message, message === "Unauthorized" ? 401 : 400);
   }
 }

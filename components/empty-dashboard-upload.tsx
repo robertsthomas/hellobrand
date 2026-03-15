@@ -20,13 +20,17 @@ function logClientIntake(event: string, details: Record<string, unknown>) {
 
 export function EmptyDashboardUpload() {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const createStartedRef = useRef(false);
+  const createPromiseRef = useRef<Promise<string> | null>(null);
   const router = useRouter();
+  const sessionId = useIntakeUiStore((state) => state.sessionId);
   const isSubmitting = useIntakeUiStore((state) => state.isSubmitting);
   const mode = useIntakeUiStore((state) => state.mode);
   const pastedText = useIntakeUiStore((state) => state.pastedText);
   const errorMessage = useIntakeUiStore((state) => state.errorMessage);
   const setMode = useIntakeUiStore((state) => state.setMode);
   const setPastedText = useIntakeUiStore((state) => state.setPastedText);
+  const setSessionId = useIntakeUiStore((state) => state.setSessionId);
   const setSelectedFilesFromList = useIntakeUiStore(
     (state) => state.setSelectedFilesFromList
   );
@@ -38,15 +42,13 @@ export function EmptyDashboardUpload() {
     reset("upload");
   }, [reset]);
 
-  async function startDraftSession() {
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    logClientIntake("draft_session_start", {
-      mode,
-      hasPastedText: pastedText.trim().length > 0
-    });
+  async function createDraftSessionId() {
+    if (createPromiseRef.current) {
+      return createPromiseRef.current;
+    }
 
-    try {
+    createStartedRef.current = true;
+    createPromiseRef.current = (async () => {
       const response = await fetch("/api/intake/draft", {
         method: "POST",
         headers: {
@@ -61,11 +63,114 @@ export function EmptyDashboardUpload() {
         throw new Error(payload.error ?? "Could not start intake.");
       }
 
-      logClientIntake("draft_session_complete", {
+      setSessionId(payload.session.id);
+      logClientIntake("draft_session_ready", {
         sessionId: payload.session.id
       });
+      return payload.session.id as string;
+    })();
+
+    try {
+      return await createPromiseRef.current;
+    } finally {
+      createPromiseRef.current = null;
+    }
+  }
+
+  async function getOrCreateDraftSessionId() {
+    if (sessionId) {
+      return sessionId;
+    }
+
+    return createDraftSessionId();
+  }
+
+  async function uploadSessionDocuments({
+    sessionId,
+    files,
+    pastedText
+  }: {
+    sessionId: string;
+    files: File[];
+    pastedText: string;
+  }) {
+    logClientIntake("background_upload_start", {
+      sessionId,
+      fileCount: files.length,
+      pastedChars: pastedText.length
+    });
+
+    try {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append("documents", file);
+      }
+      if (pastedText) {
+        formData.append("pastedText", pastedText);
+      }
+
+      const response = await fetch(`/api/intake/${sessionId}/documents`, {
+        method: "POST",
+        body: formData
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not upload documents.");
+      }
+
+      logClientIntake("background_upload_complete", {
+        sessionId,
+        status: payload.session?.status ?? null
+      });
+      createStartedRef.current = false;
+      reset("upload");
+      router.refresh();
+    } catch (error) {
+      logClientIntake("background_upload_failed", {
+        sessionId,
+        error:
+          error instanceof Error ? error.message : "Could not upload documents."
+      });
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not upload documents."
+      );
+      createStartedRef.current = false;
       setIsSubmitting(false);
-      router.push(`/app/intake/${payload.session.id}`);
+    }
+  }
+
+  async function startDraftSession({
+    files,
+    pastedSourceText,
+    forceFreshSession = false
+  }: {
+    files: File[];
+    pastedSourceText: string;
+    forceFreshSession?: boolean;
+  }) {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    logClientIntake("draft_session_start", {
+      mode,
+      fileCount: files.length,
+      hasPastedText: pastedSourceText.length > 0
+    });
+
+    try {
+      const nextSessionId = forceFreshSession
+        ? await createDraftSessionId()
+        : await getOrCreateDraftSessionId();
+      logClientIntake("draft_session_complete", {
+        sessionId: nextSessionId,
+        forceFreshSession
+      });
+      void uploadSessionDocuments({
+        sessionId: nextSessionId,
+        files,
+        pastedText: pastedSourceText
+      });
+      router.push(`/app/intake/${nextSessionId}`);
       router.refresh();
     } catch (error) {
       logClientIntake("draft_session_failed", {
@@ -74,6 +179,7 @@ export function EmptyDashboardUpload() {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start intake."
       );
+      createStartedRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -93,19 +199,28 @@ export function EmptyDashboardUpload() {
       }))
     });
     setSelectedFilesFromList(files);
-    await startDraftSession();
+    await startDraftSession({
+      files: selected,
+      pastedSourceText: ""
+    });
   }
 
   async function handlePasteSubmit() {
-    if (!pastedText.trim()) {
+    const trimmed = pastedText.trim();
+
+    if (!trimmed) {
       setErrorMessage("Paste some text from the brand first.");
       return;
     }
 
     logClientIntake("paste_submit", {
-      chars: pastedText.trim().length
+      chars: trimmed.length
     });
-    await startDraftSession();
+    await startDraftSession({
+      files: [],
+      pastedSourceText: trimmed,
+      forceFreshSession: true
+    });
   }
 
   return (
@@ -154,7 +269,7 @@ export function EmptyDashboardUpload() {
             isSubmitting ? "opacity-60" : ""
           )}
         >
-          Paste text instead
+          Paste text
         </button>
       </div>
 
@@ -163,7 +278,17 @@ export function EmptyDashboardUpload() {
           <button
             type="button"
             disabled={isSubmitting}
-            onClick={() => inputRef.current?.click()}
+            onClick={() => {
+              void getOrCreateDraftSessionId().catch((error) => {
+                logClientIntake("draft_session_prepare_failed", {
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : "Could not prepare intake."
+                });
+              });
+              inputRef.current?.click();
+            }}
             className={cn(
               buttonVariants({ className: "gap-2" }),
               isSubmitting ? "cursor-not-allowed opacity-60" : ""
@@ -174,8 +299,8 @@ export function EmptyDashboardUpload() {
           </button>
 
           <p className="max-w-md text-center text-sm text-black/55 dark:text-white/60">
-            Start with the contract. You can add briefs, decks, invoices, or
-            email context later.
+            This starts a new deal workspace. Begin with the contract, then add
+            briefs, decks, invoices, or email context later.
           </p>
         </div>
       ) : (
@@ -189,8 +314,8 @@ export function EmptyDashboardUpload() {
           />
           <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="max-w-xl text-sm text-black/55 dark:text-white/60">
-              Paste whatever you have. HelloBrand will organize it during
-              analysis.
+              This starts a new deal workspace from pasted text. HelloBrand will
+              organize it during analysis.
             </p>
             <button
               type="button"

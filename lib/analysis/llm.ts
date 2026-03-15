@@ -9,8 +9,18 @@ import type {
   FieldEvidence,
   RiskFlagRecord
 } from "@/lib/types";
+import {
+  serializeDealSummarySections,
+  stripInlineMarkdown,
+  toPlainDealSummary
+} from "@/lib/deal-summary";
 
 type TermsData = Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
+type LlmTask = "extract_section" | "analyze_risks" | "generate_summary";
+type LlmRoute = {
+  primary: string;
+  fallbacks: string[];
+};
 
 function shouldLogLlmDebug() {
   return process.env.DEBUG_DOCUMENT_PIPELINE === "1" || process.env.NODE_ENV !== "production";
@@ -47,14 +57,6 @@ function providerConfig() {
     };
   }
 
-  if (process.env.OPENAI_API_KEY) {
-    return {
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL || undefined,
-      defaultHeaders: undefined
-    };
-  }
-
   return null;
 }
 
@@ -71,13 +73,99 @@ export function hasLlmKey() {
   return Boolean(providerConfig());
 }
 
-export function getLlmModel() {
-  return (
+function parseModelList(value: string | undefined) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function taskSpecificModel(task: LlmTask) {
+  switch (task) {
+    case "extract_section":
+      return (
+        process.env.LLM_MODEL_EXTRACT ||
+        process.env.OPENROUTER_MODEL_EXTRACT ||
+        null
+      );
+    case "analyze_risks":
+      return (
+        process.env.LLM_MODEL_RISKS ||
+        process.env.OPENROUTER_MODEL_RISKS ||
+        null
+      );
+    case "generate_summary":
+      return (
+        process.env.LLM_MODEL_SUMMARY ||
+        process.env.OPENROUTER_MODEL_SUMMARY ||
+        null
+      );
+    default:
+      return null;
+  }
+}
+
+function taskSpecificFallbacks(task: LlmTask) {
+  switch (task) {
+    case "extract_section":
+      return parseModelList(
+        process.env.LLM_MODEL_EXTRACT_FALLBACKS ||
+          process.env.OPENROUTER_MODEL_EXTRACT_FALLBACKS
+      );
+    case "analyze_risks":
+      return parseModelList(
+        process.env.LLM_MODEL_RISKS_FALLBACKS ||
+          process.env.OPENROUTER_MODEL_RISKS_FALLBACKS
+      );
+    case "generate_summary":
+      return parseModelList(
+        process.env.LLM_MODEL_SUMMARY_FALLBACKS ||
+          process.env.OPENROUTER_MODEL_SUMMARY_FALLBACKS
+      );
+    default:
+      return [];
+  }
+}
+
+export function getLlmModel(task: LlmTask = "extract_section") {
+  return getLlmRoute(task).primary;
+}
+
+export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
+  const defaultRoutes: Record<LlmTask, LlmRoute> = {
+    extract_section: {
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-chat", "anthropic/claude-sonnet-4.5"]
+    },
+    analyze_risks: {
+      primary: "anthropic/claude-sonnet-4.5",
+      fallbacks: ["openai/gpt-5-chat", "google/gemini-3-pro-preview"]
+    },
+    generate_summary: {
+      primary: "openai/gpt-5-chat",
+      fallbacks: ["google/gemini-3-flash-preview", "anthropic/claude-sonnet-4.5"]
+    }
+  };
+
+  const sharedFallbacks = parseModelList(
+    process.env.LLM_MODEL_FALLBACKS || process.env.OPENROUTER_MODEL_FALLBACKS
+  );
+  const primary =
+    taskSpecificModel(task) ||
     process.env.LLM_MODEL ||
     process.env.OPENROUTER_MODEL ||
-    process.env.OPENAI_MODEL ||
-    (process.env.OPENROUTER_API_KEY ? "openrouter/free" : "gpt-5")
-  );
+    defaultRoutes[task].primary;
+  const fallbacks = [
+    ...taskSpecificFallbacks(task),
+    ...sharedFallbacks,
+    ...defaultRoutes[task].fallbacks
+  ].filter((model, index, list) => model !== primary && list.indexOf(model) === index);
+
+  return { primary, fallbacks };
 }
 
 function safeParseJson(input: string) {
@@ -94,15 +182,19 @@ function safeParseJson(input: string) {
 }
 
 async function requestJson(
+  task: LlmTask,
   systemPrompt: string,
   userPrompt: string,
   debugMeta?: Record<string, unknown>
 ) {
-  const model = getLlmModel();
+  const route = getLlmRoute(task);
+  const model = route.primary;
   const startedAt = Date.now();
 
   logLlmDebug("info", "request_start", {
     model,
+    fallbacks: route.fallbacks,
+    task,
     ...debugMeta
   });
 
@@ -114,7 +206,14 @@ async function requestJson(
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      ...(route.fallbacks.length > 0
+        ? {
+            extra_body: {
+              models: route.fallbacks
+            }
+          }
+        : {})
     } as never);
 
     const content = response.choices?.[0]?.message?.content;
@@ -125,6 +224,9 @@ async function requestJson(
 
     logLlmDebug("info", "request_complete", {
       model,
+      resolvedModel: response.model ?? model,
+      fallbacks: route.fallbacks,
+      task,
       durationMs: Date.now() - startedAt,
       responseChars: content.length,
       ...debugMeta
@@ -134,6 +236,8 @@ async function requestJson(
   } catch (error) {
     logLlmDebug("error", "request_failed", {
       model,
+      fallbacks: route.fallbacks,
+      task,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : "Unknown LLM error",
       ...debugMeta
@@ -372,6 +476,7 @@ export async function extractSectionWithLlm(
   fallback: ExtractionPipelineResult
 ): Promise<ExtractionPipelineResult> {
   const payload = await requestJson(
+    "extract_section",
     "You extract creator deal facts from one document section at a time. Return only explicit facts from the section. Never guess missing values. Use null for anything not present. Keep output compact and factual.",
     `Extract facts from this ${documentKind} section.\n\nSection title: ${section.title}\nSection text:\n${section.content}\n\nFallback extraction for this section:\n${JSON.stringify(
       fallback.data,
@@ -389,7 +494,7 @@ export async function extractSectionWithLlm(
 
   return {
     schemaVersion: "v2-section",
-    model: `llm:${getLlmModel()}`,
+    model: `llm:${getLlmModel("extract_section")}`,
     confidence: asNumber(payload.confidence) ?? fallback.confidence,
     data: normalizeTerms(payload.data, fallback.data),
     evidence: normalizeEvidence(
@@ -409,6 +514,7 @@ export async function analyzeRisksWithLlm(
   documentId: string
 ) {
   const payload = await requestJson(
+    "analyze_risks",
     "You analyze creator deal risk after factual extraction is complete. Focus on creator-specific issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination. Do not restate every contract term.",
     `Document kind: ${documentKind}\n\nNormalized document text:\n${text}\n\nStructured extraction:\n${JSON.stringify(
       extraction.data,
@@ -433,12 +539,13 @@ export async function generateSummaryWithLlm(
   fallback: DocumentSummaryResult
 ) {
   const payload = await requestJson(
+    "generate_summary",
     "You write concise, plain-English creator deal summaries. You are not a law firm. Be clear, direct, and useful.",
-    `Using the extracted fields and risk flags below, write a creator-facing summary with these sections: "What this deal is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts".\n\nExtracted fields:\n${JSON.stringify(
+    `Using the extracted fields and risk flags below, write a creator-facing summary with these sections: "What this deal is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nExtracted fields:\n${JSON.stringify(
       extraction.data,
       null,
       2
-    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "body": "markdown summary"\n}`,
+    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this deal is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
     {
       requestType: "generate_summary",
       riskCount: risks.length,
@@ -447,8 +554,44 @@ export async function generateSummaryWithLlm(
     }
   );
 
+  const sections = Array.isArray(payload.sections)
+    ? payload.sections
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") {
+            return null;
+          }
+
+          const record = entry as { title?: unknown; paragraphs?: unknown };
+          const title = stripInlineMarkdown(asString(record.title) ?? "");
+          const paragraphs = Array.isArray(record.paragraphs)
+            ? record.paragraphs
+                .map((paragraph) => toPlainDealSummary(asString(paragraph) ?? ""))
+                .filter((paragraph): paragraph is string => Boolean(paragraph))
+            : [];
+
+          if (!title || paragraphs.length === 0) {
+            return null;
+          }
+
+          return {
+            id: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+            title,
+            paragraphs
+          };
+        })
+        .filter(
+          (
+            entry
+          ): entry is { id: string; title: string; paragraphs: string[] } =>
+            Boolean(entry)
+        )
+    : [];
+
   return {
-    body: asString(payload.body) ?? fallback.body,
-    version: `llm:${getLlmModel()}`
+    body:
+      (sections.length > 0
+        ? serializeDealSummarySections(sections)
+        : toPlainDealSummary(asString(payload.body) ?? fallback.body)) ?? fallback.body,
+    version: `llm:${getLlmModel("generate_summary")}`
   };
 }

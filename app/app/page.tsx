@@ -10,7 +10,9 @@ import {
   Plus,
 } from "lucide-react";
 
-import { deleteIntakeDraftAction } from "@/app/actions";
+import { deleteIntakeDraftAction, deleteWorkspaceAction } from "@/app/actions";
+import { DeleteDraftButton } from "@/components/delete-draft-button";
+import { DeleteWorkspaceButton } from "@/components/delete-workspace-button";
 import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -282,13 +284,12 @@ export default async function WorkspaceDashboardPage() {
                         </Badge>
                         <form action={deleteIntakeDraftAction}>
                           <input type="hidden" name="sessionId" value={session.id} />
-                          <button
-                            type="submit"
+                          <DeleteDraftButton
                             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
                             aria-label={`Delete draft ${deal.campaignName}`}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </button>
+                          </DeleteDraftButton>
                         </form>
                       </div>
                     </div>
@@ -318,6 +319,8 @@ export default async function WorkspaceDashboardPage() {
           <Link
             href="/app/intake/new?pick=1"
             className={buttonVariants({ className: "gap-2" })}
+            aria-label="Upload documents for a new deal workspace"
+            title="Start a new deal workspace"
           >
             <Plus className="h-4 w-4" />
             Upload documents
@@ -392,13 +395,12 @@ export default async function WorkspaceDashboardPage() {
                           </Badge>
                           <form action={deleteIntakeDraftAction}>
                             <input type="hidden" name="sessionId" value={session.id} />
-                            <button
-                              type="submit"
+                            <DeleteDraftButton
                               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
                               aria-label={`Delete draft ${deal.campaignName}`}
                             >
                               <Trash2 className="h-4 w-4" />
-                            </button>
+                            </DeleteDraftButton>
                           </form>
                         </div>
                       </div>
@@ -426,39 +428,53 @@ export default async function WorkspaceDashboardPage() {
                   const progress = progressForStatus(deal.status);
 
                   return (
-                    <Link key={deal.id} href={`/app/deals/${deal.id}`}>
-                      <Card className="app-surface app-surface-hover border-black/5 bg-white p-8 dark:border-white/10 dark:bg-white/[0.06]">
-                        <div className="flex items-start justify-between gap-6">
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-4 flex flex-wrap items-center gap-3">
-                              <h3 className="text-[22px] font-semibold tracking-tight text-foreground">
-                                {deal.campaignName}
-                              </h3>
-                              <Badge className={statusBadgeClass(deal.status)}>
-                                {humanizeToken(deal.status)}
+                    <Card
+                      key={deal.id}
+                      className="app-surface app-surface-hover border-black/5 bg-white p-8 dark:border-white/10 dark:bg-white/[0.06]"
+                    >
+                      <div className="flex items-start justify-between gap-6">
+                        <Link href={`/app/deals/${deal.id}`} className="min-w-0 flex-1">
+                          <div className="mb-4 flex flex-wrap items-center gap-3">
+                            <h3 className="text-[22px] font-semibold tracking-tight text-foreground">
+                              {deal.campaignName}
+                            </h3>
+                            <Badge className={statusBadgeClass(deal.status)}>
+                              {humanizeToken(deal.status)}
+                            </Badge>
+                            {deal.riskFlags.length > 0 ? (
+                              <Badge
+                                variant="outline"
+                                className="border-accent/30 text-accent"
+                              >
+                                {deal.riskFlags.length} Risk Flag
+                                {deal.riskFlags.length === 1 ? "" : "s"}
                               </Badge>
-                              {deal.riskFlags.length > 0 ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-accent/30 text-accent"
-                                >
-                                  {deal.riskFlags.length} Risk Flag
-                                  {deal.riskFlags.length === 1 ? "" : "s"}
-                                </Badge>
-                              ) : null}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
-                              <span>
-                                Payment:{" "}
-                                {formatCurrency(deal.paymentAmount, deal.currency)}
-                              </span>
-                              <span>Due: {formatDate(deal.nextDeliverableDate)}</span>
-                              <span>
-                                {deal.deliverables.length || deal.documents.length}{" "}
-                                {deal.deliverables.length > 0 ? "deliverables" : "documents"}
-                              </span>
-                            </div>
+                            ) : null}
                           </div>
+                          <div className="flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-muted-foreground">
+                            <span>
+                              Payment:{" "}
+                              {formatCurrency(deal.paymentAmount, deal.currency)}
+                            </span>
+                            <span>Due: {formatDate(deal.nextDeliverableDate)}</span>
+                            <span>
+                              {deal.deliverables.length || deal.documents.length}{" "}
+                              {deal.deliverables.length > 0 ? "deliverables" : "documents"}
+                            </span>
+                          </div>
+                        </Link>
+
+                        <div className="flex items-start gap-3">
+                          <form action={deleteWorkspaceAction}>
+                            <input type="hidden" name="dealId" value={deal.id} />
+                            <input type="hidden" name="redirectTo" value="/app" />
+                            <DeleteWorkspaceButton
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
+                              label={`Delete ${deal.campaignName}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </DeleteWorkspaceButton>
+                          </form>
 
                           {deal.status === "completed" || deal.status === "paid" ? (
                             <div className="pt-1">
@@ -482,8 +498,8 @@ export default async function WorkspaceDashboardPage() {
                             </div>
                           )}
                         </div>
-                      </Card>
-                    </Link>
+                      </div>
+                    </Card>
                   );
                 })}
               </div>

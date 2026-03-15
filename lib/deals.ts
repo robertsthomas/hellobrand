@@ -10,8 +10,8 @@ import { getViewerById } from "@/lib/auth";
 import {
   analyzeRisksWithLlm,
   extractSectionWithLlm,
+  getLlmRoute,
   generateSummaryWithLlm,
-  getLlmModel,
   hasLlmKey
 } from "@/lib/analysis/llm";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
@@ -186,7 +186,7 @@ function logDocumentPipeline(
 }
 
 function llmSectionLimits() {
-  const model = getLlmModel().toLowerCase();
+  const model = getLlmRoute("extract_section").primary.toLowerCase();
   const usingFreeModel =
     model.includes("openrouter/free") || model.includes(":free") || model.includes("/free");
 
@@ -443,7 +443,8 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       dealId: document.dealId,
       documentId: document.id,
       fileName: document.fileName,
-      model: hasLlmKey() ? getLlmModel() : null,
+      model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
+      fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
       usingFreeModel: llmPlan.usingFreeModel,
       selectedSectionCount: llmPlan.selected.length,
       totalSectionCount: sections.length,
@@ -729,6 +730,10 @@ export async function updateDealForViewer(
   patch: Partial<DealRecord>
 ) {
   return getRepository().updateDeal(viewer.id, dealId, patch);
+}
+
+export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
+  return getRepository().deleteDeal(viewer.id, dealId);
 }
 
 export async function updateTermsForViewer(

@@ -172,3 +172,101 @@ select {
 html.dark ::selection {
   background: rgba(127, 188, 165, 0.28);
 }
+
+@keyframes intake-loader-pan {
+  0% {
+    transform: translate3d(-5%, -3%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, 2%, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(-3%, 4%, 0) scale(1.01);
+  }
+}
+
+@keyframes intake-loader-pulse {
+  0% {
+    opacity: 0.32;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0.36;
+    transform: scale(0.99);
+  }
+}
+
+@keyframes intake-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.intake-loader-shell {
+  background:
+    linear-gradient(180deg, rgba(203, 214, 228, 0.92) 0%, rgba(180, 196, 214, 0.96) 100%);
+}
+
+.intake-loader-shell-glow {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.28), transparent 34%),
+    radial-gradient(circle at 82% 12%, rgba(255, 255, 255, 0.24), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.intake-loader-canvas {
+  background:
+    linear-gradient(140deg, rgba(238, 245, 255, 0.95), rgba(241, 249, 241, 0.92)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.5));
+}
+
+.intake-loader-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(28px);
+  opacity: 0.46;
+  animation: intake-loader-pan 14s ease-in-out infinite alternate,
+    intake-loader-pulse 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.intake-loader-aurora-one {
+  left: -8%;
+  top: 8%;
+  height: 340px;
+  width: 340px;
+  background: radial-gradient(circle, rgba(189, 207, 255, 0.95) 0%, rgba(189, 207, 255, 0) 68%);
+}
+
+.intake-loader-aurora-two {
+  right: -6%;
+  top: 12%;
+  height: 360px;
+  width: 360px;
+  background: radial-gradient(circle, rgba(220, 246, 223, 0.9) 0%, rgba(220, 246, 223, 0) 68%);
+  animation-delay: -3s;
+}
+
+.intake-loader-aurora-three {
+  bottom: -16%;
+  left: 26%;
+  height: 300px;
+  width: 300px;
+  background: radial-gradient(circle, rgba(236, 245, 224, 0.84) 0%, rgba(236, 245, 224, 0) 68%);
+  animation-delay: -5s;
+}
+
+.intake-loader-spinner {
+  display: inline-block;
+  height: 22px;
+  width: 22px;
+  border-radius: 9999px;
+  border: 2px solid rgba(16, 24, 40, 0.12);
+  border-top-color: rgba(16, 24, 40, 0.95);
+  animation: intake-loader-spin 0.9s linear infinite;
+}

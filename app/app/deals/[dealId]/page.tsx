@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
+import { Trash2 } from "lucide-react";
 
+import { deleteWorkspaceAction } from "@/app/actions";
+import { DeleteWorkspaceButton } from "@/components/delete-workspace-button";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
 import { DealStatusPanel } from "@/components/deal-status-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
@@ -12,6 +15,7 @@ import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
+import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
 import { ensureDraftsForDeal, getDealForViewer } from "@/lib/deals";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -49,23 +53,51 @@ export default async function WorkspaceDealDetailPage({
     extractionResults,
     summaries
   } = aggregate;
+  const summaryBody =
+    aggregate.currentSummary?.body ??
+    deal.summary ??
+    "Upload documents to generate a plain-English summary, extracted creator terms, and negotiation watchouts.";
+  const summarySections = parseDealSummarySections(summaryBody);
+  const plainSummary = toPlainDealSummary(summaryBody) ?? summaryBody;
 
   return (
     <div className="p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-[2rem] bg-white/80 dark:bg-white/5 p-7 shadow-panel">
-            <p className="text-xs uppercase tracking-[0.24em] text-black/45 dark:text-white/45">
-              {deal.brandName}
-            </p>
-            <h1 className="mt-4 font-serif text-5xl text-ocean">
-              {deal.campaignName}
-            </h1>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-black/65 dark:text-white/70">
-              {aggregate.currentSummary?.body ??
-                deal.summary ??
-                "Upload documents to generate a plain-English summary, extracted creator terms, and negotiation watchouts."}
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-black/45 dark:text-white/45">
+                  {deal.brandName}
+                </p>
+                <h1 className="mt-4 font-serif text-5xl text-ocean">
+                  {deal.campaignName}
+                </h1>
+              </div>
+            </div>
+            {summarySections.length > 0 ? (
+              <div className="mt-5 max-w-4xl space-y-4">
+                {summarySections.map((section) => (
+                  <div key={section.id} className="space-y-1.5">
+                    <h2 className="text-sm font-semibold text-ink">
+                      {section.title}
+                    </h2>
+                    {section.paragraphs.map((paragraph, index) => (
+                      <p
+                        key={`${section.id}-${index}`}
+                        className="text-sm leading-6 text-black/65 dark:text-white/70"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 max-w-3xl text-sm leading-6 text-black/65 dark:text-white/70">
+                {plainSummary}
+              </p>
+            )}
             <p className="mt-4 text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
               {deal.legalDisclaimer}
             </p>
@@ -197,6 +229,19 @@ export default async function WorkspaceDealDetailPage({
             <DealNotesPanel dealId={deal.id} notes={terms?.notes ?? null} />
           </TabsContent>
         </Tabs>
+
+        <div className="border-t border-black/6 pt-6 dark:border-white/8">
+          <form action={deleteWorkspaceAction}>
+            <input type="hidden" name="dealId" value={deal.id} />
+            <input type="hidden" name="redirectTo" value="/app/deals/history" />
+            <DeleteWorkspaceButton
+              className="inline-flex items-center gap-2 text-sm font-medium text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete this deal
+            </DeleteWorkspaceButton>
+          </form>
+        </div>
       </div>
     </div>
   );

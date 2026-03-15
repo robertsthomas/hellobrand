@@ -10,6 +10,7 @@ import type {
   NormalizedIntakeRecord,
   SummaryRecord
 } from "@/lib/types";
+import { toPlainDealSummary } from "@/lib/deal-summary";
 
 export const INTAKE_NORMALIZED_VERSION = "intake-normalized:v1";
 
@@ -475,13 +476,48 @@ function buildTimelineLabel(snippet: string) {
   return "Timeline item";
 }
 
+function splitTimelineCandidates(line: string) {
+  return line
+    .split(/\s*(?:,|;|\band\b)\s*/i)
+    .map((entry) => entry.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
+function isTimelineBoilerplate(snippet: string) {
+  return /time is of the essence|notify company|sole discretion|publish|distribute|jurisdiction|ftc|comply|adher(?:e|ence)|approve? for publication|content format|services and deliverables|section \d|schedule \d|agreement|notice|company may|content delivered to company/i.test(
+    snippet
+  );
+}
+
+function scoreTimelineSnippet(snippet: string, kind: DocumentKind, hasDate: boolean) {
+  let score = lineScore(kind);
+
+  if (hasDate) {
+    score += 5;
+  }
+  if (/timing:|timeline:|live date|go live|drafts? due|outline due|review by|final due|submission due|due by|due on/i.test(snippet)) {
+    score += 4;
+  }
+  if (/approx|no later than|within|after accepting/i.test(snippet)) {
+    score += 2;
+  }
+  if (/services and deliverables|deliver the content to company|publish|distribute|jurisdiction|sole discretion/i.test(snippet)) {
+    score -= 6;
+  }
+
+  return score;
+}
+
 function extractTimelineItems(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.timelineItems;
   if (persisted?.length) {
     return persisted;
   }
 
-  const snippets = new Map<string, IntakeTimelineItem>();
+  const snippets = new Map<
+    string,
+    IntakeTimelineItem & { score: number; sourceLength: number }
+  >();
   const datePattern =
     /\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|[A-Z][a-z]{2,8}\s+\d{1,2}(?:,\s*\d{4})?|\d+\s*(?:hrs?|hours?|days?)\s+after)\b/;
 
@@ -494,23 +530,62 @@ function extractTimelineItems(aggregate: DealAggregate) {
       if (!line) {
         continue;
       }
-      if (!/(due|draft|final|live|review|outline|submit|submission)/i.test(line)) {
+      if (!/(due|draft|final|live|review|outline|submit|submission|timing|timeline)/i.test(line)) {
         continue;
       }
 
-      const dateMatch = line.match(datePattern);
-      const item: IntakeTimelineItem = {
-        id: `timeline-${snippets.size + 1}`,
-        label: buildTimelineLabel(line),
-        date: presentText(dateMatch?.[0] ?? null),
-        source: line,
-        status: "scheduled"
-      };
-      snippets.set(`${item.label}:${item.date ?? line}`, item);
+      for (const candidate of splitTimelineCandidates(line)) {
+        if (!/(due|draft|final|live|review|outline|submit|submission|timing|timeline)/i.test(candidate)) {
+          continue;
+        }
+        if (isTimelineBoilerplate(candidate)) {
+          continue;
+        }
+
+        const dateMatch = candidate.match(datePattern);
+        const date = presentText(dateMatch?.[0] ?? null);
+        if (!date) {
+          continue;
+        }
+
+        const label = buildTimelineLabel(candidate);
+        const key = `${label}:${date.toLowerCase()}`;
+        const score = scoreTimelineSnippet(candidate, document.documentKind, true);
+        const nextItem: IntakeTimelineItem & { score: number; sourceLength: number } = {
+          id: `timeline-${snippets.size + 1}`,
+          label,
+          date,
+          source: candidate,
+          status: "scheduled",
+          score,
+          sourceLength: candidate.length
+        };
+        const existing = snippets.get(key);
+
+        if (
+          !existing ||
+          nextItem.score > existing.score ||
+          (nextItem.score === existing.score &&
+            nextItem.sourceLength < existing.sourceLength)
+        ) {
+          snippets.set(key, nextItem);
+        }
+      }
     }
   }
 
-  return Array.from(snippets.values());
+  return Array.from(snippets.values())
+    .sort((left, right) => {
+      if (right.score === left.score) {
+        return left.sourceLength - right.sourceLength;
+      }
+      return right.score - left.score;
+    })
+    .slice(0, 6)
+    .map(({ score: _score, sourceLength: _sourceLength, ...item }, index) => ({
+      ...item,
+      id: `timeline-${index + 1}`
+    }));
 }
 
 function extractAnalytics(aggregate: DealAggregate) {
@@ -520,24 +595,51 @@ function extractAnalytics(aggregate: DealAggregate) {
   }
 
   const highlights = new Set<string>();
+  const analyticsDocumentPattern =
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|performance|viewers)\b/i;
+  const analyticsLinePattern =
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|for you|following|personal profile|female|male|18-24|25-34|35-44|45-54|55\+)\b/i;
+  const analyticsMetricPattern =
+    /(?:\b\d+(?:\.\d+)?%\b|\b\d+(?:\.\d+)?s\b|\b\d+(?:\.\d+)?[kKmM]\b|\b\d{1,3}(?:,\d{3})+\b)/;
+  const analyticsBoilerplatePattern =
+    /\b(manager\/agency|agreement|term of agreement|usage term|usage platforms|document ref|company|talent manager|services and deliverables)\b/i;
 
   for (const document of aggregate.documents) {
     const text = document.normalizedText ?? document.rawText ?? "";
+    if (!text) {
+      continue;
+    }
+
+    const fileName = document.fileName.toLowerCase();
+    const looksLikeAnalyticsDocument =
+      /analytics|insights|performance|viewers|audience|retention|tiktok/i.test(fileName) ||
+      Array.from(text.matchAll(new RegExp(analyticsDocumentPattern, "gi"))).length >= 2;
+
+    if (!looksLikeAnalyticsDocument) {
+      continue;
+    }
+
     const lines = text.split(/\r?\n/);
 
     for (const line of lines) {
       const trimmed = line.replace(/\s+/g, " ").trim();
+      if (!trimmed || trimmed.length > 120) {
+        continue;
+      }
+      if (analyticsBoilerplatePattern.test(trimmed)) {
+        continue;
+      }
       if (
-        /total viewers|average watch time|watched full video|new followers|traffic sources|top locations|gender|age/i.test(
-          trimmed
-        )
+        analyticsLinePattern.test(trimmed) &&
+        (analyticsMetricPattern.test(trimmed) ||
+          /\b(gender|age|traffic sources|top locations|retention rate)\b/i.test(trimmed))
       ) {
-        highlights.add(trimmed);
+        highlights.add(trimmed.replace(/\s{2,}/g, " "));
       }
     }
   }
 
-  return highlights.size > 0 ? { highlights: Array.from(highlights).slice(0, 8) } : null;
+  return highlights.size > 0 ? { highlights: Array.from(highlights).slice(0, 5) } : null;
 }
 
 function inferContractTitle(
@@ -716,7 +818,7 @@ export function buildNormalizedIntakeRecord(
     ? persisted.analytics
     : extractAnalytics(aggregate);
   const contractSummary =
-    presentText(persisted?.contractSummary) ??
+    toPlainDealSummary(persisted?.contractSummary) ??
     buildContractSummary({
       brandName,
       agencyName,
@@ -726,7 +828,7 @@ export function buildNormalizedIntakeRecord(
       deliverables,
       timelineItems
     }) ??
-    presentText(aggregate.currentSummary?.body);
+    toPlainDealSummary(aggregate.currentSummary?.body);
 
   const notes = presentText(persisted?.notes) ?? presentText(aggregate.terms?.notes);
   const evidenceGroups = buildEvidenceGroups({

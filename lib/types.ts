@@ -301,8 +301,21 @@ export interface ProfileRecord {
   contactEmail: string | null;
   preferredSignature: string | null;
   payoutDetails: string | null;
+  defaultCurrency: string | null;
+  reminderLeadDays: number | null;
+  conflictAlertsEnabled: boolean;
+  paymentRemindersEnabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProfileAuditRecord {
+  id: string;
+  profileId: string;
+  actorUserId: string;
+  changedFields: string[];
+  snapshot: Record<string, { before: unknown; after: unknown }>;
+  createdAt: string;
 }
 
 export interface PaymentRecord {
