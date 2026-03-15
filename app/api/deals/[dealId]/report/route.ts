@@ -77,6 +77,15 @@ export async function PATCH(
         body.exclusivityRestrictions ??
         aggregate.terms?.exclusivityRestrictions ??
         null,
+      brandCategory: body.brandCategory ?? aggregate.terms?.brandCategory ?? null,
+      competitorCategories:
+        body.competitorCategories ?? aggregate.terms?.competitorCategories ?? [],
+      restrictedCategories:
+        body.restrictedCategories ?? aggregate.terms?.restrictedCategories ?? [],
+      campaignDateWindow:
+        body.campaignDateWindow ?? aggregate.terms?.campaignDateWindow ?? null,
+      disclosureObligations:
+        body.disclosureObligations ?? aggregate.terms?.disclosureObligations ?? [],
       revisions: body.revisions ?? aggregate.terms?.revisions ?? null,
       revisionRounds: body.revisionRounds ?? aggregate.terms?.revisionRounds ?? null,
       termination: body.termination ?? aggregate.terms?.termination ?? null,

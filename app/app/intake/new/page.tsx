@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { FileText, Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
+import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { IntakeDraftEditor } from "@/components/intake-draft-editor";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
@@ -10,13 +11,11 @@ import { getIntakeSessionForViewer } from "@/lib/intake";
 export default async function NewIntakePage({
   searchParams
 }: {
-  searchParams: Promise<{ pick?: string; mode?: string; draft?: string }>;
+  searchParams: Promise<{ mode?: string; draft?: string }>;
 }) {
   const viewer = await requireViewer();
   const resolvedSearchParams = await searchParams;
-  const autoOpenPicker = resolvedSearchParams.pick === "1";
-  const initialMode =
-    resolvedSearchParams.mode === "paste" && !autoOpenPicker ? "paste" : "upload";
+  const initialMode = resolvedSearchParams.mode === "paste" ? "paste" : "upload";
   let initialDraft: Parameters<typeof IntakeDraftEditor>[0]["initialDraft"] = null;
 
   if (resolvedSearchParams.draft) {
@@ -29,7 +28,7 @@ export default async function NewIntakePage({
     initialDraft = {
       sessionId: payload.session.id,
       mode:
-        payload.session.inputSource === "paste" && !autoOpenPicker
+        payload.session.inputSource === "paste"
           ? "paste"
           : initialMode,
       brandName:
@@ -53,7 +52,7 @@ export default async function NewIntakePage({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
               Documents
             </p>
-            <h1 className="text-4xl font-semibold text-ink">Upload documents</h1>
+            <h1 className="text-4xl font-semibold text-ink">New workspace</h1>
             <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
               Upload a contract, paste an email thread, or do both. HelloBrand
               analyzes the source material first, then lets you confirm the deal
@@ -73,11 +72,26 @@ export default async function NewIntakePage({
             </form>
           ) : null}
         </section>
-        <IntakeDraftEditor
-          autoOpenPicker={autoOpenPicker}
-          initialMode={initialMode}
-          initialDraft={initialDraft}
-        />
+        {initialDraft ? (
+          <IntakeDraftEditor
+            autoOpenPicker={false}
+            initialMode={initialMode}
+            initialDraft={initialDraft}
+          />
+        ) : (
+          <div className="flex min-h-[50vh] items-center justify-center">
+            <div className="max-w-md text-center">
+              <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
+                <FileText className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h2 className="mb-3 text-2xl font-semibold">Start a new workspace</h2>
+              <p className="mb-8 text-black/60 dark:text-white/65">
+                Upload your first deal document or paste text to create a new workspace.
+              </p>
+              <EmptyDashboardUpload initialMode={initialMode} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

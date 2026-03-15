@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import { prisma } from "@/lib/prisma";
 import type {
   DealAggregate,
@@ -109,6 +110,11 @@ function toDealTermsRecord(terms: {
   exclusivityCategory: string | null;
   exclusivityDuration: string | null;
   exclusivityRestrictions: string | null;
+  brandCategory: string | null;
+  competitorCategories: unknown;
+  restrictedCategories: unknown;
+  campaignDateWindow: unknown;
+  disclosureObligations: unknown;
   revisions: string | null;
   revisionRounds: number | null;
   termination: string | null;
@@ -126,6 +132,16 @@ function toDealTermsRecord(terms: {
       ? (terms.deliverables as DealTermsRecord["deliverables"])
       : [],
     usageChannels: toStringArray(terms.usageChannels),
+    brandCategory: normalizeDealCategory(terms.brandCategory),
+    competitorCategories: toStringArray(terms.competitorCategories),
+    restrictedCategories: toStringArray(terms.restrictedCategories),
+    campaignDateWindow:
+      terms.campaignDateWindow && typeof terms.campaignDateWindow === "object"
+        ? (terms.campaignDateWindow as DealTermsRecord["campaignDateWindow"])
+        : null,
+    disclosureObligations: Array.isArray(terms.disclosureObligations)
+      ? (terms.disclosureObligations as DealTermsRecord["disclosureObligations"])
+      : [],
     createdAt: iso(terms.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(terms.updatedAt) ?? new Date().toISOString()
   };
@@ -324,6 +340,7 @@ export class PrismaRepository {
       latestDocument: documents[0] ?? null,
       documents,
       terms: deal.terms ? toDealTermsRecord(deal.terms) : null,
+      conflictResults: [],
       paymentRecord: deal.paymentRecord
         ? {
             ...deal.paymentRecord,
@@ -639,13 +656,21 @@ export class PrismaRepository {
       update: {
         ...patch,
         deliverables: patch.deliverables,
-        usageChannels: patch.usageChannels
+        usageChannels: patch.usageChannels,
+        competitorCategories: patch.competitorCategories,
+        restrictedCategories: patch.restrictedCategories,
+        campaignDateWindow: patch.campaignDateWindow,
+        disclosureObligations: patch.disclosureObligations
       },
       create: {
         dealId,
         ...patch,
         deliverables: patch.deliverables,
-        usageChannels: patch.usageChannels
+        usageChannels: patch.usageChannels,
+        competitorCategories: patch.competitorCategories,
+        restrictedCategories: patch.restrictedCategories,
+        campaignDateWindow: patch.campaignDateWindow,
+        disclosureObligations: patch.disclosureObligations
       }
     });
 

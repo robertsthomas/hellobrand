@@ -1,11 +1,29 @@
 import { saveTermsAction } from "@/app/actions";
+import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import type {
+  DealCategory,
   DealTermsRecord,
   DocumentSectionRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord
 } from "@/lib/types";
 import { humanizeToken } from "@/lib/utils";
+
+const DEAL_CATEGORY_OPTIONS: DealCategory[] = [
+  "beauty_personal_care",
+  "fashion_apparel",
+  "food_beverage",
+  "entertainment_media",
+  "fitness_wellness",
+  "parenting_family",
+  "tech_gaming",
+  "travel_hospitality",
+  "finance",
+  "home_lifestyle",
+  "retail_ecommerce",
+  "sports_outdoors",
+  "other"
+];
 
 function EvidenceList({
   fieldPath,
@@ -180,6 +198,31 @@ export function TermsEditor({
           />
           <FieldSignals
             fieldPath="agencyName"
+            evidence={evidence}
+            sections={sections}
+            extractionResults={extractionResults}
+          />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
+          Brand category
+          <select
+            className="rounded-2xl border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-3"
+            name="brandCategory"
+            defaultValue={terms?.brandCategory ?? ""}
+          >
+            <option value="">Not set</option>
+            {DEAL_CATEGORY_OPTIONS.map((category) => (
+              <option key={category} value={category}>
+                {dealCategoryLabel(category)}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs leading-5 text-black/50 dark:text-white/55">
+            Override the detected category if this deal should be compared against a
+            different competitor group.
+          </p>
+          <FieldSignals
+            fieldPath="brandCategory"
             evidence={evidence}
             sections={sections}
             extractionResults={extractionResults}

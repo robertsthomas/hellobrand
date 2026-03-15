@@ -80,6 +80,11 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       exclusivityCategory: terms.exclusivityCategory ?? null,
       exclusivityDuration: terms.exclusivityDuration ?? null,
       exclusivityRestrictions: terms.exclusivityRestrictions ?? null,
+      brandCategory: terms.brandCategory ?? null,
+      competitorCategories: terms.competitorCategories ?? [],
+      restrictedCategories: terms.restrictedCategories ?? [],
+      campaignDateWindow: terms.campaignDateWindow ?? null,
+      disclosureObligations: terms.disclosureObligations ?? [],
       revisionRounds: terms.revisionRounds ?? null,
       terminationAllowed: terms.terminationAllowed ?? null,
       terminationNotice: terms.terminationNotice ?? null,
@@ -156,6 +161,7 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
     latestDocument,
     documents,
     terms: store.dealTerms.find((record) => record.dealId === deal.id) ?? null,
+    conflictResults: [],
     paymentRecord: null,
     riskFlags: sortNewestFirst(
       store.riskFlags.filter((flag) => flag.dealId === deal.id)

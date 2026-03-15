@@ -15,7 +15,7 @@ export function AppShell({
 }) {
   const nav = [
     { href: "/", label: "Dashboard" },
-    { href: "/app/intake/new?pick=1", label: "Upload documents" }
+    { href: "/app/intake/new", label: "New Workspace" }
   ];
 
   return (
@@ -23,7 +23,7 @@ export function AppShell({
       <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8 lg:px-10">
         <header className="mb-10 flex flex-col gap-5 rounded-[2rem] border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/5 px-6 py-5 shadow-panel backdrop-blur md:flex-row md:items-center md:justify-between">
           <div>
-            <Link href="/" className="font-serif text-3xl text-ocean">
+            <Link href="/app" className="font-serif text-3xl text-ocean">
               HelloBrand
             </Link>
             <p className="mt-2 max-w-xl text-sm text-black/65 dark:text-white/70">

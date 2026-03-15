@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { Fragment } from "react";
 
 import { deleteWorkspaceAction } from "@/app/actions";
+import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteWorkspaceButton } from "@/components/delete-workspace-button";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
 import { DealStatusPanel } from "@/components/deal-status-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
+import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { EmailDrafts } from "@/components/email-drafts";
 import { PaymentPanel } from "@/components/payment-panel";
@@ -15,9 +18,33 @@ import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
+import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
 import { ensureDraftsForDeal, getDealForViewer } from "@/lib/deals";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+
+function renderSummaryParagraph(paragraph: string) {
+  const pattern =
+    /(\$[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|\bNet\s+\d+\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}\b|\bTikTok\b|\bInstagram\b|\bYouTube\b|\b#ad\b|\bpaid partnership\b)/gi;
+  const parts = paragraph.split(pattern);
+
+  return parts.map((part, index) => {
+    if (!part) {
+      return null;
+    }
+
+    const isEmphasis = pattern.test(part);
+    pattern.lastIndex = 0;
+
+    return isEmphasis ? (
+      <strong key={`${part}-${index}`} className="font-semibold text-ink">
+        {part}
+      </strong>
+    ) : (
+      <Fragment key={`${part}-${index}`}>{part}</Fragment>
+    );
+  });
+}
 
 export default async function WorkspaceDealDetailPage({
   params
@@ -76,20 +103,25 @@ export default async function WorkspaceDealDetailPage({
               </div>
             </div>
             {summarySections.length > 0 ? (
-              <div className="mt-5 max-w-4xl space-y-4">
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
                 {summarySections.map((section) => (
-                  <div key={section.id} className="space-y-1.5">
-                    <h2 className="text-sm font-semibold text-ink">
+                  <div
+                    key={section.id}
+                    className="rounded-[1.5rem] border border-black/6 bg-sand/35 p-5 dark:border-white/8 dark:bg-white/[0.04]"
+                  >
+                    <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-black/48 dark:text-white/48">
                       {section.title}
                     </h2>
+                    <div className="mt-3 space-y-3">
                     {section.paragraphs.map((paragraph, index) => (
                       <p
                         key={`${section.id}-${index}`}
-                        className="text-sm leading-6 text-black/65 dark:text-white/70"
+                        className="text-[15px] leading-7 text-black/68 dark:text-white/72"
                       >
-                        {paragraph}
+                        {renderSummaryParagraph(paragraph)}
                       </p>
                     ))}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -154,6 +186,16 @@ export default async function WorkspaceDealDetailPage({
 
           <TabsContent value="overview" className="space-y-6">
             <UploadContractForm dealId={deal.id} documents={documents} />
+            {(aggregate.conflictResults?.length ?? 0) > 0 ? (
+              <ConflictWarnings
+                conflicts={aggregate.conflictResults}
+                title="Cross-deal conflict warnings"
+                description="These warnings compare this deal against your other active deals."
+              />
+            ) : null}
+            {(terms?.disclosureObligations?.length ?? 0) > 0 ? (
+              <DisclosureObligations obligations={terms?.disclosureObligations ?? []} />
+            ) : null}
             <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
               <DealStatusPanel
                 dealId={deal.id}
@@ -179,7 +221,12 @@ export default async function WorkspaceDealDetailPage({
               <SummaryCard
                 label="Exclusivity"
                 value={terms?.exclusivityDuration ?? "Not detected"}
-                caption={terms?.exclusivityCategory ?? "Category not specified"}
+                caption={
+                  terms?.exclusivityCategory ??
+                  (terms?.brandCategory
+                    ? dealCategoryLabel(terms.brandCategory)
+                    : "Category not specified")
+                }
                 accent="clay"
               />
               <SummaryCard

@@ -1,7 +1,10 @@
 import OpenAI from "openai";
 
+import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict-intelligence";
 import type {
+  CampaignDateWindow,
   DealTermsRecord,
+  DisclosureObligation,
   DocumentKind,
   DocumentSectionInput,
   DocumentSummaryResult,
@@ -266,6 +269,49 @@ function asStringArray(value: unknown) {
   return value.map(asString).filter((entry): entry is string => Boolean(entry));
 }
 
+function asDateWindow(value: unknown): CampaignDateWindow | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  return {
+    startDate: asString(row.startDate),
+    endDate: asString(row.endDate),
+    postingWindow: asString(row.postingWindow)
+  };
+}
+
+function asDisclosureObligations(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const row = entry as Record<string, unknown>;
+      const title = asString(row.title);
+      const detail = asString(row.detail);
+      if (!title || !detail) {
+        return null;
+      }
+
+      const obligation: DisclosureObligation = {
+        id: asString(row.id) ?? `llm-disclosure-${index}`,
+        title,
+        detail,
+        source: asString(row.source)
+      };
+
+      return obligation;
+    })
+    .filter((entry): entry is DisclosureObligation => entry !== null);
+}
+
 function normalizeDeliverables(
   value: unknown,
   fallbackDeliverables: TermsData["deliverables"]
@@ -323,6 +369,13 @@ function normalizeTerms(
 
   const input = rawData as Record<string, unknown>;
 
+  const mergedConflictIntelligence = mergeConflictIntelligence(fallbackData, {
+    competitorCategories: asStringArray(input.competitorCategories),
+    restrictedCategories: asStringArray(input.restrictedCategories),
+    disclosureObligations: asDisclosureObligations(input.disclosureObligations),
+    campaignDateWindow: asDateWindow(input.campaignDateWindow)
+  });
+
   return {
     ...fallbackData,
     brandName: asString(input.brandName) ?? fallbackData.brandName,
@@ -357,6 +410,12 @@ function normalizeTerms(
       asString(input.exclusivityDuration) ?? fallbackData.exclusivityDuration,
     exclusivityRestrictions:
       asString(input.exclusivityRestrictions) ?? fallbackData.exclusivityRestrictions,
+    brandCategory:
+      normalizeDealCategory(asString(input.brandCategory)) ?? fallbackData.brandCategory,
+    competitorCategories: mergedConflictIntelligence.competitorCategories,
+    restrictedCategories: mergedConflictIntelligence.restrictedCategories,
+    campaignDateWindow: mergedConflictIntelligence.campaignDateWindow,
+    disclosureObligations: mergedConflictIntelligence.disclosureObligations,
     revisions: asString(input.revisions) ?? fallbackData.revisions,
     revisionRounds: asNumber(input.revisionRounds) ?? fallbackData.revisionRounds,
     termination: asString(input.termination) ?? fallbackData.termination,
@@ -538,6 +597,7 @@ export async function generateSummaryWithLlm(
   risks: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>,
   fallback: DocumentSummaryResult
 ) {
+  const evidenceCount = Array.isArray(extraction.evidence) ? extraction.evidence.length : 0;
   const payload = await requestJson(
     "generate_summary",
     "You write concise, plain-English creator deal summaries. You are not a law firm. Be clear, direct, and useful.",
@@ -549,7 +609,7 @@ export async function generateSummaryWithLlm(
     {
       requestType: "generate_summary",
       riskCount: risks.length,
-      evidenceCount: extraction.evidence.length,
+      evidenceCount,
       fallbackSummaryChars: fallback.body.length
     }
   );

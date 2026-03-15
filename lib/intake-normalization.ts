@@ -1,6 +1,9 @@
 import type {
+  CampaignDateWindow,
+  DealCategory,
   DealAggregate,
   DeliverableItem,
+  DisclosureObligation,
   DocumentKind,
   ExtractionEvidenceRecord,
   IntakeAnalyticsRecord,
@@ -12,7 +15,7 @@ import type {
 } from "@/lib/types";
 import { toPlainDealSummary } from "@/lib/deal-summary";
 
-export const INTAKE_NORMALIZED_VERSION = "intake-normalized:v1";
+export const INTAKE_NORMALIZED_VERSION = "intake-normalized:v2";
 
 interface PersistedIntakeRecord {
   brandName: string | null;
@@ -24,6 +27,11 @@ interface PersistedIntakeRecord {
   currency: string | null;
   deliverables: DeliverableItem[];
   timelineItems: IntakeTimelineItem[];
+  brandCategory: DealCategory | null;
+  competitorCategories: string[];
+  restrictedCategories: string[];
+  campaignDateWindow: CampaignDateWindow | null;
+  disclosureObligations: DisclosureObligation[];
   analytics: IntakeAnalyticsRecord | null;
   notes: string | null;
 }
@@ -456,6 +464,38 @@ function parseDeliverablesFromText(aggregate: DealAggregate) {
   return found;
 }
 
+function campaignWindowFromTimelineItems(timelineItems: IntakeTimelineItem[]) {
+  const dated = timelineItems
+    .map((item) => presentText(item.date))
+    .filter(
+      (value): value is string =>
+        Boolean(value) &&
+        (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value) ||
+          /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(
+            value
+          ) ||
+          /^\d{4}-\d{2}-\d{2}/.test(value))
+    )
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => left.localeCompare(right));
+
+  if (dated.length === 0) {
+    return null;
+  }
+
+  const startDate = dated[0] ?? null;
+  const endDate = dated[dated.length - 1] ?? null;
+
+  return {
+    startDate,
+    endDate,
+    postingWindow:
+      startDate && endDate && startDate !== endDate
+        ? `${startDate} to ${endDate}`
+        : startDate ?? endDate ?? null
+  };
+}
+
 function buildTimelineLabel(snippet: string) {
   const lower = snippet.toLowerCase();
   if (lower.includes("outline")) {
@@ -725,6 +765,8 @@ function buildEvidenceGroups(input: {
   primaryContact: IntakePrimaryContact;
   contractTitle: string | null;
   timelineItems: IntakeTimelineItem[];
+  brandCategory: DealCategory | null;
+  disclosureObligations: DisclosureObligation[];
   analytics: IntakeAnalyticsRecord | null;
 }) {
   const groups: IntakeEvidenceGroup[] = [];
@@ -769,6 +811,19 @@ function buildEvidenceGroups(input: {
     snippets: Array.from(new Set(snapshotSnippets)).slice(0, 4)
   });
 
+  const intelligenceSnippets = [
+    input.brandCategory ? input.brandCategory.replace(/_/g, " ") : null,
+    ...input.disclosureObligations.map((entry) => entry.title)
+  ].filter((entry): entry is string => Boolean(presentText(entry)));
+
+  if (intelligenceSnippets.length > 0) {
+    groups.push({
+      id: "rights-and-disclosure",
+      title: "Rights and disclosure",
+      snippets: Array.from(new Set(intelligenceSnippets)).slice(0, 6)
+    });
+  }
+
   if (input.timelineItems.length > 0) {
     groups.push({
       id: "timeline",
@@ -780,11 +835,11 @@ function buildEvidenceGroups(input: {
     });
   }
 
-  if (input.analytics?.highlights.length) {
+  if ((input.analytics?.highlights?.length ?? 0) > 0) {
     groups.push({
       id: "analytics",
       title: "Audience and analytics",
-      snippets: input.analytics.highlights.slice(0, 6)
+      snippets: (input.analytics?.highlights ?? []).slice(0, 6)
     });
   }
 
@@ -804,19 +859,44 @@ export function buildNormalizedIntakeRecord(
   const primaryContact = extractPrimaryContact(aggregate, agencyName, brandName);
   const contractTitle = inferContractTitle(aggregate, brandName);
   const paymentAmount = inferPaymentAmount(aggregate);
+  const persistedDeliverables = Array.isArray(persisted?.deliverables)
+    ? persisted.deliverables
+    : [];
+  const aggregateDeliverables = Array.isArray(aggregate.terms?.deliverables)
+    ? aggregate.terms.deliverables
+    : [];
   const deliverables = cleanDeliverables(
-    persisted?.deliverables?.length
-      ? persisted.deliverables
-      : aggregate.terms?.deliverables?.length
-        ? aggregate.terms.deliverables
+    persistedDeliverables.length > 0
+      ? persistedDeliverables
+      : aggregateDeliverables.length > 0
+        ? aggregateDeliverables
         : parseDeliverablesFromText(aggregate)
   );
-  const timelineItems = persisted?.timelineItems?.length
-    ? persisted.timelineItems
-    : extractTimelineItems(aggregate);
-  const analytics = persisted?.analytics?.highlights?.length
-    ? persisted.analytics
-    : extractAnalytics(aggregate);
+  const timelineItems =
+    Array.isArray(persisted?.timelineItems) && persisted.timelineItems.length > 0
+      ? persisted.timelineItems
+      : extractTimelineItems(aggregate);
+  const analytics =
+    Array.isArray(persisted?.analytics?.highlights) && persisted.analytics.highlights.length > 0
+      ? persisted.analytics
+      : extractAnalytics(aggregate);
+  const brandCategory = persisted?.brandCategory ?? aggregate.terms?.brandCategory ?? null;
+  const competitorCategories =
+    Array.isArray(persisted?.competitorCategories) && persisted.competitorCategories.length > 0
+      ? persisted.competitorCategories
+      : aggregate.terms?.competitorCategories ?? [];
+  const restrictedCategories =
+    Array.isArray(persisted?.restrictedCategories) && persisted.restrictedCategories.length > 0
+      ? persisted.restrictedCategories
+      : aggregate.terms?.restrictedCategories ?? [];
+  const campaignDateWindow =
+    persisted?.campaignDateWindow ??
+    aggregate.terms?.campaignDateWindow ??
+    campaignWindowFromTimelineItems(timelineItems);
+  const disclosureObligations =
+    Array.isArray(persisted?.disclosureObligations) && persisted.disclosureObligations.length > 0
+      ? persisted.disclosureObligations
+      : aggregate.terms?.disclosureObligations ?? [];
   const contractSummary =
     toPlainDealSummary(persisted?.contractSummary) ??
     buildContractSummary({
@@ -838,6 +918,8 @@ export function buildNormalizedIntakeRecord(
     primaryContact,
     contractTitle,
     timelineItems,
+    brandCategory,
+    disclosureObligations,
     analytics
   });
 
@@ -854,6 +936,11 @@ export function buildNormalizedIntakeRecord(
       deliverables.length,
     deliverables,
     timelineItems,
+    brandCategory,
+    competitorCategories,
+    restrictedCategories,
+    campaignDateWindow,
+    disclosureObligations,
     analytics,
     notes,
     evidenceGroups
@@ -872,6 +959,11 @@ export function createPersistedIntakeRecord(
     | "currency"
     | "deliverables"
     | "timelineItems"
+    | "brandCategory"
+    | "competitorCategories"
+    | "restrictedCategories"
+    | "campaignDateWindow"
+    | "disclosureObligations"
     | "analytics"
     | "notes"
   >

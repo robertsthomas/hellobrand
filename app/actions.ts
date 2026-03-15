@@ -194,6 +194,11 @@ export async function saveTermsAction(formData: FormData) {
     exclusivityRestrictions: parseNullableString(
       formData.get("exclusivityRestrictions")
     ),
+    brandCategory: parseNullableString(formData.get("brandCategory")),
+    competitorCategories: [],
+    restrictedCategories: [],
+    campaignDateWindow: null,
+    disclosureObligations: [],
     revisions: parseNullableString(formData.get("revisions")),
     revisionRounds: parseNullableNumber(formData.get("revisionRounds")),
     termination: parseNullableString(formData.get("termination")),

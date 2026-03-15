@@ -1,59 +1,112 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Check,
-  FileCheck2,
-  Search,
-  ShieldCheck,
-  Sparkles
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, FileCheck2, Search, ShieldCheck, Sparkles } from "lucide-react";
 
-const steps = [
+import type {
+  IntakeProcessingSnapshot,
+  IntakeProcessingStageId,
+  IntakeSessionStatus
+} from "@/lib/types";
+
+const steps: Array<{
+  id: IntakeProcessingStageId;
+  title: string;
+  subtitle: string;
+  icon: typeof Search;
+}> = [
   {
-    title: "Analyzing request",
-    subtitle: "Understanding your deal documents",
+    id: "extracting",
+    title: "Extracting source details",
+    subtitle: "Parsing files, classifying documents, and isolating sections.",
     icon: Search
   },
   {
-    title: "Generating workspace",
-    subtitle: "Mapping terms, contacts, and payments",
+    id: "structuring",
+    title: "Structuring key terms",
+    subtitle: "Pulling out payment, deliverables, contacts, rights, and dates.",
     icon: Sparkles
   },
   {
-    title: "Reviewing quality",
-    subtitle: "Checking rights, timing, and gaps",
+    id: "risk_review",
+    title: "Reviewing rights and conflicts",
+    subtitle: "Checking restrictions, disclosure obligations, and creator risks.",
     icon: ShieldCheck
   },
   {
-    title: "Finalizing workspace",
-    subtitle: "Preparing your review-ready deal summary",
+    id: "summary",
+    title: "Preparing review",
+    subtitle: "Generating the summary and saving the review-ready workspace draft.",
     icon: FileCheck2
   }
 ];
 
 export function IntakeProcessingState({
-  documentsCount
+  documentsCount,
+  sessionId,
+  status,
+  initialProcessing
 }: {
   documentsCount: number;
+  sessionId: string;
+  status: IntakeSessionStatus;
+  initialProcessing: IntakeProcessingSnapshot;
 }) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [processing, setProcessing] = useState(initialProcessing);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setActiveIndex((current) => {
-        if (current >= steps.length - 1) {
-          return current;
+    setProcessing(initialProcessing);
+  }, [initialProcessing]);
+
+  useEffect(() => {
+    if (!["uploading", "processing"].includes(status)) {
+      return;
+    }
+
+    let disposed = false;
+
+    async function pollProcessing() {
+      try {
+        const response = await fetch(`/api/intake/${sessionId}`, {
+          method: "GET",
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          return;
         }
 
-        return current + 1;
-      });
-    }, 1800);
+        const payload = await response.json();
+        const nextProcessing = payload?.processing as IntakeProcessingSnapshot | undefined;
+
+        if (!disposed && nextProcessing) {
+          setProcessing(nextProcessing);
+        }
+      } catch {
+        return;
+      }
+    }
+
+    void pollProcessing();
+    const timer = window.setInterval(() => {
+      void pollProcessing();
+    }, 1500);
 
     return () => {
+      disposed = true;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [sessionId, status]);
+
+  const activeIndex = useMemo(() => {
+    const currentStage = processing.currentStage;
+    if (!currentStage) {
+      return 0;
+    }
+
+    const index = steps.findIndex((step) => step.id === currentStage);
+    return index === -1 ? 0 : index;
+  }, [processing.currentStage]);
 
   return (
     <section className="w-full py-8">
@@ -67,17 +120,24 @@ export function IntakeProcessingState({
               ? `Working through ${documentsCount} uploaded source${documentsCount === 1 ? "" : "s"}.`
               : "Working through your uploaded or pasted source material."}
           </p>
+          <p className="pt-2 text-sm font-medium text-black/72 dark:text-white/72">
+            {processing.activeLabel}
+          </p>
+          <p className="text-sm text-black/50 dark:text-white/52">
+            {processing.activeDescription}
+          </p>
         </div>
 
         <div>
           {steps.map((step, index) => {
             const Icon = step.icon;
-            const isComplete = index < activeIndex;
+            const isComplete =
+              processing.completedStages.includes(step.id) || index < activeIndex;
             const isActive = index === activeIndex;
 
             return (
               <div
-                key={step.title}
+                key={step.id}
                 className="flex items-center gap-3 border-t border-black/6 py-5 first:border-t dark:border-white/8"
               >
                 <div
@@ -122,7 +182,10 @@ export function IntakeProcessingState({
                   ) : isComplete ? (
                     <span className="h-2 w-2 rounded-full bg-[#0f1728]" aria-hidden="true" />
                   ) : (
-                    <span className="h-5 w-5 rounded-full border border-black/10 bg-white/60" aria-hidden="true" />
+                    <span
+                      className="h-5 w-5 rounded-full border border-black/10 bg-white/60"
+                      aria-hidden="true"
+                    />
                   )}
                 </div>
               </div>

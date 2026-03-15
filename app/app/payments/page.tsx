@@ -61,7 +61,7 @@ export default async function PaymentsPage() {
         {rows.length === 0 ? (
           <div className="rounded-[1.75rem] border border-dashed border-black/10 bg-white/75 p-8 text-sm text-black/60 shadow-panel dark:border-white/12 dark:bg-white/[0.05] dark:text-white/65">
             No confirmed deal payments yet. Upload documents from{" "}
-            <Link href="/app/intake/new?pick=1" className="font-semibold text-ocean underline">
+            <Link href="/app/intake/new" className="font-semibold text-ocean underline">
               the upload flow
             </Link>{" "}
             and confirm a deal to track payout status here.

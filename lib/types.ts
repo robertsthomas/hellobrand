@@ -36,6 +36,12 @@ export type JobType =
   | "analyze_risks"
   | "generate_summary";
 
+export type IntakeProcessingStageId =
+  | "extracting"
+  | "structuring"
+  | "risk_review"
+  | "summary";
+
 export type DraftIntent =
   | "clarify-clause"
   | "request-faster-payment"
@@ -125,6 +131,55 @@ export interface IntakeEvidenceGroup {
   snippets: string[];
 }
 
+export type DealCategory =
+  | "beauty_personal_care"
+  | "fashion_apparel"
+  | "food_beverage"
+  | "entertainment_media"
+  | "fitness_wellness"
+  | "parenting_family"
+  | "tech_gaming"
+  | "travel_hospitality"
+  | "finance"
+  | "home_lifestyle"
+  | "retail_ecommerce"
+  | "sports_outdoors"
+  | "other";
+
+export interface CampaignDateWindow {
+  startDate: string | null;
+  endDate: string | null;
+  postingWindow: string | null;
+}
+
+export interface DisclosureObligation {
+  id: string;
+  title: string;
+  detail: string;
+  source: string | null;
+}
+
+export type ConflictType =
+  | "category_conflict"
+  | "competitor_restriction"
+  | "exclusivity_overlap"
+  | "schedule_collision";
+
+export type ConflictLevel = "hard_conflict" | "warning" | "informational";
+
+export interface ConflictResult {
+  type: ConflictType;
+  level: ConflictLevel;
+  severity: "low" | "medium" | "high";
+  confidence: number;
+  title: string;
+  detail: string;
+  relatedDealIds: string[];
+  evidenceRefs: string[];
+  acknowledgedAt?: string | null;
+  acknowledgedByUser?: string | null;
+}
+
 export interface NormalizedIntakeRecord {
   brandName: string | null;
   agencyName: string | null;
@@ -136,6 +191,11 @@ export interface NormalizedIntakeRecord {
   deliverableCount: number;
   deliverables: DeliverableItem[];
   timelineItems: IntakeTimelineItem[];
+  brandCategory: DealCategory | null;
+  competitorCategories: string[];
+  restrictedCategories: string[];
+  campaignDateWindow: CampaignDateWindow | null;
+  disclosureObligations: DisclosureObligation[];
   analytics: IntakeAnalyticsRecord | null;
   notes: string | null;
   evidenceGroups: IntakeEvidenceGroup[];
@@ -167,6 +227,11 @@ export interface DealTermsRecord {
   exclusivityCategory: string | null;
   exclusivityDuration: string | null;
   exclusivityRestrictions: string | null;
+  brandCategory: DealCategory | null;
+  competitorCategories: string[];
+  restrictedCategories: string[];
+  campaignDateWindow: CampaignDateWindow | null;
+  disclosureObligations: DisclosureObligation[];
   revisions: string | null;
   revisionRounds: number | null;
   termination: string | null;
@@ -287,6 +352,14 @@ export interface IntakeSessionRecord {
   expiresAt: string | null;
 }
 
+export interface IntakeProcessingSnapshot {
+  currentStage: IntakeProcessingStageId | null;
+  activeJobType: JobType | null;
+  activeLabel: string;
+  activeDescription: string;
+  completedStages: IntakeProcessingStageId[];
+}
+
 export interface IntakeDraftListItem {
   session: IntakeSessionRecord;
   deal: Pick<DealRecord, "id" | "brandName" | "campaignName" | "updatedAt">;
@@ -338,6 +411,7 @@ export interface DealAggregate {
   latestDocument: DocumentRecord | null;
   documents: DocumentRecord[];
   terms: DealTermsRecord | null;
+  conflictResults: ConflictResult[];
   paymentRecord: PaymentRecord | null;
   riskFlags: RiskFlagRecord[];
   emailDrafts: EmailDraftRecord[];

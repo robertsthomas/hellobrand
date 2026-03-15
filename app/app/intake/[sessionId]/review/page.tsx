@@ -2,15 +2,18 @@ import { redirect } from "next/navigation";
 import { LoaderCircle, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ConflictWarnings } from "@/components/conflict-warnings";
 import { SubmitButton } from "@/components/submit-button";
 import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
+import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { WorkspaceCreationOverlay } from "@/components/workspace-creation-overlay";
 import {
   confirmIntakeSessionAction,
   deleteIntakeDraftAction
 } from "@/app/actions";
 import { requireViewer } from "@/lib/auth";
+import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, humanizeToken } from "@/lib/utils";
@@ -128,6 +131,14 @@ export default async function IntakeSessionPage({
 
   const analysisRunning = false;
   const normalized = buildNormalizedIntakeRecord(aggregate);
+  const deliverables = normalized?.deliverables ?? [];
+  const timelineItems = normalized?.timelineItems ?? [];
+  const evidenceGroups = normalized?.evidenceGroups ?? [];
+  const disclosureObligations = normalized?.disclosureObligations ?? [];
+  const restrictedCategories = normalized?.restrictedCategories ?? [];
+  const analyticsHighlights = normalized?.analytics?.highlights ?? [];
+  const conflictResults = aggregate?.conflictResults ?? [];
+  const riskFlags = aggregate?.riskFlags ?? [];
   const derivedHandle = deriveHandleFromEmail(profileDefaults?.contactEmail ?? viewer.email);
   const creatorDefault =
     presentText(profileDefaults?.creatorLegalName) ??
@@ -160,7 +171,8 @@ export default async function IntakeSessionPage({
     "min-h-32 w-full rounded-[20px] border border-black/10 bg-sand/40 px-4 py-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
 
   const contactType =
-    normalized?.primaryContact.organizationType ?? (normalized?.agencyName ? "agency" : "brand");
+    normalized?.primaryContact?.organizationType ??
+    (normalized?.agencyName ? "agency" : "brand");
   const summaryCards = [
     {
       label: "Brand",
@@ -170,13 +182,13 @@ export default async function IntakeSessionPage({
     {
       label: "Primary contact",
       value:
-        normalized?.primaryContact.name ??
-        normalized?.primaryContact.email ??
+        normalized?.primaryContact?.name ??
+        normalized?.primaryContact?.email ??
         (analysisRunning ? "Analyzing..." : "Not found"),
       loading:
         analysisRunning &&
-        !normalized?.primaryContact.name &&
-        !normalized?.primaryContact.email
+        !normalized?.primaryContact?.name &&
+        !normalized?.primaryContact?.email
     },
     {
       label: "Payment",
@@ -227,6 +239,35 @@ export default async function IntakeSessionPage({
           <section className="rounded-[26px] border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
             {session.errorMessage}
           </section>
+        ) : null}
+        {conflictResults.length > 0 ? (
+          <ConflictWarnings
+            conflicts={conflictResults}
+            title="Potential conflicts before confirmation"
+            description="This deal appears to overlap with another active deal in your account. Review the warning before you create the workspace."
+          />
+        ) : null}
+        {session.errorMessage ? (
+          <details className="rounded-[26px] border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
+            <summary className="cursor-pointer font-medium text-black/70 dark:text-white/70">
+              Debug details
+            </summary>
+            <div className="mt-3 space-y-1 font-mono">
+              <div>sessionStatus: {session.status}</div>
+              <div>dealId: {session.dealId}</div>
+              <div>documents: {(aggregate?.documents ?? []).length}</div>
+              {(aggregate?.documents ?? []).map((document) => (
+                <div key={document.id}>
+                  {document.fileName} | {document.processingStatus} | {document.errorMessage ?? "ok"}
+                </div>
+              ))}
+              <div>normalizedDeliverables: {deliverables.length}</div>
+              <div>normalizedTimelineItems: {timelineItems.length}</div>
+              <div>normalizedEvidenceGroups: {evidenceGroups.length}</div>
+              <div>normalizedAnalyticsHighlights: {analyticsHighlights.length}</div>
+              <div>conflicts: {conflictResults.length}</div>
+            </div>
+          </details>
         ) : null}
 
         <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
@@ -340,14 +381,14 @@ export default async function IntakeSessionPage({
                       <input
                         className={inputClassName}
                         name="primaryContactName"
-                        defaultValue={normalized?.primaryContact.name ?? ""}
+                        defaultValue={normalized?.primaryContact?.name ?? ""}
                         placeholder="Primary contact name"
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
                       {supportText({
                         analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact.name),
+                        hasValue: Boolean(normalized?.primaryContact?.name),
                         pendingLabel: "Scanning signatures and agreement party sections...",
                         emptyLabel: "Add the main external contact if it is not extracted."
                       })}
@@ -358,14 +399,14 @@ export default async function IntakeSessionPage({
                       <input
                         className={inputClassName}
                         name="primaryContactTitle"
-                        defaultValue={normalized?.primaryContact.title ?? ""}
+                        defaultValue={normalized?.primaryContact?.title ?? ""}
                         placeholder="Campaign manager, partnerships lead, agent..."
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
                       {supportText({
                         analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact.title),
+                        hasValue: Boolean(normalized?.primaryContact?.title),
                         pendingLabel: "Looking for job titles in the source material...",
                         emptyLabel: "Optional."
                       })}
@@ -377,14 +418,14 @@ export default async function IntakeSessionPage({
                         className={inputClassName}
                         name="primaryContactEmail"
                         type="email"
-                        defaultValue={normalized?.primaryContact.email ?? ""}
+                        defaultValue={normalized?.primaryContact?.email ?? ""}
                         placeholder="name@company.com"
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
                       {supportText({
                         analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact.email),
+                        hasValue: Boolean(normalized?.primaryContact?.email),
                         pendingLabel: "Extracting contact emails...",
                         emptyLabel: "Optional."
                       })}
@@ -395,14 +436,14 @@ export default async function IntakeSessionPage({
                       <input
                         className={inputClassName}
                         name="primaryContactPhone"
-                        defaultValue={normalized?.primaryContact.phone ?? ""}
+                        defaultValue={normalized?.primaryContact?.phone ?? ""}
                         placeholder="Phone number"
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
                       {supportText({
                         analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact.phone),
+                        hasValue: Boolean(normalized?.primaryContact?.phone),
                         pendingLabel: "Checking for phone numbers...",
                         emptyLabel: "Optional."
                       })}
@@ -491,6 +532,41 @@ export default async function IntakeSessionPage({
                         </p>
                       </div>
                     </div>
+
+                    <div className="grid gap-5 md:grid-cols-3">
+                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
+                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
+                          Brand category
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-ink">
+                          {normalized?.brandCategory
+                            ? dealCategoryLabel(normalized.brandCategory)
+                            : "Not detected"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
+                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
+                          Posting window
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-ink">
+                          {normalized?.campaignDateWindow?.postingWindow ?? "Not detected"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
+                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
+                          Restricted categories
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-ink">
+                          {restrictedCategories.length > 0
+                            ? restrictedCategories.join(", ")
+                            : "None detected"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {disclosureObligations.length > 0 ? (
+                      <DisclosureObligations obligations={disclosureObligations} />
+                    ) : null}
                   </div>
                 </SectionCard>
 
@@ -503,8 +579,8 @@ export default async function IntakeSessionPage({
                       <div className="text-sm font-medium text-black/70 dark:text-white/75">
                         Deliverables
                       </div>
-                      {normalized?.deliverables.length ? (
-                        normalized.deliverables.map((item) => (
+                      {deliverables.length > 0 ? (
+                        deliverables.map((item) => (
                           <div
                             key={item.id}
                             className="rounded-2xl border border-black/5 bg-sand/45 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]"
@@ -543,9 +619,9 @@ export default async function IntakeSessionPage({
                       <div className="text-sm font-medium text-black/70 dark:text-white/75">
                         Timeline
                       </div>
-                      {normalized?.timelineItems.length ? (
+                      {timelineItems.length > 0 ? (
                         <div className="grid gap-3">
-                          {normalized.timelineItems.map((item) => (
+                          {timelineItems.map((item) => (
                             <div
                               key={item.id}
                               className="rounded-2xl border border-black/5 bg-sand/45 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]"
@@ -573,7 +649,7 @@ export default async function IntakeSessionPage({
                   </div>
                 </SectionCard>
 
-                {normalized?.analytics ? (
+                {analyticsHighlights.length > 0 && normalized?.analytics ? (
                   <SectionCard
                     title="Audience and analytics"
                     description="Analytics stay optional and only appear when source material includes them."
@@ -581,7 +657,7 @@ export default async function IntakeSessionPage({
                     <div className="rounded-2xl border border-black/5 bg-sand/35 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
                       <div className="text-sm font-medium text-ink">Audience snapshot</div>
                       <div className="mt-3 grid gap-2">
-                        {normalized.analytics.highlights.map((line, index) => (
+                        {analyticsHighlights.map((line, index) => (
                           <div
                             key={`${line}-${index}`}
                             className="text-sm text-black/70 dark:text-white/70"
@@ -620,8 +696,8 @@ export default async function IntakeSessionPage({
                         Source evidence
                       </summary>
                       <div className="mt-4 grid gap-4">
-                        {normalized?.evidenceGroups.length ? (
-                          normalized.evidenceGroups.map((group) => (
+                        {evidenceGroups.length > 0 ? (
+                          evidenceGroups.map((group) => (
                             <div
                               key={group.id}
                               className="rounded-2xl bg-white/80 px-4 py-4 dark:bg-white/[0.03]"
@@ -725,7 +801,7 @@ export default async function IntakeSessionPage({
         <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
               <h2 className="text-xl font-semibold text-ink">Risk watchouts</h2>
               <div className="mt-4 grid gap-3">
-                {(aggregate?.riskFlags ?? []).slice(0, 4).map((flag) => (
+                {riskFlags.slice(0, 4).map((flag) => (
                   <div
                     key={flag.id}
                     className="rounded-2xl bg-sand/55 p-4 dark:bg-white/[0.04]"
@@ -736,7 +812,7 @@ export default async function IntakeSessionPage({
                     </p>
                   </div>
                 ))}
-                {aggregate?.riskFlags.length === 0 ? (
+                {riskFlags.length === 0 ? (
                   <div className="rounded-2xl bg-sand/55 p-4 text-sm text-black/60 dark:bg-white/[0.04] dark:text-white/65">
                     {analysisRunning
                       ? "Still evaluating creator risk as the extraction completes."

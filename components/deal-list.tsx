@@ -20,7 +20,7 @@ export function DealList({
           documents.
         </p>
         <Link
-          href="/app/intake/new?pick=1"
+          href="/app/intake/new"
           className="mt-6 inline-flex rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white"
           aria-label="Upload documents for a new deal workspace"
           title="Start a new deal workspace"

@@ -157,6 +157,11 @@ model DealTerms {
   exclusivityCategory       String?
   exclusivityDuration       String?
   exclusivityRestrictions   String?
+  brandCategory             String?
+  competitorCategories      Json
+  restrictedCategories      Json
+  campaignDateWindow        Json?
+  disclosureObligations     Json
   revisions                 String?
   revisionRounds            Int?
   termination               String?

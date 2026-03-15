@@ -12,6 +12,7 @@ function createAggregate(): DealAggregate {
     latestDocument: seed.documents[0],
     documents: seed.documents,
     terms: seed.dealTerms[0],
+    conflictResults: [],
     paymentRecord: null,
     riskFlags: seed.riskFlags,
     emailDrafts: seed.emailDrafts,
@@ -77,6 +78,7 @@ describe("intake normalization", () => {
     expect(normalized?.contractTitle).toContain("OREO Cakesters");
     expect(normalized?.paymentAmount).toBe(3200);
     expect(normalized?.agencyName).toBeNull();
+    expect(normalized?.brandCategory).toBe("sports_outdoors");
   });
 
   test("extracts agency contact and timeline from campaign offer emails", () => {

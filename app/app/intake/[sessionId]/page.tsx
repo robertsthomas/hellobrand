@@ -18,7 +18,10 @@ export default async function IntakeProcessingPage({
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
-  const { session, aggregate } = await getIntakeSessionForViewer(viewer, sessionId);
+  const { session, aggregate, processing } = await getIntakeSessionForViewer(
+    viewer,
+    sessionId
+  );
 
   if (session.status === "completed" && aggregate) {
     redirect(`/app/deals/${aggregate.deal.id}`);
@@ -47,7 +50,12 @@ export default async function IntakeProcessingPage({
         </div>
 
         <div className="flex min-h-[60vh] flex-col items-center justify-center">
-          <IntakeProcessingState documentsCount={documents.length} />
+          <IntakeProcessingState
+            documentsCount={documents.length}
+            sessionId={session.id}
+            status={session.status}
+            initialProcessing={processing}
+          />
           <div className="sr-only">
             <IntakePendingUpload sessionId={session.id} status={session.status} />
             <IntakeAutoRefresh

@@ -8,6 +8,12 @@ import {
 } from "@/lib/analysis/fallback";
 import { getViewerById } from "@/lib/auth";
 import {
+  buildConflictIntelligencePatch,
+  buildConflictResults,
+  dealCategoryLabel,
+  mergeConflictIntelligence
+} from "@/lib/conflict-intelligence";
+import {
   analyzeRisksWithLlm,
   extractSectionWithLlm,
   getLlmRoute,
@@ -19,6 +25,7 @@ import { generateEmailDraft } from "@/lib/email/generate";
 import { inngest } from "@/lib/inngest/client";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
+import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { readStoredBytes, storeUploadedBytes } from "@/lib/storage";
@@ -61,6 +68,11 @@ function createEmptyTerms(
     exclusivityCategory: null,
     exclusivityDuration: null,
     exclusivityRestrictions: null,
+    brandCategory: null,
+    competitorCategories: [],
+    restrictedCategories: [],
+    campaignDateWindow: null,
+    disclosureObligations: [],
     revisions: null,
     revisionRounds: null,
     termination: null,
@@ -77,12 +89,14 @@ function mergeDeliverables(
   incoming: NonNullable<DealTermsRecord["deliverables"]>
 ) {
   const map = new Map<string, (typeof existing)[number]>();
+  const safeExisting = Array.isArray(existing) ? existing : [];
+  const safeIncoming = Array.isArray(incoming) ? incoming : [];
 
-  for (const item of existing) {
+  for (const item of safeExisting) {
     map.set(`${item.title}:${item.dueDate ?? "none"}`, item);
   }
 
-  for (const item of incoming) {
+  for (const item of safeIncoming) {
     map.set(`${item.title}:${item.dueDate ?? "none"}`, item);
   }
 
@@ -95,11 +109,21 @@ function mergeTerms(
   base: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">,
   patch: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">
 ) {
+  const baseUsageChannels = Array.isArray(base.usageChannels) ? base.usageChannels : [];
+  const patchUsageChannels = Array.isArray(patch.usageChannels) ? patch.usageChannels : [];
+
   return {
     ...base,
     ...Object.fromEntries(
       Object.entries(patch).filter(([key, value]) => {
-        if (key === "deliverables" || key === "usageChannels") {
+        if (
+          key === "deliverables" ||
+          key === "usageChannels" ||
+          key === "competitorCategories" ||
+          key === "restrictedCategories" ||
+          key === "disclosureObligations" ||
+          key === "campaignDateWindow"
+        ) {
           return false;
         }
 
@@ -111,7 +135,8 @@ function mergeTerms(
       })
     ),
     deliverables: mergeDeliverables(base.deliverables, patch.deliverables),
-    usageChannels: Array.from(new Set([...base.usageChannels, ...patch.usageChannels]))
+    usageChannels: Array.from(new Set([...baseUsageChannels, ...patchUsageChannels])),
+    ...mergeConflictIntelligence(base, patch)
   };
 }
 
@@ -357,7 +382,7 @@ async function runStage<T>(
       durationMs: Date.now() - startedAt,
       error: message
     });
-    throw error;
+    throw new Error(`${type}: ${message}`);
   }
 }
 
@@ -500,21 +525,79 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       async () => mergeExtractionResults(partialExtractions as ExtractionPipelineResult[])
     );
 
+    const intelligence = buildConflictIntelligencePatch({
+      text: extractionSource.normalizedText,
+      sectionKey: null,
+      fallbackTerms: extraction.data
+    });
+    extraction.data = mergeConflictIntelligence(extraction.data, intelligence.patch);
+    extraction.evidence = [...extraction.evidence, ...intelligence.evidence];
+    const extractionEvidence = Array.isArray(extraction.evidence) ? extraction.evidence : [];
+    const extractionDeliverables = Array.isArray(extraction.data.deliverables)
+      ? extraction.data.deliverables
+      : [];
+
     logDocumentPipeline("info", "merge_complete", {
       dealId: document.dealId,
       documentId: document.id,
-      evidenceCount: extraction.evidence.length,
-      deliverablesCount: extraction.data.deliverables.length,
+      evidenceCount: extractionEvidence.length,
+      deliverablesCount: extractionDeliverables.length,
       hasPaymentAmount: extraction.data.paymentAmount !== null,
       hasBrandName: Boolean(extraction.data.brandName),
       hasCampaignName: Boolean(extraction.data.campaignName)
     });
 
+    const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
+      extraction.data.brandName
+    );
+
+    if (categoryEnrichment?.category) {
+      const previousCategory = extraction.data.brandCategory;
+      extraction.data.brandCategory = categoryEnrichment.category;
+      extraction.evidence = [
+        ...extraction.evidence,
+        {
+          fieldPath: "brandCategory",
+          snippet:
+            categoryEnrichment.snippet ??
+            `${categoryEnrichment.brandName} matched ${dealCategoryLabel(
+              categoryEnrichment.category
+            )}.`,
+          sectionKey: null,
+          confidence: categoryEnrichment.confidence
+        }
+      ];
+
+      if (
+        previousCategory &&
+        previousCategory !== categoryEnrichment.category
+      ) {
+        extraction.evidence.push({
+          fieldPath: "brandCategory",
+          snippet: `${categoryEnrichment.brandName} company enrichment suggests ${dealCategoryLabel(
+            categoryEnrichment.category
+          )}, which overrides a conflicting detected category.`,
+          sectionKey: null,
+          confidence: categoryEnrichment.confidence
+        });
+      }
+
+      logDocumentPipeline("info", "brand_category_enriched", {
+        dealId: document.dealId,
+        documentId: document.id,
+        brandName: categoryEnrichment.brandName,
+        previousCategory,
+        enrichedCategory: categoryEnrichment.category,
+        confidence: categoryEnrichment.confidence,
+        website: categoryEnrichment.website
+      });
+    }
+
     await repository.upsertExtractionResult(document.id, extraction);
 
     await repository.replaceExtractionEvidence(
       document.id,
-      extraction.evidence.map((entry) => ({
+      extractionEvidence.map((entry) => ({
         fieldPath: entry.fieldPath,
         snippet: entry.snippet,
         sectionId: savedSections.find(
@@ -637,7 +720,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       durationMs: Date.now() - pipelineStartedAt,
       error: message
     });
-    throw error;
+    throw new Error(`pipeline: ${message}`);
   }
 }
 
@@ -697,12 +780,43 @@ export async function listDealsForViewer(viewer: Viewer) {
   return getRepository().listDeals(viewer.id);
 }
 
+async function loadRawDealAggregatesForViewer(viewer: Viewer) {
+  const deals = await getRepository().listDeals(viewer.id);
+  const aggregates = await Promise.all(
+    deals.map((deal) => getRepository().getDealAggregate(viewer.id, deal.id))
+  );
+
+  return aggregates.filter((aggregate): aggregate is DealAggregate => Boolean(aggregate));
+}
+
+export async function listDealAggregatesForViewer(viewer: Viewer) {
+  const aggregates = await loadRawDealAggregatesForViewer(viewer);
+
+  return aggregates.map((aggregate) => ({
+    ...aggregate,
+    conflictResults: buildConflictResults(aggregate, aggregates)
+  }));
+}
+
 export async function listDocumentsForViewer(viewer: Viewer, dealId: string) {
   return getRepository().listDocuments(viewer.id, dealId);
 }
 
 export async function getDealForViewer(viewer: Viewer, dealId: string) {
-  return getRepository().getDealAggregate(viewer.id, dealId);
+  const target = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!target) {
+    return null;
+  }
+
+  const aggregates = await loadRawDealAggregatesForViewer(viewer);
+  const comparisonSet = aggregates.some((aggregate) => aggregate.deal.id === dealId)
+    ? aggregates
+    : [target, ...aggregates];
+
+  return {
+    ...target,
+    conflictResults: buildConflictResults(target, comparisonSet)
+  };
 }
 
 export async function createDealForViewer(

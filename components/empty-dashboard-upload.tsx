@@ -18,7 +18,11 @@ function logClientIntake(event: string, details: Record<string, unknown>) {
   console.info(`[client-intake] ${event}`, details);
 }
 
-export function EmptyDashboardUpload() {
+export function EmptyDashboardUpload({
+  initialMode = "upload"
+}: {
+  initialMode?: "upload" | "paste";
+}) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const createStartedRef = useRef(false);
   const createPromiseRef = useRef<Promise<string> | null>(null);
@@ -39,8 +43,8 @@ export function EmptyDashboardUpload() {
   const reset = useIntakeUiStore((state) => state.reset);
 
   useEffect(() => {
-    reset("upload");
-  }, [reset]);
+    reset(initialMode);
+  }, [initialMode, reset]);
 
   async function createDraftSessionId() {
     if (createPromiseRef.current) {
@@ -279,14 +283,6 @@ export function EmptyDashboardUpload() {
             type="button"
             disabled={isSubmitting}
             onClick={() => {
-              void getOrCreateDraftSessionId().catch((error) => {
-                logClientIntake("draft_session_prepare_failed", {
-                  error:
-                    error instanceof Error
-                      ? error.message
-                      : "Could not prepare intake."
-                });
-              });
               inputRef.current?.click();
             }}
             className={cn(

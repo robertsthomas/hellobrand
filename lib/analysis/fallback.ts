@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
 
+import {
+  buildConflictIntelligencePatch,
+  mergeConflictIntelligence
+} from "@/lib/conflict-intelligence";
 import type {
   DealTermsRecord,
   DocumentAnalysisResult,
@@ -36,6 +40,11 @@ function createEmptyTerms(): Omit<DealTermsRecord, "id" | "dealId" | "createdAt"
     exclusivityCategory: null,
     exclusivityDuration: null,
     exclusivityRestrictions: null,
+    brandCategory: null,
+    competitorCategories: [],
+    restrictedCategories: [],
+    campaignDateWindow: null,
+    disclosureObligations: [],
     revisions: null,
     revisionRounds: null,
     termination: null,
@@ -535,12 +544,23 @@ function extractStructuredTermsFromSection(
     terms.notes = "Imported from pasted email text. Confirm any negotiated changes manually.";
   }
 
+  const intelligence = buildConflictIntelligencePatch({
+    text,
+    sectionKey,
+    fallbackTerms: terms
+  });
+
+  const nextTerms = {
+    ...terms,
+    ...intelligence.patch
+  };
+
   return {
     schemaVersion: "v2-section",
     model: "fallback-section",
     confidence: 0.68,
-    data: terms,
-    evidence,
+    data: nextTerms,
+    evidence: [...evidence, ...intelligence.evidence],
     conflicts: []
   };
 }
@@ -570,8 +590,10 @@ function mergeDeliverablesWithPriority(
   incoming: ReturnType<typeof createEmptyTerms>["deliverables"]
 ) {
   const merged = new Map<string, (typeof existing)[number]>();
+  const safeExisting = Array.isArray(existing) ? existing : [];
+  const safeIncoming = Array.isArray(incoming) ? incoming : [];
 
-  for (const item of [...existing, ...incoming]) {
+  for (const item of [...safeExisting, ...safeIncoming]) {
     merged.set(`${item.title}:${item.dueDate ?? "none"}`, item);
   }
 
@@ -585,17 +607,27 @@ export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
   const evidence: FieldEvidence[] = [];
   const conflicts = new Set<string>();
   const scalarKeys = Object.keys(merged).filter(
-    (key) => key !== "deliverables" && key !== "usageChannels"
+    (key) =>
+      key !== "deliverables" &&
+      key !== "usageChannels" &&
+      key !== "competitorCategories" &&
+      key !== "restrictedCategories" &&
+      key !== "disclosureObligations" &&
+      key !== "campaignDateWindow"
   ) as Array<keyof typeof merged>;
 
   for (const part of parts) {
-    evidence.push(...part.evidence);
+    const partEvidence = Array.isArray(part.evidence) ? part.evidence : [];
+    const partDeliverables = Array.isArray(part.data.deliverables) ? part.data.deliverables : [];
+    const partUsageChannels = Array.isArray(part.data.usageChannels) ? part.data.usageChannels : [];
+
+    evidence.push(...partEvidence);
     merged.deliverables = mergeDeliverablesWithPriority(
       merged.deliverables,
-      part.data.deliverables
+      partDeliverables
     );
     merged.usageChannels = Array.from(
-      new Set([...merged.usageChannels, ...part.data.usageChannels])
+      new Set([...merged.usageChannels, ...partUsageChannels])
     );
 
     for (const key of scalarKeys) {
@@ -643,7 +675,22 @@ export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
     schemaVersion: "v2-section-merge",
     model: parts.map((part) => part.model).filter(Boolean).join("+") || "fallback-merge",
     confidence,
-    data: merged,
+    data: {
+      ...merged,
+      ...mergeConflictIntelligence(merged, {
+        competitorCategories: parts.flatMap((part) =>
+          Array.isArray(part.data.competitorCategories) ? part.data.competitorCategories : []
+        ),
+        restrictedCategories: parts.flatMap((part) =>
+          Array.isArray(part.data.restrictedCategories) ? part.data.restrictedCategories : []
+        ),
+        disclosureObligations: parts.flatMap((part) =>
+          Array.isArray(part.data.disclosureObligations) ? part.data.disclosureObligations : []
+        ),
+        campaignDateWindow:
+          parts.find((part) => part.data.campaignDateWindow)?.data.campaignDateWindow ?? null
+      })
+    },
     evidence: dedupeEvidence(evidence),
     conflicts: Array.from(conflicts)
   };
@@ -700,6 +747,9 @@ export function analyzeCreatorRisks(
 ) {
   const risks: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">> = [];
   const lower = text.toLowerCase();
+  const deliverables = Array.isArray(extraction.data.deliverables)
+    ? extraction.data.deliverables
+    : [];
 
   if ((extraction.data.netTermsDays ?? 0) >= 45) {
     risks.push({
@@ -760,7 +810,7 @@ export function analyzeCreatorRisks(
     });
   }
 
-  if (extraction.data.deliverables.length === 0 || /to be agreed|as requested|tbd/i.test(lower)) {
+  if (deliverables.length === 0 || /to be agreed|as requested|tbd/i.test(lower)) {
     risks.push({
       category: "deliverables",
       title: "Deliverables may be vague",
@@ -810,6 +860,9 @@ export function buildCreatorSummary(
   extraction: ReturnType<typeof extractStructuredTerms>,
   risks: ReturnType<typeof analyzeCreatorRisks>
 ) {
+  const deliverables = Array.isArray(extraction.data.deliverables)
+    ? extraction.data.deliverables
+    : [];
   const amount =
     extraction.data.paymentAmount !== null
       ? new Intl.NumberFormat("en-US", {
@@ -820,8 +873,8 @@ export function buildCreatorSummary(
       : "an unspecified amount";
 
   const deliverableLine =
-    extraction.data.deliverables.length > 0
-      ? extraction.data.deliverables
+    deliverables.length > 0
+      ? deliverables
           .map((item) =>
             item.quantity ? `${item.quantity} ${item.title}` : item.title
           )

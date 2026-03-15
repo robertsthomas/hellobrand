@@ -12,14 +12,26 @@ export function MarketingNav() {
   return (
     <nav className="sticky top-0 z-40 border-b border-black/5 bg-[#eeece8]/95 backdrop-blur dark:border-white/10 dark:bg-[#171b1f]/90">
       <div className="mx-auto flex h-[76px] max-w-[1224px] items-center justify-between px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-[43px] w-[43px] items-center justify-center rounded-2xl bg-ocean text-[15px] font-semibold text-white">
-            H
-          </div>
-          <span className="editorial-display text-[20px] font-semibold text-ocean dark:text-sand">
-            HelloBrand
-          </span>
-        </Link>
+        <Show when="signed-out">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="flex h-[43px] w-[43px] items-center justify-center rounded-2xl bg-ocean text-[15px] font-semibold text-white">
+              H
+            </div>
+            <span className="editorial-display text-[20px] font-semibold text-ocean dark:text-sand">
+              HelloBrand
+            </span>
+          </Link>
+        </Show>
+        <Show when="signed-in">
+          <Link href="/app" className="flex items-center gap-3">
+            <div className="flex h-[43px] w-[43px] items-center justify-center rounded-2xl bg-ocean text-[15px] font-semibold text-white">
+              H
+            </div>
+            <span className="editorial-display text-[20px] font-semibold text-ocean dark:text-sand">
+              HelloBrand
+            </span>
+          </Link>
+        </Show>
         <div className="flex items-center gap-3 md:hidden">
           <ThemeSwitch compact />
           <Show when="signed-out">

@@ -78,7 +78,7 @@ export function AppFrame({
       <div className="flex h-screen">
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-[#f5f3f0] lg:flex dark:bg-[#22201d]">
           <div className="border-b border-border px-6 py-7">
-            <Link href="/" className="flex items-center gap-4">
+            <Link href="/app" className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                 <span className="text-xl font-semibold">H</span>
               </div>
@@ -120,7 +120,7 @@ export function AppFrame({
         <main className="flex-1 overflow-auto">
           <div className="lg:hidden">
             <div className="flex items-center justify-between border-b border-border bg-[#f5f3f0] px-5 py-4 dark:bg-[#22201d]">
-              <Link href="/" className="flex items-center gap-2">
+              <Link href="/app" className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                   <span className="font-semibold">H</span>
                 </div>
@@ -129,12 +129,12 @@ export function AppFrame({
               <div className="flex items-center gap-2">
                 <ThemeSwitch compact className="rounded-xl" />
                 <Link
-                  href="/app/intake/new?pick=1"
-                  aria-label="Upload documents for a new deal workspace"
+                  href="/app/intake/new"
+                  aria-label="Create a new workspace"
                   title="Start a new deal workspace"
                   className={buttonVariants({ size: "sm" })}
                 >
-                  Upload documents
+                  New Workspace
                 </Link>
               </div>
             </div>

@@ -53,6 +53,7 @@ function cleanParagraph(value: string) {
   return stripInlineMarkdown(
     value
       .replace(/^[\s\-*•]+/gm, "")
+      .replace(/^overview:\s*/gim, "")
       .replace(/\r/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
   );
@@ -66,6 +67,10 @@ function prepareForSectionParsing(value: string) {
     next = next.replace(
       new RegExp(`\\s*(#{1,6}\\s*${escaped}\\b)`, "gi"),
       "\n$1"
+    );
+    next = next.replace(
+      new RegExp(`\\s*(${escaped})\\s*:`, "gi"),
+      "\n## $1\n"
     );
   }
 

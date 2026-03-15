@@ -15,8 +15,11 @@ import type {
   DeliverableItem,
   IntakeAnalyticsRecord,
   IntakeDraftListItem,
+  IntakeProcessingSnapshot,
   IntakeSessionRecord,
   IntakeTimelineItem,
+  JobRecord,
+  JobType,
   Viewer
 } from "@/lib/types";
 
@@ -109,6 +112,11 @@ function emptyEditableTerms(input: {
     exclusivityCategory: null,
     exclusivityDuration: null,
     exclusivityRestrictions: null,
+    brandCategory: null,
+    competitorCategories: [],
+    restrictedCategories: [],
+    campaignDateWindow: null,
+    disclosureObligations: [],
     revisions: null,
     revisionRounds: null,
     termination: null,
@@ -146,6 +154,11 @@ function editableTermsFromAggregate(aggregate: DealAggregate | null) {
       exclusivityCategory: aggregate.terms.exclusivityCategory,
       exclusivityDuration: aggregate.terms.exclusivityDuration,
       exclusivityRestrictions: aggregate.terms.exclusivityRestrictions,
+      brandCategory: aggregate.terms.brandCategory,
+      competitorCategories: aggregate.terms.competitorCategories,
+      restrictedCategories: aggregate.terms.restrictedCategories,
+      campaignDateWindow: aggregate.terms.campaignDateWindow,
+      disclosureObligations: aggregate.terms.disclosureObligations,
       revisions: aggregate.terms.revisions,
       revisionRounds: aggregate.terms.revisionRounds,
       termination: aggregate.terms.termination,
@@ -158,6 +171,105 @@ function editableTermsFromAggregate(aggregate: DealAggregate | null) {
   }
 
   return null;
+}
+
+function campaignDateWindowFromTimelineItems(timelineItems: IntakeTimelineItem[]) {
+  const datedItems = timelineItems
+    .map((item) => item.date)
+    .filter((value): value is string => Boolean(value))
+    .sort((left, right) => left.localeCompare(right));
+
+  if (datedItems.length === 0) {
+    return null;
+  }
+
+  const startDate = datedItems[0] ?? null;
+  const endDate = datedItems[datedItems.length - 1] ?? null;
+
+  return {
+    startDate,
+    endDate,
+    postingWindow:
+      startDate && endDate && startDate !== endDate
+        ? `${startDate.slice(0, 10)} to ${endDate.slice(0, 10)}`
+        : startDate?.slice(0, 10) ?? endDate?.slice(0, 10) ?? null
+  };
+}
+
+const JOB_STAGE_MAP: Record<JobType, IntakeProcessingSnapshot["currentStage"]> = {
+  extract_text: "extracting",
+  classify_document: "extracting",
+  section_document: "extracting",
+  extract_fields: "structuring",
+  merge_results: "structuring",
+  analyze_risks: "risk_review",
+  generate_summary: "summary"
+};
+
+const STAGE_META: Record<
+  NonNullable<IntakeProcessingSnapshot["currentStage"]>,
+  { label: string; description: string }
+> = {
+  extracting: {
+    label: "Extracting source details",
+    description: "Parsing files, classifying documents, and isolating sections."
+  },
+  structuring: {
+    label: "Structuring key terms",
+    description: "Pulling out payment, deliverables, contacts, rights, and dates."
+  },
+  risk_review: {
+    label: "Reviewing rights and conflicts",
+    description: "Checking restrictions, disclosure obligations, and creator risks."
+  },
+  summary: {
+    label: "Preparing review",
+    description: "Generating the summary and saving the review-ready workspace draft."
+  }
+};
+
+function deriveProcessingSnapshot(
+  aggregate: DealAggregate | null,
+  session: IntakeSessionRecord
+): IntakeProcessingSnapshot {
+  const jobs = aggregate?.jobs ?? [];
+  const processingJob =
+    jobs.find((job) => job.status === "processing") ??
+    (session.status === "failed" ? jobs.find((job) => job.status === "failed") : null) ??
+    null;
+  const activeStage =
+    (processingJob ? JOB_STAGE_MAP[processingJob.type] : null) ??
+    (["ready_for_confirmation", "completed"].includes(session.status) ? "summary" : null);
+
+  const completedStages = Array.from(
+    new Set(
+      jobs
+        .filter((job) => job.status === "ready")
+        .map((job) => JOB_STAGE_MAP[job.type])
+        .filter((stage): stage is NonNullable<IntakeProcessingSnapshot["currentStage"]> =>
+          Boolean(stage)
+        )
+    )
+  );
+
+  if (
+    activeStage &&
+    ["ready_for_confirmation", "completed"].includes(session.status) &&
+    !completedStages.includes(activeStage)
+  ) {
+    completedStages.push(activeStage);
+  }
+
+  const stageMeta = activeStage ? STAGE_META[activeStage] : null;
+
+  return {
+    currentStage: activeStage,
+    activeJobType: processingJob?.type ?? null,
+    activeLabel: stageMeta?.label ?? "Preparing intake",
+    activeDescription:
+      stageMeta?.description ?? "Waiting for the next document processing step.",
+    completedStages
+  };
 }
 
 export async function createIntakeSessionForViewer(
@@ -503,6 +615,7 @@ export async function getIntakeSessionForViewer(
 ): Promise<{
   session: IntakeSessionRecord;
   aggregate: DealAggregate | null;
+  processing: IntakeProcessingSnapshot;
   profileDefaults: {
     displayName: string | null;
     creatorLegalName: string | null;
@@ -528,9 +641,12 @@ export async function getIntakeSessionForViewer(
     ? await getProfileForViewer(viewer).catch(() => null)
     : null;
 
+  const nextSession = synced ?? toIntakeSessionRecord(session);
+
   return {
-    session: synced ?? toIntakeSessionRecord(session),
+    session: nextSession,
     aggregate,
+    processing: deriveProcessingSnapshot(aggregate, nextSession),
     profileDefaults: profile
       ? {
           displayName: profile.displayName,
@@ -657,6 +773,14 @@ export async function confirmIntakeSessionForViewer(
       input.deliverables && input.deliverables.length > 0
         ? input.deliverables
         : aggregate.terms?.deliverables ?? [],
+    brandCategory: aggregate.terms?.brandCategory ?? null,
+    competitorCategories: aggregate.terms?.competitorCategories ?? [],
+    restrictedCategories: aggregate.terms?.restrictedCategories ?? [],
+    campaignDateWindow:
+      campaignDateWindowFromTimelineItems(input.timelineItems ?? []) ??
+      aggregate.terms?.campaignDateWindow ??
+      null,
+    disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
     creatorName:
       aggregate.terms?.creatorName ??
       profile?.creatorLegalName?.trim() ??
@@ -694,6 +818,14 @@ export async function confirmIntakeSessionForViewer(
           ? input.deliverables
           : aggregate.terms?.deliverables ?? [],
       timelineItems: input.timelineItems ?? [],
+      brandCategory: aggregate.terms?.brandCategory ?? null,
+      competitorCategories: aggregate.terms?.competitorCategories ?? [],
+      restrictedCategories: aggregate.terms?.restrictedCategories ?? [],
+      campaignDateWindow:
+        campaignDateWindowFromTimelineItems(input.timelineItems ?? []) ??
+        aggregate.terms?.campaignDateWindow ??
+        null,
+      disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
       analytics: input.analytics ?? null,
       notes: input.notes?.trim() || aggregate.terms?.notes || null
     })

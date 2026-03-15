@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { IntakeSourceSwitcher } from "@/components/intake-source-switcher";
@@ -67,7 +67,6 @@ export function IntakeDraftEditor({
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
   const reset = useIntakeUiStore((state) => state.reset);
   const lastSavedRef = useRef("");
-  const createStartedRef = useRef(false);
   const autoContinueStartedRef = useRef(false);
 
   useEffect(() => {
@@ -85,39 +84,6 @@ export function IntakeDraftEditor({
       pastedText: ""
     });
   }, [autoOpenPicker, hydrateDraft, initialDraft, initialMode]);
-
-  useEffect(() => {
-    if (initialDraft?.sessionId || sessionId || createStartedRef.current) {
-      return;
-    }
-
-    createStartedRef.current = true;
-
-    async function createDraft() {
-      try {
-        const response = await fetch("/api/intake/draft", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({})
-        });
-        const payload = await response.json();
-
-        if (!response.ok || !payload.session?.id) {
-          throw new Error(payload.error ?? "Could not create draft.");
-        }
-
-        setSessionId(payload.session.id);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not create draft."
-        );
-      }
-    }
-
-    void createDraft();
-  }, [initialDraft?.sessionId, sessionId, setErrorMessage, setSessionId]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -153,6 +119,28 @@ export function IntakeDraftEditor({
     };
   }, [brandName, campaignName, mode, notes, pastedText, sessionId]);
 
+  const createDraftSession = useCallback(async () => {
+    const response = await fetch("/api/intake/draft", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        brandName,
+        campaignName,
+        notes
+      })
+    });
+    const payload = await response.json();
+
+    if (!response.ok || !payload.session?.id) {
+      throw new Error(payload.error ?? "Could not create draft.");
+    }
+
+    setSessionId(payload.session.id);
+    return payload.session.id as string;
+  }, [brandName, campaignName, notes, setSessionId]);
+
   useEffect(() => {
     if (mode !== "upload") {
       autoContinueStartedRef.current = false;
@@ -164,7 +152,7 @@ export function IntakeDraftEditor({
       return;
     }
 
-    if (!sessionId || isSubmitting || autoContinueStartedRef.current) {
+    if (isSubmitting || autoContinueStartedRef.current) {
       return;
     }
 
@@ -173,8 +161,11 @@ export function IntakeDraftEditor({
     setErrorMessage(null);
     void (async () => {
       try {
+        const nextSessionId = sessionId ?? (await createDraftSession());
+        router.push(`/app/intake/${nextSessionId}`);
+        router.refresh();
         const response = await uploadSessionDocumentsRequest({
-          sessionId,
+          sessionId: nextSessionId,
           files: pendingFiles,
           pastedText: ""
         });
@@ -191,10 +182,9 @@ export function IntakeDraftEditor({
           error instanceof Error ? error.message : "Could not upload documents."
         );
         setIsSubmitting(false);
+        autoContinueStartedRef.current = false;
       }
     })();
-    router.push(`/app/intake/${sessionId}`);
-    router.refresh();
   }, [
     isSubmitting,
     mode,
@@ -205,14 +195,10 @@ export function IntakeDraftEditor({
     sessionId,
     setErrorMessage,
     setIsSubmitting,
+    createDraftSession,
   ]);
 
   async function handleContinue() {
-    if (!sessionId) {
-      setErrorMessage("Draft session is still being created.");
-      return;
-    }
-
     if (pendingFiles.length === 0 && !pastedText.trim()) {
       setErrorMessage("Upload a file or paste text before continuing.");
       return;
@@ -220,10 +206,13 @@ export function IntakeDraftEditor({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    const nextSessionId = sessionId ?? (await createDraftSession());
+    router.push(`/app/intake/${nextSessionId}`);
+    router.refresh();
     void (async () => {
       try {
         const response = await uploadSessionDocumentsRequest({
-          sessionId,
+          sessionId: nextSessionId,
           files: pendingFiles,
           pastedText: pastedText.trim()
         });
@@ -242,8 +231,6 @@ export function IntakeDraftEditor({
         setIsSubmitting(false);
       }
     })();
-    router.push(`/app/intake/${sessionId}`);
-    router.refresh();
   }
 
   return (

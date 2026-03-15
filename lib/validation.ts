@@ -70,6 +70,19 @@ const analyticsSchema = z.object({
   highlights: z.array(z.string())
 });
 
+const campaignDateWindowSchema = z.object({
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  postingWindow: z.string().nullable()
+});
+
+const disclosureObligationSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1),
+  detail: z.string().min(1),
+  source: z.string().nullable()
+});
+
 export const dealTermsInputSchema = z.object({
   brandName: z.string().nullable(),
   agencyName: z.string().nullable(),
@@ -94,6 +107,11 @@ export const dealTermsInputSchema = z.object({
   exclusivityCategory: z.string().nullable(),
   exclusivityDuration: z.string().nullable(),
   exclusivityRestrictions: z.string().nullable(),
+  brandCategory: z.string().nullable().optional(),
+  competitorCategories: z.array(z.string()).optional().default([]),
+  restrictedCategories: z.array(z.string()).optional().default([]),
+  campaignDateWindow: campaignDateWindowSchema.nullable().optional(),
+  disclosureObligations: z.array(disclosureObligationSchema).optional().default([]),
   revisions: z.string().nullable(),
   revisionRounds: z.number().nullable(),
   termination: z.string().nullable(),

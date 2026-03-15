@@ -10,19 +10,21 @@ import {
   Plus,
 } from "lucide-react";
 
-import { deleteIntakeDraftAction, deleteWorkspaceAction } from "@/app/actions";
+import { deleteIntakeDraftAction } from "@/app/actions";
+import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { DeleteWorkspaceButton } from "@/components/delete-workspace-button";
+import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
+import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
-import { listDealsForViewer } from "@/lib/deals";
+import { countConflictSeverity } from "@/lib/conflict-intelligence";
+import { listDealAggregatesForViewer } from "@/lib/deals";
 import { listIntakeDraftsForViewer } from "@/lib/intake";
-import { getRepository } from "@/lib/repository";
 import { cn, formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 function progressForStatus(status: string) {
@@ -85,24 +87,32 @@ function statusBadgeClass(status: string) {
 
 export default async function WorkspaceDashboardPage() {
   const viewer = await requireViewer();
-  const deals = await listDealsForViewer(viewer);
+  const aggregates = await listDealAggregatesForViewer(viewer);
   const intakeDrafts = await listIntakeDraftsForViewer(viewer);
 
-  const dealRows = await Promise.all(
-    deals.map(async (deal) => {
-      const aggregate = await getRepository().getDealAggregate(viewer.id, deal.id);
+  const dealRows = aggregates.map((aggregate) => ({
+    ...aggregate.deal,
+    riskFlags: aggregate.riskFlags,
+    deliverables: aggregate.terms?.deliverables ?? [],
+    paymentAmount: aggregate.terms?.paymentAmount ?? null,
+    currency: aggregate.terms?.currency ?? "USD",
+    documents: aggregate.documents,
+    latestDocument: aggregate.latestDocument,
+    conflictResults: aggregate.conflictResults,
+    disclosureObligations: aggregate.terms?.disclosureObligations ?? []
+  }));
 
-      return {
-        ...deal,
-        riskFlags: aggregate?.riskFlags ?? [],
-        deliverables: aggregate?.terms?.deliverables ?? [],
-        paymentAmount: aggregate?.terms?.paymentAmount ?? null,
-        currency: aggregate?.terms?.currency ?? "USD",
-        documents: aggregate?.documents ?? [],
-        latestDocument: aggregate?.latestDocument ?? null,
-      };
-    }),
+  const dashboardConflicts = Array.from(
+    new Map(
+      dealRows
+        .flatMap((deal) => deal.conflictResults)
+        .map((conflict) => [
+          `${conflict.type}:${conflict.title}:${conflict.relatedDealIds.join(",")}`,
+          conflict
+        ])
+    ).values()
   );
+  const dashboardConflictCounts = countConflictSeverity(dashboardConflicts);
 
   const allDeliverables = dealRows
     .flatMap((deal) =>
@@ -222,8 +232,14 @@ export default async function WorkspaceDashboardPage() {
       value: String(riskAlertCount),
       icon: AlertTriangle,
       href: "/app/deals/history",
-      note: riskAlertCount > 0 ? "Review recommended" : "No urgent alerts",
-      noteClassName: "text-muted-foreground",
+      note:
+        dashboardConflictCounts.total > 0
+          ? `${dashboardConflictCounts.total} cross-deal warning${dashboardConflictCounts.total === 1 ? "" : "s"}`
+          : riskAlertCount > 0
+            ? "Review recommended"
+            : "No urgent alerts",
+      noteClassName:
+        dashboardConflictCounts.total > 0 ? "text-warning" : "text-muted-foreground",
     },
   ];
 
@@ -232,14 +248,16 @@ export default async function WorkspaceDashboardPage() {
       <div className="p-8">
         <div className="mx-auto max-w-4xl space-y-10">
           <div className="flex min-h-[50vh] items-center justify-center">
-            <div className="max-w-md text-center">
-              <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
-                <FileText className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h2 className="mb-3 text-2xl font-semibold">No contracts yet</h2>
-              <p className="mb-8 text-muted-foreground">
-                Upload your first brand deal to get started. HelloBrand will help you
-                understand the terms and negotiate with confidence.
+            <div className="max-w-xl text-center">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-black/40 dark:text-white/40">
+                Start here
+              </p>
+              <h2 className="mb-4 text-3xl font-semibold tracking-tight text-foreground">
+                Start your first workspace
+              </h2>
+              <p className="mb-8 text-[17px] leading-8 text-muted-foreground">
+                Upload a contract, brief, or email thread. We&apos;ll organize the
+                deal details into one review-ready workspace.
               </p>
               <EmptyDashboardUpload />
             </div>
@@ -317,13 +335,13 @@ export default async function WorkspaceDashboardPage() {
             </p>
           </div>
           <Link
-            href="/app/intake/new?pick=1"
+            href="/app/intake/new"
             className={buttonVariants({ className: "gap-2" })}
-            aria-label="Upload documents for a new deal workspace"
+            aria-label="Create a new workspace"
             title="Start a new deal workspace"
           >
             <Plus className="h-4 w-4" />
-            Upload documents
+            New Workspace
           </Link>
         </div>
 
@@ -356,6 +374,15 @@ export default async function WorkspaceDashboardPage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-8">
+            {dashboardConflicts.length > 0 ? (
+              <ConflictWarnings
+                conflicts={dashboardConflicts}
+                compact
+                title="Active conflict warnings"
+                description="HelloBrand found overlapping category, exclusivity, or timing signals across your active deals."
+              />
+            ) : null}
+
             {intakeDrafts.length > 0 ? (
               <section>
                 <div className="mb-6 flex items-center justify-between">
@@ -462,19 +489,19 @@ export default async function WorkspaceDashboardPage() {
                               {deal.deliverables.length > 0 ? "deliverables" : "documents"}
                             </span>
                           </div>
+                          {(deal.conflictResults?.length ?? 0) > 0 ? (
+                            <p className="mt-3 text-sm text-amber-700 dark:text-amber-200">
+                              {deal.conflictResults?.length ?? 0} conflict warning
+                              {(deal.conflictResults?.length ?? 0) === 1 ? "" : "s"} to review
+                            </p>
+                          ) : null}
                         </Link>
 
                         <div className="flex items-start gap-3">
-                          <form action={deleteWorkspaceAction}>
-                            <input type="hidden" name="dealId" value={deal.id} />
-                            <input type="hidden" name="redirectTo" value="/app" />
-                            <DeleteWorkspaceButton
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/55 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/55"
-                              label={`Delete ${deal.campaignName}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </DeleteWorkspaceButton>
-                          </form>
+                          <RecentDealCardMenu
+                            dealId={deal.id}
+                            dealName={deal.campaignName}
+                          />
 
                           {deal.status === "completed" || deal.status === "paid" ? (
                             <div className="pt-1">
@@ -505,6 +532,13 @@ export default async function WorkspaceDashboardPage() {
               </div>
             </section>
 
+            {dealRows.some((deal) => (deal.disclosureObligations?.length ?? 0) > 0) ? (
+              <DisclosureObligations
+                obligations={dealRows.flatMap((deal) => deal.disclosureObligations ?? []).slice(0, 4)}
+                title="Disclosure reminders across active deals"
+              />
+            ) : null}
+
             <section className="grid gap-6 lg:grid-cols-2">
               <Card className="border-black/5 bg-white p-8 dark:border-white/10 dark:bg-white/[0.06]">
                 <h2 className="mb-6 text-[24px] font-semibold tracking-tight text-foreground">
@@ -519,7 +553,10 @@ export default async function WorkspaceDashboardPage() {
                     ];
 
                     return (
-                      <div key={deliverable.id} className="flex items-start gap-4">
+                      <div
+                        key={`${deliverable.dealId}:${deliverable.id}:${deliverable.dueDate ?? "no-date"}:${index}`}
+                        className="flex items-start gap-4"
+                      >
                         <div
                           className={cn(
                             "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",

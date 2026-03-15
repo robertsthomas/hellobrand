@@ -46,6 +46,22 @@ function createSeedTerms(now: string): DealTermsRecord {
     exclusivityCategory: "Athletic footwear",
     exclusivityDuration: "30 days",
     exclusivityRestrictions: "No competitive footwear partnerships.",
+    brandCategory: "sports_outdoors",
+    competitorCategories: ["Sports & outdoors"],
+    restrictedCategories: ["Sports & outdoors"],
+    campaignDateWindow: {
+      startDate: "2026-03-30T00:00:00.000Z",
+      endDate: "2026-03-31T00:00:00.000Z",
+      postingWindow: "2026-03-30 to 2026-03-31"
+    },
+    disclosureObligations: [
+      {
+        id: "disclosure-1",
+        title: "Disclosure required",
+        detail: "Use a paid partnership label or #ad when posting sponsored content.",
+        source: "Sponsored social content must include clear disclosure."
+      }
+    ],
     revisions: "One round of revisions.",
     revisionRounds: 1,
     termination: "Brand may terminate with 7 days notice before content is submitted.",
@@ -218,6 +234,11 @@ export function createSeedStore(): AppStore {
           exclusivityCategory: terms.exclusivityCategory,
           exclusivityDuration: terms.exclusivityDuration,
           exclusivityRestrictions: terms.exclusivityRestrictions,
+          brandCategory: terms.brandCategory,
+          competitorCategories: terms.competitorCategories,
+          restrictedCategories: terms.restrictedCategories,
+          campaignDateWindow: terms.campaignDateWindow,
+          disclosureObligations: terms.disclosureObligations,
           revisions: terms.revisions,
           revisionRounds: terms.revisionRounds,
           termination: terms.termination,
