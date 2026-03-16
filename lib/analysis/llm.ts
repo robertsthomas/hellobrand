@@ -473,8 +473,9 @@ function normalizeRiskFlags(
     return fallback;
   }
 
-  const next: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">> = raw
-    .map((entry) => {
+  const mapped: Array<
+    Omit<RiskFlagRecord, "id" | "dealId" | "createdAt"> | null
+  > = raw.map((entry) => {
       if (!entry || typeof entry !== "object") {
         return null;
       }
@@ -519,12 +520,13 @@ function normalizeRiskFlags(
         evidence: asStringArray(row.evidence),
         sourceDocumentId: documentId
       };
-    })
-    .filter(
-      (
-        entry
-      ): entry is Omit<RiskFlagRecord, "id" | "dealId" | "createdAt"> => Boolean(entry)
-    );
+    });
+
+  const next = mapped.filter(
+    (
+      entry
+    ): entry is Omit<RiskFlagRecord, "id" | "dealId" | "createdAt"> => entry !== null
+  );
 
   return next.length > 0 ? next : fallback;
 }

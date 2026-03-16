@@ -10,16 +10,8 @@ export default async function ProfilePage() {
   ]);
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <section className="max-w-3xl">
-          <h1 className="text-4xl font-semibold text-ink">Profile</h1>
-          <p className="mt-4 text-black/60 dark:text-white/65">
-            Manage creator identity, workflow defaults, and reminder preferences used
-            across intake, workspaces, and AI-generated drafts.
-          </p>
-        </section>
-
+    <div className="px-8 py-10">
+      <div className="mx-auto max-w-5xl">
         <ProfileEditor
           initialProfile={profile}
           initialEmail={viewer.email}

@@ -1,8 +1,22 @@
 "use client";
 
+import type {
+  FormEvent,
+  InputHTMLAttributes,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes
+} from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { History } from "lucide-react";
+import {
+  History,
+  Instagram,
+  Plus,
+  Trash2,
+  Twitter,
+  Upload,
+  Youtube
+} from "lucide-react";
 
 import {
   Dialog,
@@ -13,15 +27,15 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
+  PROFILE_CATEGORY_OPTIONS,
+  PROFILE_PLATFORM_OPTIONS,
+  parseProfileMetadata,
+  serializeProfileMetadata,
+  splitSocialHandles,
+  type ProfilePlatform,
+  type SocialHandleEntry
+} from "@/lib/profile-metadata";
 import type { ProfileAuditRecord, ProfileRecord } from "@/lib/types";
-
-const CURRENCY_OPTIONS = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD"];
 
 function presentDateTime(value: string) {
   try {
@@ -43,6 +57,148 @@ function humanizeField(field: string) {
     .replace(/^./, (value) => value.toUpperCase());
 }
 
+function createHandleId(prefix: string) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function deriveInitials(value: string) {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "HB";
+}
+
+function iconForPlatform(platform: ProfilePlatform) {
+  switch (platform) {
+    case "instagram":
+      return <Instagram className="h-4 w-4" />;
+    case "youtube":
+      return <Youtube className="h-4 w-4" />;
+    case "twitter":
+      return <Twitter className="h-4 w-4" />;
+    case "tiktok":
+      return <span className="text-sm font-semibold">TT</span>;
+    case "threads":
+      return <span className="text-sm font-semibold">@</span>;
+    case "newsletter":
+      return <span className="text-[11px] font-semibold uppercase">NL</span>;
+    case "podcast":
+      return <span className="text-[11px] font-semibold uppercase">PC</span>;
+    default:
+      return <span className="text-[11px] font-semibold uppercase">ID</span>;
+  }
+}
+
+function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
+  const platforms: ProfilePlatform[] = [
+    "instagram",
+    "youtube",
+    "tiktok",
+    "twitter"
+  ];
+
+  return platforms.map((platform) => {
+    const existing = initialHandles.find(
+      (entry) => entry.platform === platform && !entry.dealContext
+    );
+
+    return (
+      existing ?? {
+        id: createHandleId(platform),
+        platform,
+        handle: "",
+        audienceLabel: "",
+        dealContext: null
+      }
+    );
+  });
+}
+
+function emptyDealHandle(): SocialHandleEntry {
+  return {
+    id: createHandleId("deal"),
+    platform: "instagram",
+    handle: "",
+    audienceLabel: "",
+    dealContext: ""
+  };
+}
+
+function SectionHeader({
+  title,
+  description
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="mb-6 md:mb-7">
+      <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">{title}</h2>
+      {description ? (
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          {description}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function FieldLabel({
+  htmlFor,
+  children
+}: {
+  htmlFor?: string;
+  children: string;
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground"
+    >
+      {children}
+    </label>
+  );
+}
+
+function FlatInput(props: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={`h-12 w-full border border-border bg-white px-4 text-[15px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary ${props.className ?? ""}`}
+    />
+  );
+}
+
+function FlatTextarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      {...props}
+      className={`min-h-28 w-full border border-border bg-white px-4 py-3 text-[15px] leading-7 text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary ${props.className ?? ""}`}
+    />
+  );
+}
+
+function FlatSelect(
+  props: SelectHTMLAttributes<HTMLSelectElement> & { options: string[] }
+) {
+  const { options, className, ...rest } = props;
+
+  return (
+    <select
+      {...rest}
+      className={`h-12 w-full border border-border bg-white px-4 text-[15px] text-foreground outline-none transition-colors focus:border-primary ${className ?? ""}`}
+    >
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function ProfileEditor({
   initialProfile,
   initialEmail,
@@ -53,40 +209,109 @@ export function ProfileEditor({
   initialAudit: ProfileAuditRecord[];
 }) {
   const router = useRouter();
+  const { metadata } = parseProfileMetadata(initialProfile.payoutDetails);
+  const splitHandles = splitSocialHandles(metadata.socialHandles);
+
   const [form, setForm] = useState({
     displayName: initialProfile.displayName ?? "",
     creatorLegalName: initialProfile.creatorLegalName ?? "",
     businessName: initialProfile.businessName ?? "",
     contactEmail: initialProfile.contactEmail ?? initialEmail,
     preferredSignature: initialProfile.preferredSignature ?? "",
-    payoutDetails: initialProfile.payoutDetails ?? "",
-    defaultCurrency: initialProfile.defaultCurrency ?? "USD",
-    reminderLeadDays: String(initialProfile.reminderLeadDays ?? 3),
-    conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
-    paymentRemindersEnabled: initialProfile.paymentRemindersEnabled
+    bio: metadata.bio ?? "",
+    location: metadata.location ?? "",
+    primaryPlatform: metadata.primaryPlatform ?? "instagram",
+    contentCategory: metadata.contentCategory ?? PROFILE_CATEGORY_OPTIONS[0],
+    taxId: metadata.taxId ?? "",
+    rateCardUrl: metadata.rateCardUrl ?? "",
+    payoutNotes: metadata.payoutNotes ?? "",
+    generalHandles: buildGeneralHandles(splitHandles.generalHandles),
+    dealHandles:
+      splitHandles.dealSpecificHandles.length > 0
+        ? splitHandles.dealSpecificHandles.map((entry) => ({
+            ...entry,
+            audienceLabel: entry.audienceLabel ?? "",
+            dealContext: entry.dealContext ?? ""
+          }))
+        : [emptyDealHandle()]
   });
   const [audit, setAudit] = useState(initialAudit);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const initials = useMemo(
+    () =>
+      deriveInitials(
+        form.creatorLegalName.trim() ||
+          form.displayName.trim() ||
+          form.businessName.trim() ||
+          "HelloBrand"
+      ),
+    [form.businessName, form.creatorLegalName, form.displayName]
+  );
+
   const isConfigured = useMemo(
     () =>
       Boolean(
         form.creatorLegalName.trim() ||
+          form.displayName.trim() ||
           form.businessName.trim() ||
-          form.preferredSignature.trim()
+          form.generalHandles.some((entry) => entry.handle.trim())
       ),
-    [form.businessName, form.creatorLegalName, form.preferredSignature]
+    [
+      form.businessName,
+      form.creatorLegalName,
+      form.displayName,
+      form.generalHandles
+    ]
   );
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function updateGeneralHandle(
+    id: string,
+    field: "handle" | "audienceLabel",
+    value: string
+  ) {
+    setForm((current) => ({
+      ...current,
+      generalHandles: current.generalHandles.map((entry) =>
+        entry.id === id ? { ...entry, [field]: value } : entry
+      )
+    }));
+  }
+
+  function updateDealHandle(
+    id: string,
+    field: "dealContext" | "platform" | "handle" | "audienceLabel",
+    value: string
+  ) {
+    setForm((current) => ({
+      ...current,
+      dealHandles: current.dealHandles.map((entry) =>
+        entry.id === id ? { ...entry, [field]: value } : entry
+      )
+    }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
+      const socialHandles = [
+        ...form.generalHandles.map((entry) => ({
+          ...entry,
+          audienceLabel: entry.audienceLabel.trim() || null
+        })),
+        ...form.dealHandles.map((entry) => ({
+          ...entry,
+          audienceLabel: entry.audienceLabel.trim() || null,
+          dealContext: entry.dealContext.trim() || null
+        }))
+      ];
+
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: {
@@ -98,14 +323,21 @@ export function ProfileEditor({
           businessName: form.businessName.trim() || null,
           contactEmail: form.contactEmail.trim() || null,
           preferredSignature: form.preferredSignature.trim() || null,
-          payoutDetails: form.payoutDetails.trim() || null,
-          defaultCurrency: form.defaultCurrency.trim() || null,
-          reminderLeadDays:
-            form.reminderLeadDays.trim().length > 0
-              ? Number(form.reminderLeadDays)
-              : null,
-          conflictAlertsEnabled: form.conflictAlertsEnabled,
-          paymentRemindersEnabled: form.paymentRemindersEnabled
+          payoutDetails: serializeProfileMetadata({
+            bio: form.bio.trim() || null,
+            location: form.location.trim() || null,
+            primaryPlatform:
+              (form.primaryPlatform as ProfilePlatform | "").trim() || null,
+            contentCategory: form.contentCategory.trim() || null,
+            taxId: form.taxId.trim() || null,
+            rateCardUrl: form.rateCardUrl.trim() || null,
+            payoutNotes: form.payoutNotes.trim() || null,
+            socialHandles
+          }),
+          defaultCurrency: initialProfile.defaultCurrency ?? "USD",
+          reminderLeadDays: initialProfile.reminderLeadDays ?? 3,
+          conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
+          paymentRemindersEnabled: initialProfile.paymentRemindersEnabled
         })
       });
 
@@ -115,7 +347,9 @@ export function ProfileEditor({
       }
 
       setSuccessMessage(payload.message ?? "Profile saved.");
-      setAudit(Array.isArray(payload.recentChanges) ? payload.recentChanges : audit);
+      setAudit(
+        Array.isArray(payload.recentChanges) ? payload.recentChanges : initialAudit
+      );
       router.refresh();
     } catch (error) {
       setErrorMessage(
@@ -127,273 +361,477 @@ export function ProfileEditor({
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <form
-        onSubmit={handleSubmit}
-        className="grid gap-6 rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-panel dark:border-white/10 dark:bg-white/[0.06]"
-      >
-        <section className="space-y-2 border-b border-black/8 pb-6 dark:border-white/10">
-          <h2 className="text-2xl font-semibold text-ink">Creator profile</h2>
-          <p className="text-sm text-black/60 dark:text-white/65">
-            These details feed intake defaults, workspace context, and AI-generated
-            drafts.
+    <form onSubmit={handleSubmit} className="space-y-0">
+      <div className="flex flex-col gap-4 border-b border-border pb-8 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-[2.5rem] font-bold tracking-[-0.05em] text-foreground">
+            Profile
+          </h1>
+          <p className="mt-3 max-w-2xl text-lg leading-8 text-muted-foreground">
+            Manage your public creator identity, social handles, and business
+            defaults used across intake, drafting, and workspace setup.
           </p>
-        </section>
+        </div>
 
-        {successMessage ? (
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
-            {successMessage}
-          </div>
-        ) : null}
-        {errorMessage ? (
-          <div className="rounded-2xl border border-clay/20 bg-clay/8 px-4 py-3 text-sm text-clay">
-            {errorMessage}
-          </div>
-        ) : null}
+        <Dialog>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-11 items-center gap-2 border border-border bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+            >
+              <History className="h-4 w-4" />
+              Recent changes
+            </button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl border border-border bg-white p-0">
+            <DialogHeader className="border-b border-border px-6 py-5 text-left">
+              <DialogTitle className="text-xl font-bold tracking-[-0.03em] text-foreground">
+                Recent profile changes
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-muted-foreground">
+                Review saved creator profile changes without cluttering the main
+                editor.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+              {audit.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No profile edits recorded yet.
+                </p>
+              ) : (
+                <div className="divide-y divide-border border-t border-border">
+                  {audit.map((event) => (
+                    <div key={event.id} className="py-4">
+                      <p className="text-sm font-medium text-foreground">
+                        {event.changedFields.map(humanizeField).join(", ")}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {presentDateTime(event.createdAt)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-        <section className="grid gap-4 md:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Display name
-            <input
-              className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
+      {successMessage ? (
+        <div className="border-b border-border py-4 text-sm text-primary">
+          {successMessage}
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <div className="border-b border-border py-4 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <section className="border-b border-border py-10">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center">
+          <div className="flex h-24 w-24 items-center justify-center bg-primary text-2xl font-bold text-primary-foreground">
+            {initials}
+          </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              className="inline-flex h-11 items-center gap-2 bg-primary px-5 text-sm font-medium text-primary-foreground opacity-80"
+            >
+              <Upload className="h-4 w-4" />
+              Upload photo
+            </button>
+            <p className="text-sm text-muted-foreground">
+              Photo upload is coming soon. Initials are used in the workspace for now.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {isConfigured
+                ? "Your profile defaults are ready to backfill new deals."
+                : "Set up your creator details so HelloBrand can draft cleaner defaults."}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-border py-10">
+        <SectionHeader
+          title="Basic Information"
+          description="These details identify you across creator-facing workflows and review screens."
+        />
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <FieldLabel htmlFor="displayName">Public display name</FieldLabel>
+            <FlatInput
+              id="displayName"
               value={form.displayName}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setForm((current) => ({ ...current, displayName: value }));
-              }}
+              placeholder="Sarah Miller"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  displayName: event.currentTarget.value
+                }))
+              }
             />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Contact email
-            <input
-              className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
+          </div>
+          <div className="space-y-2">
+            <FieldLabel htmlFor="creatorLegalName">Creator name</FieldLabel>
+            <FlatInput
+              id="creatorLegalName"
+              value={form.creatorLegalName}
+              placeholder="Sarah Miller"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  creatorLegalName: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel htmlFor="businessName">Business name or primary handle</FieldLabel>
+            <FlatInput
+              id="businessName"
+              value={form.businessName}
+              placeholder="@sarahmiller"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  businessName: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel htmlFor="contactEmail">Contact email</FieldLabel>
+            <FlatInput
+              id="contactEmail"
               type="email"
               value={form.contactEmail}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setForm((current) => ({ ...current, contactEmail: value }));
-              }}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Creator / legal name
-            <input
-              className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
-              value={form.creatorLegalName}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
+              placeholder={initialEmail}
+              onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  creatorLegalName: value
-                }));
-              }}
+                  contactEmail: event.currentTarget.value
+                }))
+              }
             />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Business name / handle
-            <input
-              className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
-              value={form.businessName}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setForm((current) => ({ ...current, businessName: value }));
-              }}
-            />
-          </label>
-        </section>
-
-        <section className="grid gap-4 border-t border-black/8 pt-6 dark:border-white/10">
-          <h3 className="text-lg font-semibold text-ink">Communication defaults</h3>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Preferred email signature
-            <input
-              className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
-              value={form.preferredSignature}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="bio">Bio</FieldLabel>
+            <FlatTextarea
+              id="bio"
+              value={form.bio}
+              placeholder="What kind of creator are you, what do you cover, and what should brands understand quickly?"
+              onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  preferredSignature: value
-                }));
-              }}
-              placeholder="Best, Sarah"
+                  bio: event.currentTarget.value
+                }))
+              }
             />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Payout details
-            <textarea
-              className="min-h-32 rounded-[1.5rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
-              value={form.payoutDetails}
-              onChange={(event) => {
-                const value = event.currentTarget.value;
-                setForm((current) => ({ ...current, payoutDetails: value }));
-              }}
-              placeholder="Invoice instructions, payment platform, or finance contact notes."
-            />
-          </label>
-        </section>
-
-        <section className="grid gap-4 border-t border-black/8 pt-6 dark:border-white/10">
-          <h3 className="text-lg font-semibold text-ink">Preferences</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-              Default currency
-              <Select
-                value={form.defaultCurrency}
-                onValueChange={(value) =>
-                  setForm((current) => ({
-                    ...current,
-                    defaultCurrency: value
-                  }))
-                }
-              >
-                <SelectTrigger className="h-auto rounded-[1.25rem] border-black/10 bg-sand/50 px-4 py-4 text-sm dark:border-white/12 dark:bg-white/[0.05]">
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CURRENCY_OPTIONS.map((currency) => (
-                    <SelectItem key={currency} value={currency}>
-                      {currency}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-              Reminder lead time (days)
-              <input
-                className="rounded-[1.25rem] border border-black/10 bg-sand/50 px-4 py-4 dark:border-white/12 dark:bg-white/[0.05]"
-                type="number"
-                min={0}
-                max={30}
-                value={form.reminderLeadDays}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  setForm((current) => ({
-                    ...current,
-                    reminderLeadDays: value
-                  }));
-                }}
-              />
-            </label>
           </div>
-          <div className="grid gap-3">
-            <label className="flex items-start gap-3 rounded-[1.25rem] border border-black/6 bg-sand/35 px-4 py-4 text-sm dark:border-white/10 dark:bg-white/[0.04]">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-black/15 text-ocean focus:ring-ocean/20"
-                checked={form.conflictAlertsEnabled}
-                onChange={(event) => {
-                  const checked = event.currentTarget.checked;
-                  setForm((current) => ({
-                    ...current,
-                    conflictAlertsEnabled: checked
-                  }));
-                }}
-              />
-              <span>
-                <span className="block font-medium text-ink">Conflict alerts</span>
-                <span className="mt-1 block text-black/55 dark:text-white/60">
-                  Flag overlapping dates, brand-category conflicts, and exclusivity
-                  collisions as this becomes available.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3 rounded-[1.25rem] border border-black/6 bg-sand/35 px-4 py-4 text-sm dark:border-white/10 dark:bg-white/[0.04]">
-              <input
-                type="checkbox"
-                className="mt-1 h-4 w-4 rounded border-black/15 text-ocean focus:ring-ocean/20"
-                checked={form.paymentRemindersEnabled}
-                onChange={(event) => {
-                  const checked = event.currentTarget.checked;
-                  setForm((current) => ({
-                    ...current,
-                    paymentRemindersEnabled: checked
-                  }));
-                }}
-              />
-              <span>
-                <span className="block font-medium text-ink">Payment reminders</span>
-                <span className="mt-1 block text-black/55 dark:text-white/60">
-                  Keep payment follow-up prompts enabled for late or overdue deals.
-                </span>
-              </span>
-            </label>
-          </div>
-        </section>
+        </div>
+      </section>
 
-        <div className="flex justify-end border-t border-black/8 pt-6 dark:border-white/10">
+      <section className="border-b border-border py-10">
+        <SectionHeader
+          title="Social Media Channels"
+          description="Keep your core channels here so intake and deal setup can reference the right public handles."
+        />
+
+        <div className="space-y-4">
+          {form.generalHandles.map((entry) => (
+            <div
+              key={entry.id}
+              className="grid gap-3 border-b border-border pb-4 md:grid-cols-[40px_minmax(0,1fr)_160px]"
+            >
+              <div className="flex h-10 w-10 items-center justify-center border border-border bg-secondary">
+                {iconForPlatform(entry.platform)}
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-handle`}>
+                  {entry.platform === "twitter" ? "Twitter / X" : entry.platform}
+                </FieldLabel>
+                <FlatInput
+                  id={`${entry.id}-handle`}
+                  value={entry.handle}
+                  placeholder="@handle"
+                  onChange={(event) =>
+                    updateGeneralHandle(entry.id, "handle", event.currentTarget.value)
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-audience`}>Audience</FieldLabel>
+                <FlatInput
+                  id={`${entry.id}-audience`}
+                  value={entry.audienceLabel ?? ""}
+                  placeholder="245K"
+                  onChange={(event) =>
+                    updateGeneralHandle(
+                      entry.id,
+                      "audienceLabel",
+                      event.currentTarget.value
+                    )
+                  }
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-b border-border py-10">
+        <SectionHeader
+          title="Deal-Specific Handles"
+          description="Use this for alternate handles or platform-specific identities you only use for certain brands, campaigns, or deal types."
+        />
+
+        <div className="space-y-4">
+          {form.dealHandles.map((entry) => (
+            <div
+              key={entry.id}
+              className="grid gap-3 border-b border-border pb-4 md:grid-cols-[minmax(0,1.3fr)_180px_minmax(0,1fr)_120px_44px]"
+            >
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-context`}>Use for</FieldLabel>
+                <FlatInput
+                  id={`${entry.id}-context`}
+                  value={entry.dealContext ?? ""}
+                  placeholder="Beauty brand deals, paid TikTok campaigns, parenthood content"
+                  onChange={(event) =>
+                    updateDealHandle(
+                      entry.id,
+                      "dealContext",
+                      event.currentTarget.value
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-platform`}>Platform</FieldLabel>
+                <FlatSelect
+                  id={`${entry.id}-platform`}
+                  value={entry.platform}
+                  options={[...PROFILE_PLATFORM_OPTIONS]}
+                  onChange={(event) =>
+                    updateDealHandle(
+                      entry.id,
+                      "platform",
+                      event.currentTarget.value
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-handle`}>Handle</FieldLabel>
+                <FlatInput
+                  id={`${entry.id}-handle`}
+                  value={entry.handle}
+                  placeholder="@handle"
+                  onChange={(event) =>
+                    updateDealHandle(entry.id, "handle", event.currentTarget.value)
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor={`${entry.id}-audience`}>Audience</FieldLabel>
+                <FlatInput
+                  id={`${entry.id}-audience`}
+                  value={entry.audienceLabel ?? ""}
+                  placeholder="1.2M"
+                  onChange={(event) =>
+                    updateDealHandle(
+                      entry.id,
+                      "audienceLabel",
+                      event.currentTarget.value
+                    )
+                  }
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="flex h-12 w-12 items-center justify-center border border-border bg-white text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  aria-label="Remove deal-specific handle"
+                  onClick={() =>
+                    setForm((current) => ({
+                      ...current,
+                      dealHandles:
+                        current.dealHandles.length > 1
+                          ? current.dealHandles.filter((item) => item.id !== entry.id)
+                          : [emptyDealHandle()]
+                    }))
+                  }
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+
           <button
-            type="submit"
-            disabled={isSaving}
-            className="rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            type="button"
+            className="inline-flex h-11 items-center gap-2 border border-border bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+            onClick={() =>
+              setForm((current) => ({
+                ...current,
+                dealHandles: [...current.dealHandles, emptyDealHandle()]
+              }))
+            }
           >
-            {isSaving ? "Saving profile..." : "Save profile"}
+            <Plus className="h-4 w-4" />
+            Add deal-specific handle
           </button>
         </div>
-      </form>
+      </section>
 
-      <aside className="space-y-4">
-        <div className="rounded-[1.75rem] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
-          <h2 className="text-lg font-semibold text-ink">Profile status</h2>
-          <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-            {isConfigured
-              ? "Your creator defaults are set and available to intake and drafting flows."
-              : "Your profile is still minimal. Fill in the creator fields so intake and email drafting have better defaults."}
-          </p>
-        </div>
+      <section className="border-b border-border py-10">
+        <SectionHeader title="Creator Details" />
 
-        <div className="rounded-[1.75rem] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
-          <h2 className="text-lg font-semibold text-ink">Profile history</h2>
-          <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-            Review the latest saved profile changes without cluttering the main
-            settings page.
-          </p>
-          <Dialog>
-            <DialogTrigger asChild>
-              <button
-                type="button"
-                className="mt-4 inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-ink transition hover:border-black/20 dark:border-white/12 dark:text-white"
-              >
-                <History className="h-4 w-4" />
-                Recent changes
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl rounded-[28px] border-black/10 bg-background p-0 dark:border-white/10">
-              <DialogHeader className="border-b border-black/8 px-6 py-5 text-left dark:border-white/10">
-                <DialogTitle className="text-xl font-semibold text-ink">
-                  Recent profile changes
-                </DialogTitle>
-                <DialogDescription className="text-sm leading-6 text-black/60 dark:text-white/65">
-                  Saved creator profile updates are listed here in reverse chronological
-                  order.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[60vh] space-y-3 overflow-y-auto px-6 py-5">
-                {audit.length === 0 ? (
-                  <p className="text-sm text-black/60 dark:text-white/65">
-                    No profile edits recorded yet.
-                  </p>
-                ) : (
-                  audit.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-[1.25rem] bg-sand/45 px-4 py-4 text-sm dark:bg-white/[0.04]"
-                    >
-                      <div className="font-medium text-ink">
-                        {event.changedFields.map(humanizeField).join(", ")}
-                      </div>
-                      <div className="mt-1 text-black/55 dark:text-white/60">
-                        {presentDateTime(event.createdAt)}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <FieldLabel htmlFor="primaryPlatform">Primary platform</FieldLabel>
+            <FlatSelect
+              id="primaryPlatform"
+              value={form.primaryPlatform}
+              options={[...PROFILE_PLATFORM_OPTIONS]}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  primaryPlatform: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel htmlFor="contentCategory">Content category</FieldLabel>
+            <FlatSelect
+              id="contentCategory"
+              value={form.contentCategory}
+              options={[...PROFILE_CATEGORY_OPTIONS]}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  contentCategory: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="location">Location</FieldLabel>
+            <FlatInput
+              id="location"
+              value={form.location}
+              placeholder="Los Angeles, CA"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  location: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
         </div>
-      </aside>
-    </div>
+      </section>
+
+      <section className="border-b border-border py-10">
+        <SectionHeader
+          title="Business Information"
+          description="These details help when HelloBrand drafts outreach, reminders, and invoice-adjacent copy."
+        />
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="space-y-2">
+            <FieldLabel htmlFor="businessNameInline">Business name</FieldLabel>
+            <FlatInput
+              id="businessNameInline"
+              value={form.businessName}
+              placeholder="Sarah Miller Media LLC"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  businessName: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <FieldLabel htmlFor="taxId">Tax ID / EIN</FieldLabel>
+            <FlatInput
+              id="taxId"
+              value={form.taxId}
+              placeholder="XX-XXXXXXX"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  taxId: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="rateCardUrl">Rate card link</FieldLabel>
+            <FlatInput
+              id="rateCardUrl"
+              value={form.rateCardUrl}
+              placeholder="https://yourdomain.com/rates"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  rateCardUrl: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="preferredSignature">Default sign-off</FieldLabel>
+            <FlatInput
+              id="preferredSignature"
+              value={form.preferredSignature}
+              placeholder="Best, Sarah"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  preferredSignature: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="payoutNotes">Invoice and payout notes</FieldLabel>
+            <FlatTextarea
+              id="payoutNotes"
+              value={form.payoutNotes}
+              placeholder="Share invoice instructions, preferred payout platform, or finance details you want to reuse."
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  payoutNotes: event.currentTarget.value
+                }))
+              }
+            />
+          </div>
+        </div>
+      </section>
+
+      <div className="flex items-center gap-4 py-8">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="inline-flex h-12 items-center justify-center bg-primary px-6 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSaving ? "Saving changes..." : "Save changes"}
+        </button>
+        <button
+          type="button"
+          className="inline-flex h-12 items-center justify-center border border-border bg-white px-6 text-sm font-medium text-foreground"
+          onClick={() => router.refresh()}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

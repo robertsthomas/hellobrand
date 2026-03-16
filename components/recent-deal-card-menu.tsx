@@ -2,11 +2,10 @@
 
 import { MoreHorizontal, Trash2 } from "lucide-react";
 
-import { deleteWorkspaceAction } from "@/app/actions";
+import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 
@@ -22,35 +21,28 @@ export function RecentDealCardMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/50 transition hover:border-black/15 hover:text-black/70 dark:border-white/10 dark:text-white/50 dark:hover:border-white/15 dark:hover:text-white/75"
+          className="inline-flex items-center justify-center p-0 text-black/45 transition hover:text-black/70 dark:text-white/45 dark:hover:text-white/75"
           aria-label={`Open actions for ${dealName}`}
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44">
-        <form action={deleteWorkspaceAction}>
-          <input type="hidden" name="dealId" value={dealId} />
-          <input type="hidden" name="redirectTo" value="/app" />
-          <DropdownMenuItem asChild variant="destructive">
-            <button
-              type="submit"
-              className="flex w-full items-center gap-2"
-              onClick={(event) => {
-                const confirmed = window.confirm(
-                  "Delete this deal and all of its uploaded documents? This cannot be undone."
-                );
-
-                if (!confirmed) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete deal
-            </button>
-          </DropdownMenuItem>
-        </form>
+      <DropdownMenuContent
+        align="end"
+        className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-neutral-950"
+      >
+        <DeleteDealDialog
+          dealId={dealId}
+          dealName={dealName}
+          redirectTo="/app"
+          triggerMode="menu-item"
+          menuLabel="Delete"
+        >
+          <>
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </>
+        </DeleteDealDialog>
       </DropdownMenuContent>
     </DropdownMenu>
   );

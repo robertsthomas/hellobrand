@@ -114,10 +114,22 @@ export default async function IntakeSessionPage({
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
-  const { session, aggregate, profileDefaults } = await getIntakeSessionForViewer(
-    viewer,
-    sessionId
-  );
+  let sessionData: Awaited<ReturnType<typeof getIntakeSessionForViewer>>;
+
+  try {
+    sessionData = await getIntakeSessionForViewer(viewer, sessionId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Intake session not found."
+    ) {
+      redirect("/app");
+    }
+
+    throw error;
+  }
+
+  const { session, aggregate, profileDefaults } = sessionData;
 
   if (session.status === "completed" && aggregate) {
     redirect(`/app/deals/${aggregate.deal.id}`);

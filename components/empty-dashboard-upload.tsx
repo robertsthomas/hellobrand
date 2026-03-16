@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Maximize2, Minimize2, Plus } from "lucide-react";
 
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export function EmptyDashboardUpload({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const createStartedRef = useRef(false);
   const createPromiseRef = useRef<Promise<string> | null>(null);
+  const [isPasteExpanded, setIsPasteExpanded] = useState(false);
   const router = useRouter();
   const sessionId = useIntakeUiStore((state) => state.sessionId);
   const isSubmitting = useIntakeUiStore((state) => state.isSubmitting);
@@ -247,6 +248,7 @@ export function EmptyDashboardUpload({
           onClick={() => {
             setMode("upload");
             setErrorMessage(null);
+            setIsPasteExpanded(false);
           }}
           className={cn(
             "rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200",
@@ -300,14 +302,50 @@ export function EmptyDashboardUpload({
           </p>
         </div>
       ) : (
-        <div className="flex w-full max-w-2xl flex-col gap-3 text-left">
-          <Textarea
-            name="pastedText"
-            value={pastedText}
-            onChange={(event) => setPastedText(event.currentTarget.value)}
-            placeholder="Paste a contract, email thread, brief, deliverables notes, or any brand context here."
-            className="min-h-44 rounded-2xl border-black/10 bg-white/90 px-5 py-4 text-sm shadow-sm transition focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]"
-          />
+        <div className="flex w-full max-w-2xl flex-col gap-3 text-left transition-all duration-200">
+          {isPasteExpanded ? (
+            <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" />
+          ) : null}
+          <div
+            className={cn(
+              isPasteExpanded
+                ? "fixed inset-0 z-50 flex items-center justify-center p-8"
+                : "relative"
+            )}
+          >
+            <div
+              className={cn(
+                "relative transition-all duration-200",
+                isPasteExpanded ? "w-[min(92vw,72rem)]" : "w-full"
+              )}
+            >
+            <button
+              type="button"
+              aria-label={isPasteExpanded ? "Collapse text area" : "Expand text area"}
+              title={isPasteExpanded ? "Collapse" : "Expand"}
+              onClick={() => setIsPasteExpanded((current) => !current)}
+              className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white/95 text-black/55 shadow-sm transition hover:text-black dark:border-white/12 dark:bg-[#111111]/90 dark:text-white/60 dark:hover:text-white"
+            >
+              {isPasteExpanded ? (
+                <Minimize2 className="h-4 w-4" />
+              ) : (
+                <Maximize2 className="h-4 w-4" />
+              )}
+            </button>
+            <Textarea
+              name="pastedText"
+              value={pastedText}
+              onChange={(event) => setPastedText(event.currentTarget.value)}
+              placeholder="Paste a contract, email thread, brief, deliverables notes, or any brand context here."
+              className={cn(
+                "rounded-2xl border-black/10 bg-white/90 px-5 py-4 pr-14 text-sm shadow-sm transition-all duration-200 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]",
+                isPasteExpanded
+                  ? "min-h-[min(72vh,46rem)] w-full rounded-[28px] shadow-2xl"
+                  : "min-h-44 w-full"
+              )}
+            />
+            </div>
+          </div>
           <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
             <p className="max-w-xl text-sm text-black/55 dark:text-white/60">
               This starts a new deal workspace from pasted text. HelloBrand will

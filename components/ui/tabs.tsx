@@ -26,7 +26,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "bg-secondary text-muted-foreground inline-flex h-12 w-fit items-center justify-center rounded-full border border-black/5 p-1 dark:border-white/10",
+        "inline-flex h-12 w-fit items-center gap-1 rounded-[18px] border border-black/8 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/[0.03]",
         className,
       )}
       {...props}
@@ -42,7 +42,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-card text-foreground/80 dark:text-muted-foreground inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-4 py-2 text-sm font-medium whitespace-nowrap transition-[color,background-color,box-shadow,transform] duration-200 focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-foreground",
+        "data-[state=active]:bg-[#111827] data-[state=active]:text-white data-[state=active]:shadow-sm focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:outline-ring text-[#667085] inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-transparent px-4 py-2 text-sm font-medium whitespace-nowrap transition-[color,background-color,box-shadow,transform] duration-200 focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-foreground dark:data-[state=active]:bg-white dark:data-[state=active]:text-[#111827]",
         className,
       )}
       {...props}

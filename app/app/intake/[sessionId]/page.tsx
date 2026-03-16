@@ -18,10 +18,22 @@ export default async function IntakeProcessingPage({
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
-  const { session, aggregate, processing } = await getIntakeSessionForViewer(
-    viewer,
-    sessionId
-  );
+  let sessionData: Awaited<ReturnType<typeof getIntakeSessionForViewer>>;
+
+  try {
+    sessionData = await getIntakeSessionForViewer(viewer, sessionId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Intake session not found."
+    ) {
+      redirect("/app");
+    }
+
+    throw error;
+  }
+
+  const { session, aggregate, processing } = sessionData;
 
   if (session.status === "completed" && aggregate) {
     redirect(`/app/deals/${aggregate.deal.id}`);

@@ -2,9 +2,8 @@ import { notFound } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
-import { deleteWorkspaceAction } from "@/app/actions";
 import { ConflictWarnings } from "@/components/conflict-warnings";
-import { DeleteWorkspaceButton } from "@/components/delete-workspace-button";
+import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
 import { DealStatusPanel } from "@/components/deal-status-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
@@ -16,6 +15,12 @@ import { RiskFlags } from "@/components/risk-flags";
 import { SummaryCard } from "@/components/summary-card";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
@@ -88,42 +93,56 @@ export default async function WorkspaceDealDetailPage({
   const plainSummary = toPlainDealSummary(summaryBody) ?? summaryBody;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="px-5 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-[1380px] space-y-6">
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[2rem] bg-white/80 dark:bg-white/5 p-7 shadow-panel">
+          <div className="rounded-[28px] border border-black/8 bg-white p-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-black/45 dark:text-white/45">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/45">
                   {deal.brandName}
                 </p>
-                <h1 className="mt-4 font-serif text-5xl text-ocean">
+                <h1 className="mt-4 max-w-4xl text-[46px] font-semibold tracking-[-0.06em] text-foreground lg:text-[58px]">
                   {deal.campaignName}
                 </h1>
               </div>
             </div>
             {summarySections.length > 0 ? (
-              <div className="mt-6 grid gap-4 lg:grid-cols-2">
-                {summarySections.map((section) => (
-                  <div
-                    key={section.id}
-                    className="rounded-[1.5rem] border border-black/6 bg-sand/35 p-5 dark:border-white/8 dark:bg-white/[0.04]"
-                  >
-                    <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-black/48 dark:text-white/48">
-                      {section.title}
-                    </h2>
-                    <div className="mt-3 space-y-3">
-                    {section.paragraphs.map((paragraph, index) => (
-                      <p
-                        key={`${section.id}-${index}`}
-                        className="text-[15px] leading-7 text-black/68 dark:text-white/72"
-                      >
-                        {renderSummaryParagraph(paragraph)}
-                      </p>
-                    ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-6 border-t border-black/6 dark:border-white/8">
+                <Accordion
+                  type="single"
+                  collapsible
+                  defaultValue={summarySections[0]?.id}
+                  className="w-full"
+                >
+                  {summarySections.map((section) => (
+                    <AccordionItem
+                      key={section.id}
+                      value={section.id}
+                      className="border-black/6 dark:border-white/8"
+                    >
+                      <AccordionTrigger className="py-5 hover:no-underline">
+                        <div className="pr-6 text-left">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
+                            {section.title}
+                          </p>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-5">
+                        <div className="space-y-3 pr-10">
+                          {section.paragraphs.map((paragraph, index) => (
+                            <p
+                              key={`${section.id}-${index}`}
+                              className="text-[15px] leading-7 text-black/68 dark:text-white/72"
+                            >
+                              {renderSummaryParagraph(paragraph)}
+                            </p>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               </div>
             ) : (
               <p className="mt-4 max-w-3xl text-sm leading-6 text-black/65 dark:text-white/70">
@@ -160,26 +179,26 @@ export default async function WorkspaceDealDetailPage({
         </section>
 
         <Tabs defaultValue="overview" className="gap-6">
-          <TabsList className="h-auto flex-wrap rounded-[1.25rem] bg-white/80 dark:bg-white/5 p-2 shadow-panel">
-            <TabsTrigger value="overview" className="rounded-full px-4 py-2">
+          <TabsList className="h-auto flex-wrap rounded-[20px] p-1.5">
+            <TabsTrigger value="overview" className="px-4 py-2">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="terms" className="rounded-full px-4 py-2">
+            <TabsTrigger value="terms" className="px-4 py-2">
               Key Terms
             </TabsTrigger>
-            <TabsTrigger value="risks" className="rounded-full px-4 py-2">
+            <TabsTrigger value="risks" className="px-4 py-2">
               Risks
             </TabsTrigger>
-            <TabsTrigger value="deliverables" className="rounded-full px-4 py-2">
+            <TabsTrigger value="deliverables" className="px-4 py-2">
               Deliverables
             </TabsTrigger>
-            <TabsTrigger value="emails" className="rounded-full px-4 py-2">
+            <TabsTrigger value="emails" className="px-4 py-2">
               Emails
             </TabsTrigger>
-            <TabsTrigger value="documents" className="rounded-full px-4 py-2">
+            <TabsTrigger value="documents" className="px-4 py-2">
               Documents
             </TabsTrigger>
-            <TabsTrigger value="notes" className="rounded-full px-4 py-2">
+            <TabsTrigger value="notes" className="px-4 py-2">
               Notes
             </TabsTrigger>
           </TabsList>
@@ -278,16 +297,16 @@ export default async function WorkspaceDealDetailPage({
         </Tabs>
 
         <div className="border-t border-black/6 pt-6 dark:border-white/8">
-          <form action={deleteWorkspaceAction}>
-            <input type="hidden" name="dealId" value={deal.id} />
-            <input type="hidden" name="redirectTo" value="/app/deals/history" />
-            <DeleteWorkspaceButton
-              className="inline-flex items-center gap-2 text-sm font-medium text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete this deal
-            </DeleteWorkspaceButton>
-          </form>
+          <DeleteDealDialog
+            dealId={deal.id}
+            dealName={deal.campaignName}
+            redirectTo="/app/deals/history"
+            className="inline-flex items-center gap-2 text-sm font-medium text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
+            triggerLabel={`Delete ${deal.campaignName}`}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete this deal
+          </DeleteDealDialog>
         </div>
       </div>
     </div>

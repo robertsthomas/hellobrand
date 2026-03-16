@@ -11,6 +11,9 @@ importers:
       '@clerk/nextjs':
         specifier: ^6.0.0
         version: 6.39.0(next@15.5.12(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@llamaindex/llama-cloud':
+        specifier: ^1.8.0
+        version: 1.8.0
       '@prisma/client':
         specifier: ^6.5.0
         version: 6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)
@@ -659,6 +662,9 @@ packages:
 
   '@js-sdsl/ordered-map@4.4.2':
     resolution: {integrity: sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==}
+
+  '@llamaindex/llama-cloud@1.8.0':
+    resolution: {integrity: sha512-1+2cPIMWNwTEmDHzPbQtmh7Zllo1hOClBg2Ps1yumFPz5eNSdeJXEQ/m9cP2epdv1148w4LFJUaxVXXS84QGFQ==}
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
@@ -5015,6 +5021,8 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@js-sdsl/ordered-map@4.4.2': {}
+
+  '@llamaindex/llama-cloud@1.8.0': {}
 
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:

@@ -16,6 +16,7 @@ import type {
   IntakeAnalyticsRecord,
   IntakeDraftListItem,
   IntakeProcessingSnapshot,
+  IntakeProcessingStageId,
   IntakeSessionRecord,
   IntakeTimelineItem,
   JobRecord,
@@ -228,29 +229,76 @@ const STAGE_META: Record<
   }
 };
 
+const STAGE_ORDER: IntakeProcessingStageId[] = [
+  "extracting",
+  "structuring",
+  "risk_review",
+  "summary"
+];
+
+function stageRank(stage: IntakeProcessingStageId | null | undefined) {
+  if (!stage) {
+    return -1;
+  }
+
+  return STAGE_ORDER.indexOf(stage);
+}
+
 function deriveProcessingSnapshot(
   aggregate: DealAggregate | null,
   session: IntakeSessionRecord
 ): IntakeProcessingSnapshot {
   const jobs = aggregate?.jobs ?? [];
-  const processingJob =
-    jobs.find((job) => job.status === "processing") ??
-    (session.status === "failed" ? jobs.find((job) => job.status === "failed") : null) ??
-    null;
-  const activeStage =
-    (processingJob ? JOB_STAGE_MAP[processingJob.type] : null) ??
-    (["ready_for_confirmation", "completed"].includes(session.status) ? "summary" : null);
-
+  const processingJobs = jobs.filter((job) => job.status === "processing");
+  const failedJobs = jobs.filter((job) => job.status === "failed");
   const completedStages = Array.from(
     new Set(
       jobs
         .filter((job) => job.status === "ready")
         .map((job) => JOB_STAGE_MAP[job.type])
-        .filter((stage): stage is NonNullable<IntakeProcessingSnapshot["currentStage"]> =>
-          Boolean(stage)
-        )
+        .filter((stage): stage is IntakeProcessingStageId => Boolean(stage))
     )
-  );
+  ).sort((left, right) => stageRank(left) - stageRank(right));
+
+  const processingJob =
+    [...processingJobs].sort((left, right) => {
+      const stageDelta =
+        stageRank(JOB_STAGE_MAP[right.type]) - stageRank(JOB_STAGE_MAP[left.type]);
+
+      if (stageDelta !== 0) {
+        return stageDelta;
+      }
+
+      return right.updatedAt.localeCompare(left.updatedAt);
+    })[0] ??
+    (session.status === "failed"
+      ? [...failedJobs].sort((left, right) => {
+          const stageDelta =
+            stageRank(JOB_STAGE_MAP[right.type]) - stageRank(JOB_STAGE_MAP[left.type]);
+
+          if (stageDelta !== 0) {
+            return stageDelta;
+          }
+
+          return right.updatedAt.localeCompare(left.updatedAt);
+        })[0] ?? null
+      : null);
+
+  const highestCompletedStage =
+    completedStages.length > 0 ? completedStages[completedStages.length - 1] : null;
+  const nextStageAfterCompleted =
+    highestCompletedStage === null
+      ? "extracting"
+      : STAGE_ORDER[Math.min(stageRank(highestCompletedStage) + 1, STAGE_ORDER.length - 1)] ??
+        null;
+
+  const activeStage =
+    (processingJob ? JOB_STAGE_MAP[processingJob.type] : null) ??
+    (["ready_for_confirmation", "completed"].includes(session.status)
+      ? "summary"
+      : session.status === "processing"
+        ? nextStageAfterCompleted
+        : null);
 
   if (
     activeStage &&

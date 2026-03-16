@@ -37,24 +37,30 @@ export default async function DealHistoryPage({
   const statuses = Array.from(new Set(enrichedDeals.map((deal) => deal.status)));
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section>
-          <h1 className="text-4xl font-semibold text-ink">All deals</h1>
-          <p className="mt-4 max-w-3xl text-black/60 dark:text-white/65">
+    <div className="px-5 py-6 lg:px-8 lg:py-8">
+      <div className="mx-auto max-w-[1380px] space-y-6">
+        <section className="rounded-[28px] border border-black/8 bg-white px-7 py-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
+            Deals
+          </p>
+          <h1 className="mt-3 text-[46px] font-semibold tracking-[-0.06em] text-foreground">
+            All workspaces
+          </h1>
+          <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
             Your full history of creator-brand workspaces, from contracts still
-            under review to finished campaigns.
+            under review to finished campaigns and completed payments.
           </p>
         </section>
-        <form className="grid gap-4 rounded-[1.75rem] border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/5 p-5 shadow-panel md:grid-cols-[1fr_220px_auto]">
+
+        <form className="grid gap-4 rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] md:grid-cols-[1fr_240px_auto]">
           <input
-            className="rounded-[1.25rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-3 text-sm"
+            className="rounded-2xl border border-black/8 bg-[#f7f8fa] px-4 py-3 text-sm text-foreground"
             name="q"
             defaultValue={params.q ?? ""}
             placeholder="Search brand or campaign"
           />
           <select
-            className="rounded-[1.25rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-3 text-sm"
+            className="rounded-2xl border border-black/8 bg-[#f7f8fa] px-4 py-3 text-sm text-foreground"
             name="status"
             defaultValue={selectedStatus}
           >
@@ -65,10 +71,11 @@ export default async function DealHistoryPage({
               </option>
             ))}
           </select>
-          <button className="rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white">
+          <button className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white">
             Filter
           </button>
         </form>
+
         <DealList deals={filteredDeals} />
       </div>
     </div>
