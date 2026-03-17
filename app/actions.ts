@@ -15,6 +15,7 @@ import {
   deleteDealForViewer as deleteDealFromDeals,
   generateDraftForViewer as generateDraftFromDeals,
   reprocessDocumentForViewer as reprocessDocumentFromDeals,
+  updateDealNotesForViewer as updateDealNotesFromDeals,
   updateDealForViewer as updateDealFromDeals,
   updateTermsForViewer as updateTermsFromDeals,
   uploadDocumentsForViewer as uploadDocumentsFromDeals
@@ -163,6 +164,12 @@ export async function saveTermsAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const deliverablesJson = String(formData.get("deliverablesJson") ?? "[]");
   const usageChannelsJson = String(formData.get("usageChannelsJson") ?? "[]");
+  const competitorCategoriesJson = String(
+    formData.get("competitorCategoriesJson") ?? "[]"
+  );
+  const restrictedCategoriesJson = String(
+    formData.get("restrictedCategoriesJson") ?? "[]"
+  );
 
   const input = dealTermsInputSchema.parse({
     brandName: parseNullableString(formData.get("brandName")),
@@ -195,8 +202,8 @@ export async function saveTermsAction(formData: FormData) {
       formData.get("exclusivityRestrictions")
     ),
     brandCategory: parseNullableString(formData.get("brandCategory")),
-    competitorCategories: [],
-    restrictedCategories: [],
+    competitorCategories: JSON.parse(competitorCategoriesJson),
+    restrictedCategories: JSON.parse(restrictedCategoriesJson),
     campaignDateWindow: null,
     disclosureObligations: [],
     revisions: parseNullableString(formData.get("revisions")),
@@ -212,6 +219,16 @@ export async function saveTermsAction(formData: FormData) {
   });
 
   await updateTermsFromDeals(viewer, dealId, input);
+
+  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath("/app");
+}
+
+export async function saveDealNotesAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+
+  await updateDealNotesFromDeals(viewer, dealId, parseNullableString(formData.get("notes")));
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
@@ -366,7 +383,19 @@ export async function confirmIntakeSessionAction(formData: FormData) {
   const viewer = await requireViewer();
   const deliverablesJson = String(formData.get("deliverablesJson") ?? "[]");
   const timelineItemsJson = String(formData.get("timelineItemsJson") ?? "[]");
-  const analyticsJson = String(formData.get("analyticsJson") ?? "null");
+  const analyticsJson = String(formData.get("analyticsJson") ?? "{\"highlights\":[]}");
+  const competitorCategoriesJson = String(
+    formData.get("competitorCategoriesJson") ?? "[]"
+  );
+  const restrictedCategoriesJson = String(
+    formData.get("restrictedCategoriesJson") ?? "[]"
+  );
+  const campaignDateWindowJson = String(
+    formData.get("campaignDateWindowJson") ?? "null"
+  );
+  const disclosureObligationsJson = String(
+    formData.get("disclosureObligationsJson") ?? "[]"
+  );
   const input = confirmIntakeSessionSchema.parse({
     brandName: clampString(String(formData.get("brandName") ?? ""), 120),
     contractTitle: clampString(String(formData.get("contractTitle") ?? ""), 160),
@@ -385,6 +414,12 @@ export async function confirmIntakeSessionAction(formData: FormData) {
     primaryContactEmail: parseClampedNullableString(formData.get("primaryContactEmail"), 320),
     primaryContactPhone: parseClampedNullableString(formData.get("primaryContactPhone"), 40),
     paymentAmount: parseNullableNumber(formData.get("paymentAmount")),
+    currency: parseClampedNullableString(formData.get("currency"), 12),
+    brandCategory: parseNullableString(formData.get("brandCategory")),
+    competitorCategories: JSON.parse(competitorCategoriesJson),
+    restrictedCategories: JSON.parse(restrictedCategoriesJson),
+    campaignDateWindow: JSON.parse(campaignDateWindowJson),
+    disclosureObligations: JSON.parse(disclosureObligationsJson),
     deliverables: JSON.parse(deliverablesJson),
     timelineItems: JSON.parse(timelineItemsJson),
     analytics: JSON.parse(analyticsJson),

@@ -1,6 +1,15 @@
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import { FileText, MessageSquareText, Plus } from "lucide-react";
+
 import { uploadDocumentsAction } from "@/app/actions";
 import type { DocumentRecord } from "@/lib/types";
-import { humanizeToken } from "@/lib/utils";
+import { cn, humanizeToken } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+
+type UploadMode = "upload" | "paste";
 
 export function UploadContractForm({
   dealId,
@@ -9,75 +18,140 @@ export function UploadContractForm({
   dealId: string;
   documents: DocumentRecord[];
 }) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [mode, setMode] = useState<UploadMode>("upload");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const latestDocument = documents[0] ?? null;
+
+  const selectedFilesLabel = useMemo(() => {
+    if (selectedFiles.length === 0) {
+      return "No files selected";
+    }
+
+    if (selectedFiles.length === 1) {
+      return selectedFiles[0]?.name ?? "1 file selected";
+    }
+
+    return `${selectedFiles.length} files selected`;
+  }, [selectedFiles]);
 
   return (
     <form
       action={uploadDocumentsAction}
-      className="rounded-[1.75rem] border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-panel"
+      className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <input type="hidden" name="dealId" value={dealId} />
+
+      <div className="flex flex-col gap-4 border-b border-black/8 pb-5 dark:border-white/10 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="font-serif text-3xl text-ocean">Add documents</h2>
+          <h2 className="text-[28px] font-semibold tracking-[-0.04em] text-foreground">
+            Add documents
+          </h2>
           <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-            These uploads attach to this existing workspace only. Add revised
-            contracts, briefs, decks, invoices, or pasted email threads and
-            HelloBrand will update the analysis for this deal.
+            Attach another file or paste more context for this workspace.
           </p>
-          {latestDocument ? (
-            <p className="mt-3 text-sm text-black/60 dark:text-white/65">
-              Latest upload:{" "}
-              <span className="font-semibold">{latestDocument.fileName}</span>{" "}
-              <span className="text-black/45 dark:text-white/45">
-                ({humanizeToken(latestDocument.documentKind)})
-              </span>
-            </p>
-          ) : null}
         </div>
-        <div className="rounded-full bg-black/5 dark:bg-white/10 px-3 py-1 text-xs font-semibold capitalize text-black/65 dark:text-white/70">
-          {latestDocument?.processingStatus ?? "no documents"}
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("upload")}
+            className={cn(
+              "inline-flex items-center gap-2 border px-3 py-2 text-sm transition",
+              mode === "upload"
+                ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
+                : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"
+            )}
+          >
+            <Plus className="h-4 w-4" />
+            Add documents
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("paste")}
+            className={cn(
+              "inline-flex items-center gap-2 border px-3 py-2 text-sm transition",
+              mode === "paste"
+                ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
+                : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"
+            )}
+          >
+            <MessageSquareText className="h-4 w-4" />
+            Paste content
+          </button>
         </div>
       </div>
 
-      <input type="hidden" name="dealId" value={dealId} />
-
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_0.95fr]">
-        <div className="grid gap-3">
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Files
+      <div className="pt-5">
+        {mode === "upload" ? (
+          <div className="space-y-4">
             <input
-              className="block w-full rounded-[1.5rem] border border-dashed border-black/20 dark:border-white/15 bg-sand/40 dark:bg-white/[0.04] px-4 py-4 text-sm"
+              ref={fileInputRef}
+              className="hidden"
               type="file"
               name="documents"
               multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+              onChange={(event) =>
+                setSelectedFiles(Array.from(event.currentTarget.files ?? []))
+              }
             />
-          </label>
-          <p className="text-xs text-black/45 dark:text-white/45">
-            Text-based PDFs and DOCX files work best. Image-only scans may fail
-            and will be flagged for manual review.
-          </p>
-        </div>
 
-        <div className="grid gap-3">
-          <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-            Paste anything from the brand
-            <textarea
-              className="min-h-32 rounded-[1.5rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-4 text-sm"
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center border border-black/8 text-black/55 dark:border-white/10 dark:text-white/60">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{selectedFilesLabel}</p>
+                  <p className="text-xs text-black/45 dark:text-white/45">
+                    PDFs, DOCX, and TXT work best.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-sm font-medium text-foreground underline underline-offset-4"
+                >
+                  Choose files
+                </button>
+                <Button type="submit" size="sm">
+                  Add to workspace
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <Textarea
               name="pastedText"
-              placeholder="Paste a contract excerpt, email thread, brief, deliverables notes, or any other plain-text context here."
+              className="min-h-36 rounded-none border-black/10 px-4 py-4 text-sm dark:border-white/12"
+              placeholder="Paste an email thread, contract excerpt, brief, or other plain-text context."
             />
-          </label>
-          <p className="text-xs text-black/45 dark:text-white/45">
-            Paste whatever you have. HelloBrand will organize contract terms,
-            email clarifications, and brand notes during analysis.
-          </p>
-        </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-black/45 dark:text-white/45">
+                Plain text works best here. The content will be attached to this workspace only.
+              </p>
+              <Button type="submit" size="sm">
+                Add to workspace
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <button className="mt-5 rounded-full bg-clay px-5 py-3 text-sm font-semibold text-white">
-        Add to this workspace
-      </button>
+      {latestDocument ? (
+        <div className="mt-5 border-t border-black/8 pt-4 text-xs text-black/45 dark:border-white/10 dark:text-white/45">
+          Latest document:{" "}
+          <span className="font-medium text-black/65 dark:text-white/70">
+            {latestDocument.fileName}
+          </span>{" "}
+          · {humanizeToken(latestDocument.processingStatus)}
+        </div>
+      ) : null}
 
       {documents.some((document) => document.errorMessage) ? (
         <div className="mt-4 grid gap-2">
@@ -86,7 +160,7 @@ export function UploadContractForm({
             .map((document) => (
               <p
                 key={document.id}
-                className="rounded-2xl bg-clay/10 px-4 py-3 text-sm text-clay"
+                className="border-l-2 border-clay/60 bg-clay/5 px-4 py-3 text-sm text-clay"
               >
                 {document.fileName}: {document.errorMessage}
               </p>

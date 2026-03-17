@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { startNextQueuedIntakeSessionForUser } from "@/lib/intake-queue";
 import type { IntakeSessionRecord, IntakeSessionStatus, PaymentStatus } from "@/lib/types";
 
 function iso(value: Date | null | undefined) {
@@ -60,6 +61,10 @@ function deriveIntakeStatus(input: {
 
   if (input.documentsCount === 0) {
     return "draft" satisfies IntakeSessionStatus;
+  }
+
+  if (input.currentStatus === "queued" && !input.hasFailed) {
+    return "queued" satisfies IntakeSessionStatus;
   }
 
   if (input.hasFailed) {
@@ -142,6 +147,10 @@ export async function syncIntakeSessionForDealId(dealId: string) {
         ]
       : [])
   ]);
+
+  if (["ready_for_confirmation", "failed", "completed"].includes(nextStatus)) {
+    await startNextQueuedIntakeSessionForUser(session.userId);
+  }
 
   const refreshed = await prisma.intakeSession.findUnique({ where: { id: session.id } });
   return refreshed ? toIntakeSessionRecord(refreshed) : null;

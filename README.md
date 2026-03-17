@@ -66,9 +66,9 @@ pnpm exec prisma generate
 pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3011](http://localhost:3011).
 
-`pnpm run dev` now runs `doppler run -- next dev` using the repo-scoped Doppler setup. If you need the raw Next.js command for debugging, use `pnpm run dev:next`.
+`pnpm run dev` now runs `doppler run -- next dev -p 3011` using the repo-scoped Doppler setup. If you need the raw Next.js command for debugging, use `pnpm run dev:next`.
 
 ## Production config
 

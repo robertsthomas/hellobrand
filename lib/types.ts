@@ -327,6 +327,7 @@ export interface SummaryRecord {
 
 export type IntakeSessionStatus =
   | "draft"
+  | "queued"
   | "uploading"
   | "processing"
   | "ready_for_confirmation"

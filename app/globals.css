@@ -139,6 +139,13 @@ h4 {
     border-color 180ms ease;
 }
 
+html.dark .app-surface {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.22),
+    0 20px 40px rgba(0, 0, 0, 0.24);
+}
+
 .app-surface-hover {
   @apply hover:-translate-y-0.5;
   box-shadow:
@@ -153,6 +160,14 @@ h4 {
 .workspace-dot-grid {
   background-image: radial-gradient(rgba(17, 24, 39, 0.08) 0.7px, transparent 0.7px);
   background-size: 12px 12px;
+}
+
+html.dark .workspace-shell {
+  background: #0f1115;
+}
+
+html.dark .workspace-dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 0.7px, transparent 0.7px);
 }
 
 p {

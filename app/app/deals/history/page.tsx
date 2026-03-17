@@ -1,82 +1,100 @@
+import { DealHistoryTable, type DealHistoryRow } from "@/components/deal-history-table";
 import { requireViewer } from "@/lib/auth";
-import { listDealsForViewer } from "@/lib/deals";
-import { getRepository } from "@/lib/repository";
-import { DealList } from "@/components/deal-list";
-import { humanizeToken } from "@/lib/utils";
+import { listDealAggregatesForViewer } from "@/lib/deals";
+import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import type { DealRecord } from "@/lib/types";
 
-export default async function DealHistoryPage({
-  searchParams
-}: {
-  searchParams?: Promise<{ q?: string; status?: string }>;
-}) {
+function mapStageGroup(
+  deal: Pick<DealRecord, "status" | "paymentStatus">
+): DealHistoryRow["stageGroup"] {
+  if (deal.status === "paid" || deal.status === "completed" || deal.paymentStatus === "paid") {
+    return "completed";
+  }
+
+  if (deal.status === "contract_received" || deal.status === "negotiating") {
+    return "under_review";
+  }
+
+  return "active";
+}
+
+function mapStageLabel(
+  deal: Pick<DealRecord, "status" | "paymentStatus">
+): DealHistoryRow["stageLabel"] {
+  if (deal.status === "paid" || deal.status === "completed" || deal.paymentStatus === "paid") {
+    return "Completed";
+  }
+
+  if (deal.status === "contract_received" || deal.status === "negotiating") {
+    return "Under Review";
+  }
+
+  return "Active";
+}
+
+function getDealDate(deal: Pick<DealRecord, "confirmedAt" | "updatedAt" | "createdAt">) {
+  return deal.confirmedAt ?? deal.updatedAt ?? deal.createdAt ?? null;
+}
+
+function getDeliverablesLabel(count: number) {
+  if (count <= 0) {
+    return "Not started";
+  }
+
+  if (count === 1) {
+    return "1 pending";
+  }
+
+  return `${count} pending`;
+}
+
+export default async function DealHistoryPage() {
   const viewer = await requireViewer();
-  const deals = await listDealsForViewer(viewer);
-  const params = (await searchParams) ?? {};
-  const query = params.q?.toLowerCase().trim() ?? "";
-  const selectedStatus = params.status?.trim() ?? "";
-  const enrichedDeals = await Promise.all(
-    deals.map(async (deal) => {
-      const aggregate = await getRepository().getDealAggregate(viewer.id, deal.id);
-      return {
-        ...deal,
-        paymentAmount: aggregate?.terms?.paymentAmount ?? null,
-        currency: aggregate?.terms?.currency ?? "USD"
-      };
-    })
-  );
-  const filteredDeals = enrichedDeals.filter((deal) => {
-    const matchesQuery =
-      query.length === 0 ||
-      deal.brandName.toLowerCase().includes(query) ||
-      deal.campaignName.toLowerCase().includes(query);
-    const matchesStatus =
-      selectedStatus.length === 0 || deal.status === selectedStatus;
+  const aggregates = await listDealAggregatesForViewer(viewer);
 
-    return matchesQuery && matchesStatus;
+  const rows: DealHistoryRow[] = aggregates.map((aggregate) => {
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+    const normalizedDeliverables = Array.isArray(normalized?.deliverables)
+      ? normalized.deliverables
+      : [];
+    const persistedDeliverables = Array.isArray(aggregate.terms?.deliverables)
+      ? aggregate.terms.deliverables
+      : [];
+    const deliverableCount = normalizedDeliverables.length || persistedDeliverables.length;
+    const amount = aggregate.terms?.paymentAmount ?? aggregate.paymentRecord?.amount ?? null;
+    const currency = aggregate.terms?.currency ?? aggregate.paymentRecord?.currency ?? "USD";
+
+    return {
+      id: aggregate.deal.id,
+      brandName: normalized?.brandName ?? aggregate.deal.brandName,
+      campaignName: normalized?.contractTitle ?? aggregate.deal.campaignName,
+      amount,
+      currency,
+      stageLabel: mapStageLabel(aggregate.deal),
+      stageGroup: mapStageGroup(aggregate.deal),
+      date: getDealDate(aggregate.deal),
+      deliverablesLabel: getDeliverablesLabel(deliverableCount),
+      riskCount: aggregate.riskFlags.length
+    };
   });
-  const statuses = Array.from(new Set(enrichedDeals.map((deal) => deal.status)));
+
+  const totalDeals = rows.length;
+  const activeDeals = rows.filter((row) => row.stageGroup === "active").length;
+  const totalEarned = rows.reduce((sum, row) => sum + (row.amount ?? 0), 0);
+  const averageDealSize = totalDeals === 0 ? 0 : totalEarned / totalDeals;
 
   return (
-    <div className="px-5 py-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-[1380px] space-y-6">
-        <section className="rounded-[28px] border border-black/8 bg-white px-7 py-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
-            Deals
-          </p>
-          <h1 className="mt-3 text-[46px] font-semibold tracking-[-0.06em] text-foreground">
-            All workspaces
-          </h1>
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-muted-foreground">
-            Your full history of creator-brand workspaces, from contracts still
-            under review to finished campaigns and completed payments.
-          </p>
-        </section>
-
-        <form className="grid gap-4 rounded-[28px] border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] md:grid-cols-[1fr_240px_auto]">
-          <input
-            className="rounded-2xl border border-black/8 bg-[#f7f8fa] px-4 py-3 text-sm text-foreground"
-            name="q"
-            defaultValue={params.q ?? ""}
-            placeholder="Search brand or campaign"
-          />
-          <select
-            className="rounded-2xl border border-black/8 bg-[#f7f8fa] px-4 py-3 text-sm text-foreground"
-            name="status"
-            defaultValue={selectedStatus}
-          >
-            <option value="">All stages</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {humanizeToken(status)}
-              </option>
-            ))}
-          </select>
-          <button className="rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white">
-            Filter
-          </button>
-        </form>
-
-        <DealList deals={filteredDeals} />
+    <div className="px-6 py-8 lg:px-10 lg:py-10">
+      <div className="mx-auto max-w-[1400px]">
+        <DealHistoryTable
+          rows={rows}
+          metrics={{
+            totalDeals,
+            activeDeals,
+            totalEarned,
+            averageDealSize
+          }}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { saveTermsAction } from "@/app/actions";
+import { saveDealNotesAction } from "@/app/actions";
 
 export function DealNotesPanel({
   dealId,
@@ -9,11 +9,11 @@ export function DealNotesPanel({
 }) {
   return (
     <form
-      action={saveTermsAction}
-      className="grid gap-4 rounded-[1.75rem] border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-panel"
+      action={saveDealNotesAction}
+      className="grid gap-6 border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
     >
       <div>
-        <h2 className="font-serif text-3xl text-ocean">Notes</h2>
+        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">Notes</h2>
         <p className="mt-2 text-sm text-black/60 dark:text-white/65">
           Keep your creator-side context here, like negotiation reminders or
           delivery prep notes.
@@ -21,17 +21,15 @@ export function DealNotesPanel({
       </div>
 
       <input type="hidden" name="dealId" value={dealId} />
-      <input type="hidden" name="deliverablesJson" value="[]" />
-      <input type="hidden" name="usageChannelsJson" value="[]" />
 
       <textarea
-        className="min-h-40 rounded-[1.5rem] border border-black/10 dark:border-white/12 bg-sand/40 dark:bg-white/[0.04] px-4 py-4 text-sm"
+        className="min-h-40 border border-black/10 bg-white px-4 py-4 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20"
         name="notes"
         defaultValue={notes ?? ""}
         placeholder="Add creator-side notes, open questions, negotiated updates, or payment reminders."
       />
 
-      <button className="inline-flex w-fit rounded-full border border-black/10 dark:border-white/12 bg-white dark:bg-white/10 dark:text-white px-5 py-3 text-sm font-semibold text-ink">
+      <button className="inline-flex w-fit border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20">
         Save notes
       </button>
     </form>

@@ -1,156 +1,203 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ExternalLink, FileText, RefreshCcw } from "lucide-react";
+
 import { reprocessDocumentAction } from "@/app/actions";
-import type {
-  DocumentSectionRecord,
-  DocumentRecord,
-  ExtractionEvidenceRecord,
-  ExtractionResultRecord,
-  SummaryRecord
-} from "@/lib/types";
+import type { DocumentRecord } from "@/lib/types";
 import { humanizeToken } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+
+function supportsInlinePreview(document: DocumentRecord) {
+  return (
+    document.sourceType === "pasted_text" ||
+    document.mimeType === "application/pdf" ||
+    document.mimeType.startsWith("text/") ||
+    document.mimeType.startsWith("image/")
+  );
+}
+
+function documentPreviewUrl(documentId: string) {
+  return `/api/documents/${documentId}/content`;
+}
+
+function plainPreviewText(document: DocumentRecord) {
+  return document.normalizedText ?? document.rawText ?? "No preview available.";
+}
 
 export function DocumentsPanel({
   dealId,
-  documents,
-  documentSections,
-  extractionEvidence,
-  extractionResults,
-  summaries
+  documents
 }: {
   dealId: string;
   documents: DocumentRecord[];
-  documentSections: DocumentSectionRecord[];
-  extractionEvidence: ExtractionEvidenceRecord[];
-  extractionResults: ExtractionResultRecord[];
-  summaries: SummaryRecord[];
 }) {
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    documents[0]?.id ?? null
+  );
+
+  const selectedDocument = useMemo(
+    () => documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null,
+    [documents, selectedDocumentId]
+  );
+
   return (
-    <section className="rounded-[1.75rem] border border-black/5 dark:border-white/10 bg-white/80 dark:bg-white/5 p-6 shadow-panel">
-      <div>
-        <h2 className="font-serif text-3xl text-ocean">Documents</h2>
-        <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-          Every file in the deal workspace is classified, processed, and stored
-          with its own extraction output and retry state.
-        </p>
+    <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+        <div className="border-b border-black/8 px-5 py-4 dark:border-white/10">
+          <h2 className="text-lg font-semibold text-foreground">Documents</h2>
+          <p className="mt-1 text-sm text-black/55 dark:text-white/60">
+            Select a source to preview it.
+          </p>
+        </div>
+
+        {documents.length > 0 ? (
+          <div className="divide-y divide-black/8 dark:divide-white/10">
+            {documents.map((document) => {
+              const isSelected = selectedDocument?.id === document.id;
+              return (
+                <button
+                  key={document.id}
+                  type="button"
+                  onClick={() => setSelectedDocumentId(document.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 px-5 py-4 text-left transition",
+                    isSelected
+                      ? "bg-black/[0.035] dark:bg-white/[0.04]"
+                      : "hover:bg-black/[0.02] dark:hover:bg-white/[0.02]"
+                  )}
+                >
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center border border-black/8 text-black/55 dark:border-white/10 dark:text-white/60">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {document.fileName}
+                    </p>
+                    <p className="mt-1 text-xs text-black/45 dark:text-white/45">
+                      {humanizeToken(document.documentKind)} ·{" "}
+                      {humanizeToken(document.processingStatus)}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="px-5 py-10 text-sm text-black/55 dark:text-white/60">
+            No documents uploaded yet.
+          </div>
+        )}
       </div>
 
-      <div className="mt-6 grid gap-4">
-        {documents.map((document) => {
-          const extraction = extractionResults.find(
-            (result) => result.documentId === document.id
-          );
-          const summary = summaries.find((entry) => entry.documentId === document.id);
-          const documentEvidence = extractionEvidence
-            .filter((entry) => entry.documentId === document.id)
-            .slice(0, 3);
-          const documentSectionTitles = new Map(
-            documentSections
-              .filter((section) => section.documentId === document.id)
-              .map((section) => [section.id, section.title])
-          );
-
-          return (
-            <article
-              key={document.id}
-              className="rounded-[1.5rem] border border-black/5 dark:border-white/10 bg-sand/50 dark:bg-white/[0.05] p-5"
-            >
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.24em] text-black/45 dark:text-white/45">
-                    {humanizeToken(document.documentKind)}
-                  </p>
-                  <h3 className="mt-2 text-xl font-semibold text-black/80 dark:text-white/85">
-                    {document.fileName}
-                  </h3>
-                  <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-                    Status: {humanizeToken(document.processingStatus)}
-                  </p>
-                  {document.errorMessage ? (
-                    <p className="mt-3 rounded-2xl bg-clay/10 px-4 py-3 text-sm text-clay">
-                      {document.errorMessage}
-                    </p>
-                  ) : null}
-                </div>
-
-                {document.processingStatus === "failed" ? (
-                  <form action={reprocessDocumentAction}>
-                    <input type="hidden" name="dealId" value={dealId} />
-                    <input type="hidden" name="documentId" value={document.id} />
-                    <button className="rounded-full border border-black/10 dark:border-white/12 bg-white dark:bg-white/10 dark:text-white px-4 py-2 text-sm font-semibold text-ink">
-                      Retry processing
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-[1.25rem] bg-white/80 dark:bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
-                    Extracted highlights
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-black/65 dark:text-white/70">
-                    {summary?.body ??
-                      "This document has not produced a summary yet."}
-                  </p>
-                </div>
-                <div className="rounded-[1.25rem] bg-white/80 dark:bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
-                    Extraction status
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-black/65 dark:text-white/70">
-                    {extraction
-                      ? `Schema ${extraction.schemaVersion} • ${extraction.model} • ${extraction.confidence ? `${Math.round(extraction.confidence * 100)}% confidence` : "confidence not set"}`
-                      : "No extraction result stored yet."}
-                  </p>
-                  {document.classificationConfidence ? (
-                    <p className="mt-2 text-xs text-black/45 dark:text-white/45">
-                      Document classification confidence:{" "}
-                      {Math.round(document.classificationConfidence * 100)}%
-                    </p>
-                  ) : null}
-                  {extraction?.conflicts.length ? (
-                    <div className="mt-3 rounded-2xl border border-clay/20 bg-clay/10 px-4 py-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-clay">
-                        Review conflicts
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-black/65 dark:text-white/70">
-                        Conflicting extracted fields:{" "}
-                        {extraction.conflicts.map(humanizeToken).join(", ")}.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              {documentEvidence.length > 0 ? (
-                <div className="mt-4 rounded-[1.25rem] bg-white/80 dark:bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
-                    Evidence samples
-                  </div>
-                  <div className="mt-3 grid gap-3 md:grid-cols-3">
-                    {documentEvidence.map((entry) => (
-                      <div key={entry.id} className="rounded-2xl bg-sand/50 dark:bg-white/[0.05] px-3 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
-                          {documentSectionTitles.get(entry.sectionId ?? "") ??
-                            humanizeToken(entry.fieldPath)}
-                        </p>
-                        <p className="mt-1 text-xs leading-5 text-black/60 dark:text-white/65">
-                          {entry.snippet}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
-
-        {documents.length === 0 ? (
-          <div className="rounded-[1.5rem] border border-dashed border-black/10 dark:border-white/12 bg-white/70 dark:bg-white/[0.05] p-5 text-sm text-black/60 dark:text-white/65">
-            No documents yet. Upload a contract, brief, deck, invoice, or pasted
-            email thread to start the workspace.
+      <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+        <div className="flex flex-col gap-3 border-b border-black/8 px-5 py-4 dark:border-white/10 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">
+              {selectedDocument?.fileName ?? "Preview"}
+            </h3>
+            <p className="mt-1 text-sm text-black/55 dark:text-white/60">
+              {selectedDocument
+                ? `${humanizeToken(selectedDocument.documentKind)} · ${humanizeToken(
+                    selectedDocument.processingStatus
+                  )}`
+                : "Select a document to preview it."}
+            </p>
           </div>
-        ) : null}
+
+          {selectedDocument ? (
+            <div className="flex items-center gap-2">
+              {selectedDocument.processingStatus === "failed" ? (
+                <form action={reprocessDocumentAction}>
+                  <input type="hidden" name="dealId" value={dealId} />
+                  <input type="hidden" name="documentId" value={selectedDocument.id} />
+                  <Button type="submit" size="sm" variant="outline">
+                    <RefreshCcw className="h-4 w-4" />
+                    Retry
+                  </Button>
+                </form>
+              ) : null}
+
+              {selectedDocument.sourceType !== "pasted_text" ? (
+                <Button size="sm" variant="outline" asChild>
+                  <a
+                    href={documentPreviewUrl(selectedDocument.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open
+                  </a>
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="min-h-[540px] bg-black/[0.015] dark:bg-black/10">
+          {!selectedDocument ? (
+            <div className="flex min-h-[540px] items-center justify-center px-6 text-sm text-black/50 dark:text-white/55">
+              Upload or paste a source to preview it here.
+            </div>
+          ) : selectedDocument.errorMessage ? (
+            <div className="flex min-h-[540px] items-center justify-center px-6">
+              <div className="max-w-lg border-l-2 border-clay/60 bg-clay/5 px-4 py-4 text-sm text-clay">
+                {selectedDocument.errorMessage}
+              </div>
+            </div>
+          ) : selectedDocument.sourceType === "pasted_text" ? (
+            <div className="h-[540px] overflow-auto px-6 py-5">
+              <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-black/72 dark:text-white/72">
+                {plainPreviewText(selectedDocument)}
+              </pre>
+            </div>
+          ) : selectedDocument.mimeType.startsWith("image/") ? (
+            <div className="flex h-[540px] items-center justify-center p-6">
+              <img
+                src={documentPreviewUrl(selectedDocument.id)}
+                alt={selectedDocument.fileName}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
+          ) : selectedDocument.mimeType === "application/pdf" ? (
+            <iframe
+              title={selectedDocument.fileName}
+              src={documentPreviewUrl(selectedDocument.id)}
+              className="h-[540px] w-full border-0"
+            />
+          ) : selectedDocument.mimeType.startsWith("text/") ? (
+            <iframe
+              title={selectedDocument.fileName}
+              src={documentPreviewUrl(selectedDocument.id)}
+              className="h-[540px] w-full border-0 bg-white"
+            />
+          ) : supportsInlinePreview(selectedDocument) ? (
+            <iframe
+              title={selectedDocument.fileName}
+              src={documentPreviewUrl(selectedDocument.id)}
+              className="h-[540px] w-full border-0 bg-white"
+            />
+          ) : (
+            <div className="flex min-h-[540px] items-center justify-center px-6">
+              <div className="space-y-3 text-center">
+                <p className="text-sm text-black/55 dark:text-white/60">
+                  Preview is not available for this file type.
+                </p>
+                <Button variant="outline" asChild>
+                  <a
+                    href={documentPreviewUrl(selectedDocument.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open document
+                  </a>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

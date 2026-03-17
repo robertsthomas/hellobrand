@@ -20,6 +20,21 @@ export const paymentStatusValues = [
 ] as const;
 
 export const countersignStatusValues = ["unknown", "pending", "signed"] as const;
+export const dealCategoryValues = [
+  "beauty_personal_care",
+  "fashion_apparel",
+  "food_beverage",
+  "entertainment_media",
+  "fitness_wellness",
+  "parenting_family",
+  "tech_gaming",
+  "travel_hospitality",
+  "finance",
+  "home_lifestyle",
+  "retail_ecommerce",
+  "sports_outdoors",
+  "other"
+] as const;
 
 export const documentKindValues = [
   "contract",
@@ -141,6 +156,7 @@ export const documentUploadSchema = z.object({
 
 export const intakeSessionStatusValues = [
   "draft",
+  "queued",
   "uploading",
   "processing",
   "ready_for_confirmation",
@@ -167,6 +183,12 @@ export const confirmIntakeSessionSchema = z.object({
   primaryContactEmail: z.string().email().nullable().optional(),
   primaryContactPhone: z.string().max(40).nullable().optional(),
   paymentAmount: z.number().nullable().optional(),
+  currency: z.string().max(12).nullable().optional(),
+  brandCategory: z.enum(dealCategoryValues).nullable().optional(),
+  competitorCategories: z.array(z.string().min(1).max(120)).optional().default([]),
+  restrictedCategories: z.array(z.string().min(1).max(120)).optional().default([]),
+  campaignDateWindow: campaignDateWindowSchema.nullable().optional(),
+  disclosureObligations: z.array(disclosureObligationSchema).optional().default([]),
   deliverables: z.array(deliverableSchema).optional().default([]),
   timelineItems: z.array(timelineItemSchema).optional().default([]),
   analytics: analyticsSchema.nullable().optional(),

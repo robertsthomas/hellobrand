@@ -3,17 +3,16 @@ import { LoaderCircle, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ConflictWarnings } from "@/components/conflict-warnings";
+import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
 import { SubmitButton } from "@/components/submit-button";
 import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { WorkspaceCreationOverlay } from "@/components/workspace-creation-overlay";
 import {
   confirmIntakeSessionAction,
   deleteIntakeDraftAction
 } from "@/app/actions";
 import { requireViewer } from "@/lib/auth";
-import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, humanizeToken } from "@/lib/utils";
@@ -105,6 +104,44 @@ function SummaryCard({
   );
 }
 
+function intakeConflictMessagesByField(conflicts: Array<{ type: string; title: string }>) {
+  const messages: Record<string, string[]> = {};
+
+  function push(field: string, message: string) {
+    messages[field] = [...(messages[field] ?? []), message];
+  }
+
+  for (const conflict of conflicts) {
+    if (conflict.type === "category_conflict") {
+      push("brandCategory", conflict.title);
+      push("competitorCategories", conflict.title);
+      continue;
+    }
+
+    if (conflict.type === "competitor_restriction") {
+      push("restrictedCategories", conflict.title);
+      push("competitorCategories", conflict.title);
+      push("brandCategory", conflict.title);
+      continue;
+    }
+
+    if (conflict.type === "exclusivity_overlap") {
+      push("restrictedCategories", conflict.title);
+      push("brandCategory", conflict.title);
+      push("campaignDateWindow", conflict.title);
+      continue;
+    }
+
+    if (conflict.type === "schedule_collision") {
+      push("campaignDateWindow", conflict.title);
+      push("timelineItems", conflict.title);
+      push("deliverables", conflict.title);
+    }
+  }
+
+  return messages;
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function IntakeSessionPage({
@@ -146,10 +183,9 @@ export default async function IntakeSessionPage({
   const deliverables = normalized?.deliverables ?? [];
   const timelineItems = normalized?.timelineItems ?? [];
   const evidenceGroups = normalized?.evidenceGroups ?? [];
-  const disclosureObligations = normalized?.disclosureObligations ?? [];
-  const restrictedCategories = normalized?.restrictedCategories ?? [];
   const analyticsHighlights = normalized?.analytics?.highlights ?? [];
   const conflictResults = aggregate?.conflictResults ?? [];
+  const conflictMessagesByField = intakeConflictMessagesByField(conflictResults);
   const riskFlags = aggregate?.riskFlags ?? [];
   const derivedHandle = deriveHandleFromEmail(profileDefaults?.contactEmail ?? viewer.email);
   const creatorDefault =
@@ -256,7 +292,7 @@ export default async function IntakeSessionPage({
           <ConflictWarnings
             conflicts={conflictResults}
             title="Potential conflicts before confirmation"
-            description="This deal appears to overlap with another active deal in your account. Review the warning before you create the workspace."
+            description="Review the highlighted fields below before creating the workspace. You can edit any generated value and continue."
           />
         ) : null}
         {session.errorMessage ? (
@@ -305,22 +341,6 @@ export default async function IntakeSessionPage({
               <form action={confirmIntakeSessionAction} className="mt-6 space-y-6">
                 <WorkspaceCreationOverlay />
                 <input type="hidden" name="sessionId" value={session.id} />
-                <input
-                  type="hidden"
-                  name="deliverablesJson"
-                  value={JSON.stringify(normalized?.deliverables ?? [])}
-                />
-                <input
-                  type="hidden"
-                  name="timelineItemsJson"
-                  value={JSON.stringify(normalized?.timelineItems ?? [])}
-                />
-                <input
-                  type="hidden"
-                  name="analyticsJson"
-                  value={JSON.stringify(normalized?.analytics ?? null)}
-                />
-
                 <SectionCard
                   title="Partnership"
                   description="Confirm who the deal is for and whether an agency is involved."
@@ -493,17 +513,15 @@ export default async function IntakeSessionPage({
                         className={textareaClassName}
                         name="contractSummary"
                         defaultValue={normalized?.contractSummary ?? ""}
-                        readOnly
-                        aria-readonly="true"
                         placeholder="A plain-English summary will appear here."
                       />
                       <span className="text-xs font-normal text-black/50 dark:text-white/50">
-                        This summary stays read-only in intake. Use notes for corrections or
-                        missing context.
+                        Edit this if the generated summary needs correction before the
+                        workspace is created.
                       </span>
                     </label>
 
-                    <div className="grid gap-5 md:grid-cols-[1.1fr_0.9fr]">
+                    <div className="grid gap-5 md:grid-cols-[1.1fr_0.7fr_0.6fr]">
                       <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                         Primary payment amount
                         <input
@@ -525,162 +543,46 @@ export default async function IntakeSessionPage({
                         })}
                       </label>
 
+                      <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
+                        Currency
+                        <input
+                          className={inputClassName}
+                          name="currency"
+                          defaultValue={normalized?.currency ?? aggregate?.terms?.currency ?? "USD"}
+                          placeholder="USD"
+                        />
+                      </label>
+
                       <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
                         <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
                           Deliverable count
                         </div>
                         <div className="mt-2 text-2xl font-semibold text-ink">
-                          {analysisRunning && !normalized?.deliverableCount ? (
-                            <span className="inline-flex items-center gap-2">
-                              <LoaderCircle className="h-4 w-4 animate-spin text-ocean" />
-                              Analyzing...
-                            </span>
-                          ) : (
-                            normalized?.deliverableCount ?? 0
-                          )}
-                        </div>
-                        <p className="mt-2 text-xs text-black/50 dark:text-white/50">
-                          Based on the extracted deliverables list so far.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-5 md:grid-cols-3">
-                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
-                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
-                          Brand category
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-ink">
-                          {normalized?.brandCategory
-                            ? dealCategoryLabel(normalized.brandCategory)
-                            : "Not detected"}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
-                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
-                          Posting window
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-ink">
-                          {normalized?.campaignDateWindow?.postingWindow ?? "Not detected"}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
-                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
-                          Restricted categories
-                        </div>
-                        <div className="mt-2 text-sm font-semibold text-ink">
-                          {restrictedCategories.length > 0
-                            ? restrictedCategories.join(", ")
-                            : "None detected"}
+                          {normalized?.deliverableCount ?? 0}
                         </div>
                       </div>
                     </div>
-
-                    {disclosureObligations.length > 0 ? (
-                      <DisclosureObligations obligations={disclosureObligations} />
-                    ) : null}
                   </div>
                 </SectionCard>
 
                 <SectionCard
                   title="Deliverables and timeline"
-                  description="HelloBrand separates deliverables from milestone dates so the deal always reads consistently."
+                  description="All generated terms stay editable here, including category, restrictions, deliverables, timeline, and disclosure obligations."
                 >
-                  <div className="grid gap-5">
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium text-black/70 dark:text-white/75">
-                        Deliverables
-                      </div>
-                      {deliverables.length > 0 ? (
-                        deliverables.map((item) => (
-                          <div
-                            key={item.id}
-                            className="rounded-2xl border border-black/5 bg-sand/45 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-ink">
-                                  {item.title}
-                                </div>
-                                <div className="mt-1 text-xs text-black/50 dark:text-white/50">
-                                  {[
-                                    item.channel,
-                                    item.quantity
-                                      ? `${item.quantity} deliverable${item.quantity === 1 ? "" : "s"}`
-                                      : null,
-                                    item.dueDate ? `Due ${item.dueDate}` : null
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" • ") ||
-                                    "No extra deliverable details extracted yet."}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-black/10 bg-sand/35 px-4 py-4 text-sm text-black/60 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65">
-                          {analysisRunning
-                            ? "Looking for deliverables in the contract, brief, and pasted text..."
-                            : "No deliverables extracted yet. Add missing scope details in notes before confirming."}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium text-black/70 dark:text-white/75">
-                        Timeline
-                      </div>
-                      {timelineItems.length > 0 ? (
-                        <div className="grid gap-3">
-                          {timelineItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="rounded-2xl border border-black/5 bg-sand/45 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]"
-                            >
-                              <div className="text-sm font-semibold text-ink">{item.label}</div>
-                              <div className="mt-1 text-sm text-black/65 dark:text-white/65">
-                                {item.date ?? "Date not specified"}
-                              </div>
-                              {presentText(item.source) ? (
-                                <div className="mt-2 text-xs text-black/50 dark:text-white/50">
-                                  Source: {item.source}
-                                </div>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-black/10 bg-sand/35 px-4 py-4 text-sm text-black/60 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65">
-                          {analysisRunning
-                            ? "Looking for outline, draft, final, and go-live timing..."
-                            : "No milestone dates extracted yet. Use notes to capture any draft, review, or live-date requirements."}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <IntakeGeneratedFieldsEditor
+                    inputClassName={inputClassName}
+                    textareaClassName={textareaClassName}
+                    initialBrandCategory={normalized?.brandCategory ?? null}
+                    initialCompetitorCategories={normalized?.competitorCategories ?? []}
+                    initialRestrictedCategories={normalized?.restrictedCategories ?? []}
+                    initialCampaignDateWindow={normalized?.campaignDateWindow ?? null}
+                    initialDisclosureObligations={normalized?.disclosureObligations ?? []}
+                    initialDeliverables={deliverables}
+                    initialTimelineItems={timelineItems}
+                    initialAnalytics={normalized?.analytics ?? null}
+                    conflictMessagesByField={conflictMessagesByField}
+                  />
                 </SectionCard>
-
-                {analyticsHighlights.length > 0 && normalized?.analytics ? (
-                  <SectionCard
-                    title="Audience and analytics"
-                    description="Analytics stay optional and only appear when source material includes them."
-                  >
-                    <div className="rounded-2xl border border-black/5 bg-sand/35 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
-                      <div className="text-sm font-medium text-ink">Audience snapshot</div>
-                      <div className="mt-3 grid gap-2">
-                        {analyticsHighlights.map((line, index) => (
-                          <div
-                            key={`${line}-${index}`}
-                            className="text-sm text-black/70 dark:text-white/70"
-                          >
-                            {line}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </SectionCard>
-                ) : null}
 
                 <SectionCard
                   title="Notes and confirmation"
@@ -739,15 +641,23 @@ export default async function IntakeSessionPage({
                       </div>
                     </details>
 
+                  </div>
+                </SectionCard>
+
+                <div className="sticky bottom-5 z-20 flex justify-end">
+                  <div className="flex items-center gap-3 border border-black/8 bg-white/92 px-3 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92">
+                    <span className="hidden text-sm text-black/55 dark:text-white/55 md:inline">
+                      Review complete?
+                    </span>
                     <SubmitButton
                       pendingLabel="Creating workspace..."
-                      className="rounded-full bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={!showConfirmation}
                     >
                       Create deal workspace
                     </SubmitButton>
                   </div>
-                </SectionCard>
+                </div>
               </form>
         </section>
 

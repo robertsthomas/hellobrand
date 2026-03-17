@@ -1,31 +1,29 @@
 import { notFound } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
-import { DealStatusPanel } from "@/components/deal-status-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
-import { EmailDrafts } from "@/components/email-drafts";
-import { PaymentPanel } from "@/components/payment-panel";
 import { RiskFlags } from "@/components/risk-flags";
-import { SummaryCard } from "@/components/summary-card";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger,
+  AccordionTrigger
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
-import { ensureDraftsForDeal, getDealForViewer } from "@/lib/deals";
+import { getDealForViewer } from "@/lib/deals";
+import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 function renderSummaryParagraph(paragraph: string) {
@@ -59,13 +57,6 @@ export default async function WorkspaceDealDetailPage({
   const { dealId } = await params;
   const viewer = await requireViewer();
 
-  await ensureDraftsForDeal(viewer, dealId, [
-    "clarify-clause",
-    "request-faster-payment",
-    "limit-usage-rights",
-    "clarify-deadline"
-  ]);
-
   const aggregate = await getDealForViewer(viewer, dealId);
 
   if (!aggregate) {
@@ -77,13 +68,7 @@ export default async function WorkspaceDealDetailPage({
     latestDocument,
     documents,
     terms,
-    paymentRecord,
-    riskFlags,
-    emailDrafts,
-    documentSections,
-    extractionEvidence,
-    extractionResults,
-    summaries
+    riskFlags
   } = aggregate;
   const summaryBody =
     aggregate.currentSummary?.body ??
@@ -91,95 +76,88 @@ export default async function WorkspaceDealDetailPage({
     "Upload documents to generate a plain-English summary, extracted creator terms, and negotiation watchouts.";
   const summarySections = parseDealSummarySections(summaryBody);
   const plainSummary = toPlainDealSummary(summaryBody) ?? summaryBody;
+  const normalized = buildNormalizedIntakeRecord(aggregate);
+  const displayCampaignName = normalized?.contractTitle ?? deal.campaignName;
+  const uploadedDate = formatDate(deal.createdAt);
+  const nextDeliverableValue = formatDate(deal.nextDeliverableDate);
+  const documentLabel = latestDocument
+    ? `${humanizeToken(latestDocument.documentKind)} • ${humanizeToken(
+        latestDocument.processingStatus
+      )}`
+    : "No documents uploaded yet";
+  const riskCount = riskFlags.length;
 
   return (
-    <div className="px-5 py-6 lg:px-8 lg:py-8">
-      <div className="mx-auto max-w-[1380px] space-y-6">
-        <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[28px] border border-black/8 bg-white p-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/45">
-                  {deal.brandName}
-                </p>
-                <h1 className="mt-4 max-w-4xl text-[46px] font-semibold tracking-[-0.06em] text-foreground lg:text-[58px]">
-                  {deal.campaignName}
+    <div className="px-6 py-8 lg:px-10 lg:py-10">
+      <div className="mx-auto max-w-[1280px] space-y-8">
+        <section className="space-y-6">
+          <Link
+            href="/app/deals/history"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            All Deals
+          </Link>
+
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/8 pb-8 dark:border-white/10">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground lg:text-[40px]">
+                  {displayCampaignName}
                 </h1>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#7CB08B]" />
+                  <span className="text-sm font-medium text-foreground">
+                    {humanizeToken(deal.status)}
+                  </span>
+                </div>
               </div>
-            </div>
-            {summarySections.length > 0 ? (
-              <div className="mt-6 border-t border-black/6 dark:border-white/8">
-                <Accordion
-                  type="single"
-                  collapsible
-                  defaultValue={summarySections[0]?.id}
-                  className="w-full"
-                >
-                  {summarySections.map((section) => (
-                    <AccordionItem
-                      key={section.id}
-                      value={section.id}
-                      className="border-black/6 dark:border-white/8"
-                    >
-                      <AccordionTrigger className="py-5 hover:no-underline">
-                        <div className="pr-6 text-left">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
-                            {section.title}
-                          </p>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-5">
-                        <div className="space-y-3 pr-10">
-                          {section.paragraphs.map((paragraph, index) => (
-                            <p
-                              key={`${section.id}-${index}`}
-                              className="text-[15px] leading-7 text-black/68 dark:text-white/72"
-                            >
-                              {renderSummaryParagraph(paragraph)}
-                            </p>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
-            ) : (
-              <p className="mt-4 max-w-3xl text-sm leading-6 text-black/65 dark:text-white/70">
-                {plainSummary}
+              <p className="text-sm text-muted-foreground">
+                Contract uploaded on {uploadedDate} · Reviewed by HelloBrand AI
               </p>
-            )}
-            <p className="mt-4 text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
-              {deal.legalDisclaimer}
-            </p>
+            </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <SummaryCard
-              label="Payment"
-              value={formatCurrency(terms?.paymentAmount ?? null, terms?.currency ?? "USD")}
-              caption={terms?.paymentTerms ?? "Payment timing not extracted yet"}
-            />
-            <SummaryCard
-              label="Next deliverable"
-              value={formatDate(deal.nextDeliverableDate)}
-              caption={`Stage: ${humanizeToken(deal.status)}`}
-              accent="sage"
-            />
-            <SummaryCard
-              label="Documents"
-              value={String(documents.length)}
-              caption={
-                latestDocument
-                  ? `${humanizeToken(latestDocument.documentKind)} • ${humanizeToken(latestDocument.processingStatus)}`
-                  : "No documents uploaded yet"
-              }
-              accent={latestDocument?.processingStatus === "failed" ? "clay" : "ocean"}
-            />
+
+          <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
+            <div className="border-b border-black/8 pb-3 dark:border-white/10">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment</p>
+              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                {formatCurrency(terms?.paymentAmount ?? null, terms?.currency ?? "USD")}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {terms?.paymentTerms ?? "Payment timing not extracted yet"}
+              </p>
+            </div>
+            <div className="border-b border-black/8 pb-3 dark:border-white/10">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Due Date</p>
+              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                {nextDeliverableValue}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Stage: {humanizeToken(deal.status)}
+              </p>
+            </div>
+            <div className="border-b border-black/8 pb-3 dark:border-white/10">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Deliverables</p>
+              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                {terms?.deliverables?.length ?? 0} pending
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {documents.length} source{documents.length === 1 ? "" : "s"} attached
+              </p>
+            </div>
+            <div className="border-b border-black/8 pb-3 dark:border-white/10">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Risk Flags</p>
+              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-[#d76742]">
+                {riskCount > 0 ? `${riskCount} flagged` : "No flags"}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{documentLabel}</p>
+            </div>
           </div>
         </section>
 
         <Tabs defaultValue="overview" className="gap-6">
-          <TabsList className="h-auto flex-wrap rounded-[20px] p-1.5">
+          <TabsList className="h-auto flex-wrap rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
             <TabsTrigger value="overview" className="px-4 py-2">
               Overview
             </TabsTrigger>
@@ -203,8 +181,7 @@ export default async function WorkspaceDealDetailPage({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <UploadContractForm dealId={deal.id} documents={documents} />
+          <TabsContent value="overview" className="mt-0 space-y-6">
             {(aggregate.conflictResults?.length ?? 0) > 0 ? (
               <ConflictWarnings
                 conflicts={aggregate.conflictResults}
@@ -215,49 +192,89 @@ export default async function WorkspaceDealDetailPage({
             {(terms?.disclosureObligations?.length ?? 0) > 0 ? (
               <DisclosureObligations obligations={terms?.disclosureObligations ?? []} />
             ) : null}
-            <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
-              <DealStatusPanel
-                dealId={deal.id}
-                status={deal.status}
-                paymentStatus={deal.paymentStatus}
-                countersignStatus={deal.countersignStatus}
-              />
-              <RiskFlags flags={riskFlags.slice(0, 3)} />
-            </div>
-            <PaymentPanel dealId={deal.id} payment={paymentRecord} />
-            <div className="grid gap-4 md:grid-cols-3">
-              <SummaryCard
-                label="Rights"
-                value={
-                  terms?.usageRightsPaidAllowed
-                    ? "Paid usage"
-                    : terms?.usageRightsOrganicAllowed
-                      ? "Organic only"
-                      : "Needs review"
-                }
-                caption={terms?.usageDuration ?? "Duration not clear yet"}
-              />
-              <SummaryCard
-                label="Exclusivity"
-                value={terms?.exclusivityDuration ?? "Not detected"}
-                caption={
-                  terms?.exclusivityCategory ??
-                  (terms?.brandCategory
-                    ? dealCategoryLabel(terms.brandCategory)
-                    : "Category not specified")
-                }
-                accent="clay"
-              />
-              <SummaryCard
-                label="Countersign"
-                value={humanizeToken(deal.countersignStatus)}
-                caption={humanizeToken(deal.paymentStatus)}
-                accent="sage"
-              />
+            <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
+              {summarySections.length > 0 ? (
+                <Accordion
+                  type="single"
+                  collapsible
+                  defaultValue={summarySections[0]?.id}
+                  className="w-full"
+                >
+                  {summarySections.map((section) => (
+                    <AccordionItem
+                      key={section.id}
+                      value={section.id}
+                      className="border-black/8 dark:border-white/10"
+                    >
+                      <AccordionTrigger className="py-5 hover:no-underline">
+                        <div className="pr-6 text-left">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
+                            {section.title}
+                          </p>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-5">
+                        <div className="max-w-4xl space-y-3">
+                          {section.paragraphs.map((paragraph, index) => (
+                            <p
+                              key={`${section.id}-${index}`}
+                              className="text-[15px] leading-8 text-black/72 dark:text-white/72"
+                            >
+                              {renderSummaryParagraph(paragraph)}
+                            </p>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              ) : (
+                <div className="max-w-4xl">
+                  <p className="text-[15px] leading-8 text-black/72 dark:text-white/72">
+                    {plainSummary}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-6 border-t border-black/8 pt-6 md:grid-cols-2 dark:border-white/10">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+                    Rights
+                  </p>
+                  <p className="text-sm text-foreground">
+                    {terms?.usageRightsPaidAllowed
+                      ? "Paid usage"
+                      : terms?.usageRightsOrganicAllowed
+                        ? "Organic only"
+                        : "Needs review"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {terms?.usageDuration ?? "Duration not clear yet"}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+                    Exclusivity
+                  </p>
+                  <p className="text-sm text-foreground">
+                    {terms?.exclusivityDuration ?? "Not detected"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {terms?.exclusivityCategory ??
+                      (terms?.brandCategory
+                        ? dealCategoryLabel(terms.brandCategory)
+                        : "Category not specified")}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
+                {deal.legalDisclaimer}
+              </p>
             </div>
           </TabsContent>
 
-          <TabsContent value="terms" className="space-y-6">
+          <TabsContent value="terms" className="mt-0 space-y-6">
             <TermsEditor
               dealId={deal.id}
               terms={terms}
@@ -267,31 +284,37 @@ export default async function WorkspaceDealDetailPage({
             />
           </TabsContent>
 
-          <TabsContent value="risks" className="space-y-6">
+          <TabsContent value="risks" className="mt-0 space-y-6">
             <RiskFlags flags={riskFlags} />
           </TabsContent>
 
-          <TabsContent value="deliverables" className="space-y-6">
+          <TabsContent value="deliverables" className="mt-0 space-y-6">
             <DeliverablesList deliverables={terms?.deliverables ?? []} />
           </TabsContent>
 
-          <TabsContent value="emails" className="space-y-6">
-            <EmailDrafts dealId={deal.id} drafts={emailDrafts} />
+          <TabsContent value="emails" className="mt-0 space-y-6">
+            <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+              <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+                Emails
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
+                Email drafting will be available after you connect an email provider.
+              </p>
+              <button className="mt-5 border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20">
+                Connect email
+              </button>
+            </section>
           </TabsContent>
 
-          <TabsContent value="documents" className="space-y-6">
+          <TabsContent value="documents" className="mt-0 space-y-6">
             <UploadContractForm dealId={deal.id} documents={documents} />
             <DocumentsPanel
               dealId={deal.id}
               documents={documents}
-              documentSections={documentSections}
-              extractionEvidence={extractionEvidence}
-              extractionResults={extractionResults}
-              summaries={summaries}
             />
           </TabsContent>
 
-          <TabsContent value="notes" className="space-y-6">
+          <TabsContent value="notes" className="mt-0 space-y-6">
             <DealNotesPanel dealId={deal.id} notes={terms?.notes ?? null} />
           </TabsContent>
         </Tabs>

@@ -3,20 +3,19 @@
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
   BarChart3,
   Bell,
   ChevronRight,
   CircleHelp,
+  Hand,
   Home,
-  Moon,
   Receipt,
   Search,
   Settings,
-  Sparkles,
   UserRound
 } from "lucide-react";
 
@@ -39,15 +38,6 @@ const navItems = [
 
 const primaryNavItems = navItems.slice(0, 5);
 const secondaryNavItems = navItems.slice(5);
-
-function deriveInitials(value: string) {
-  return value
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("") || "HB";
-}
 
 function labelForPath(pathname: string) {
   if (pathname === "/app" || pathname === "/app/dashboard") {
@@ -134,6 +124,7 @@ export function AppFrame({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -142,7 +133,7 @@ export function AppFrame({
     viewer.displayName.startsWith("@")
       ? viewer.displayName
       : `@${viewer.displayName.toLowerCase().replace(/\s+/g, "")}`;
-  const initials = useMemo(() => deriveInitials(viewer.displayName), [viewer.displayName]);
+  const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
 
   useEffect(() => {
     const container = mainRef.current;
@@ -153,6 +144,25 @@ export function AppFrame({
 
     window.scrollTo({ top: 0, left: 0 });
   }, [pathname, searchParams]);
+
+  useEffect(() => {
+    setSidebarQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  const handleSidebarSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const normalizedQuery = sidebarQuery.trim();
+
+    if (normalizedQuery.length === 0) {
+      router.push("/app/deals/history");
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("q", normalizedQuery);
+    router.push(`/app/deals/history?${params.toString()}`);
+  };
 
   const renderNavItem = (item: (typeof navItems)[number]) => {
     const Icon = item.icon;
@@ -186,13 +196,13 @@ export function AppFrame({
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-white">
+    <div className="h-screen overflow-hidden bg-white dark:bg-[#0f1115]">
       <div className="flex h-full overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
           <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
             <Link href="/app" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center bg-primary text-sm font-semibold text-primary-foreground">
-                H
+              <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
+                <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
               <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
                 HelloBrand
@@ -201,10 +211,20 @@ export function AppFrame({
           </div>
 
           <div className="border-b border-border px-5 py-5 dark:border-white/8">
-            <div className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 text-[13px] text-muted-foreground dark:border-white/10 dark:bg-white/[0.04]">
+            <form
+              onSubmit={handleSidebarSearch}
+              className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
+            >
               <Search className="h-4 w-4 shrink-0" />
-              <span className="truncate">Search deals, drafts, invoices</span>
-            </div>
+              <input
+                type="search"
+                value={sidebarQuery}
+                onChange={(event) => setSidebarQuery(event.target.value)}
+                placeholder="Search deals"
+                aria-label="Search deals"
+                className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
+              />
+            </form>
           </div>
 
           <div className="flex-1 overflow-auto px-3 pb-4">
@@ -221,16 +241,7 @@ export function AppFrame({
               </p>
             </div>
 
-            <div className="space-y-1">
-              <div className="flex h-10 items-center justify-between px-3 text-[13px] font-medium text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  <Moon className="h-4.5 w-4.5 text-muted-foreground" />
-                  <span>Dark mode</span>
-                </div>
-                <ThemeSwitch minimal />
-              </div>
-              {secondaryNavItems.map(renderNavItem)}
-            </div>
+            <div className="space-y-1">{secondaryNavItems.map(renderNavItem)}</div>
           </div>
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
@@ -255,7 +266,6 @@ export function AppFrame({
                 )}
               >
                 <span>New workspace</span>
-                <Sparkles className="h-4 w-4" />
               </Link>
             </div>
           </div>
@@ -272,27 +282,7 @@ export function AppFrame({
             </div>
 
             <div className="flex items-center gap-2 lg:gap-3">
-              <Link
-                href="/app/intake/new"
-                className={cn(
-                  buttonVariants({ size: "sm" }),
-                  "hidden px-4 lg:inline-flex"
-                )}
-              >
-                New workspace
-              </Link>
-
-              <ThemeSwitch compact className="border border-border bg-secondary/35 dark:border-white/10 dark:bg-white/[0.04]" />
-
-              <div className="hidden items-center gap-3 border border-border bg-white px-3 py-2 lg:flex dark:border-white/10 dark:bg-white/[0.03]">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/12 text-sm font-semibold text-primary">
-                  {initials}
-                </div>
-                <div className="text-right">
-                  <p className="text-[13px] font-semibold text-foreground">{viewer.displayName}</p>
-                  <p className="text-xs text-muted-foreground">Creator workspace</p>
-                </div>
-              </div>
+              <ThemeSwitch iconOnly />
             </div>
           </header>
 

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { createPersistedIntakeRecord } from "@/lib/intake-normalization";
+import { startNextQueuedIntakeSessionForUser, startQueuedIntakeSessionById } from "@/lib/intake-queue";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import {
   getDealForViewer,
@@ -11,8 +12,11 @@ import {
   uploadDocumentsForViewer
 } from "@/lib/deals";
 import type {
+  CampaignDateWindow,
   DealAggregate,
+  DealCategory,
   DeliverableItem,
+  DisclosureObligation,
   IntakeAnalyticsRecord,
   IntakeDraftListItem,
   IntakeProcessingSnapshot,
@@ -81,6 +85,25 @@ function detectInputSource(files: File[], pastedText: string | null | undefined)
   }
 
   return null;
+}
+
+function mergeInputSource(
+  existing: IntakeSessionRecord["inputSource"] | null,
+  incoming: IntakeSessionRecord["inputSource"] | null
+) {
+  if (!existing) {
+    return incoming;
+  }
+
+  if (!incoming) {
+    return existing;
+  }
+
+  if (existing === incoming) {
+    return existing;
+  }
+
+  return "mixed" as const;
 }
 
 function emptyEditableTerms(input: {
@@ -353,7 +376,7 @@ export async function createIntakeSessionForViewer(
     data: {
       userId: viewer.id,
       dealId: draftDeal.id,
-      status: "uploading",
+      status: "queued",
       inputSource: detectInputSource(files, pastedText),
       draftBrandName: input.brandName?.trim() || draftDeal.brandName,
       draftCampaignName: input.campaignName?.trim() || draftDeal.campaignName,
@@ -366,7 +389,8 @@ export async function createIntakeSessionForViewer(
 
   const aggregate = await uploadDocumentsForViewer(viewer, draftDeal.id, {
     files,
-    pastedText
+    pastedText,
+    startProcessing: false
   });
 
   if (input.notes?.trim()) {
@@ -395,11 +419,6 @@ export async function createIntakeSessionForViewer(
       skipDuplicates: true
     });
   }
-
-  await prisma.intakeSession.update({
-    where: { id: session.id },
-    data: { status: "processing", errorMessage: null }
-  });
 
   const synced = await syncIntakeSessionForDealId(draftDeal.id);
   return synced ?? toIntakeSessionRecord(session);
@@ -464,6 +483,7 @@ export async function appendDocumentsToIntakeSessionForViewer(
   input: {
     pastedText?: string | null;
     files?: File[];
+    startProcessing?: boolean;
   }
 ) {
   const session = await prisma.intakeSession.findFirst({
@@ -488,20 +508,28 @@ export async function appendDocumentsToIntakeSessionForViewer(
     throw new Error("Please upload a file or paste document text.");
   }
 
+  const shouldStartProcessing =
+    input.startProcessing ??
+    ["processing", "uploading"].includes(session.status);
+
   await prisma.intakeSession.update({
     where: { id: session.id },
     data: {
       status: "uploading",
-      inputSource: detectInputSource(files, pastedText),
-      draftPastedText: pastedText,
-      draftPastedTextTitle: null,
+      inputSource: mergeInputSource(
+        session.inputSource as IntakeSessionRecord["inputSource"] | null,
+        detectInputSource(files, pastedText)
+      ),
+      draftPastedText: pastedText ?? session.draftPastedText,
+      draftPastedTextTitle: pastedText ? null : session.draftPastedTextTitle,
       errorMessage: null
     }
   });
 
   await uploadDocumentsForViewer(viewer, session.dealId, {
     files,
-    pastedText
+    pastedText,
+    startProcessing: shouldStartProcessing
   });
 
   const documents = await getRepository().listDocuments(viewer.id, session.dealId);
@@ -517,7 +545,10 @@ export async function appendDocumentsToIntakeSessionForViewer(
 
   await prisma.intakeSession.update({
     where: { id: session.id },
-    data: { status: "processing", errorMessage: null }
+    data: {
+      status: shouldStartProcessing ? "processing" : "queued",
+      errorMessage: null
+    }
   });
 
   const synced = await syncIntakeSessionForDealId(session.dealId);
@@ -597,7 +628,7 @@ export async function listIntakeDraftsForViewer(
     where: {
       userId: viewer.id,
       status: {
-        in: ["draft", "uploading", "processing", "ready_for_confirmation", "failed"]
+        in: ["draft", "queued", "uploading", "processing", "ready_for_confirmation", "failed"]
       },
       deal: {
         confirmedAt: null
@@ -707,6 +738,28 @@ export async function getIntakeSessionForViewer(
   };
 }
 
+export async function startQueuedIntakeAnalysisForViewer(
+  viewer: Viewer,
+  input?: {
+    sessionIds?: string[];
+    sessionId?: string;
+  }
+) {
+  const startedSessionId = input?.sessionId
+    ? await startQueuedIntakeSessionById(viewer.id, input.sessionId)
+    : await startNextQueuedIntakeSessionForUser(viewer.id, input?.sessionIds);
+
+  if (!startedSessionId) {
+    throw new Error("There are no queued workspaces ready to analyze.");
+  }
+
+  const sessionId =
+    typeof startedSessionId === "string" ? startedSessionId : startedSessionId.id;
+
+  const payload = await getIntakeSessionForViewer(viewer, sessionId);
+  return payload.session;
+}
+
 export async function retryIntakeSessionForViewer(viewer: Viewer, sessionId: string) {
   const session = await prisma.intakeSession.findFirst({
     where: {
@@ -754,6 +807,12 @@ export async function confirmIntakeSessionForViewer(
     primaryContactEmail?: string | null;
     primaryContactPhone?: string | null;
     paymentAmount?: number | null;
+    currency?: string | null;
+    brandCategory?: DealCategory | null;
+    competitorCategories?: string[];
+    restrictedCategories?: string[];
+    campaignDateWindow?: CampaignDateWindow | null;
+    disclosureObligations?: DisclosureObligation[];
     deliverables?: DeliverableItem[];
     timelineItems?: IntakeTimelineItem[];
     analytics?: IntakeAnalyticsRecord | null;
@@ -817,18 +876,20 @@ export async function confirmIntakeSessionForViewer(
     campaignName: input.contractTitle,
     agencyName: input.agencyName?.trim() || null,
     paymentAmount: input.paymentAmount ?? aggregate.terms?.paymentAmount ?? null,
-    deliverables:
-      input.deliverables && input.deliverables.length > 0
-        ? input.deliverables
-        : aggregate.terms?.deliverables ?? [],
-    brandCategory: aggregate.terms?.brandCategory ?? null,
-    competitorCategories: aggregate.terms?.competitorCategories ?? [],
-    restrictedCategories: aggregate.terms?.restrictedCategories ?? [],
+    currency: input.currency?.trim() || aggregate.terms?.currency || null,
+    deliverables: input.deliverables ?? aggregate.terms?.deliverables ?? [],
+    brandCategory: input.brandCategory ?? aggregate.terms?.brandCategory ?? null,
+    competitorCategories:
+      input.competitorCategories ?? aggregate.terms?.competitorCategories ?? [],
+    restrictedCategories:
+      input.restrictedCategories ?? aggregate.terms?.restrictedCategories ?? [],
     campaignDateWindow:
+      input.campaignDateWindow ??
       campaignDateWindowFromTimelineItems(input.timelineItems ?? []) ??
       aggregate.terms?.campaignDateWindow ??
       null,
-    disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
+    disclosureObligations:
+      input.disclosureObligations ?? aggregate.terms?.disclosureObligations ?? [],
     creatorName:
       aggregate.terms?.creatorName ??
       profile?.creatorLegalName?.trim() ??
@@ -860,20 +921,25 @@ export async function confirmIntakeSessionForViewer(
       contractTitle: input.contractTitle,
       contractSummary,
       paymentAmount: input.paymentAmount ?? aggregate.terms?.paymentAmount ?? null,
-      currency: aggregate.terms?.currency ?? aggregate.paymentRecord?.currency ?? "USD",
-      deliverables:
-        input.deliverables && input.deliverables.length > 0
-          ? input.deliverables
-          : aggregate.terms?.deliverables ?? [],
+      currency:
+        input.currency?.trim() ||
+        aggregate.terms?.currency ||
+        aggregate.paymentRecord?.currency ||
+        "USD",
+      deliverables: input.deliverables ?? aggregate.terms?.deliverables ?? [],
       timelineItems: input.timelineItems ?? [],
-      brandCategory: aggregate.terms?.brandCategory ?? null,
-      competitorCategories: aggregate.terms?.competitorCategories ?? [],
-      restrictedCategories: aggregate.terms?.restrictedCategories ?? [],
+      brandCategory: input.brandCategory ?? aggregate.terms?.brandCategory ?? null,
+      competitorCategories:
+        input.competitorCategories ?? aggregate.terms?.competitorCategories ?? [],
+      restrictedCategories:
+        input.restrictedCategories ?? aggregate.terms?.restrictedCategories ?? [],
       campaignDateWindow:
+        input.campaignDateWindow ??
         campaignDateWindowFromTimelineItems(input.timelineItems ?? []) ??
         aggregate.terms?.campaignDateWindow ??
         null,
-      disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
+      disclosureObligations:
+        input.disclosureObligations ?? aggregate.terms?.disclosureObligations ?? [],
       analytics: input.analytics ?? null,
       notes: input.notes?.trim() || aggregate.terms?.notes || null
     })

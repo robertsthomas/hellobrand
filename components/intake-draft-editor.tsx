@@ -23,6 +23,7 @@ async function uploadSessionDocumentsRequest({
   if (pastedText) {
     formData.append("pastedText", pastedText);
   }
+  formData.append("startProcessing", "0");
 
   return fetch(`/api/intake/${sessionId}/documents`, {
     method: "POST",
@@ -67,7 +68,6 @@ export function IntakeDraftEditor({
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
   const reset = useIntakeUiStore((state) => state.reset);
   const lastSavedRef = useRef("");
-  const autoContinueStartedRef = useRef(false);
 
   useEffect(() => {
     if (initialDraft) {
@@ -141,96 +141,37 @@ export function IntakeDraftEditor({
     return payload.session.id as string;
   }, [brandName, campaignName, notes, setSessionId]);
 
-  useEffect(() => {
-    if (mode !== "upload") {
-      autoContinueStartedRef.current = false;
-      return;
-    }
-
-    if (pendingFiles.length === 0) {
-      autoContinueStartedRef.current = false;
-      return;
-    }
-
-    if (isSubmitting || autoContinueStartedRef.current) {
-      return;
-    }
-
-    autoContinueStartedRef.current = true;
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    void (async () => {
-      try {
-        const nextSessionId = sessionId ?? (await createDraftSession());
-        router.push(`/app/intake/${nextSessionId}`);
-        router.refresh();
-        const response = await uploadSessionDocumentsRequest({
-          sessionId: nextSessionId,
-          files: pendingFiles,
-          pastedText: ""
-        });
-        const payload = await response.json();
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Could not upload documents.");
-        }
-
-        reset("upload");
-        router.refresh();
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not upload documents."
-        );
-        setIsSubmitting(false);
-        autoContinueStartedRef.current = false;
-      }
-    })();
-  }, [
-    isSubmitting,
-    mode,
-    pendingFiles.length,
-    pendingFiles,
-    reset,
-    router,
-    sessionId,
-    setErrorMessage,
-    setIsSubmitting,
-    createDraftSession,
-  ]);
-
   async function handleContinue() {
     if (pendingFiles.length === 0 && !pastedText.trim()) {
-      setErrorMessage("Upload a file or paste text before continuing.");
+      setErrorMessage("Upload a file or paste text before finishing the workspace.");
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
-    const nextSessionId = sessionId ?? (await createDraftSession());
-    router.push(`/app/intake/${nextSessionId}`);
-    router.refresh();
-    void (async () => {
-      try {
-        const response = await uploadSessionDocumentsRequest({
-          sessionId: nextSessionId,
-          files: pendingFiles,
-          pastedText: pastedText.trim()
-        });
-        const payload = await response.json();
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Could not upload documents.");
-        }
+    try {
+      const nextSessionId = sessionId ?? (await createDraftSession());
+      const response = await uploadSessionDocumentsRequest({
+        sessionId: nextSessionId,
+        files: pendingFiles,
+        pastedText: pastedText.trim()
+      });
+      const payload = await response.json();
 
-        reset("upload");
-        router.refresh();
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not upload documents."
-        );
-        setIsSubmitting(false);
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not upload documents.");
       }
-    })();
+
+      reset("upload");
+      router.push("/app/intake/new");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not upload documents."
+      );
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -283,9 +224,8 @@ export function IntakeDraftEditor({
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/8 pt-8 dark:border-white/8">
             <div className="max-w-2xl text-sm leading-6 text-black/55 dark:text-white/60">
               <p>
-                Drafts save in progress. Selecting files opens the live analysis
-                screen immediately. Paste mode stays manual so you can finish the
-                text first.
+                Drafts save in progress. Finish this workspace to queue its
+                sources, then start analysis once you are ready.
               </p>
               {sessionId ? (
                 <p className="mt-2 text-xs text-black/45 dark:text-white/45">
@@ -295,12 +235,12 @@ export function IntakeDraftEditor({
             </div>
             <SubmitButton
               type="button"
-              pendingLabel="Opening intake..."
+              pendingLabel="Finishing workspace..."
               onClick={() => void handleContinue()}
               className="rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isSubmitting}
             >
-              Continue to analysis
+              Finish workspace
             </SubmitButton>
           </div>
 

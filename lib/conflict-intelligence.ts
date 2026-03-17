@@ -166,6 +166,8 @@ const CATEGORY_LABELS: Record<DealCategory, string> = {
   other: "Other"
 };
 
+export const dealCategoryOptions = Object.keys(CATEGORY_LABELS) as DealCategory[];
+
 const KNOWN_BRAND_CATEGORY_HINTS: Array<{
   match: RegExp;
   brand: string;
@@ -288,10 +290,39 @@ function detectKnownBrandCategory(value: string | null | undefined) {
   return null;
 }
 
+function detectKnownBrandCategoryFromValues(values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const match = detectKnownBrandCategory(value);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textContainsKeyword(text: string, keyword: string) {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return false;
+  }
+
+  if (normalizedKeyword.includes(" ")) {
+    return text.includes(normalizedKeyword);
+  }
+
+  const pattern = new RegExp(`\\b${escapeRegex(normalizedKeyword)}\\b`, "i");
+  return pattern.test(text);
+}
+
 function scoreCategory(text: string, category: DealCategory) {
   const lower = text.toLowerCase();
   return CATEGORY_KEYWORDS[category].reduce((score, keyword) => {
-    if (lower.includes(keyword)) {
+    if (textContainsKeyword(lower, keyword)) {
       return score + Math.max(1, keyword.split(" ").length);
     }
     return score;
@@ -351,8 +382,12 @@ function chooseBrandCategory(
   texts: string[],
   fallbacks: Array<string | null | undefined>
 ): { category: DealCategory | null; confidence: number; snippet: string | null } {
-  const brandHint = detectKnownBrandCategory(fallbacks[0] ?? null);
   const combined = uniqueStrings([...fallbacks, ...texts]).join("\n");
+  const brandHint = detectKnownBrandCategoryFromValues([
+    ...fallbacks,
+    ...texts,
+    combined
+  ]);
   if (!combined && !brandHint) {
     return { category: null, confidence: 0, snippet: null };
   }
@@ -384,11 +419,16 @@ function chooseBrandCategory(
   }
 
   if (!bestCategory) {
-    return { category: null, confidence: 0, snippet: null };
+    return {
+      category: "other",
+      confidence: 0.2,
+      snippet: normalizeWhitespace(combined.slice(0, 180))
+    };
   }
 
   const lower = combined.toLowerCase();
-  const keyword = CATEGORY_KEYWORDS[bestCategory].find((entry) => lower.includes(entry)) ?? null;
+  const keyword =
+    CATEGORY_KEYWORDS[bestCategory].find((entry) => textContainsKeyword(lower, entry)) ?? null;
   const snippet =
     keyword && lower.includes(keyword)
       ? sentenceAround(combined, lower.indexOf(keyword))
@@ -790,6 +830,7 @@ export function mergeConflictIntelligence(
   patch: Partial<TermsData>
 ): Pick<
   TermsData,
+  | "brandCategory"
   | "competitorCategories"
   | "restrictedCategories"
   | "disclosureObligations"
@@ -815,6 +856,7 @@ export function mergeConflictIntelligence(
     : [];
 
   return {
+    brandCategory: patch.brandCategory ?? base.brandCategory,
     competitorCategories: uniqueStrings([
       ...baseCompetitorCategories,
       ...patchCompetitorCategories

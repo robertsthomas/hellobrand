@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { FileText, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { IntakeDraftEditor } from "@/components/intake-draft-editor";
 import { requireViewer } from "@/lib/auth";
-import { getIntakeSessionForViewer } from "@/lib/intake";
+import { getIntakeSessionForViewer, listIntakeDraftsForViewer } from "@/lib/intake";
 
 export default async function NewIntakePage({
   searchParams
@@ -14,6 +14,7 @@ export default async function NewIntakePage({
   searchParams: Promise<{ mode?: string; draft?: string }>;
 }) {
   const viewer = await requireViewer();
+  const intakeDrafts = await listIntakeDraftsForViewer(viewer);
   const resolvedSearchParams = await searchParams;
   const initialMode = resolvedSearchParams.mode === "paste" ? "paste" : "upload";
   let initialDraft: Parameters<typeof IntakeDraftEditor>[0]["initialDraft"] = null;
@@ -54,9 +55,9 @@ export default async function NewIntakePage({
             </p>
             <h1 className="text-4xl font-semibold text-ink">New workspace</h1>
             <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
-              Upload a contract, paste an email thread, or do both. HelloBrand
-              analyzes the source material first, then lets you confirm the deal
-              details before the workspace goes live.
+              Build one or more workspaces from uploaded documents or pasted text.
+              Start analysis when the queue is ready, then confirm each deal before
+              the workspace goes live.
             </p>
           </div>
           {initialDraft?.sessionId ? (
@@ -79,17 +80,13 @@ export default async function NewIntakePage({
             initialDraft={initialDraft}
           />
         ) : (
-          <div className="flex min-h-[50vh] items-center justify-center">
-            <div className="max-w-md text-center">
-              <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
-                <FileText className="h-10 w-10 text-muted-foreground" />
-              </div>
-              <h2 className="mb-3 text-2xl font-semibold">Start a new workspace</h2>
-              <p className="mb-8 text-black/60 dark:text-white/65">
-                Upload your first deal document or paste text to create a new workspace.
-              </p>
-              <EmptyDashboardUpload initialMode={initialMode} />
-            </div>
+          <div className="max-w-3xl">
+            <EmptyDashboardUpload
+              initialMode={initialMode}
+              initialQueuedWorkspaces={intakeDrafts.filter(
+                ({ session }) => session.status === "queued"
+              )}
+            />
           </div>
         )}
       </div>

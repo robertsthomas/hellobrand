@@ -28,7 +28,8 @@ export async function POST(
       pastedText:
         typeof formData.get("pastedText") === "string"
           ? String(formData.get("pastedText"))
-          : null
+          : null,
+      startProcessing: String(formData.get("startProcessing") ?? "") === "1"
     });
 
     debug.complete({

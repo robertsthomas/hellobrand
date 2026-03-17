@@ -19,9 +19,9 @@ export function ConflictWarnings({
   }
 
   return (
-    <section className="rounded-[1.5rem] border border-amber-500/20 bg-amber-50/70 p-5 dark:border-amber-300/15 dark:bg-amber-300/[0.06]">
+    <section className="border border-amber-500/18 bg-amber-50/28 px-5 py-4 dark:border-amber-300/12 dark:bg-amber-300/[0.03]">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-full bg-amber-500/10 p-2 text-amber-700 dark:text-amber-200">
+        <div className="mt-0.5 text-amber-700 dark:text-amber-200">
           <ShieldAlert className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -30,11 +30,11 @@ export function ConflictWarnings({
             <p className="mt-1 text-sm text-black/60 dark:text-white/65">{description}</p>
           ) : null}
 
-          <div className={cn("mt-4 grid gap-3", compact && "gap-2")}>
+          <div className={cn("mt-4 grid gap-0", compact && "gap-0")}>
             {conflicts.slice(0, compact ? 3 : 6).map((conflict) => (
               <div
                 key={`${conflict.type}-${conflict.title}-${conflict.relatedDealIds.join("-")}`}
-                className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-white/[0.04]"
+                className="border-t border-black/6 px-0 py-3 first:border-t-0 dark:border-white/10"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

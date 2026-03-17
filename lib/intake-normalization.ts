@@ -82,6 +82,27 @@ function cleanFileName(fileName: string) {
     .trim();
 }
 
+function isGenericIntakeLabel(value: string | null | undefined) {
+  const normalized = presentText(value)?.toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  return (
+    normalized === "pasted email thread" ||
+    normalized === "pasted deliverables notes" ||
+    normalized === "pasted invoice" ||
+    normalized === "pasted contract" ||
+    normalized === "pasted campaign brief" ||
+    normalized === "pasted context" ||
+    normalized === "email thread" ||
+    normalized === "campaign brief" ||
+    normalized === "contract" ||
+    normalized === "context" ||
+    normalized === "partnership"
+  );
+}
+
 function lineScore(kind: DocumentKind) {
   switch (kind) {
     case "contract":
@@ -239,7 +260,7 @@ function extractPrimaryContact(
 function extractLikelyBrandFromFileNames(fileNames: string[]) {
   for (const fileName of fileNames) {
     const cleaned = cleanFileName(fileName);
-    if (!cleaned) {
+    if (!cleaned || isGenericIntakeLabel(cleaned)) {
       continue;
     }
 
@@ -278,7 +299,7 @@ function extractBrandFromText(text: string) {
 
 function inferBrandName(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.brandName;
-  if (persisted) {
+  if (persisted && !isGenericIntakeLabel(persisted)) {
     return presentText(persisted);
   }
 
@@ -319,10 +340,14 @@ function inferBrandName(aggregate: DealAggregate) {
     "campaignName"
   ]);
   if (evidenceSnippet) {
-    return cleanExtractedLabel(evidenceSnippet);
+    const cleaned = cleanExtractedLabel(evidenceSnippet);
+    if (cleaned && !isGenericIntakeLabel(cleaned)) {
+      return cleaned;
+    }
   }
 
-  return presentText(aggregate.deal.brandName);
+  const dealBrand = presentText(aggregate.deal.brandName);
+  return dealBrand && !isGenericIntakeLabel(dealBrand) ? dealBrand : null;
 }
 
 function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
@@ -684,27 +709,94 @@ function extractAnalytics(aggregate: DealAggregate) {
 
 function inferContractTitle(
   aggregate: DealAggregate,
-  brandName: string | null
+  brandName: string | null,
+  agencyName: string | null
 ) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.contractTitle;
-  if (persisted) {
+  if (persisted && !isGenericIntakeLabel(persisted)) {
     return presentText(persisted);
   }
 
   const campaign = cleanExtractedLabel(aggregate.terms?.campaignName);
-  if (campaign && !/\bname\b/i.test(aggregate.terms?.campaignName ?? "")) {
-    return campaign;
+  if (
+    campaign &&
+    !/\bname\b/i.test(aggregate.terms?.campaignName ?? "") &&
+    !isGenericIntakeLabel(campaign)
+  ) {
+    return brandName && !campaign.toLowerCase().includes(brandName.toLowerCase())
+      ? `${brandName} - ${campaign}`
+      : campaign;
+  }
+
+  const primaryText = aggregate.documents
+    .slice()
+    .sort((left, right) => lineScore(right.documentKind) - lineScore(left.documentKind))
+    .map((document) => document.normalizedText ?? document.rawText ?? "")
+    .find(Boolean);
+
+  if (primaryText) {
+    const subject = presentText(
+      primaryText
+        .match(/^subject:\s*(.+)$/im)?.[1]
+        ?.replace(/^(re|fwd?):\s*/gi, "")
+        ?.trim() ?? null
+    );
+
+    if (subject && !isGenericIntakeLabel(subject)) {
+      return brandName && !subject.toLowerCase().includes(brandName.toLowerCase())
+        ? `${brandName} - ${subject}`
+        : subject;
+    }
+
+    const explicitCampaign = presentText(
+      primaryText.match(/^(?:campaign|project)\s*:\s*(.+)$/im)?.[1] ?? null
+    );
+    if (explicitCampaign && !isGenericIntakeLabel(explicitCampaign)) {
+      return brandName && !explicitCampaign.toLowerCase().includes(brandName.toLowerCase())
+        ? `${brandName} - ${explicitCampaign}`
+        : explicitCampaign;
+    }
   }
 
   const fileName = aggregate.documents[0]?.fileName;
   if (fileName) {
     const cleaned = cleanFileName(fileName);
-    if (cleaned) {
+    if (cleaned && !isGenericIntakeLabel(cleaned)) {
       return cleaned;
     }
   }
 
-  return brandName ? `${brandName} partnership` : presentText(aggregate.deal.campaignName);
+  const channels = Array.from(
+    new Set(
+      (aggregate.terms?.deliverables ?? [])
+        .map((item) => `${item.title ?? ""} ${item.channel ?? ""}`)
+        .join(" ")
+        .match(/\b(TikTok|Instagram|YouTube)\b/gi) ?? []
+    )
+  )
+    .map((entry) =>
+      entry.toLowerCase() === "tiktok"
+        ? "TikTok"
+        : entry.toLowerCase() === "youtube"
+          ? "YouTube"
+          : "Instagram"
+    )
+    .slice(0, 2);
+
+  if (brandName && channels.length > 0) {
+    return `${brandName} - ${channels.join(" + ")} Partnership`;
+  }
+
+  if (brandName && agencyName) {
+    return `${brandName} via ${agencyName}`;
+  }
+
+  if (brandName) {
+    return `${brandName} partnership`;
+  }
+
+  const fallbackCampaign = presentText(aggregate.deal.campaignName);
+  return fallbackCampaign && !isGenericIntakeLabel(fallbackCampaign) ? fallbackCampaign : null;
 }
 
 function buildContractSummary(input: {
@@ -857,7 +949,7 @@ export function buildNormalizedIntakeRecord(
   const brandName = inferBrandName(aggregate);
   const agencyName = inferAgencyName(aggregate, brandName);
   const primaryContact = extractPrimaryContact(aggregate, agencyName, brandName);
-  const contractTitle = inferContractTitle(aggregate, brandName);
+  const contractTitle = inferContractTitle(aggregate, brandName, agencyName);
   const paymentAmount = inferPaymentAmount(aggregate);
   const persistedDeliverables = Array.isArray(persisted?.deliverables)
     ? persisted.deliverables

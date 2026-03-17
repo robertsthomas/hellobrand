@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 export function ThemeSwitch({
   className,
   compact = false,
-  minimal = false
+  minimal = false,
+  iconOnly = false
 }: {
   className?: string;
   compact?: boolean;
   minimal?: boolean;
+  iconOnly?: boolean;
 }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -24,6 +26,26 @@ export function ThemeSwitch({
   }, []);
 
   const isDark = mounted && resolvedTheme === "dark";
+
+  if (iconOnly) {
+    return (
+      <button
+        type="button"
+        aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        onClick={() => setTheme(isDark ? "light" : "dark")}
+        className={cn(
+          "inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white",
+          className
+        )}
+      >
+        {isDark ? (
+          <SunMedium className="h-5 w-5 text-clay" />
+        ) : (
+          <MoonStar className="h-5 w-5 text-ocean dark:text-sand" />
+        )}
+      </button>
+    );
+  }
 
   return (
     <label

@@ -28,8 +28,8 @@ export function IntakeSourceSwitcher({
           <h2 className="text-lg font-semibold text-ink">Documents</h2>
           <p className="text-sm text-black/55 dark:text-white/60">
             Add the contract first. You can also include briefs, decks, invoices,
-            or copied email context. After upload, HelloBrand opens the analysis
-            screen and starts filling in the deal data.
+            or copied email context. Finish the workspace when the source set is
+            ready, then start the analysis queue explicitly.
           </p>
         </div>
         <div className="inline-flex rounded-full border border-black/10 bg-white p-1 dark:border-white/10 dark:bg-white/[0.04]">

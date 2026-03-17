@@ -142,6 +142,20 @@ function mergeTerms(
 
 function inferPastedTextFileName(text: string) {
   const lower = text.toLowerCase();
+  const subjectLine = text
+    .match(/^subject:\s*(.+)$/im)?.[1]
+    ?.replace(/^(re|fwd?):\s*/gi, "")
+    ?.trim();
+  const campaignLine = text.match(/^(?:campaign|project)\s*:\s*(.+)$/im)?.[1]?.trim();
+
+  const normalizedTitle = (subjectLine || campaignLine || "")
+    .replace(/[^\w\s&+.'-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (normalizedTitle) {
+    return `${normalizedTitle}.txt`;
+  }
 
   if (
     /(^|\n)\s*(from|to|subject|cc):|\b(sent from my iphone|thanks,|best,|regards,)\b/.test(
@@ -530,7 +544,10 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       sectionKey: null,
       fallbackTerms: extraction.data
     });
-    extraction.data = mergeConflictIntelligence(extraction.data, intelligence.patch);
+    extraction.data = {
+      ...extraction.data,
+      ...mergeConflictIntelligence(extraction.data, intelligence.patch)
+    };
     extraction.evidence = [...extraction.evidence, ...intelligence.evidence];
     const extractionEvidence = Array.isArray(extraction.evidence) ? extraction.evidence : [];
     const extractionDeliverables = Array.isArray(extraction.data.deliverables)
@@ -781,12 +798,19 @@ export async function listDealsForViewer(viewer: Viewer) {
 }
 
 async function loadRawDealAggregatesForViewer(viewer: Viewer) {
-  const deals = await getRepository().listDeals(viewer.id);
-  const aggregates = await Promise.all(
-    deals.map((deal) => getRepository().getDealAggregate(viewer.id, deal.id))
-  );
+  const repository = getRepository();
+  const deals = await repository.listDeals(viewer.id);
+  const aggregates: DealAggregate[] = [];
 
-  return aggregates.filter((aggregate): aggregate is DealAggregate => Boolean(aggregate));
+  for (const deal of deals) {
+    const aggregate = await repository.getDealAggregate(viewer.id, deal.id);
+
+    if (aggregate) {
+      aggregates.push(aggregate);
+    }
+  }
+
+  return aggregates;
 }
 
 export async function listDealAggregatesForViewer(viewer: Viewer) {
@@ -878,6 +902,24 @@ export async function updateTermsForViewer(
   return terms;
 }
 
+export async function updateDealNotesForViewer(
+  viewer: Viewer,
+  dealId: string,
+  notes: string | null
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate) {
+    return null;
+  }
+
+  const nextTerms = mergeTerms(
+    aggregate.terms ?? createEmptyTerms(aggregate.deal),
+    { notes }
+  );
+
+  return getRepository().upsertTerms(dealId, nextTerms);
+}
+
 export async function uploadDocumentsForViewer(
   viewer: Viewer,
   dealId: string,
@@ -885,6 +927,7 @@ export async function uploadDocumentsForViewer(
     files?: File[];
     pastedText?: string | null;
     documentKindHint?: DocumentKind | null;
+    startProcessing?: boolean;
   }
 ) {
   const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
@@ -945,13 +988,15 @@ export async function uploadDocumentsForViewer(
     throw new Error("Please upload at least one file or paste document text.");
   }
 
-  for (const document of createdDocuments) {
-    const queue = await enqueueDocumentProcessing(document.id);
+  if (input.startProcessing !== false) {
+    for (const document of createdDocuments) {
+      const queue = await enqueueDocumentProcessing(document.id);
 
-    if (queue.mode === "local") {
-      void processDocumentById(document.id).catch(async () => {
-        await getRepository().getDealAggregate(viewer.id, dealId);
-      });
+      if (queue.mode === "local") {
+        void processDocumentById(document.id).catch(async () => {
+          await getRepository().getDealAggregate(viewer.id, dealId);
+        });
+      }
     }
   }
 

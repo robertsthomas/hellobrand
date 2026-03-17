@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "doppler run -- next dev",
-    "dev:next": "next dev",
+    "dev": "doppler run -- next dev -p 3011",
+    "dev:next": "next dev -p 3011",
     "build": "next build",
     "build:prd": "doppler run --config prd -- next build",
     "start": "next start",
@@ -44,6 +44,7 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
