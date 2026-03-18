@@ -72,6 +72,7 @@ function createSeedTerms(now: string): DealTermsRecord {
     notes: "Creator should confirm whether paid usage includes whitelisting.",
     manuallyEditedFields: [],
     briefData: null,
+    pendingExtraction: null,
     createdAt: now,
     updatedAt: now
   };

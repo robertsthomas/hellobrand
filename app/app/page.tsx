@@ -331,7 +331,7 @@ export default async function WorkspaceDashboardPage() {
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-6">
-        <section className="rounded-[28px] border border-black/8 bg-white px-7 py-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)] lg:px-8 dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
+        <section className="border border-black/8 bg-white px-7 py-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)] lg:px-8 dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
           <div>
             <DashboardGreeting firstName={firstName} />
           </div>
@@ -343,7 +343,7 @@ export default async function WorkspaceDashboardPage() {
               return (
                 <div
                   key={metric.label}
-                  className="rounded-[22px] border border-black/7 bg-[#fbfbfc] px-5 py-5 dark:border-white/10 dark:bg-[#10141a]"
+                  className="border border-black/7 bg-[#fbfbfc] px-5 py-5 dark:border-white/10 dark:bg-[#10141a]"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -379,7 +379,7 @@ export default async function WorkspaceDashboardPage() {
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            <div className="hidden items-center gap-3 rounded-[18px] border border-black/8 bg-white px-4 py-3 text-sm text-muted-foreground lg:flex dark:border-white/10 dark:bg-[#15191f]">
+            <div className="hidden items-center gap-3 rounded-md border border-black/8 bg-white px-4 py-3 text-sm text-muted-foreground lg:flex dark:border-white/10 dark:bg-[#15191f]">
               <Clock3 className="h-4 w-4 text-[#98a2b3] dark:text-[#8f98a6]" />
               <span>{dueSoonDeliverables.length} due this week</span>
             </div>
@@ -397,7 +397,7 @@ export default async function WorkspaceDashboardPage() {
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_360px]">
               <div className="space-y-6">
-                <section className="rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
+                <section className="border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
                   <div className="mb-6 flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
@@ -409,7 +409,7 @@ export default async function WorkspaceDashboardPage() {
                     </div>
                     <Link
                       href="/app/deals/history"
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "rounded-2xl")}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                     >
                       View all
                     </Link>

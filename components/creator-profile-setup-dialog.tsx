@@ -55,7 +55,7 @@ export function CreatorProfileSetupDialog({
           {configured ? "Edit creator profile" : "Setup creator profile"}
         </button>
       </DialogTrigger>
-      <DialogContent className="max-w-md rounded-[24px] border-black/10 bg-background p-0 dark:border-white/10">
+      <DialogContent className="max-w-md rounded-md border-black/10 bg-background p-0 dark:border-white/10">
         <form
           action={(formData) => {
             startTransition(async () => {

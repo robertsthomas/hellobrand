@@ -8,15 +8,7 @@ import type {
 } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  History,
-  Instagram,
-  Plus,
-  Trash2,
-  Twitter,
-  Upload,
-  Youtube
-} from "lucide-react";
+import { History, Plus, Trash2, Upload } from "lucide-react";
 
 import {
   Dialog,
@@ -35,6 +27,8 @@ import {
   type ProfilePlatform,
   type SocialHandleEntry
 } from "@/lib/profile-metadata";
+import { createClientRowId } from "@/lib/row-identity";
+import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import type { ProfileAuditRecord, ProfileRecord } from "@/lib/types";
 
 function presentDateTime(value: string) {
@@ -57,10 +51,6 @@ function humanizeField(field: string) {
     .replace(/^./, (value) => value.toUpperCase());
 }
 
-function createHandleId(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 function deriveInitials(value: string) {
   return value
     .split(/\s+/)
@@ -71,24 +61,7 @@ function deriveInitials(value: string) {
 }
 
 function iconForPlatform(platform: ProfilePlatform) {
-  switch (platform) {
-    case "instagram":
-      return <Instagram className="h-4 w-4" />;
-    case "youtube":
-      return <Youtube className="h-4 w-4" />;
-    case "twitter":
-      return <Twitter className="h-4 w-4" />;
-    case "tiktok":
-      return <span className="text-sm font-semibold">TT</span>;
-    case "threads":
-      return <span className="text-sm font-semibold">@</span>;
-    case "newsletter":
-      return <span className="text-[11px] font-semibold uppercase">NL</span>;
-    case "podcast":
-      return <span className="text-[11px] font-semibold uppercase">PC</span>;
-    default:
-      return <span className="text-[11px] font-semibold uppercase">ID</span>;
-  }
+  return <SocialPlatformIcon platform={platform} />;
 }
 
 function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
@@ -106,7 +79,7 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
 
     return (
       existing ?? {
-        id: createHandleId(platform),
+        id: createClientRowId(platform),
         platform,
         handle: "",
         audienceLabel: "",
@@ -118,7 +91,7 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
 
 function emptyDealHandle(): SocialHandleEntry {
   return {
-    id: createHandleId("deal"),
+    id: createClientRowId("deal"),
     platform: "instagram",
     handle: "",
     audienceLabel: "",
@@ -303,12 +276,12 @@ export function ProfileEditor({
       const socialHandles = [
         ...form.generalHandles.map((entry) => ({
           ...entry,
-          audienceLabel: entry.audienceLabel.trim() || null
+          audienceLabel: entry.audienceLabel?.trim() || null
         })),
         ...form.dealHandles.map((entry) => ({
           ...entry,
-          audienceLabel: entry.audienceLabel.trim() || null,
-          dealContext: entry.dealContext.trim() || null
+          audienceLabel: entry.audienceLabel?.trim() || null,
+          dealContext: entry.dealContext?.trim() || null
         }))
       ];
 
@@ -326,8 +299,7 @@ export function ProfileEditor({
           payoutDetails: serializeProfileMetadata({
             bio: form.bio.trim() || null,
             location: form.location.trim() || null,
-            primaryPlatform:
-              (form.primaryPlatform as ProfilePlatform | "").trim() || null,
+            primaryPlatform: form.primaryPlatform as ProfilePlatform,
             contentCategory: form.contentCategory.trim() || null,
             taxId: form.taxId.trim() || null,
             rateCardUrl: form.rateCardUrl.trim() || null,
@@ -700,7 +672,7 @@ export function ProfileEditor({
               onChange={(event) =>
                 setForm((current) => ({
                   ...current,
-                  primaryPlatform: event.currentTarget.value
+                  primaryPlatform: event.currentTarget.value as ProfilePlatform
                 }))
               }
             />

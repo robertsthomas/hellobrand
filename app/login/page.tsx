@@ -9,7 +9,7 @@ export default function LoginPage() {
     <div className="min-h-screen">
       <MarketingNav />
       <section className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-5 py-16 sm:px-8 lg:px-10">
-        <div className="w-full max-w-md rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <div className="w-full max-w-md border border-black/5 bg-white/85 p-8 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
           <h1 className="text-4xl font-semibold text-ink">Continue to HelloBrand</h1>
           <p className="mt-4 text-sm text-black/60 dark:text-white/65">
             Sign in or create an account to upload documents, confirm extracted
@@ -29,7 +29,7 @@ export default function LoginPage() {
               </SignInButton>
             </Show>
             <Show when="signed-in">
-              <div className="flex items-center justify-between rounded-[1.25rem] bg-sand/50 px-4 py-4 dark:bg-white/[0.04]">
+              <div className="flex items-center justify-between bg-sand/50 px-4 py-4 dark:bg-white/[0.04]">
                 <span className="text-sm text-black/60 dark:text-white/65">
                   Signed in
                 </span>

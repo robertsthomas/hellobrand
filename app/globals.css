@@ -128,7 +128,7 @@ h4 {
 .app-surface {
   @apply border bg-white dark:bg-[#16181c];
   border-color: rgba(14, 17, 22, 0.08);
-  border-radius: 22px;
+  border-radius: 0;
   box-shadow:
     0 1px 1px rgba(14, 17, 22, 0.03),
     0 20px 40px rgba(14, 17, 22, 0.04);
@@ -318,4 +318,41 @@ html.dark ::selection {
   border: 2px solid rgba(16, 24, 40, 0.12);
   border-top-color: rgba(16, 24, 40, 0.95);
   animation: intake-loader-spin 0.9s linear infinite;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-print-brief],
+  [data-print-brief] * {
+    visibility: visible;
+  }
+
+  [data-print-brief] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 2rem;
+    display: block;
+  }
+
+  [data-print-brief] > div {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem;
+  }
+
+  [data-print-brief] p {
+    font-size: 12pt;
+    line-height: 1.6;
+    color: #111;
+  }
+
+  [data-print-brief] ul {
+    font-size: 11pt;
+    color: #111;
+  }
 }

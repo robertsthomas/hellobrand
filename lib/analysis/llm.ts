@@ -4,6 +4,7 @@ import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict
 import type {
   BriefData,
   CampaignDateWindow,
+  DealAggregate,
   DealTermsRecord,
   DisclosureObligation,
   DocumentKind,
@@ -11,6 +12,8 @@ import type {
   DocumentSummaryResult,
   ExtractionPipelineResult,
   FieldEvidence,
+  GeneratedBrief,
+  GeneratedBriefSection,
   RiskFlagRecord
 } from "@/lib/types";
 import {
@@ -20,7 +23,7 @@ import {
 } from "@/lib/deal-summary";
 
 type TermsData = Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
-type LlmTask = "extract_section" | "analyze_risks" | "generate_summary";
+type LlmTask = "extract_section" | "analyze_risks" | "generate_summary" | "generate_brief";
 type LlmRoute = {
   primary: string;
   fallbacks: string[];
@@ -108,6 +111,12 @@ function taskSpecificModel(task: LlmTask) {
         process.env.OPENROUTER_MODEL_SUMMARY ||
         null
       );
+    case "generate_brief":
+      return (
+        process.env.LLM_MODEL_BRIEF ||
+        process.env.OPENROUTER_MODEL_BRIEF ||
+        null
+      );
     default:
       return null;
   }
@@ -129,6 +138,11 @@ function taskSpecificFallbacks(task: LlmTask) {
       return parseModelList(
         process.env.LLM_MODEL_SUMMARY_FALLBACKS ||
           process.env.OPENROUTER_MODEL_SUMMARY_FALLBACKS
+      );
+    case "generate_brief":
+      return parseModelList(
+        process.env.LLM_MODEL_BRIEF_FALLBACKS ||
+          process.env.OPENROUTER_MODEL_BRIEF_FALLBACKS
       );
     default:
       return [];
@@ -152,6 +166,10 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
     generate_summary: {
       primary: "openai/gpt-5-chat",
       fallbacks: ["google/gemini-3-flash-preview", "anthropic/claude-sonnet-4.5"]
+    },
+    generate_brief: {
+      primary: "openai/gpt-5-chat",
+      fallbacks: ["anthropic/claude-sonnet-4.5", "google/gemini-3-flash-preview"]
     }
   };
 
@@ -695,4 +713,110 @@ Only include information explicitly stated. Return null or empty arrays for fiel
   } catch {
     return fallback;
   }
+}
+
+const BRIEF_SECTION_IDS = [
+  "campaign-overview",
+  "deliverables-summary",
+  "key-dates",
+  "talking-points",
+  "messaging-guidelines",
+  "brand-guidelines",
+  "usage-rights-summary",
+  "do-not-mention",
+  "approval-requirements"
+] as const;
+
+function normalizeBriefSections(raw: unknown): GeneratedBriefSection[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  const sections: GeneratedBriefSection[] = [];
+
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+
+    const row = entry as Record<string, unknown>;
+    const id = asString(row.id);
+    const title = asString(row.title);
+    const content = asString(row.content);
+
+    if (!id || !title || !content) {
+      continue;
+    }
+
+    const items = asStringArray(row.items);
+    const section: GeneratedBriefSection = { id, title, content };
+    if (items.length > 0) {
+      section.items = items;
+    }
+    sections.push(section);
+  }
+
+  return sections;
+}
+
+function buildBriefContext(aggregate: DealAggregate) {
+  const { deal, terms, riskFlags } = aggregate;
+  const summary = aggregate.currentSummary?.body ?? deal.summary ?? null;
+
+  const context: Record<string, unknown> = {
+    brandName: terms?.brandName,
+    campaignName: terms?.campaignName ?? deal.campaignName,
+    summary,
+    paymentAmount: terms?.paymentAmount,
+    currency: terms?.currency,
+    paymentTerms: terms?.paymentTerms,
+    deliverables: terms?.deliverables?.map((d) => ({
+      title: d.title,
+      dueDate: d.dueDate,
+      channel: d.channel,
+      quantity: d.quantity,
+      description: d.description
+    })),
+    usageRights: terms?.usageRights,
+    usageDuration: terms?.usageDuration,
+    usageChannels: terms?.usageChannels,
+    exclusivity: terms?.exclusivity,
+    exclusivityDuration: terms?.exclusivityDuration,
+    exclusivityCategory: terms?.exclusivityCategory,
+    campaignDateWindow: terms?.campaignDateWindow,
+    briefData: terms?.briefData,
+    riskFlags: riskFlags.map((f) => ({
+      category: f.category,
+      title: f.title,
+      detail: f.detail,
+      severity: f.severity
+    }))
+  };
+
+  return JSON.stringify(context, null, 2);
+}
+
+export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<GeneratedBrief> {
+  const systemPrompt = `You are a creator campaign brief writer. Synthesize all deal context into a polished, actionable campaign brief with these specific sections (use these exact IDs):
+
+${BRIEF_SECTION_IDS.map((id) => `- "${id}"`).join("\n")}
+
+For each section, provide an id, title, content (paragraph text), and optional items (bullet list).
+Pre-fill from existing briefData where available and enhance with deal context.
+Return JSON: { "sections": [{ "id": "...", "title": "...", "content": "...", "items": ["..."] }] }`;
+
+  const userPrompt = `Generate a professional campaign brief from this deal context:\n\n${buildBriefContext(aggregate)}`;
+
+  const payload = await requestJson("generate_brief", systemPrompt, userPrompt, {
+    requestType: "generate_brief",
+    dealId: aggregate.deal.id
+  });
+
+  const sections = normalizeBriefSections(payload.sections);
+
+  return {
+    sections: sections.length > 0 ? sections : [],
+    generatedAt: new Date().toISOString(),
+    modelVersion: `llm:${getLlmModel("generate_brief")}`
+  };
 }

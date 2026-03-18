@@ -127,6 +127,7 @@ function toDealTermsRecord(terms: {
   notes: string | null;
   manuallyEditedFields: unknown;
   briefData: unknown;
+  pendingExtraction: unknown;
   createdAt: Date;
   updatedAt: Date;
 }): DealTermsRecord {
@@ -150,6 +151,10 @@ function toDealTermsRecord(terms: {
     briefData:
       terms.briefData && typeof terms.briefData === "object"
         ? (terms.briefData as DealTermsRecord["briefData"])
+        : null,
+    pendingExtraction:
+      terms.pendingExtraction && typeof terms.pendingExtraction === "object"
+        ? (terms.pendingExtraction as DealTermsRecord["pendingExtraction"])
         : null,
     createdAt: iso(terms.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(terms.updatedAt) ?? new Date().toISOString()
@@ -722,7 +727,8 @@ export class PrismaRepository {
         campaignDateWindow: patch.campaignDateWindow,
         disclosureObligations: patch.disclosureObligations,
         manuallyEditedFields: patch.manuallyEditedFields,
-        briefData: patch.briefData
+        briefData: patch.briefData,
+        pendingExtraction: patch.pendingExtraction ?? null
       },
       create: {
         dealId,
@@ -734,11 +740,19 @@ export class PrismaRepository {
         campaignDateWindow: patch.campaignDateWindow,
         disclosureObligations: patch.disclosureObligations,
         manuallyEditedFields: patch.manuallyEditedFields,
-        briefData: patch.briefData
+        briefData: patch.briefData,
+        pendingExtraction: patch.pendingExtraction ?? null
       }
     });
 
     return toDealTermsRecord(saved);
+  }
+
+  async savePendingExtraction(dealId: string, data: unknown) {
+    await prisma.dealTerms.update({
+      where: { dealId },
+      data: { pendingExtraction: (data ?? null) as never }
+    });
   }
 
   async replaceRiskFlagsForDocument(

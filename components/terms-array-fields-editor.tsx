@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { createClientRowId } from "@/lib/row-identity";
 import type { DeliverableItem } from "@/lib/types";
 
 type EditableDeliverable = {
@@ -212,7 +213,10 @@ export function EditableStringListField({
         addLabel={addLabel}
         placeholder={placeholder}
         onAdd={() =>
-          setItems((current) => [...current, { id: `line-${Date.now()}`, value: "" }])
+          setItems((current) => [
+            ...current,
+            { id: createClientRowId("line"), value: "" }
+          ])
         }
         onChange={(id, value) =>
           setItems((current) =>
@@ -280,7 +284,7 @@ export function TermsArrayFieldsEditor({
               setEditableDeliverables((current) => [
                 ...current,
                 {
-                  id: `deliverable-${Date.now()}`,
+                  id: createClientRowId("deliverable"),
                   title: "",
                   dueDate: "",
                   channel: "",

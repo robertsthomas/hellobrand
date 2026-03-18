@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { BarChart3, CheckCircle2, CircleAlert, Radio, RefreshCcw } from "lucide-react";
+import { BarChart3, CheckCircle2, CircleAlert, RefreshCcw } from "lucide-react";
 
+import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import { requireViewer } from "@/lib/auth";
 import { listDealsForViewer } from "@/lib/deals";
 import { getProfileForViewer } from "@/lib/profile";
-import { parseProfileMetadata } from "@/lib/profile-metadata";
+import { parseProfileMetadata, type ProfilePlatform } from "@/lib/profile-metadata";
 import { getRepository } from "@/lib/repository";
 import type { DealAggregate } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -109,7 +110,13 @@ export default async function AnalyticsPage() {
     .slice(0, 5);
 
   const { metadata } = parseProfileMetadata(profile.payoutDetails);
-  const platformRows =
+  const platformRows: Array<{
+    id: string;
+    platform: ProfilePlatform;
+    handle: string;
+    audienceLabel: string | null;
+    dealContext: string | null;
+  }> =
     metadata.socialHandles.length > 0
       ? metadata.socialHandles
       : [
@@ -335,7 +342,7 @@ export default async function AnalyticsPage() {
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-1 flex h-9 w-9 items-center justify-center bg-[#f7f5f1] text-foreground">
-                          <Radio className="h-4 w-4" />
+                          <SocialPlatformIcon platform={entry.platform} />
                         </div>
                         <div>
                           <div className="font-medium capitalize text-foreground">

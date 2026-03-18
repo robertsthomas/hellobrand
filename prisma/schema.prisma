@@ -173,6 +173,7 @@ model DealTerms {
   notes                     String?
   manuallyEditedFields      Json     @default("[]")
   briefData                 Json?
+  pendingExtraction         Json?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 

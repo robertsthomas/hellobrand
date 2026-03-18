@@ -4,6 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { dealCategoryLabel, dealCategoryOptions } from "@/lib/conflict-intelligence";
+import { createClientRowId, dedupeRowsById } from "@/lib/row-identity";
 import type {
   CampaignDateWindow,
   DealCategory,
@@ -33,35 +34,41 @@ function toDateInputValue(value: string | null | undefined) {
 }
 
 function normalizeDeliverables(deliverables: DeliverableItem[]) {
-  return deliverables.map((item, index) => ({
-    id: item.id || `deliverable-${index + 1}`,
-    title: item.title ?? "",
-    dueDate: toDateInputValue(item.dueDate),
-    channel: item.channel ?? "",
-    quantity: item.quantity,
-    status: item.status ?? "pending",
-    description: item.description ?? "",
-    source: item.source ?? null
-  }));
+  return dedupeRowsById(
+    deliverables.map((item, index) => ({
+      id: item.id || `deliverable-${index + 1}`,
+      title: item.title ?? "",
+      dueDate: toDateInputValue(item.dueDate),
+      channel: item.channel ?? "",
+      quantity: item.quantity,
+      status: item.status ?? "pending",
+      description: item.description ?? "",
+      source: item.source ?? null
+    }))
+  );
 }
 
 function normalizeTimelineItems(items: IntakeTimelineItem[]) {
-  return items.map((item, index) => ({
-    id: item.id || `timeline-${index + 1}`,
-    label: item.label ?? "",
-    date: toDateInputValue(item.date),
-    source: item.source ?? "",
-    status: item.status ?? "unknown"
-  }));
+  return dedupeRowsById(
+    items.map((item, index) => ({
+      id: item.id || `timeline-${index + 1}`,
+      label: item.label ?? "",
+      date: toDateInputValue(item.date),
+      source: item.source ?? "",
+      status: item.status ?? "unknown"
+    }))
+  );
 }
 
 function normalizeDisclosureObligations(items: DisclosureObligation[]) {
-  return items.map((item, index) => ({
-    id: item.id || `disclosure-${index + 1}`,
-    title: item.title ?? "",
-    detail: item.detail ?? "",
-    source: item.source ?? ""
-  }));
+  return dedupeRowsById(
+    items.map((item, index) => ({
+      id: item.id || `disclosure-${index + 1}`,
+      title: item.title ?? "",
+      detail: item.detail ?? "",
+      source: item.source ?? ""
+    }))
+  );
 }
 
 export function IntakeGeneratedFieldsEditor({
@@ -357,7 +364,7 @@ export function IntakeGeneratedFieldsEditor({
               setDisclosureObligations((current) => [
                 ...current,
                 {
-                  id: `disclosure-${Date.now()}`,
+                  id: createClientRowId("disclosure"),
                   title: "",
                   detail: "",
                   source: ""
@@ -449,7 +456,7 @@ export function IntakeGeneratedFieldsEditor({
               setDeliverables((current) => [
                 ...current,
                 {
-                  id: `deliverable-${Date.now()}`,
+                  id: createClientRowId("deliverable"),
                   title: "",
                   dueDate: "",
                   channel: "",
@@ -579,7 +586,7 @@ export function IntakeGeneratedFieldsEditor({
               setTimelineItems((current) => [
                 ...current,
                 {
-                  id: `timeline-${Date.now()}`,
+                  id: createClientRowId("timeline"),
                   label: "",
                   date: "",
                   source: "",

@@ -16,7 +16,7 @@ export interface ClusterOutput {
   }>;
 }
 
-function extractBrandFromText(text: string): string | null {
+export function extractBrandFromText(text: string): string | null {
   const lower = text.toLowerCase();
 
   const brandPatterns = [
@@ -39,7 +39,7 @@ function extractBrandFromText(text: string): string | null {
   return null;
 }
 
-function extractBrandFromFileName(fileName: string): string | null {
+export function extractBrandFromFileName(fileName: string): string | null {
   const withoutExt = fileName.replace(/\.[^.]+$/, "");
   const parts = withoutExt
     .replace(/[-_]+/g, " ")
@@ -60,7 +60,7 @@ function extractBrandFromFileName(fileName: string): string | null {
   return null;
 }
 
-function normalizeBrand(value: string): string {
+export function normalizeBrand(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
 }
 

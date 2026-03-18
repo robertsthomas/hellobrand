@@ -5,9 +5,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, MessageSquareText, Play, Plus, Trash2 } from "lucide-react";
 
+import { DuplicateDealDialog } from "@/components/duplicate-deal-dialog";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { DuplicateMatch } from "@/lib/duplicate-detection";
 import {
   deleteLocalWorkspace,
   loadLocalWorkspace,
@@ -137,6 +139,11 @@ export function EmptyDashboardUpload({
   );
   const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
+  const duplicateMatches = useIntakeUiStore((state) => state.duplicateMatches);
+  const isDuplicateCheckPending = useIntakeUiStore((state) => state.isDuplicateCheckPending);
+  const setDuplicateMatches = useIntakeUiStore((state) => state.setDuplicateMatches);
+  const setIsDuplicateCheckPending = useIntakeUiStore((state) => state.setIsDuplicateCheckPending);
+  const clearDuplicateMatches = useIntakeUiStore((state) => state.clearDuplicateMatches);
   const reset = useIntakeUiStore((state) => state.reset);
 
   useEffect(() => {
@@ -183,6 +190,49 @@ export function EmptyDashboardUpload({
     return payload.session.id as string;
   }
 
+  async function checkForDuplicates(): Promise<DuplicateMatch[]> {
+    try {
+      const formData = new FormData();
+      for (const file of pendingFiles) {
+        formData.append("documents", file);
+      }
+      if (pastedText.trim()) {
+        formData.append("pastedText", pastedText.trim());
+      }
+
+      const response = await fetch("/api/intake/check-duplicates", {
+        method: "POST",
+        body: formData
+      });
+      const payload = await response.json();
+      return (payload.matches ?? []) as DuplicateMatch[];
+    } catch {
+      return [];
+    }
+  }
+
+  async function saveWorkspaceLocally() {
+    const item = await saveLocalWorkspace({
+      files: pendingFiles,
+      pastedText: pastedText.trim(),
+      brandName: buildWorkspaceBrand({
+        pastedText,
+        fallbackBrandName: null
+      }),
+      campaignName: buildWorkspaceLabel({
+        files: pendingFiles,
+        pastedText,
+        fallbackCampaignName: null
+      }),
+      inputSource: detectLocalInputSource(pendingFiles, pastedText)
+    });
+
+    setLocalWorkspaces((current) => [...current, item]);
+    clearDuplicateMatches();
+    reset(initialMode);
+    setIsComposerVisible(false);
+  }
+
   async function finishWorkspace() {
     if (!hasDraftSource) {
       setErrorMessage("Add documents or pasted text before saving this workspace.");
@@ -191,26 +241,77 @@ export function EmptyDashboardUpload({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    setIsDuplicateCheckPending(true);
 
     try {
-      const item = await saveLocalWorkspace({
-        files: pendingFiles,
-        pastedText: pastedText.trim(),
-        brandName: buildWorkspaceBrand({
-          pastedText,
-          fallbackBrandName: null
-        }),
-        campaignName: buildWorkspaceLabel({
-          files: pendingFiles,
-          pastedText,
-          fallbackCampaignName: null
-        }),
-        inputSource: detectLocalInputSource(pendingFiles, pastedText)
+      const matches = await checkForDuplicates();
+
+      if (matches.length > 0) {
+        setDuplicateMatches(matches);
+        setIsDuplicateCheckPending(false);
+        setIsSubmitting(false);
+        return;
+      }
+
+      await saveWorkspaceLocally();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not save this workspace."
+      );
+      clearDuplicateMatches();
+    } finally {
+      setIsSubmitting(false);
+      setIsDuplicateCheckPending(false);
+    }
+  }
+
+  async function handleAddToExisting(dealId: string) {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const sessionId = await createDraftSessionId({
+        brandName: buildWorkspaceBrand({ pastedText, fallbackBrandName: null }),
+        campaignName: buildWorkspaceLabel({ files: pendingFiles, pastedText, fallbackCampaignName: null })
       });
 
-      setLocalWorkspaces((current) => [...current, item]);
+      const formData = new FormData();
+      for (const file of pendingFiles) {
+        formData.append("documents", file);
+      }
+      if (pastedText.trim()) {
+        formData.append("pastedText", pastedText.trim());
+      }
+      formData.append("startProcessing", "1");
+      formData.append("targetDealId", dealId);
+
+      const uploadResponse = await fetch(`/api/intake/${sessionId}/documents`, {
+        method: "POST",
+        body: formData
+      });
+      const uploadPayload = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadPayload.error ?? "Could not add documents to existing workspace.");
+      }
+
+      clearDuplicateMatches();
       reset(initialMode);
-      setIsComposerVisible(false);
+      router.push(`/app/deals/${dealId}`);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not add to existing workspace."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleCreateNewAnyway() {
+    setIsSubmitting(true);
+    try {
+      await saveWorkspaceLocally();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not save this workspace."
@@ -438,16 +539,30 @@ export function EmptyDashboardUpload({
                     </span>
                   ) : null}
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => void finishWorkspace()}
-                    className={cn(buttonVariants({ className: "gap-2" }))}
-                  >
-                    {isSubmitting ? "Saving..." : "Done adding sources"}
-                  </button>
-                </div>
+
+                {duplicateMatches.length > 0 ? (
+                  <DuplicateDealDialog
+                    matches={duplicateMatches}
+                    onAddToExisting={(dealId) => void handleAddToExisting(dealId)}
+                    onCreateNew={() => void handleCreateNewAnyway()}
+                    isSubmitting={isSubmitting}
+                  />
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => void finishWorkspace()}
+                      className={cn(buttonVariants({ className: "gap-2" }))}
+                    >
+                      {isSubmitting
+                        ? isDuplicateCheckPending
+                          ? "Checking for duplicates..."
+                          : "Saving..."
+                        : "Done adding sources"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

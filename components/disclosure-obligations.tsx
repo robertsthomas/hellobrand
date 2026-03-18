@@ -14,13 +14,13 @@ export function DisclosureObligations({
   }
 
   return (
-    <section className="rounded-[1.5rem] border border-black/6 bg-white/80 p-5 dark:border-white/8 dark:bg-white/[0.05]">
+    <section className="border border-black/6 bg-white/80 p-5 dark:border-white/8 dark:bg-white/[0.05]">
       <div className="text-sm font-semibold text-ink">{title}</div>
       <div className="mt-4 grid gap-3">
         {obligations.slice(0, 4).map((obligation, index) => (
           <div
             key={`${obligation.id}-${index}`}
-            className="rounded-2xl bg-sand/45 px-4 py-3 dark:bg-white/[0.04]"
+            className="bg-sand/45 px-4 py-3 dark:bg-white/[0.04]"
           >
             <div className="flex items-start gap-3">
               <div className="mt-0.5 rounded-full bg-sage/10 p-2 text-sage">

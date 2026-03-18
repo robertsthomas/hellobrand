@@ -5,6 +5,7 @@ import { Trash2 } from "lucide-react";
 import { deleteIntakeDraftAction } from "@/app/actions";
 import { IntakeAutoRefresh } from "@/components/intake-auto-refresh";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
+import { IntakeDuplicateWarning } from "@/components/intake-duplicate-warning";
 import { IntakePendingUpload } from "@/components/intake-pending-upload";
 import { IntakeProcessingState } from "@/components/intake-processing-state";
 import { StartQueuedAnalysisButton } from "@/components/start-queued-analysis-button";
@@ -118,6 +119,11 @@ export default async function IntakeProcessingPage({
             sessionId={session.id}
             status={session.status}
             initialProcessing={processing}
+          />
+          <IntakeDuplicateWarning
+            sessionId={session.id}
+            dealId={session.dealId}
+            status={session.status}
           />
           <div className="sr-only">
             <IntakePendingUpload sessionId={session.id} status={session.status} />

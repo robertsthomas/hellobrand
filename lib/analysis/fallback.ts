@@ -6,6 +6,7 @@ import {
 } from "@/lib/conflict-intelligence";
 import type {
   BriefData,
+  DealAggregate,
   DealTermsRecord,
   DocumentAnalysisResult,
   DocumentClassificationResult,
@@ -13,6 +14,8 @@ import type {
   DocumentSectionInput,
   ExtractionPipelineResult,
   FieldEvidence,
+  GeneratedBrief,
+  GeneratedBriefSection,
   RiskFlagRecord
 } from "@/lib/types";
 
@@ -55,7 +58,8 @@ function createEmptyTerms(): Omit<DealTermsRecord, "id" | "dealId" | "createdAt"
     governingLaw: null,
     notes: null,
     manuallyEditedFields: [],
-    briefData: null
+    briefData: null,
+    pendingExtraction: null
   };
 }
 
@@ -616,7 +620,8 @@ export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
       key !== "competitorCategories" &&
       key !== "restrictedCategories" &&
       key !== "disclosureObligations" &&
-      key !== "campaignDateWindow"
+      key !== "campaignDateWindow" &&
+      key !== "pendingExtraction"
   ) as Array<keyof typeof merged>;
 
   for (const part of parts) {
@@ -634,7 +639,7 @@ export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
     );
 
     for (const key of scalarKeys) {
-      const candidate = part.data[key];
+      const candidate = (part.data as Record<string, unknown>)[key];
       const current = merged[key];
 
       if (candidate === null || candidate === undefined) {
@@ -654,7 +659,7 @@ export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
 
   for (const key of scalarKeys) {
     const values = parts
-      .map((part) => part.data[key])
+      .map((part) => (part.data as Record<string, unknown>)[key])
       .filter((value) => value !== null && value !== undefined);
 
     if (values.length === 0) {
@@ -1028,5 +1033,119 @@ export function fallbackAnalyzeContract(text: string) {
     summary: result.summary.body,
     terms: result.extraction.data,
     riskFlags: result.riskFlags
+  };
+}
+
+export function buildFallbackBrief(aggregate: DealAggregate): GeneratedBrief {
+  const { deal, terms, riskFlags } = aggregate;
+  const briefData = terms?.briefData;
+  const deliverables = terms?.deliverables ?? [];
+  const sections: GeneratedBriefSection[] = [];
+
+  const overview =
+    briefData?.campaignOverview ??
+    aggregate.currentSummary?.body ??
+    deal.summary;
+  if (overview) {
+    sections.push({
+      id: "campaign-overview",
+      title: "Campaign Overview",
+      content: overview
+    });
+  }
+
+  if (deliverables.length > 0) {
+    sections.push({
+      id: "deliverables-summary",
+      title: "Deliverables Summary",
+      content: `This campaign includes ${deliverables.length} deliverable${deliverables.length === 1 ? "" : "s"}.`,
+      items: deliverables.map((d) => {
+        const parts = [d.title];
+        if (d.channel) parts.push(`(${d.channel})`);
+        if (d.dueDate) parts.push(`— due ${d.dueDate}`);
+        return parts.join(" ");
+      })
+    });
+  }
+
+  const dateWindow = terms?.campaignDateWindow;
+  const dueDates = deliverables.filter((d) => d.dueDate).map((d) => d.dueDate!);
+  if (dateWindow || dueDates.length > 0) {
+    const items: string[] = [];
+    if (dateWindow?.startDate) items.push(`Campaign start: ${dateWindow.startDate}`);
+    if (dateWindow?.endDate) items.push(`Campaign end: ${dateWindow.endDate}`);
+    if (dateWindow?.postingWindow) items.push(`Posting window: ${dateWindow.postingWindow}`);
+    for (const d of deliverables) {
+      if (d.dueDate) items.push(`${d.title}: ${d.dueDate}`);
+    }
+    sections.push({
+      id: "key-dates",
+      title: "Key Dates",
+      content: "Important dates for this campaign.",
+      items
+    });
+  }
+
+  if (briefData?.talkingPoints && briefData.talkingPoints.length > 0) {
+    sections.push({
+      id: "talking-points",
+      title: "Talking Points",
+      content: "Key points to cover in your content.",
+      items: briefData.talkingPoints
+    });
+  }
+
+  if (briefData?.messagingPoints && briefData.messagingPoints.length > 0) {
+    sections.push({
+      id: "messaging-guidelines",
+      title: "Messaging Guidelines",
+      content: "Core messaging to weave into your content.",
+      items: briefData.messagingPoints
+    });
+  }
+
+  if (briefData?.brandGuidelines) {
+    sections.push({
+      id: "brand-guidelines",
+      title: "Brand Guidelines",
+      content: briefData.brandGuidelines
+    });
+  }
+
+  const usageParts: string[] = [];
+  if (terms?.usageRights) usageParts.push(terms.usageRights);
+  if (terms?.usageDuration) usageParts.push(`Duration: ${terms.usageDuration}`);
+  if (terms?.usageChannels && terms.usageChannels.length > 0) {
+    usageParts.push(`Channels: ${terms.usageChannels.join(", ")}`);
+  }
+  if (usageParts.length > 0) {
+    sections.push({
+      id: "usage-rights-summary",
+      title: "Usage Rights Summary",
+      content: usageParts.join(". ") + "."
+    });
+  }
+
+  if (briefData?.doNotMention && briefData.doNotMention.length > 0) {
+    sections.push({
+      id: "do-not-mention",
+      title: "Do Not Mention",
+      content: "Avoid the following topics or references in your content.",
+      items: briefData.doNotMention
+    });
+  }
+
+  if (briefData?.approvalRequirements) {
+    sections.push({
+      id: "approval-requirements",
+      title: "Approval Requirements",
+      content: briefData.approvalRequirements
+    });
+  }
+
+  return {
+    sections,
+    generatedAt: new Date().toISOString(),
+    modelVersion: "fallback"
   };
 }

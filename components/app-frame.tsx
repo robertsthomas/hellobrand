@@ -5,116 +5,18 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  Archive,
-  BarChart3,
-  Bell,
-  ChevronRight,
-  CircleHelp,
-  Hand,
-  Home,
-  Receipt,
-  Search,
-  Settings,
-  UserRound
-} from "lucide-react";
+import { ChevronRight, Hand, Search } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Show } from "@/components/clerk-show";
 import { ThemeSwitch } from "@/components/theme-switch";
+import {
+  getAppRouteMeta,
+  primaryAppNavItems,
+  secondaryAppNavItems
+} from "@/lib/app-shell";
 import type { Viewer } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/app", label: "Dashboard", icon: Home },
-  { href: "/app/deals/history", label: "All deals", icon: Archive },
-  { href: "/app/payments", label: "Payments", icon: Receipt },
-  { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/app/notifications", label: "Notifications", icon: Bell },
-  { href: "/app/help", label: "Help", icon: CircleHelp },
-  { href: "/app/profile", label: "Profile", icon: UserRound },
-  { href: "/app/settings", label: "Settings", icon: Settings }
-];
-
-const primaryNavItems = navItems.slice(0, 5);
-const secondaryNavItems = navItems.slice(5);
-
-function labelForPath(pathname: string) {
-  if (pathname === "/app" || pathname === "/app/dashboard") {
-    return {
-      section: "Workspace",
-      title: "Dashboard"
-    };
-  }
-
-  if (pathname.startsWith("/app/deals/history")) {
-    return {
-      section: "Deals",
-      title: "All deals"
-    };
-  }
-
-  if (pathname.startsWith("/app/deals/")) {
-    return {
-      section: "Deals",
-      title: "Deal workspace"
-    };
-  }
-
-  if (pathname.startsWith("/app/payments")) {
-    return {
-      section: "Operations",
-      title: "Payments"
-    };
-  }
-
-  if (pathname.startsWith("/app/analytics")) {
-    return {
-      section: "Operations",
-      title: "Analytics"
-    };
-  }
-
-  if (pathname.startsWith("/app/intake")) {
-    return {
-      section: "Workspace",
-      title: "New workspace"
-    };
-  }
-
-  if (pathname.startsWith("/app/profile")) {
-    return {
-      section: "Settings",
-      title: "Profile"
-    };
-  }
-
-  if (pathname.startsWith("/app/settings")) {
-    return {
-      section: "Settings",
-      title: "Settings"
-    };
-  }
-
-  if (pathname.startsWith("/app/notifications")) {
-    return {
-      section: "Workspace",
-      title: "Notifications"
-    };
-  }
-
-  if (pathname.startsWith("/app/help")) {
-    return {
-      section: "Workspace",
-      title: "Help"
-    };
-  }
-
-  return {
-    section: "Workspace",
-    title: "HelloBrand"
-  };
-}
 
 export function AppFrame({
   viewer,
@@ -128,7 +30,7 @@ export function AppFrame({
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLElement | null>(null);
 
-  const meta = useMemo(() => labelForPath(pathname), [pathname]);
+  const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
   const handle =
     viewer.displayName.startsWith("@")
       ? viewer.displayName
@@ -164,7 +66,7 @@ export function AppFrame({
     router.push(`/app/deals/history?${params.toString()}`);
   };
 
-  const renderNavItem = (item: (typeof navItems)[number]) => {
+  const renderNavItem = (item: (typeof primaryAppNavItems)[number]) => {
     const Icon = item.icon;
     const active =
       item.href === "/app"
@@ -233,7 +135,7 @@ export function AppFrame({
                 Workspace
               </p>
             </div>
-            <nav className="space-y-1">{primaryNavItems.map(renderNavItem)}</nav>
+            <nav className="space-y-1">{primaryAppNavItems.map(renderNavItem)}</nav>
 
             <div className="mb-4 mt-8 px-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -241,7 +143,7 @@ export function AppFrame({
               </p>
             </div>
 
-            <div className="space-y-1">{secondaryNavItems.map(renderNavItem)}</div>
+            <div className="space-y-1">{secondaryAppNavItems.map(renderNavItem)}</div>
           </div>
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">

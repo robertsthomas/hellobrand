@@ -97,7 +97,7 @@ function DealHistoryRowActions({
       </DropdownMenu>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <AlertDialogContent className="max-w-md rounded-[24px] border-black/10 bg-background p-6 dark:border-white/10">
+        <AlertDialogContent className="max-w-md rounded-md border-black/10 bg-background p-6 dark:border-white/10">
           <AlertDialogHeader className="gap-3">
             <AlertDialogTitle>Delete this deal?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">

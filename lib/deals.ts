@@ -31,6 +31,11 @@ import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { readStoredBytes, storeUploadedBytes } from "@/lib/storage";
+import {
+  buildAppliedTerms,
+  coalesceExtractions,
+  hasMeaningfulChanges
+} from "@/lib/pending-changes";
 import type {
   BriefData,
   DealAggregate,
@@ -41,6 +46,7 @@ import type {
   DraftIntent,
   ExtractionPipelineResult,
   JobType,
+  PendingExtractionData,
   Viewer
 } from "@/lib/types";
 
@@ -85,7 +91,8 @@ function createEmptyTerms(
     governingLaw: null,
     notes: null,
     manuallyEditedFields: [],
-    briefData: null
+    briefData: null,
+    pendingExtraction: null
   };
 }
 
@@ -152,7 +159,7 @@ function mergeBriefData(
   };
 }
 
-function mergeTerms(
+export function mergeTerms(
   base: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">,
   patch: Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>,
   options?: { manuallyEditedFields?: string[] }
@@ -762,30 +769,96 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
 
     const latestAggregate =
       (await repository.getDealAggregate(viewer.id, document.dealId)) ?? aggregate;
-    const nextTerms = mergeTerms(
-      latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal),
-      extraction.data,
-      { manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? [] }
-    );
-    await repository.upsertTerms(document.dealId, nextTerms);
-    if (process.env.DATABASE_URL) {
-      await syncPaymentRecordForDeal(document.dealId, nextTerms);
+    const isFirstDocument = latestAggregate.terms === null;
+    const existingTerms = latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal);
+
+    if (isFirstDocument) {
+      const nextTerms = mergeTerms(existingTerms, extraction.data, {
+        manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
+      });
+      await repository.upsertTerms(document.dealId, nextTerms);
+      if (process.env.DATABASE_URL) {
+        await syncPaymentRecordForDeal(document.dealId, nextTerms);
+      }
+
+      await repository.updateDocument(document.id, {
+        processingStatus: "ready",
+        rawText: extractionSource.rawText,
+        normalizedText: extractionSource.normalizedText,
+        errorMessage: null
+      });
+
+      await repository.updateDeal(viewer.id, document.dealId, {
+        summary: summary.body,
+        analyzedAt: new Date().toISOString(),
+        nextDeliverableDate: earliestDeliverableDate(nextTerms),
+        brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
+        campaignName: nextTerms.campaignName ?? latestAggregate.deal.campaignName
+      });
+    } else {
+      const mergedFull = mergeTerms(
+        createEmptyTerms(latestAggregate.deal),
+        extraction.data
+      );
+      const { pendingExtraction: _pe, ...mergedExtraction } = mergedFull;
+      const pendingCandidate = mergedExtraction as PendingExtractionData;
+
+      if (
+        !hasMeaningfulChanges(
+          latestAggregate.terms as DealTermsRecord,
+          pendingCandidate
+        )
+      ) {
+        const nextTerms = mergeTerms(existingTerms, extraction.data, {
+          manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
+        });
+        await repository.upsertTerms(document.dealId, nextTerms);
+        if (process.env.DATABASE_URL) {
+          await syncPaymentRecordForDeal(document.dealId, nextTerms);
+        }
+
+        await repository.updateDocument(document.id, {
+          processingStatus: "ready",
+          rawText: extractionSource.rawText,
+          normalizedText: extractionSource.normalizedText,
+          errorMessage: null
+        });
+
+        await repository.updateDeal(viewer.id, document.dealId, {
+          summary: summary.body,
+          analyzedAt: new Date().toISOString(),
+          nextDeliverableDate: earliestDeliverableDate(existingTerms),
+          brandName: existingTerms.brandName ?? latestAggregate.deal.brandName,
+          campaignName: existingTerms.campaignName ?? latestAggregate.deal.campaignName
+        });
+      } else {
+        const existingPending = (latestAggregate.terms as DealTermsRecord)
+          .pendingExtraction as PendingExtractionData | null;
+
+        const pendingData = existingPending
+          ? coalesceExtractions(existingPending, extraction.data, (base, patch) => {
+              const full = { ...base, pendingExtraction: null };
+              const merged = mergeTerms(full, patch);
+              const { pendingExtraction: _, ...rest } = merged;
+              return rest as PendingExtractionData;
+            })
+          : pendingCandidate;
+
+        await repository.savePendingExtraction(document.dealId, pendingData);
+
+        await repository.updateDocument(document.id, {
+          processingStatus: "ready",
+          rawText: extractionSource.rawText,
+          normalizedText: extractionSource.normalizedText,
+          errorMessage: null
+        });
+
+        await repository.updateDeal(viewer.id, document.dealId, {
+          summary: summary.body,
+          analyzedAt: new Date().toISOString()
+        });
+      }
     }
-
-    await repository.updateDocument(document.id, {
-      processingStatus: "ready",
-      rawText: extractionSource.rawText,
-      normalizedText: extractionSource.normalizedText,
-      errorMessage: null
-    });
-
-    await repository.updateDeal(viewer.id, document.dealId, {
-      summary: summary.body,
-      analyzedAt: new Date().toISOString(),
-      nextDeliverableDate: earliestDeliverableDate(nextTerms),
-      brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
-      campaignName: nextTerms.campaignName ?? latestAggregate.deal.campaignName
-    });
 
     if (process.env.DATABASE_URL) {
       await syncIntakeSessionForDealId(document.dealId);
@@ -798,7 +871,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       durationMs: Date.now() - pipelineStartedAt,
       riskCount: risks.length,
       summaryLength: summary.body.length,
-      deliverablesCount: nextTerms.deliverables.length
+      deliverablesCount: extraction.data.deliverables?.length ?? 0
     });
 
     return repository.getDealAggregate(viewer.id, document.dealId);
@@ -1164,4 +1237,41 @@ export async function ensureDraftsForDeal(
   }
 
   return getDealForViewer(viewer, dealId);
+}
+
+export async function applyPendingChangesForViewer(
+  viewer: Viewer,
+  dealId: string,
+  acceptedFields: string[]
+) {
+  const repository = getRepository();
+  const aggregate = await repository.getDealAggregate(viewer.id, dealId);
+  if (!aggregate?.terms?.pendingExtraction) {
+    return null;
+  }
+
+  const pending = aggregate.terms.pendingExtraction as PendingExtractionData;
+  const applied = buildAppliedTerms(aggregate.terms, pending, acceptedFields);
+  await repository.upsertTerms(dealId, applied);
+
+  if (process.env.DATABASE_URL) {
+    await syncPaymentRecordForDeal(dealId, applied);
+  }
+
+  await repository.updateDeal(viewer.id, dealId, {
+    nextDeliverableDate: earliestDeliverableDate(applied),
+    brandName: applied.brandName ?? aggregate.deal.brandName,
+    campaignName: applied.campaignName ?? aggregate.deal.campaignName
+  });
+
+  return repository.getDealAggregate(viewer.id, dealId);
+}
+
+export async function dismissPendingChangesForViewer(
+  viewer: Viewer,
+  dealId: string
+) {
+  const repository = getRepository();
+  await repository.savePendingExtraction(dealId, null);
+  return repository.getDealAggregate(viewer.id, dealId);
 }

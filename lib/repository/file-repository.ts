@@ -93,6 +93,7 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       terminationConditions: terms.terminationConditions ?? null,
       manuallyEditedFields: terms.manuallyEditedFields ?? [],
       briefData: terms.briefData ?? null,
+      pendingExtraction: terms.pendingExtraction ?? null,
       deliverables: (terms.deliverables ?? []).map((deliverable) => ({
         ...deliverable,
         status: deliverable.status ?? "pending",
@@ -496,6 +497,18 @@ export class FileRepository {
 
     await saveStore(store);
     return next;
+  }
+
+  async savePendingExtraction(dealId: string, data: unknown) {
+    const store = await ensureStore();
+    const index = store.dealTerms.findIndex((entry) => entry.dealId === dealId);
+    if (index === -1) return;
+    store.dealTerms[index] = {
+      ...store.dealTerms[index],
+      pendingExtraction: (data as DealTermsRecord["pendingExtraction"]) ?? null,
+      updatedAt: new Date().toISOString()
+    };
+    await saveStore(store);
   }
 
   async replaceRiskFlagsForDocument(

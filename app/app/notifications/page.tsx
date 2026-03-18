@@ -1,85 +1,135 @@
 import { requireViewer } from "@/lib/auth";
-import { listDealsForViewer } from "@/lib/deals";
-import { getRepository } from "@/lib/repository";
-import { formatDate, humanizeToken } from "@/lib/utils";
+import { listDealAggregatesForViewer } from "@/lib/deals";
+import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import { NotificationsView } from "@/components/notifications-view";
+import type { DealAggregate } from "@/lib/types";
+
+export type NotificationType =
+  | "payment_overdue"
+  | "upcoming_deadline"
+  | "contract_risk"
+  | "deliverable_approved"
+  | "new_contract"
+  | "payment_received";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  title: string;
+  description: string;
+  dealId: string;
+  createdAt: string;
+}
+
+function generateNotifications(aggregates: DealAggregate[]): NotificationItem[] {
+  const items: NotificationItem[] = [];
+
+  for (const aggregate of aggregates) {
+    const { deal, documents, riskFlags, terms } = aggregate;
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+    const brandName = normalized?.brandName ?? deal.brandName;
+    const paymentAmount = terms?.paymentAmount;
+    const currency = terms?.currency ?? "USD";
+    const formattedAmount = paymentAmount
+      ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(paymentAmount)
+      : null;
+
+    if (deal.paymentStatus === "late") {
+      items.push({
+        id: `payment-overdue-${deal.id}`,
+        type: "payment_overdue",
+        title: `${brandName} payment is overdue`,
+        description: formattedAmount
+          ? `Payment of ${formattedAmount} is overdue and needs follow-up.`
+          : `Payment is overdue and needs follow-up.`,
+        dealId: deal.id,
+        createdAt: deal.updatedAt
+      });
+    }
+
+    if (deal.paymentStatus === "paid") {
+      items.push({
+        id: `payment-received-${deal.id}`,
+        type: "payment_received",
+        title: `${brandName} payment received`,
+        description: formattedAmount
+          ? `${brandName} paid ${formattedAmount}.`
+          : `Payment has been received from ${brandName}.`,
+        dealId: deal.id,
+        createdAt: deal.updatedAt
+      });
+    }
+
+    const deliverables = terms?.deliverables ?? [];
+    for (const deliverable of deliverables) {
+      if (deliverable.dueDate) {
+        const daysUntil = Math.ceil(
+          (new Date(deliverable.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (daysUntil >= 0 && daysUntil <= 7) {
+          items.push({
+            id: `deadline-${deal.id}-${deliverable.id}`,
+            type: "upcoming_deadline",
+            title: `${deliverable.title} due${daysUntil === 0 ? " today" : ` in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`}`,
+            description: `${deliverable.title} for ${brandName} is coming up.`,
+            dealId: deal.id,
+            createdAt: deliverable.dueDate
+          });
+        }
+      }
+
+      if (deliverable.status === "completed") {
+        items.push({
+          id: `approved-${deal.id}-${deliverable.id}`,
+          type: "deliverable_approved",
+          title: `${deliverable.title} approved`,
+          description: `Your ${deliverable.title} ${deliverable.channel ? `on ${deliverable.channel} ` : ""}was approved by ${brandName}.`,
+          dealId: deal.id,
+          createdAt: deal.updatedAt
+        });
+      }
+    }
+
+    const highRisks = riskFlags.filter((flag) => flag.severity === "high");
+    if (highRisks.length > 0) {
+      items.push({
+        id: `risk-${deal.id}`,
+        type: "contract_risk",
+        title: `${brandName} contract has ${highRisks.length} risk flag${highRisks.length === 1 ? "" : "s"}`,
+        description: `Review ${highRisks.length} high-severity item${highRisks.length === 1 ? "" : "s"} before signing.`,
+        dealId: deal.id,
+        createdAt: highRisks[0].createdAt
+      });
+    }
+
+    const readyDocuments = documents.filter((doc) => doc.processingStatus === "ready");
+    for (const doc of readyDocuments) {
+      items.push({
+        id: `contract-${doc.id}`,
+        type: "new_contract",
+        title: `${doc.fileName} processing complete`,
+        description: `${brandName} contract document is ready for review.`,
+        dealId: deal.id,
+        createdAt: doc.updatedAt
+      });
+    }
+  }
+
+  return items.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
 
 export default async function NotificationsPage() {
   const viewer = await requireViewer();
-  const deals = await listDealsForViewer(viewer);
-  const aggregates = await Promise.all(
-    deals.map((deal) => getRepository().getDealAggregate(viewer.id, deal.id))
-  );
-
-  const notifications = aggregates
-    .filter(Boolean)
-    .flatMap((aggregate) => {
-      if (!aggregate) {
-        return [];
-      }
-
-      const items: Array<{ id: string; message: string }> = [];
-      const failedDocument = aggregate.documents.find(
-        (document) => document.processingStatus === "failed"
-      );
-      if (failedDocument) {
-        items.push({
-          id: `failed-${failedDocument.id}`,
-          message: `${failedDocument.fileName} failed processing in ${aggregate.deal.campaignName}.`
-        });
-      }
-
-      if (aggregate.deal.paymentStatus === "late") {
-        items.push({
-          id: `late-${aggregate.deal.id}`,
-          message: `${aggregate.deal.campaignName} is marked late for payment follow-up.`
-        });
-      }
-
-      const nextDeliverable = aggregate.terms?.deliverables.find(
-        (item) => item.dueDate
-      );
-      if (nextDeliverable) {
-        items.push({
-          id: `due-${nextDeliverable.id}`,
-          message: `${nextDeliverable.title} for ${aggregate.deal.campaignName} is due ${formatDate(nextDeliverable.dueDate)}.`
-        });
-      }
-
-      items.push({
-        id: `status-${aggregate.deal.id}`,
-        message: `${aggregate.deal.campaignName} is currently ${humanizeToken(aggregate.deal.status)}.`
-      });
-
-      return items;
-    })
-    .slice(0, 8);
+  const aggregates = await listDealAggregatesForViewer(viewer);
+  const notifications = generateNotifications(aggregates);
 
   return (
     <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="max-w-3xl">
-          <h1 className="text-4xl font-semibold text-ink">Notifications</h1>
-          <p className="mt-4 text-black/60 dark:text-white/65">
-            Keep up with document failures, deliverable reminders, and payment
-            follow-up prompts across your creator workspaces.
-          </p>
-        </section>
-        <section className="max-w-4xl space-y-3">
-          {notifications.map((message) => (
-            <div
-              key={message.id}
-              className="rounded-[1.25rem] border border-black/5 dark:border-white/10 bg-sand/60 dark:bg-white/[0.06] px-4 py-4 text-sm text-black/65 dark:text-white/70"
-            >
-              {message.message}
-            </div>
-          ))}
-          {notifications.length === 0 ? (
-            <div className="rounded-[1.25rem] border border-black/5 dark:border-white/10 bg-sand/60 dark:bg-white/[0.06] px-4 py-4 text-sm text-black/65 dark:text-white/70">
-              You’re all caught up. New document issues, due dates, and payment
-              nudges will show up here.
-            </div>
-          ) : null}
-        </section>
+      <div className="mx-auto max-w-4xl">
+        <NotificationsView notifications={notifications} />
       </div>
     </div>
   );

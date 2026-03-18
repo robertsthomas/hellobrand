@@ -40,14 +40,14 @@ export default function OnboardingPage() {
             Let&apos;s get your creator workspace set up in three simple steps.
           </p>
         </section>
-        <section className="rounded-[2rem] border border-black/5 dark:border-white/10 bg-white/85 dark:bg-white/[0.06] p-8 shadow-panel">
+        <section className="border border-black/5 dark:border-white/10 bg-white/85 dark:bg-white/[0.06] p-8 shadow-panel">
           <div className="grid gap-5 md:grid-cols-3">
             {steps.map((step) => {
               const Icon = step.icon;
               return (
                 <article
                   key={step.title}
-                  className="rounded-[1.75rem] border border-black/5 dark:border-white/10 bg-sand/60 dark:bg-white/[0.06] p-6 text-center"
+                  className="border border-black/5 dark:border-white/10 bg-sand/60 dark:bg-white/[0.06] p-6 text-center"
                 >
                   <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-ocean text-sm font-semibold text-white">
                     {step.number}

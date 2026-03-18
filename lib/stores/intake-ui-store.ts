@@ -2,6 +2,8 @@
 
 import { create, type UseBoundStore, type StoreApi } from "zustand";
 
+import type { DuplicateMatch } from "@/lib/duplicate-detection";
+
 export type IntakeUiMode = "upload" | "paste";
 
 export interface SelectedFileMeta {
@@ -21,6 +23,8 @@ interface IntakeUiState {
   selectedFiles: SelectedFileMeta[];
   isSubmitting: boolean;
   errorMessage: string | null;
+  duplicateMatches: DuplicateMatch[];
+  isDuplicateCheckPending: boolean;
   setSessionId: (value: string | null) => void;
   setMode: (mode: IntakeUiMode) => void;
   setBrandName: (value: string) => void;
@@ -31,6 +35,9 @@ interface IntakeUiState {
   setPendingFiles: (files: File[]) => void;
   setIsSubmitting: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
+  setDuplicateMatches: (matches: DuplicateMatch[]) => void;
+  setIsDuplicateCheckPending: (value: boolean) => void;
+  clearDuplicateMatches: () => void;
   reset: (mode?: IntakeUiMode) => void;
   hydrateDraft: (input: {
     sessionId: string | null;
@@ -52,7 +59,9 @@ const initialState = {
   pastedText: "",
   selectedFiles: [],
   isSubmitting: false,
-  errorMessage: null
+  errorMessage: null,
+  duplicateMatches: [] as DuplicateMatch[],
+  isDuplicateCheckPending: false
 };
 
 export const useIntakeUiStore: UseBoundStore<StoreApi<IntakeUiState>> =
@@ -84,6 +93,9 @@ export const useIntakeUiStore: UseBoundStore<StoreApi<IntakeUiState>> =
     }),
   setIsSubmitting: (isSubmitting) => set({ isSubmitting }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),
+  setDuplicateMatches: (duplicateMatches) => set({ duplicateMatches }),
+  setIsDuplicateCheckPending: (isDuplicateCheckPending) => set({ isDuplicateCheckPending }),
+  clearDuplicateMatches: () => set({ duplicateMatches: [], isDuplicateCheckPending: false }),
   reset: (mode = "upload") =>
     set({
       ...initialState,

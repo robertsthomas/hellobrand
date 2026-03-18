@@ -72,7 +72,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+    <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
       <div className="space-y-1">
         <h3 className="text-xl font-semibold text-ink">{title}</h3>
         <p className="text-sm text-black/60 dark:text-white/65">{description}</p>
@@ -284,7 +284,7 @@ export default async function IntakeSessionPage({
           </div>
         </section>
         {session.errorMessage ? (
-          <section className="rounded-[26px] border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
+          <section className=" border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
             {session.errorMessage}
           </section>
         ) : null}
@@ -296,7 +296,7 @@ export default async function IntakeSessionPage({
           />
         ) : null}
         {session.errorMessage ? (
-          <details className="rounded-[26px] border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
+          <details className=" border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
             <summary className="cursor-pointer font-medium text-black/70 dark:text-white/70">
               Debug details
             </summary>
@@ -318,7 +318,7 @@ export default async function IntakeSessionPage({
           </details>
         ) : null}
 
-        <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold text-ink">Confirm this deal</h2>
                 <p className="text-sm text-black/60 dark:text-white/65">
@@ -661,7 +661,7 @@ export default async function IntakeSessionPage({
               </form>
         </section>
 
-        <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-ink">Profile defaults</h2>
@@ -720,7 +720,7 @@ export default async function IntakeSessionPage({
           )}
         </section>
 
-        <section className="rounded-[26px] border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
               <h2 className="text-xl font-semibold text-ink">Risk watchouts</h2>
               <div className="mt-4 grid gap-3">
                 {riskFlags.slice(0, 4).map((flag) => (

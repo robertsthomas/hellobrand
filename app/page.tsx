@@ -143,7 +143,7 @@ export default function LandingPage() {
               return (
                 <article
                   key={feature.title}
-                  className="rounded-[28px] border border-black/5 dark:border-white/10 bg-white/78 dark:bg-white/[0.05] p-7 shadow-[0_18px_50px_rgba(41,39,34,0.06)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.22)]"
+                  className="border border-black/5 dark:border-white/10 bg-white/78 dark:bg-white/[0.05] p-7 shadow-[0_18px_50px_rgba(41,39,34,0.06)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.22)]"
                 >
                   <div
                     className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${feature.tint}`}

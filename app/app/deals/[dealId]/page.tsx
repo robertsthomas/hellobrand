@@ -3,7 +3,11 @@ import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
+import { PendingChangesBanner } from "@/components/pending-changes-banner";
+import { BriefGenerator } from "@/components/brief-generator";
 import { BriefOverview } from "@/components/brief-overview";
+import { DealContextPanel } from "@/components/deal-context-panel";
+import { DeliverableTracker } from "@/components/deliverable-tracker";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
@@ -160,6 +164,10 @@ export default async function WorkspaceDealDetailPage({
           </div>
         </section>
 
+        {terms?.pendingExtraction ? (
+          <PendingChangesBanner dealId={deal.id} terms={terms} />
+        ) : null}
+
         <Tabs defaultValue="overview" className="gap-6">
           <TabsList className="h-auto flex-wrap rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
             <TabsTrigger value="overview" className="px-4 py-2">
@@ -189,6 +197,7 @@ export default async function WorkspaceDealDetailPage({
           </TabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
+            <DealContextPanel terms={terms} />
             {(aggregate.conflictResults?.length ?? 0) > 0 ? (
               <ConflictWarnings
                 conflicts={aggregate.conflictResults}
@@ -296,11 +305,13 @@ export default async function WorkspaceDealDetailPage({
           </TabsContent>
 
           <TabsContent value="deliverables" className="mt-0 space-y-6">
+            <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
             <DeliverablesList deliverables={terms?.deliverables ?? []} />
           </TabsContent>
 
           <TabsContent value="brief" className="mt-0 space-y-6">
             <BriefOverview briefData={terms?.briefData} documents={documents} />
+            <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} documents={documents} />
           </TabsContent>
 
           <TabsContent value="emails" className="mt-0 space-y-6">

@@ -42,7 +42,7 @@ export function DealList({
 }) {
   if (deals.length === 0) {
     return (
-      <div className="rounded-[28px] border border-dashed border-black/10 bg-white px-8 py-16 text-center shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
+      <div className="border border-dashed border-black/10 bg-white px-8 py-16 text-center shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
         <h2 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground">
           No workspaces yet
         </h2>
@@ -52,7 +52,7 @@ export function DealList({
         </p>
         <Link
           href="/app/intake/new"
-          className={cn(buttonVariants(), "mt-6 rounded-2xl px-5")}
+          className={cn(buttonVariants(), "mt-6 px-5")}
           aria-label="Upload documents for a new deal workspace"
           title="Start a new deal workspace"
         >
@@ -63,8 +63,8 @@ export function DealList({
   }
 
   return (
-    <section className="rounded-[28px] border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
-      <div className="overflow-hidden rounded-[22px] border border-black/8">
+    <section className="border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
+      <div className="overflow-hidden border border-black/8">
         <div className="grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] border-b border-black/8 bg-[#f7f8fa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
           <span>Campaign</span>
           <span>Stage</span>

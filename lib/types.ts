@@ -214,6 +214,19 @@ export interface BriefData {
   sourceDocumentIds: string[];
 }
 
+export interface GeneratedBriefSection {
+  id: string;
+  title: string;
+  content: string;
+  items?: string[];
+}
+
+export interface GeneratedBrief {
+  sections: GeneratedBriefSection[];
+  generatedAt: string;
+  modelVersion: string;
+}
+
 export interface DealTermsRecord {
   id: string;
   dealId: string;
@@ -255,8 +268,30 @@ export interface DealTermsRecord {
   notes: string | null;
   manuallyEditedFields: string[];
   briefData: BriefData | null;
+  pendingExtraction: PendingExtractionData | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type PendingExtractionData = Omit<
+  DealTermsRecord,
+  "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"
+>;
+
+export interface TermsDiffEntry {
+  field: string;
+  label: string;
+  currentValue: unknown;
+  proposedValue: unknown;
+  isManuallyEdited: boolean;
+  fieldType: "scalar" | "json_array" | "boolean" | "number";
+}
+
+export interface PendingChangesSummary {
+  hasPendingChanges: boolean;
+  totalChangedFields: number;
+  manuallyEditedConflicts: number;
+  entries: TermsDiffEntry[];
 }
 
 export interface RiskFlagRecord {
@@ -325,7 +360,7 @@ export interface ExtractionResultRecord {
   documentId: string;
   schemaVersion: string;
   model: string;
-  data: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
+  data: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction">;
   confidence: number | null;
   conflicts: string[];
   createdAt: string;
@@ -499,7 +534,7 @@ export interface ExtractionPipelineResult {
   schemaVersion: string;
   model: string;
   confidence: number | null;
-  data: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
+  data: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction">;
   evidence: FieldEvidence[];
   conflicts: string[];
 }
