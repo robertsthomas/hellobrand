@@ -1,0 +1,23 @@
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+
+export function assistantProvider() {
+  if (!process.env.OPENROUTER_API_KEY) {
+    return null;
+  }
+
+  return createOpenRouter({
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+    compatibility: "strict",
+    headers: {
+      "HTTP-Referer":
+        process.env.OPENROUTER_SITE_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "http://localhost:3011",
+      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
+    },
+    extraBody: {
+      models: ["openai/gpt-5.2", "openai/gpt-5-mini"]
+    }
+  });
+}

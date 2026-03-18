@@ -148,6 +148,61 @@ export const draftIntentSchema = z.enum([
   "confirm-revised-brief"
 ]);
 
+export const assistantScopeValues = ["user", "deal"] as const;
+export const assistantDealTabValues = [
+  "overview",
+  "terms",
+  "risks",
+  "deliverables",
+  "brief",
+  "emails",
+  "documents",
+  "notes"
+] as const;
+export const assistantTriggerKindValues = [
+  "risk_flag",
+  "payment",
+  "deliverable",
+  "deal_context",
+  "email",
+  "general"
+] as const;
+
+export const assistantTriggerSchema = z.object({
+  kind: z.enum(assistantTriggerKindValues),
+  sourceId: z.string().nullable(),
+  prompt: z.string().max(2000).nullable(),
+  label: z.string().max(120).nullable()
+});
+
+export const assistantToneValues = ["professional", "friendly", "direct", "warm"] as const;
+
+export const assistantClientContextSchema = z.object({
+  pathname: z.string().min(1).max(500),
+  pageTitle: z.string().min(1).max(120),
+  dealId: z.string().nullable(),
+  tab: z.enum(assistantDealTabValues).nullable(),
+  trigger: assistantTriggerSchema.nullable(),
+  tone: z.enum(assistantToneValues)
+});
+
+export const assistantThreadCreateSchema = z.object({
+  scope: z.enum(assistantScopeValues),
+  dealId: z.string().nullable().optional(),
+  title: z.string().max(160).nullable().optional(),
+  context: assistantClientContextSchema
+});
+
+export const assistantChatRequestSchema = z.object({
+  id: z.string().nullable().optional(),
+  threadId: z.string().min(1),
+  scope: z.enum(assistantScopeValues),
+  dealId: z.string().nullable(),
+  context: assistantClientContextSchema,
+  messages: z.array(z.any()).min(1).max(40),
+  messageId: z.string().nullable().optional()
+});
+
 export const documentUploadSchema = z.object({
   dealId: z.string().min(1),
   pastedText: z.string().nullable().optional(),

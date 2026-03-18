@@ -172,6 +172,9 @@ export function createSeedStore(): AppStore {
         updatedAt: now
       }
     ],
+    assistantThreads: [],
+    assistantMessages: [],
+    assistantContextSnapshots: [],
     jobs: [
       {
         id: "job-1",

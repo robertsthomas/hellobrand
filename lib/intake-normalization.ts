@@ -541,6 +541,23 @@ function buildTimelineLabel(snippet: string) {
   return "Timeline item";
 }
 
+function timelineLabelRank(label: string) {
+  switch (label) {
+    case "Outline due":
+      return 0;
+    case "Draft due":
+      return 1;
+    case "Review due":
+      return 2;
+    case "Final due":
+      return 3;
+    case "Go live":
+      return 4;
+    default:
+      return 5;
+  }
+}
+
 function splitTimelineCandidates(line: string) {
   return line
     .split(/\s*(?:,|;|\band\b)\s*/i)
@@ -584,7 +601,7 @@ function extractTimelineItems(aggregate: DealAggregate) {
     IntakeTimelineItem & { score: number; sourceLength: number }
   >();
   const datePattern =
-    /\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|[A-Z][a-z]{2,8}\s+\d{1,2}(?:,\s*\d{4})?|\d+\s*(?:hrs?|hours?|days?)\s+after)\b/;
+    /\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:,\s*\d{4})?|\d+\s*(?:hrs?|hours?|days?)\s+after)\b/i;
 
   for (const document of aggregate.documents) {
     const text = document.normalizedText ?? document.rawText ?? "";
@@ -641,6 +658,11 @@ function extractTimelineItems(aggregate: DealAggregate) {
 
   return Array.from(snippets.values())
     .sort((left, right) => {
+      const rankDelta = timelineLabelRank(left.label) - timelineLabelRank(right.label);
+      if (rankDelta !== 0) {
+        return rankDelta;
+      }
+
       if (right.score === left.score) {
         return left.sourceLength - right.sourceLength;
       }

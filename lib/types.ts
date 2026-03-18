@@ -375,6 +375,120 @@ export interface SummaryRecord {
   createdAt: string;
 }
 
+export type AssistantScope = "user" | "deal";
+
+export type AssistantDealTab =
+  | "overview"
+  | "terms"
+  | "risks"
+  | "deliverables"
+  | "brief"
+  | "emails"
+  | "documents"
+  | "notes";
+
+export type AssistantTriggerKind =
+  | "risk_flag"
+  | "payment"
+  | "deliverable"
+  | "deal_context"
+  | "email"
+  | "general";
+
+export interface AssistantTrigger {
+  kind: AssistantTriggerKind;
+  sourceId: string | null;
+  prompt: string | null;
+  label: string | null;
+}
+
+export type AssistantTone = "professional" | "friendly" | "direct" | "warm";
+
+export interface AssistantClientContext {
+  pathname: string;
+  pageTitle: string;
+  dealId: string | null;
+  tab: AssistantDealTab | null;
+  trigger: AssistantTrigger | null;
+  tone: AssistantTone;
+}
+
+export interface AssistantThreadRecord {
+  id: string;
+  userId: string;
+  dealId: string | null;
+  scope: AssistantScope;
+  title: string;
+  summary: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantMessageRecord {
+  id: string;
+  threadId: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  parts: unknown[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantContextSnapshotRecord {
+  id: string;
+  userId: string;
+  dealId: string | null;
+  scope: AssistantScope;
+  key: string;
+  version: string;
+  summary: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantNavigationAction {
+  type: "navigation";
+  label: string;
+  href: string;
+  description?: string | null;
+}
+
+export interface AssistantDraftArtifact {
+  type: "draft";
+  label: string;
+  subject: string;
+  body: string;
+}
+
+export interface AssistantCitation {
+  label: string;
+  detail: string;
+}
+
+export interface AssistantWorkspaceListItem {
+  dealId: string;
+  brandName: string;
+  campaignName: string;
+  status: DealStatus;
+  paymentStatus: PaymentStatus;
+  href: string;
+  prompt: string | null;
+}
+
+export interface AssistantWorkspaceListBlock {
+  type: "workspace-list";
+  title: string;
+  description: string;
+  prompt: string | null;
+  workspaces: AssistantWorkspaceListItem[];
+}
+
+export type AssistantUiBlock =
+  | AssistantNavigationAction
+  | AssistantDraftArtifact
+  | AssistantWorkspaceListBlock;
+
 export type IntakeSessionStatus =
   | "draft"
   | "queued"
@@ -504,6 +618,9 @@ export interface AppStore {
   dealTerms: DealTermsRecord[];
   riskFlags: RiskFlagRecord[];
   emailDrafts: EmailDraftRecord[];
+  assistantThreads: AssistantThreadRecord[];
+  assistantMessages: AssistantMessageRecord[];
+  assistantContextSnapshots: AssistantContextSnapshotRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];
   extractionResults: ExtractionResultRecord[];

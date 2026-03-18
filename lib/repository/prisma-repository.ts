@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 
+import { Prisma } from "@prisma/client";
+
 import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import { prisma } from "@/lib/prisma";
 import type {
+  AssistantContextSnapshotRecord,
+  AssistantMessageRecord,
+  AssistantThreadRecord,
   DealAggregate,
   DealRecord,
   DealTermsRecord,
@@ -32,6 +37,16 @@ function toStringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
+}
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function toNullableJsonValue(
+  value: unknown
+): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput {
+  return value == null ? Prisma.JsonNull : toJsonValue(value);
 }
 
 function toDealRecord(deal: {
@@ -79,6 +94,7 @@ function toDocumentRecord(document: {
 }): DocumentRecord {
   return {
     ...document,
+    processingStatus: document.processingStatus as DocumentRecord["processingStatus"],
     sourceType: document.sourceType as DocumentRecord["sourceType"],
     documentKind: document.documentKind as DocumentRecord["documentKind"],
     createdAt: iso(document.createdAt) ?? new Date().toISOString(),
@@ -281,6 +297,77 @@ function toSummaryRecord(summary: {
   };
 }
 
+function toAssistantThreadRecord(thread: {
+  id: string;
+  userId: string;
+  dealId: string | null;
+  scope: string;
+  title: string;
+  summary: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): AssistantThreadRecord {
+  return {
+    id: thread.id,
+    userId: thread.userId,
+    dealId: thread.dealId,
+    scope: thread.scope as AssistantThreadRecord["scope"],
+    title: thread.title,
+    summary: thread.summary,
+    createdAt: iso(thread.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(thread.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toAssistantMessageRecord(message: {
+  id: string;
+  threadId: string;
+  role: string;
+  content: string;
+  parts: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}): AssistantMessageRecord {
+  return {
+    id: message.id,
+    threadId: message.threadId,
+    role: message.role as AssistantMessageRecord["role"],
+    content: message.content,
+    parts: Array.isArray(message.parts) ? message.parts : [],
+    createdAt: iso(message.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(message.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toAssistantContextSnapshotRecord(snapshot: {
+  id: string;
+  userId: string;
+  dealId: string | null;
+  scope: string;
+  key: string;
+  version: string;
+  summary: string;
+  payload: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+}): AssistantContextSnapshotRecord {
+  return {
+    id: snapshot.id,
+    userId: snapshot.userId,
+    dealId: snapshot.dealId,
+    scope: snapshot.scope as AssistantContextSnapshotRecord["scope"],
+    key: snapshot.key,
+    version: snapshot.version,
+    summary: snapshot.summary,
+    payload:
+      snapshot.payload && typeof snapshot.payload === "object"
+        ? (snapshot.payload as Record<string, unknown>)
+        : {},
+    createdAt: iso(snapshot.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(snapshot.updatedAt) ?? new Date().toISOString()
+  };
+}
+
 function toBatchGroupRecord(group: {
   id: string;
   batchId: string;
@@ -379,20 +466,23 @@ export class PrismaRepository {
     }
 
     const documentIds = deal.documents.map((document) => document.id);
-    const [sections, extractionResults, extractionEvidence] = await Promise.all([
-      prisma.documentSection.findMany({
-        where: { documentId: { in: documentIds.length ? documentIds : ["__none__"] } },
-        orderBy: [{ chunkIndex: "asc" }]
-      }),
-      prisma.extractionResult.findMany({
-        where: { documentId: { in: documentIds.length ? documentIds : ["__none__"] } },
-        orderBy: { createdAt: "desc" }
-      }),
-      prisma.extractionEvidence.findMany({
-        where: { documentId: { in: documentIds.length ? documentIds : ["__none__"] } },
-        orderBy: { createdAt: "desc" }
-      })
-    ]);
+    const [sections, extractionResults, extractionEvidence] =
+      documentIds.length > 0
+        ? await prisma.$transaction([
+            prisma.documentSection.findMany({
+              where: { documentId: { in: documentIds } },
+              orderBy: [{ chunkIndex: "asc" }]
+            }),
+            prisma.extractionResult.findMany({
+              where: { documentId: { in: documentIds } },
+              orderBy: { createdAt: "desc" }
+            }),
+            prisma.extractionEvidence.findMany({
+              where: { documentId: { in: documentIds } },
+              orderBy: { createdAt: "desc" }
+            })
+          ])
+        : [[], [], []];
 
     const documents = deal.documents.map(toDocumentRecord);
     const summaries = deal.summaries.map(toSummaryRecord);
@@ -620,17 +710,17 @@ export class PrismaRepository {
       update: {
         schemaVersion: result.schemaVersion,
         model: result.model,
-        data: result.data,
+        data: toJsonValue(result.data),
         confidence: result.confidence,
-        conflicts: result.conflicts
+        conflicts: toJsonValue(result.conflicts)
       },
       create: {
         documentId,
         schemaVersion: result.schemaVersion,
         model: result.model,
-        data: result.data,
+        data: toJsonValue(result.data),
         confidence: result.confidence,
-        conflicts: result.conflicts
+        conflicts: toJsonValue(result.conflicts)
       }
     });
 
@@ -716,32 +806,28 @@ export class PrismaRepository {
     dealId: string,
     patch: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">
   ) {
+    const jsonPatch = {
+      deliverables: toJsonValue(patch.deliverables),
+      usageChannels: toJsonValue(patch.usageChannels),
+      competitorCategories: toJsonValue(patch.competitorCategories),
+      restrictedCategories: toJsonValue(patch.restrictedCategories),
+      campaignDateWindow: toNullableJsonValue(patch.campaignDateWindow),
+      disclosureObligations: toJsonValue(patch.disclosureObligations),
+      manuallyEditedFields: toJsonValue(patch.manuallyEditedFields),
+      briefData: toNullableJsonValue(patch.briefData),
+      pendingExtraction: toNullableJsonValue(patch.pendingExtraction)
+    };
+
     const saved = await prisma.dealTerms.upsert({
       where: { dealId },
       update: {
         ...patch,
-        deliverables: patch.deliverables,
-        usageChannels: patch.usageChannels,
-        competitorCategories: patch.competitorCategories,
-        restrictedCategories: patch.restrictedCategories,
-        campaignDateWindow: patch.campaignDateWindow,
-        disclosureObligations: patch.disclosureObligations,
-        manuallyEditedFields: patch.manuallyEditedFields,
-        briefData: patch.briefData,
-        pendingExtraction: patch.pendingExtraction ?? null
+        ...jsonPatch
       },
       create: {
         dealId,
         ...patch,
-        deliverables: patch.deliverables,
-        usageChannels: patch.usageChannels,
-        competitorCategories: patch.competitorCategories,
-        restrictedCategories: patch.restrictedCategories,
-        campaignDateWindow: patch.campaignDateWindow,
-        disclosureObligations: patch.disclosureObligations,
-        manuallyEditedFields: patch.manuallyEditedFields,
-        briefData: patch.briefData,
-        pendingExtraction: patch.pendingExtraction ?? null
+        ...jsonPatch
       }
     });
 
@@ -751,7 +837,7 @@ export class PrismaRepository {
   async savePendingExtraction(dealId: string, data: unknown) {
     await prisma.dealTerms.update({
       where: { dealId },
-      data: { pendingExtraction: (data ?? null) as never }
+      data: { pendingExtraction: toNullableJsonValue(data) }
     });
   }
 
@@ -815,6 +901,192 @@ export class PrismaRepository {
     });
 
     return toEmailDraftRecord(saved);
+  }
+
+  async listAssistantThreads(
+    userId: string,
+    options?: { scope?: AssistantThreadRecord["scope"]; dealId?: string | null }
+  ) {
+    const threads = await prisma.assistantThread.findMany({
+      where: {
+        userId,
+        scope: options?.scope,
+        dealId: options?.dealId === undefined ? undefined : options.dealId
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    return threads.map(toAssistantThreadRecord);
+  }
+
+  async getAssistantThread(userId: string, threadId: string) {
+    const thread = await prisma.assistantThread.findFirst({
+      where: { id: threadId, userId }
+    });
+
+    return thread ? toAssistantThreadRecord(thread) : null;
+  }
+
+  async createAssistantThread(
+    userId: string,
+    input: Pick<AssistantThreadRecord, "scope" | "dealId" | "title" | "summary">
+  ) {
+    const thread = await prisma.assistantThread.create({
+      data: {
+        userId,
+        dealId: input.dealId ?? null,
+        scope: input.scope,
+        title: input.title,
+        summary: input.summary ?? null
+      }
+    });
+
+    return toAssistantThreadRecord(thread);
+  }
+
+  async updateAssistantThread(
+    userId: string,
+    threadId: string,
+    patch: Partial<Pick<AssistantThreadRecord, "title" | "summary">>
+  ) {
+    const existing = await prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true }
+    });
+
+    if (!existing) {
+      return null;
+    }
+
+    const thread = await prisma.assistantThread.update({
+      where: { id: threadId },
+      data: {
+        title: patch.title,
+        summary: patch.summary
+      }
+    });
+
+    return toAssistantThreadRecord(thread);
+  }
+
+  async deleteAssistantThread(userId: string, threadId: string) {
+    const existing = await prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true }
+    });
+
+    if (!existing) {
+      return false;
+    }
+
+    await prisma.assistantThread.delete({
+      where: { id: threadId }
+    });
+
+    return true;
+  }
+
+  async listAssistantMessages(userId: string, threadId: string) {
+    const thread = await prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true }
+    });
+
+    if (!thread) {
+      return [];
+    }
+
+    const messages = await prisma.assistantMessage.findMany({
+      where: { threadId },
+      orderBy: { createdAt: "asc" }
+    });
+
+    return messages.map(toAssistantMessageRecord);
+  }
+
+  async saveAssistantMessage(
+    userId: string,
+    threadId: string,
+    input: Pick<AssistantMessageRecord, "role" | "content" | "parts"> & { id?: string }
+  ) {
+    const thread = await prisma.assistantThread.findFirst({
+      where: { id: threadId, userId },
+      select: { id: true }
+    });
+
+    if (!thread) {
+      return null;
+    }
+
+    const message = await prisma.assistantMessage.upsert({
+      where: { id: input.id ?? "__create__" },
+      update: {
+        role: input.role,
+        content: input.content,
+        parts: toJsonValue(input.parts)
+      },
+      create: {
+        id: input.id,
+        threadId,
+        role: input.role,
+        content: input.content,
+        parts: toJsonValue(input.parts)
+      }
+    });
+
+    if (input.role === "assistant" && input.content.trim().length > 0) {
+      await prisma.assistantThread.update({
+        where: { id: threadId },
+        data: {
+          summary: input.content.slice(0, 280)
+        }
+      });
+    }
+
+    return toAssistantMessageRecord(message);
+  }
+
+  async getAssistantContextSnapshot(userId: string, key: string) {
+    const snapshot = await prisma.assistantContextSnapshot.findFirst({
+      where: { userId, key }
+    });
+
+    return snapshot ? toAssistantContextSnapshotRecord(snapshot) : null;
+  }
+
+  async saveAssistantContextSnapshot(
+    userId: string,
+    input: Pick<
+      AssistantContextSnapshotRecord,
+      "dealId" | "scope" | "key" | "version" | "summary" | "payload"
+    >
+  ) {
+    const snapshot = await prisma.assistantContextSnapshot.upsert({
+      where: {
+        userId_key: {
+          userId,
+          key: input.key
+        }
+      },
+      update: {
+        dealId: input.dealId ?? null,
+        scope: input.scope,
+        version: input.version,
+        summary: input.summary,
+        payload: toJsonValue(input.payload)
+      },
+      create: {
+        userId,
+        dealId: input.dealId ?? null,
+        scope: input.scope,
+        key: input.key,
+        version: input.version,
+        summary: input.summary,
+        payload: toJsonValue(input.payload)
+      }
+    });
+
+    return toAssistantContextSnapshotRecord(snapshot);
   }
 
   async createBatch(

@@ -4,6 +4,9 @@ import path from "node:path";
 
 import { createSeedStore } from "@/lib/repository/seed";
 import type {
+  AssistantContextSnapshotRecord,
+  AssistantMessageRecord,
+  AssistantThreadRecord,
   AppStore,
   DealAggregate,
   DealRecord,
@@ -107,6 +110,9 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       sourceDocumentId: flag.sourceDocumentId ?? null
     })),
     emailDrafts: store.emailDrafts ?? [],
+    assistantThreads: store.assistantThreads ?? [],
+    assistantMessages: store.assistantMessages ?? [],
+    assistantContextSnapshots: store.assistantContextSnapshots ?? [],
     jobs: (store.jobs ?? []).map((job) => ({
       ...job,
       type: job.type ?? "generate_summary"
@@ -297,6 +303,16 @@ export class FileRepository {
     store.dealTerms = store.dealTerms.filter((entry) => entry.dealId !== dealId);
     store.riskFlags = store.riskFlags.filter((entry) => entry.dealId !== dealId);
     store.emailDrafts = store.emailDrafts.filter((entry) => entry.dealId !== dealId);
+    const deletedThreadIds = store.assistantThreads
+      .filter((entry) => entry.dealId === dealId)
+      .map((entry) => entry.id);
+    store.assistantThreads = store.assistantThreads.filter((entry) => entry.dealId !== dealId);
+    store.assistantMessages = store.assistantMessages.filter(
+      (entry) => !deletedThreadIds.includes(entry.threadId)
+    );
+    store.assistantContextSnapshots = store.assistantContextSnapshots.filter(
+      (entry) => entry.dealId !== dealId
+    );
     store.jobs = store.jobs.filter((entry) => entry.dealId !== dealId);
     store.summaries = store.summaries.filter((entry) => entry.dealId !== dealId);
     store.documentSections = store.documentSections.filter(
@@ -559,6 +575,216 @@ export class FileRepository {
       store.emailDrafts.unshift(next);
     } else {
       store.emailDrafts[existingIndex] = next;
+    }
+
+    await saveStore(store);
+    return next;
+  }
+
+  async listAssistantThreads(
+    userId: string,
+    options?: { scope?: AssistantThreadRecord["scope"]; dealId?: string | null }
+  ) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.assistantThreads.filter((thread) => {
+        if (thread.userId !== userId) {
+          return false;
+        }
+
+        if (options?.scope && thread.scope !== options.scope) {
+          return false;
+        }
+
+        if (options?.dealId !== undefined && thread.dealId !== (options.dealId ?? null)) {
+          return false;
+        }
+
+        return true;
+      })
+    );
+  }
+
+  async getAssistantThread(userId: string, threadId: string) {
+    const store = await ensureStore();
+    return (
+      store.assistantThreads.find(
+        (thread) => thread.id === threadId && thread.userId === userId
+      ) ?? null
+    );
+  }
+
+  async createAssistantThread(
+    userId: string,
+    input: Pick<AssistantThreadRecord, "scope" | "dealId" | "title" | "summary">
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    const thread: AssistantThreadRecord = {
+      id: randomUUID(),
+      userId,
+      dealId: input.dealId ?? null,
+      scope: input.scope,
+      title: input.title,
+      summary: input.summary ?? null,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    store.assistantThreads.unshift(thread);
+    await saveStore(store);
+    return thread;
+  }
+
+  async updateAssistantThread(
+    userId: string,
+    threadId: string,
+    patch: Partial<Pick<AssistantThreadRecord, "title" | "summary">>
+  ) {
+    const store = await ensureStore();
+    const index = store.assistantThreads.findIndex(
+      (thread) => thread.id === threadId && thread.userId === userId
+    );
+
+    if (index === -1) {
+      return null;
+    }
+
+    store.assistantThreads[index] = {
+      ...store.assistantThreads[index],
+      ...patch,
+      updatedAt: new Date().toISOString()
+    };
+
+    await saveStore(store);
+    return store.assistantThreads[index];
+  }
+
+  async deleteAssistantThread(userId: string, threadId: string) {
+    const store = await ensureStore();
+    const existing = store.assistantThreads.find(
+      (thread) => thread.id === threadId && thread.userId === userId
+    );
+
+    if (!existing) {
+      return false;
+    }
+
+    store.assistantThreads = store.assistantThreads.filter((thread) => thread.id !== threadId);
+    store.assistantMessages = store.assistantMessages.filter((message) => message.threadId !== threadId);
+    await saveStore(store);
+    return true;
+  }
+
+  async listAssistantMessages(userId: string, threadId: string) {
+    const store = await ensureStore();
+    const thread = store.assistantThreads.find(
+      (entry) => entry.id === threadId && entry.userId === userId
+    );
+
+    if (!thread) {
+      return [];
+    }
+
+    return [...store.assistantMessages]
+      .filter((message) => message.threadId === threadId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
+  async saveAssistantMessage(
+    userId: string,
+    threadId: string,
+    input: Pick<AssistantMessageRecord, "role" | "content" | "parts"> & { id?: string }
+  ) {
+    const store = await ensureStore();
+    const threadIndex = store.assistantThreads.findIndex(
+      (thread) => thread.id === threadId && thread.userId === userId
+    );
+
+    if (threadIndex === -1) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const existingIndex = input.id
+      ? store.assistantMessages.findIndex((message) => message.id === input.id)
+      : -1;
+
+    const next: AssistantMessageRecord = {
+      id: input.id ?? randomUUID(),
+      threadId,
+      role: input.role,
+      content: input.content,
+      parts: input.parts,
+      createdAt:
+        existingIndex === -1 ? now : store.assistantMessages[existingIndex].createdAt,
+      updatedAt: now
+    };
+
+    if (existingIndex === -1) {
+      store.assistantMessages.push(next);
+    } else {
+      store.assistantMessages[existingIndex] = next;
+    }
+
+    store.assistantThreads[threadIndex] = {
+      ...store.assistantThreads[threadIndex],
+      updatedAt: now,
+      summary:
+        input.role === "assistant" && input.content.trim().length > 0
+          ? input.content.slice(0, 280)
+          : store.assistantThreads[threadIndex].summary
+    };
+
+    await saveStore(store);
+    return next;
+  }
+
+  async getAssistantContextSnapshot(userId: string, key: string) {
+    const store = await ensureStore();
+    return (
+      store.assistantContextSnapshots.find(
+        (snapshot) => snapshot.userId === userId && snapshot.key === key
+      ) ?? null
+    );
+  }
+
+  async saveAssistantContextSnapshot(
+    userId: string,
+    input: Pick<
+      AssistantContextSnapshotRecord,
+      "dealId" | "scope" | "key" | "version" | "summary" | "payload"
+    >
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    const existingIndex = store.assistantContextSnapshots.findIndex(
+      (snapshot) => snapshot.userId === userId && snapshot.key === input.key
+    );
+
+    const next: AssistantContextSnapshotRecord = {
+      id:
+        existingIndex === -1
+          ? randomUUID()
+          : store.assistantContextSnapshots[existingIndex].id,
+      userId,
+      dealId: input.dealId ?? null,
+      scope: input.scope,
+      key: input.key,
+      version: input.version,
+      summary: input.summary,
+      payload: input.payload,
+      createdAt:
+        existingIndex === -1
+          ? now
+          : store.assistantContextSnapshots[existingIndex].createdAt,
+      updatedAt: now
+    };
+
+    if (existingIndex === -1) {
+      store.assistantContextSnapshots.unshift(next);
+    } else {
+      store.assistantContextSnapshots[existingIndex] = next;
     }
 
     await saveStore(store);

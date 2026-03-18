@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Hand, Menu, Search } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { AssistantProvider } from "@/components/assistant-provider";
 import {
   Sheet,
   SheetContent,
@@ -110,7 +111,8 @@ export function AppFrame({
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-white dark:bg-[#0f1115]">
+    <AssistantProvider>
+      <div className="h-screen overflow-hidden bg-white dark:bg-[#0f1115]">
       <div className="flex h-full overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
           <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
@@ -341,6 +343,7 @@ export function AppFrame({
           </main>
         </div>
       </div>
-    </div>
+      </div>
+    </AssistantProvider>
   );
 }

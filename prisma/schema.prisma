@@ -18,6 +18,8 @@ model User {
   intakeSessions IntakeSession[]
   intakeBatches  IntakeBatch[]
   deals          Deal[]
+  assistantThreads   AssistantThread[]
+  assistantSnapshots AssistantContextSnapshot[]
 }
 
 model Deal {
@@ -43,6 +45,8 @@ model Deal {
   terms             DealTerms?
   riskFlags         RiskFlag[]
   emailDrafts       EmailDraft[]
+  assistantThreads  AssistantThread[]
+  assistantSnapshots AssistantContextSnapshot[]
   jobs              Job[]
   summaries         Summary[]
 }
@@ -130,6 +134,57 @@ model Summary {
   document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([dealId])
+}
+
+model AssistantThread {
+  id        String   @id @default(uuid())
+  userId    String
+  dealId    String?
+  scope     String
+  title     String
+  summary   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal     Deal?              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  messages AssistantMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([dealId, updatedAt])
+}
+
+model AssistantMessage {
+  id        String   @id @default(uuid())
+  threadId  String
+  role      String
+  content   String
+  parts     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}
+
+model AssistantContextSnapshot {
+  id        String   @id @default(uuid())
+  userId    String
+  dealId    String?
+  scope     String
+  key       String
+  version   String
+  summary   String
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal Deal? @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([dealId, scope])
 }
 
 model DealTerms {

@@ -445,6 +445,7 @@ function extractRestrictionPhrases(text: string) {
   const results: string[] = [];
   const patterns = [
     /no\s+(?:other\s+)?(?:competitive|competing)\s+([a-z0-9&/' -]{3,80})/gi,
+    /may\s+not\s+work\s+with\s+(?:competing\s+)?([a-z0-9&/' -]{3,80}?)(?:\s+brands?)?(?=\s+(?:for|during|within)\b|[.,;:]|$)/gi,
     /exclusive(?:ly)?\s+within\s+([a-z0-9&/' -]{3,80})/gi,
     /(?:category|vertical)\s+exclusivity(?:\s+for|\s+within)?\s+([a-z0-9&/' -]{3,80})/gi,
     /restricted\s+from\s+working\s+with\s+([a-z0-9&/' -]{3,80})/gi
@@ -489,7 +490,7 @@ function extractDisclosureObligationsFromText(
   const entries = [
     {
       field: "disclosureObligations",
-      pattern: /\b(#ad|#sponsored|paid partnership|disclose|disclosure)\b/i,
+      pattern: /(?:#ad|#sponsored|paid partnership|\bdisclose\b|\bdisclosure\b)/i,
       title: "Disclosure required",
       detail:
         "This deal appears to require sponsored-content disclosure such as #ad, #sponsored, or a paid partnership label."

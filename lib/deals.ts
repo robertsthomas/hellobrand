@@ -50,6 +50,11 @@ import type {
   Viewer
 } from "@/lib/types";
 
+async function queueAssistantSnapshotRefresh(viewer: Viewer, dealId?: string | null) {
+  const { refreshAssistantSnapshotsForViewer } = await import("@/lib/assistant/snapshots");
+  await refreshAssistantSnapshotsForViewer(viewer, { dealId });
+}
+
 function createEmptyTerms(
   deal: Pick<DealRecord, "brandName" | "campaignName">
 ): Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt"> {
@@ -874,6 +879,8 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       deliverablesCount: extraction.data.deliverables?.length ?? 0
     });
 
+    void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
+
     return repository.getDealAggregate(viewer.id, document.dealId);
   } catch (error) {
     const message =
@@ -1017,6 +1024,8 @@ export async function createDealForViewer(
     );
   }
 
+  void queueAssistantSnapshotRefresh(viewer, deal.id).catch(() => undefined);
+
   return deal;
 }
 
@@ -1025,7 +1034,9 @@ export async function updateDealForViewer(
   dealId: string,
   patch: Partial<DealRecord>
 ) {
-  return getRepository().updateDeal(viewer.id, dealId, patch);
+  const deal = await getRepository().updateDeal(viewer.id, dealId, patch);
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+  return deal;
 }
 
 export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
@@ -1065,6 +1076,8 @@ export async function updateTermsForViewer(
     campaignName: nextTerms.campaignName ?? aggregate.deal.campaignName
   });
 
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+
   return terms;
 }
 
@@ -1082,8 +1095,9 @@ export async function updateDealNotesForViewer(
     aggregate.terms ?? createEmptyTerms(aggregate.deal),
     { notes }
   );
-
-  return getRepository().upsertTerms(dealId, nextTerms);
+  const terms = await getRepository().upsertTerms(dealId, nextTerms);
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+  return terms;
 }
 
 export async function uploadDocumentsForViewer(
@@ -1170,6 +1184,8 @@ export async function uploadDocumentsForViewer(
     await syncIntakeSessionForDealId(dealId);
   }
 
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+
   return getRepository().getDealAggregate(viewer.id, dealId);
 }
 
@@ -1196,6 +1212,8 @@ export async function reprocessDocumentForViewer(
     void processDocumentById(document.id).catch(() => undefined);
   }
 
+  void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
+
   return getRepository().getDealAggregate(viewer.id, document.dealId);
 }
 
@@ -1217,7 +1235,9 @@ export async function generateDraftForViewer(
     profile?.displayName?.trim() ||
     viewer.displayName;
   const draft = generateEmailDraft(aggregate, intent, senderName);
-  return getRepository().saveEmailDraft(dealId, intent, draft);
+  const saved = await getRepository().saveEmailDraft(dealId, intent, draft);
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+  return saved;
 }
 
 export async function ensureDraftsForDeal(
@@ -1264,6 +1284,8 @@ export async function applyPendingChangesForViewer(
     campaignName: applied.campaignName ?? aggregate.deal.campaignName
   });
 
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+
   return repository.getDealAggregate(viewer.id, dealId);
 }
 
@@ -1273,5 +1295,6 @@ export async function dismissPendingChangesForViewer(
 ) {
   const repository = getRepository();
   await repository.savePendingExtraction(dealId, null);
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
   return repository.getDealAggregate(viewer.id, dealId);
 }

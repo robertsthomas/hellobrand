@@ -68,7 +68,7 @@ pnpm run dev
 
 Open [http://localhost:3011](http://localhost:3011).
 
-`pnpm run dev` now runs `doppler run -- next dev -p 3011` using the repo-scoped Doppler setup. If you need the raw Next.js command for debugging, use `pnpm run dev:next`.
+`pnpm run dev` now runs `doppler run -- next dev --turbopack -p 3011` using the repo-scoped Doppler setup. If you need the raw Next.js command for debugging, use `pnpm run dev:next`. If Turbopack-specific behavior gets in the way while debugging, use `pnpm run dev:webpack` or `pnpm run dev:next:webpack`.
 
 ## Production config
 
