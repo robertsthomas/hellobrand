@@ -65,7 +65,7 @@ export function DealList({
   return (
     <section className="border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
       <div className="overflow-hidden border border-black/8">
-        <div className="grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] border-b border-black/8 bg-[#f7f8fa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+        <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] border-b border-black/8 bg-[#f7f8fa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
           <span>Campaign</span>
           <span>Stage</span>
           <span>Payment status</span>
@@ -77,7 +77,7 @@ export function DealList({
         {deals.map((deal) => (
           <div
             key={deal.id}
-            className="grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] items-center border-b border-black/6 px-5 py-4 last:border-b-0"
+            className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] md:items-center"
           >
             <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
               <p className="truncate text-base font-semibold text-foreground">
@@ -86,24 +86,32 @@ export function DealList({
               <p className="mt-1 truncate text-sm text-muted-foreground">{deal.brandName}</p>
             </Link>
 
-            <div>
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs text-muted-foreground md:hidden">Stage</span>
               <Badge className={statusBadgeClass(deal.status)}>
                 {humanizeToken(deal.status)}
               </Badge>
             </div>
 
-            <div>
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs text-muted-foreground md:hidden">Payment</span>
               <Badge className={paymentBadgeClass(deal.paymentStatus)}>
                 {humanizeToken(deal.paymentStatus)}
               </Badge>
             </div>
 
-            <div className="text-sm font-medium text-foreground">
-              {formatCurrency(deal.paymentAmount ?? null, deal.currency ?? "USD")}
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs text-muted-foreground md:hidden">Amount</span>
+              <span className="text-sm font-medium text-foreground">
+                {formatCurrency(deal.paymentAmount ?? null, deal.currency ?? "USD")}
+              </span>
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              {formatDate(deal.nextDeliverableDate)}
+            <div className="flex items-center justify-between md:block">
+              <span className="text-xs text-muted-foreground md:hidden">Next due</span>
+              <span className="text-sm text-muted-foreground">
+                {formatDate(deal.nextDeliverableDate)}
+              </span>
             </div>
 
             <div className="flex justify-end">

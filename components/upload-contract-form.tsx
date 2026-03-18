@@ -57,7 +57,7 @@ export function UploadContractForm({
             type="button"
             onClick={() => setMode("upload")}
             className={cn(
-              "inline-flex items-center gap-2 border px-3 py-2 text-sm transition",
+              "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
               mode === "upload"
                 ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
                 : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"
@@ -70,7 +70,7 @@ export function UploadContractForm({
             type="button"
             onClick={() => setMode("paste")}
             className={cn(
-              "inline-flex items-center gap-2 border px-3 py-2 text-sm transition",
+              "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
               mode === "paste"
                 ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
                 : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"

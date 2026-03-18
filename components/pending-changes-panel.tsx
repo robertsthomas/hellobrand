@@ -155,7 +155,7 @@ export function PendingChangesPanel({
               type="button"
               onClick={handleApply}
               disabled={isSubmitting || checkedFields.size === 0}
-              className="border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              className="min-h-[44px] border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
             >
               Apply {checkedFields.size} change
               {checkedFields.size === 1 ? "" : "s"}
@@ -164,7 +164,7 @@ export function PendingChangesPanel({
               type="button"
               onClick={acceptAll}
               disabled={isSubmitting}
-              className="border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+              className="min-h-[44px] border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
             >
               Accept all
             </button>
@@ -172,7 +172,7 @@ export function PendingChangesPanel({
               type="button"
               onClick={handleDismiss}
               disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-black/45 transition hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
+              className="min-h-[44px] px-4 py-2 text-sm font-medium text-black/45 transition hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
             >
               Dismiss all
             </button>

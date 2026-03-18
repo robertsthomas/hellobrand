@@ -237,7 +237,7 @@ export function DealHistoryTable({
     <div className="space-y-8">
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-[46px] font-semibold tracking-[-0.06em] text-foreground">
+          <h1 className="text-3xl sm:text-[38px] lg:text-[46px] font-semibold tracking-[-0.06em] text-foreground">
             All Deals
           </h1>
           <p className="text-lg text-muted-foreground">
@@ -253,7 +253,7 @@ export function DealHistoryTable({
         </Link>
       </section>
 
-      <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
+      <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Total Deals</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.totalDeals}</p>
@@ -370,8 +370,9 @@ export function DealHistoryTable({
           })}
         </div>
 
+        <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
         <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
-          <Table>
+          <Table className="min-w-[800px]">
             <TableHeader>
               <TableRow className="border-black/8 bg-secondary/40 hover:bg-secondary/40 dark:border-white/10 dark:bg-white/[0.03]">
                 <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Brand</TableHead>
@@ -467,6 +468,7 @@ export function DealHistoryTable({
               )}
             </TableBody>
           </Table>
+        </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">

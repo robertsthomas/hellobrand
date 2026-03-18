@@ -127,7 +127,7 @@ export default async function NotificationsPage() {
   const notifications = generateNotifications(aggregates);
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl">
         <NotificationsView notifications={notifications} />
       </div>

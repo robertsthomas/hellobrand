@@ -126,7 +126,7 @@ export default async function WorkspaceDealDetailPage({
             </div>
           </div>
 
-          <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:gap-8 md:grid-cols-2 xl:grid-cols-4">
             <div className="border-b border-black/8 pb-3 dark:border-white/10">
               <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment</p>
               <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
@@ -169,7 +169,7 @@ export default async function WorkspaceDealDetailPage({
         ) : null}
 
         <Tabs defaultValue="overview" className="gap-6">
-          <TabsList className="h-auto flex-wrap rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
+          <TabsList className="h-auto flex-wrap overflow-x-auto rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
             <TabsTrigger value="overview" className="px-4 py-2">
               Overview
             </TabsTrigger>

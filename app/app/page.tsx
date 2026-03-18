@@ -336,7 +336,7 @@ export default async function WorkspaceDashboardPage() {
             <DashboardGreeting firstName={firstName} />
           </div>
 
-          <div className="mt-8 grid gap-4 xl:grid-cols-4">
+          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {metrics.map((metric) => {
               const Icon = metric.icon;
 
@@ -379,7 +379,7 @@ export default async function WorkspaceDashboardPage() {
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
 
-            <div className="hidden items-center gap-3 rounded-md border border-black/8 bg-white px-4 py-3 text-sm text-muted-foreground lg:flex dark:border-white/10 dark:bg-[#15191f]">
+            <div className="flex items-center gap-3 rounded-md border border-black/8 bg-white px-4 py-3 text-sm text-muted-foreground dark:border-white/10 dark:bg-[#15191f]">
               <Clock3 className="h-4 w-4 text-[#98a2b3] dark:text-[#8f98a6]" />
               <span>{dueSoonDeliverables.length} due this week</span>
             </div>
@@ -416,7 +416,7 @@ export default async function WorkspaceDashboardPage() {
                   </div>
 
                   <div className="border-t border-black/8 dark:border-white/10">
-                    <div className="grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] border-b border-black/8 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:border-white/10 dark:text-[#8f98a6]">
+                    <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] border-b border-black/8 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:border-white/10 dark:text-[#8f98a6]">
                       <span>Deal</span>
                       <span>Stage</span>
                       <span>Payment</span>
@@ -427,7 +427,7 @@ export default async function WorkspaceDashboardPage() {
                     {dealRows.slice(0, 6).map((deal) => (
                       <div
                         key={deal.id}
-                        className="grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] items-center border-b border-black/6 px-5 py-4 transition-colors hover:bg-[#f6f7f8] dark:border-white/8 dark:hover:bg-white/[0.04]"
+                        className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 transition-colors hover:bg-[#f6f7f8] md:grid md:grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] md:items-center dark:border-white/8 dark:hover:bg-white/[0.04]"
                       >
                         <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
                           <p className="truncate text-base font-semibold text-foreground">
@@ -437,16 +437,23 @@ export default async function WorkspaceDashboardPage() {
                             {deal.brandName}
                           </p>
                         </Link>
-                        <div>
+                        <div className="flex items-center justify-between md:block">
+                          <span className="text-xs text-muted-foreground md:hidden">Stage</span>
                           <Badge className={statusBadgeClass(deal.status)}>
                             {humanizeToken(deal.status)}
                           </Badge>
                         </div>
-                        <div className="text-sm font-medium text-foreground">
-                          {formatCurrency(deal.paymentAmount, deal.currency)}
+                        <div className="flex items-center justify-between md:block">
+                          <span className="text-xs text-muted-foreground md:hidden">Payment</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {formatCurrency(deal.paymentAmount, deal.currency)}
+                          </span>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDate(deal.nextDeliverableDate)}
+                        <div className="flex items-center justify-between md:block">
+                          <span className="text-xs text-muted-foreground md:hidden">Next due</span>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDate(deal.nextDeliverableDate)}
+                          </span>
                         </div>
                         <div className="flex justify-end">
                           <RecentDealCardMenu dealId={deal.id} dealName={deal.campaignName} />

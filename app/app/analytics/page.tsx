@@ -156,7 +156,7 @@ export default async function AnalyticsPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
               Analytics
             </p>
-            <h1 className="mt-3 text-[44px] font-semibold tracking-[-0.06em] text-foreground">
+            <h1 className="mt-3 text-3xl sm:text-[36px] lg:text-[44px] font-semibold tracking-[-0.06em] text-foreground">
               Analytics
             </h1>
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
@@ -219,7 +219,7 @@ export default async function AnalyticsPage() {
               </div>
 
               <div className="mt-8 border-t border-black/8 pt-6">
-                <div className="grid min-h-[280px] grid-cols-6 gap-4">
+                <div className="grid min-h-[280px] grid-cols-3 sm:grid-cols-6 gap-4">
                   {monthlyRevenue.map((item, index) => {
                     const height = `${Math.max((item.value / maxRevenuePoint) * 180, 26)}px`;
                     const isPeak = item.value === maxRevenuePoint && item.value > 0;
