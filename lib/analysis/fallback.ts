@@ -5,6 +5,7 @@ import {
   mergeConflictIntelligence
 } from "@/lib/conflict-intelligence";
 import type {
+  BriefData,
   DealTermsRecord,
   DocumentAnalysisResult,
   DocumentClassificationResult,
@@ -52,7 +53,9 @@ function createEmptyTerms(): Omit<DealTermsRecord, "id" | "dealId" | "createdAt"
     terminationNotice: null,
     terminationConditions: null,
     governingLaw: null,
-    notes: null
+    notes: null,
+    manuallyEditedFields: [],
+    briefData: null
   };
 }
 
@@ -890,6 +893,106 @@ export function buildCreatorSummary(
   return {
     body: `This deal appears to cover ${deliverableLine} for ${amount}. Payment terms are ${extraction.data.paymentTerms ?? "not clearly stated"}, and the brand receives ${rightsLine}. The main watchout right now is ${topRisk.title.toLowerCase()}.`,
     version: "v1"
+  };
+}
+
+export function extractBriefData(text: string, documentKind: DocumentKind): BriefData | null {
+  if (
+    documentKind !== "campaign_brief" &&
+    documentKind !== "deliverables_brief" &&
+    documentKind !== "pitch_deck"
+  ) {
+    return null;
+  }
+
+  const lower = text.toLowerCase();
+
+  function extractAfterLabel(patterns: RegExp[]): string | null {
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match?.[1]?.trim()) {
+        return match[1].trim();
+      }
+    }
+    return null;
+  }
+
+  function extractListAfterLabel(patterns: RegExp[]): string[] {
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match?.[1]) {
+        return match[1]
+          .split(/\n|;|•|–|—|-\s/)
+          .map((item) => item.replace(/^\d+\.\s*/, "").trim())
+          .filter((item) => item.length > 2);
+      }
+    }
+    return [];
+  }
+
+  const campaignOverview = extractAfterLabel([
+    /(?:campaign overview|overview)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i,
+    /(?:concept|creative concept)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const messagingPoints = extractListAfterLabel([
+    /(?:key messaging|messaging points?|key messages)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const talkingPoints = extractListAfterLabel([
+    /(?:talking points?|key talking)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const creativeConceptOverview = extractAfterLabel([
+    /(?:creative concept|concept overview)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const brandGuidelines = extractAfterLabel([
+    /(?:brand guidelines?|style guide)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const approvalRequirements = extractAfterLabel([
+    /(?:approval (?:process|requirements?|workflow))[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const targetAudience = extractAfterLabel([
+    /(?:target audience|audience)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const toneAndStyle = extractAfterLabel([
+    /(?:tone (?:and|&) style|tone|voice)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const doNotMention = extractListAfterLabel([
+    /(?:do not mention|avoid|don't mention|do not include)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const hasContent =
+    campaignOverview ||
+    messagingPoints.length > 0 ||
+    talkingPoints.length > 0 ||
+    creativeConceptOverview ||
+    brandGuidelines ||
+    approvalRequirements ||
+    targetAudience ||
+    toneAndStyle ||
+    doNotMention.length > 0;
+
+  if (!hasContent) {
+    return null;
+  }
+
+  return {
+    campaignOverview,
+    messagingPoints,
+    talkingPoints,
+    creativeConceptOverview,
+    brandGuidelines,
+    approvalRequirements,
+    targetAudience,
+    toneAndStyle,
+    doNotMention,
+    sourceDocumentIds: []
   };
 }
 

@@ -70,6 +70,8 @@ function createSeedTerms(now: string): DealTermsRecord {
     terminationConditions: "Before content submission",
     governingLaw: "New York",
     notes: "Creator should confirm whether paid usage includes whitelisting.",
+    manuallyEditedFields: [],
+    briefData: null,
     createdAt: now,
     updatedAt: now
   };

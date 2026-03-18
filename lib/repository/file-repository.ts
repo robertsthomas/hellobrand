@@ -14,6 +14,8 @@ import type {
   EmailDraftRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord,
+  IntakeBatchGroupRecord,
+  IntakeBatchRecord,
   JobRecord,
   RiskFlagRecord,
   SummaryRecord
@@ -89,6 +91,8 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       terminationAllowed: terms.terminationAllowed ?? null,
       terminationNotice: terms.terminationNotice ?? null,
       terminationConditions: terms.terminationConditions ?? null,
+      manuallyEditedFields: terms.manuallyEditedFields ?? [],
+      briefData: terms.briefData ?? null,
       deliverables: (terms.deliverables ?? []).map((deliverable) => ({
         ...deliverable,
         status: deliverable.status ?? "pending",
@@ -546,5 +550,48 @@ export class FileRepository {
 
     await saveStore(store);
     return next;
+  }
+
+  async createBatch(
+    userId: string,
+    groups: Array<{ label: string; confidence: number; documentIds: string[] }>
+  ): Promise<IntakeBatchRecord> {
+    const now = new Date().toISOString();
+    const batch: IntakeBatchRecord = {
+      id: randomUUID(),
+      userId,
+      status: "review",
+      createdAt: now,
+      updatedAt: now,
+      groups: groups.map((group) => ({
+        id: randomUUID(),
+        batchId: "",
+        intakeSessionId: null,
+        label: group.label,
+        confidence: group.confidence,
+        documentIds: group.documentIds,
+        status: "pending" as const,
+        createdAt: now
+      }))
+    };
+    for (const g of batch.groups) {
+      g.batchId = batch.id;
+    }
+    return batch;
+  }
+
+  async getBatch(_userId: string, _batchId: string): Promise<IntakeBatchRecord | null> {
+    return null;
+  }
+
+  async updateBatchGroup(
+    _groupId: string,
+    _patch: Partial<Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">>
+  ): Promise<IntakeBatchGroupRecord> {
+    throw new Error("Batch operations require a database.");
+  }
+
+  async updateBatchStatus(_batchId: string, _status: string) {
+    // no-op in file mode
   }
 }

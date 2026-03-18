@@ -2,6 +2,7 @@ import OpenAI from "openai";
 
 import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict-intelligence";
 import type {
+  BriefData,
   CampaignDateWindow,
   DealTermsRecord,
   DisclosureObligation,
@@ -656,4 +657,42 @@ export async function generateSummaryWithLlm(
         : toPlainDealSummary(asString(payload.body) ?? fallback.body)) ?? fallback.body,
     version: `llm:${getLlmModel("generate_summary")}`
   };
+}
+
+export async function extractBriefWithLlm(
+  text: string,
+  kind: DocumentKind,
+  fallback: BriefData
+): Promise<BriefData> {
+  const systemPrompt = `You are a creator-deal analyst. Extract campaign brief fields from the document and return a JSON object with these fields:
+campaignOverview (string|null), messagingPoints (string[]), talkingPoints (string[]), creativeConceptOverview (string|null), brandGuidelines (string|null), approvalRequirements (string|null), targetAudience (string|null), toneAndStyle (string|null), doNotMention (string[]).
+Only include information explicitly stated. Return null or empty arrays for fields not found.`;
+
+  try {
+    const payload = await requestJson("extract_section", systemPrompt, text.slice(0, 6000), {
+      documentKind: kind,
+      purpose: "brief_extraction"
+    });
+
+    return {
+      campaignOverview: asString(payload.campaignOverview) ?? fallback.campaignOverview,
+      messagingPoints: asStringArray(payload.messagingPoints).length > 0
+        ? asStringArray(payload.messagingPoints)
+        : fallback.messagingPoints,
+      talkingPoints: asStringArray(payload.talkingPoints).length > 0
+        ? asStringArray(payload.talkingPoints)
+        : fallback.talkingPoints,
+      creativeConceptOverview: asString(payload.creativeConceptOverview) ?? fallback.creativeConceptOverview,
+      brandGuidelines: asString(payload.brandGuidelines) ?? fallback.brandGuidelines,
+      approvalRequirements: asString(payload.approvalRequirements) ?? fallback.approvalRequirements,
+      targetAudience: asString(payload.targetAudience) ?? fallback.targetAudience,
+      toneAndStyle: asString(payload.toneAndStyle) ?? fallback.toneAndStyle,
+      doNotMention: asStringArray(payload.doNotMention).length > 0
+        ? asStringArray(payload.doNotMention)
+        : fallback.doNotMention,
+      sourceDocumentIds: fallback.sourceDocumentIds
+    };
+  } catch {
+    return fallback;
+  }
 }

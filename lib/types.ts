@@ -201,6 +201,19 @@ export interface NormalizedIntakeRecord {
   evidenceGroups: IntakeEvidenceGroup[];
 }
 
+export interface BriefData {
+  campaignOverview: string | null;
+  messagingPoints: string[];
+  talkingPoints: string[];
+  creativeConceptOverview: string | null;
+  brandGuidelines: string | null;
+  approvalRequirements: string | null;
+  targetAudience: string | null;
+  toneAndStyle: string | null;
+  doNotMention: string[];
+  sourceDocumentIds: string[];
+}
+
 export interface DealTermsRecord {
   id: string;
   dealId: string;
@@ -240,6 +253,8 @@ export interface DealTermsRecord {
   terminationConditions: string | null;
   governingLaw: string | null;
   notes: string | null;
+  manuallyEditedFields: string[];
+  briefData: BriefData | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -405,6 +420,29 @@ export interface PaymentRecord {
   source: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type IntakeBatchStatus = "clustering" | "review" | "confirmed" | "failed";
+export type IntakeBatchGroupStatus = "pending" | "confirmed" | "rejected";
+
+export interface IntakeBatchRecord {
+  id: string;
+  userId: string;
+  status: IntakeBatchStatus;
+  createdAt: string;
+  updatedAt: string;
+  groups: IntakeBatchGroupRecord[];
+}
+
+export interface IntakeBatchGroupRecord {
+  id: string;
+  batchId: string;
+  intakeSessionId: string | null;
+  label: string;
+  confidence: number | null;
+  documentIds: string[];
+  status: IntakeBatchGroupStatus;
+  createdAt: string;
 }
 
 export interface DealAggregate {

@@ -2,6 +2,7 @@ import {
   analyzeCreatorRisks,
   buildCreatorSummary,
   classifyDocumentHeuristically,
+  extractBriefData,
   extractStructuredTerms,
   mergeExtractionResults,
   splitIntoSections
@@ -15,6 +16,7 @@ import {
 } from "@/lib/conflict-intelligence";
 import {
   analyzeRisksWithLlm,
+  extractBriefWithLlm,
   extractSectionWithLlm,
   getLlmRoute,
   generateSummaryWithLlm,
@@ -30,6 +32,7 @@ import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { readStoredBytes, storeUploadedBytes } from "@/lib/storage";
 import type {
+  BriefData,
   DealAggregate,
   DealRecord,
   DealTermsRecord,
@@ -80,8 +83,31 @@ function createEmptyTerms(
     terminationNotice: null,
     terminationConditions: null,
     governingLaw: null,
-    notes: null
+    notes: null,
+    manuallyEditedFields: [],
+    briefData: null
   };
+}
+
+function detectChangedFields(
+  base: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">,
+  patch: Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>
+): string[] {
+  const changed: string[] = [];
+  const skip = new Set(["deliverables", "usageChannels", "competitorCategories", "restrictedCategories", "disclosureObligations", "campaignDateWindow", "manuallyEditedFields"]);
+
+  for (const key of Object.keys(patch) as Array<keyof typeof patch>) {
+    if (skip.has(key)) continue;
+    const baseVal = base[key];
+    const patchVal = patch[key];
+    if (patchVal === null || patchVal === undefined) continue;
+    if (typeof patchVal === "string" && patchVal.trim().length === 0) continue;
+    if (baseVal !== patchVal) {
+      changed.push(key);
+    }
+  }
+
+  return changed;
 }
 
 function mergeDeliverables(
@@ -105,10 +131,33 @@ function mergeDeliverables(
   );
 }
 
+function mergeBriefData(
+  base: BriefData | null,
+  patch: BriefData | null
+): BriefData | null {
+  if (!base) return patch;
+  if (!patch) return base;
+
+  return {
+    campaignOverview: patch.campaignOverview ?? base.campaignOverview,
+    messagingPoints: patch.messagingPoints.length > 0 ? patch.messagingPoints : base.messagingPoints,
+    talkingPoints: patch.talkingPoints.length > 0 ? patch.talkingPoints : base.talkingPoints,
+    creativeConceptOverview: patch.creativeConceptOverview ?? base.creativeConceptOverview,
+    brandGuidelines: patch.brandGuidelines ?? base.brandGuidelines,
+    approvalRequirements: patch.approvalRequirements ?? base.approvalRequirements,
+    targetAudience: patch.targetAudience ?? base.targetAudience,
+    toneAndStyle: patch.toneAndStyle ?? base.toneAndStyle,
+    doNotMention: patch.doNotMention.length > 0 ? patch.doNotMention : base.doNotMention,
+    sourceDocumentIds: Array.from(new Set([...base.sourceDocumentIds, ...patch.sourceDocumentIds]))
+  };
+}
+
 function mergeTerms(
   base: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">,
-  patch: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">
+  patch: Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>,
+  options?: { manuallyEditedFields?: string[] }
 ) {
+  const manuallyEdited = options?.manuallyEditedFields ?? base.manuallyEditedFields ?? [];
   const baseUsageChannels = Array.isArray(base.usageChannels) ? base.usageChannels : [];
   const patchUsageChannels = Array.isArray(patch.usageChannels) ? patch.usageChannels : [];
 
@@ -116,13 +165,19 @@ function mergeTerms(
     ...base,
     ...Object.fromEntries(
       Object.entries(patch).filter(([key, value]) => {
+        if (manuallyEdited.includes(key)) {
+          return false;
+        }
+
         if (
           key === "deliverables" ||
           key === "usageChannels" ||
           key === "competitorCategories" ||
           key === "restrictedCategories" ||
           key === "disclosureObligations" ||
-          key === "campaignDateWindow"
+          key === "campaignDateWindow" ||
+          key === "manuallyEditedFields" ||
+          key === "briefData"
         ) {
           return false;
         }
@@ -134,8 +189,10 @@ function mergeTerms(
         return value !== null && value !== undefined;
       })
     ),
-    deliverables: mergeDeliverables(base.deliverables, patch.deliverables),
+    deliverables: mergeDeliverables(base.deliverables, patch.deliverables ?? []),
     usageChannels: Array.from(new Set([...baseUsageChannels, ...patchUsageChannels])),
+    manuallyEditedFields: manuallyEdited,
+    briefData: mergeBriefData(base.briefData ?? null, patch.briefData ?? null),
     ...mergeConflictIntelligence(base, patch)
   };
 }
@@ -564,6 +621,33 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       hasCampaignName: Boolean(extraction.data.campaignName)
     });
 
+    if (
+      classification.documentKind === "campaign_brief" ||
+      classification.documentKind === "deliverables_brief" ||
+      classification.documentKind === "pitch_deck"
+    ) {
+      const fallbackBrief = extractBriefData(
+        extractionSource.normalizedText,
+        classification.documentKind
+      );
+      if (fallbackBrief) {
+        fallbackBrief.sourceDocumentIds = [document.id];
+        let briefData = fallbackBrief;
+        if (hasLlmKey()) {
+          try {
+            briefData = await extractBriefWithLlm(
+              extractionSource.normalizedText,
+              classification.documentKind,
+              fallbackBrief
+            );
+          } catch {
+            // keep fallback
+          }
+        }
+        extraction.data.briefData = briefData;
+      }
+    }
+
     const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
       extraction.data.brandName
     );
@@ -680,7 +764,8 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       (await repository.getDealAggregate(viewer.id, document.dealId)) ?? aggregate;
     const nextTerms = mergeTerms(
       latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal),
-      extraction.data
+      extraction.data,
+      { manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? [] }
     );
     await repository.upsertTerms(document.dealId, nextTerms);
     if (process.env.DATABASE_URL) {
@@ -877,17 +962,25 @@ export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
 export async function updateTermsForViewer(
   viewer: Viewer,
   dealId: string,
-  patch: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">
+  patch: Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>
 ) {
   const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
   if (!aggregate) {
     return null;
   }
 
+  const existing = aggregate.terms ?? createEmptyTerms(aggregate.deal);
+  const changedFields = detectChangedFields(existing, patch);
+  const nextManualEdits = Array.from(new Set([
+    ...(aggregate.terms?.manuallyEditedFields ?? []),
+    ...changedFields
+  ]));
+
   const nextTerms = mergeTerms(
-    aggregate.terms ?? createEmptyTerms(aggregate.deal),
-    patch
+    existing,
+    { ...patch, manuallyEditedFields: nextManualEdits }
   );
+  nextTerms.manuallyEditedFields = nextManualEdits;
   const terms = await getRepository().upsertTerms(dealId, nextTerms);
   if (process.env.DATABASE_URL) {
     await syncPaymentRecordForDeal(dealId, nextTerms);

@@ -14,9 +14,10 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  profile       Profile?
+  profile        Profile?
   intakeSessions IntakeSession[]
-  deals       Deal[]
+  intakeBatches  IntakeBatch[]
+  deals          Deal[]
 }
 
 model Deal {
@@ -170,6 +171,8 @@ model DealTerms {
   terminationConditions     String?
   governingLaw              String?
   notes                     String?
+  manuallyEditedFields      Json     @default("[]")
+  briefData                 Json?
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
 
@@ -275,9 +278,10 @@ model IntakeSession {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deal      Deal             @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  documents IntakeDocument[]
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal       Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  documents  IntakeDocument[]
+  batchGroup IntakeBatchGroup?
 
   @@index([userId, status])
 }
@@ -309,4 +313,33 @@ model PaymentRecord {
   updatedAt   DateTime @updatedAt
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model IntakeBatch {
+  id        String   @id @default(uuid())
+  userId    String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groups IntakeBatchGroup[]
+
+  @@index([userId])
+}
+
+model IntakeBatchGroup {
+  id              String   @id @default(uuid())
+  batchId         String
+  intakeSessionId String?  @unique
+  label           String
+  confidence      Float?
+  documentIds     Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  batch         IntakeBatch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  intakeSession IntakeSession? @relation(fields: [intakeSessionId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
 }

@@ -12,6 +12,8 @@ import type {
   EmailDraftRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord,
+  IntakeBatchGroupRecord,
+  IntakeBatchRecord,
   JobRecord,
   PaymentRecord,
   RiskFlagRecord,
@@ -123,6 +125,8 @@ function toDealTermsRecord(terms: {
   terminationConditions: string | null;
   governingLaw: string | null;
   notes: string | null;
+  manuallyEditedFields: unknown;
+  briefData: unknown;
   createdAt: Date;
   updatedAt: Date;
 }): DealTermsRecord {
@@ -142,6 +146,11 @@ function toDealTermsRecord(terms: {
     disclosureObligations: Array.isArray(terms.disclosureObligations)
       ? (terms.disclosureObligations as DealTermsRecord["disclosureObligations"])
       : [],
+    manuallyEditedFields: toStringArray(terms.manuallyEditedFields),
+    briefData:
+      terms.briefData && typeof terms.briefData === "object"
+        ? (terms.briefData as DealTermsRecord["briefData"])
+        : null,
     createdAt: iso(terms.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(terms.updatedAt) ?? new Date().toISOString()
   };
@@ -264,6 +273,57 @@ function toSummaryRecord(summary: {
   return {
     ...summary,
     createdAt: iso(summary.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toBatchGroupRecord(group: {
+  id: string;
+  batchId: string;
+  intakeSessionId: string | null;
+  label: string;
+  confidence: number | null;
+  documentIds: unknown;
+  status: string;
+  createdAt: Date;
+}): IntakeBatchGroupRecord {
+  return {
+    id: group.id,
+    batchId: group.batchId,
+    intakeSessionId: group.intakeSessionId,
+    label: group.label,
+    confidence: group.confidence,
+    documentIds: toStringArray(group.documentIds),
+    status: group.status as IntakeBatchGroupRecord["status"],
+    createdAt: iso(group.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toBatchRecord(
+  batch: {
+    id: string;
+    userId: string;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  groups: Array<{
+    id: string;
+    batchId: string;
+    intakeSessionId: string | null;
+    label: string;
+    confidence: number | null;
+    documentIds: unknown;
+    status: string;
+    createdAt: Date;
+  }>
+): IntakeBatchRecord {
+  return {
+    id: batch.id,
+    userId: batch.userId,
+    status: batch.status as IntakeBatchRecord["status"],
+    createdAt: iso(batch.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(batch.updatedAt) ?? new Date().toISOString(),
+    groups: groups.map(toBatchGroupRecord)
   };
 }
 
@@ -660,7 +720,9 @@ export class PrismaRepository {
         competitorCategories: patch.competitorCategories,
         restrictedCategories: patch.restrictedCategories,
         campaignDateWindow: patch.campaignDateWindow,
-        disclosureObligations: patch.disclosureObligations
+        disclosureObligations: patch.disclosureObligations,
+        manuallyEditedFields: patch.manuallyEditedFields,
+        briefData: patch.briefData
       },
       create: {
         dealId,
@@ -670,7 +732,9 @@ export class PrismaRepository {
         competitorCategories: patch.competitorCategories,
         restrictedCategories: patch.restrictedCategories,
         campaignDateWindow: patch.campaignDateWindow,
-        disclosureObligations: patch.disclosureObligations
+        disclosureObligations: patch.disclosureObligations,
+        manuallyEditedFields: patch.manuallyEditedFields,
+        briefData: patch.briefData
       }
     });
 
@@ -737,5 +801,62 @@ export class PrismaRepository {
     });
 
     return toEmailDraftRecord(saved);
+  }
+
+  async createBatch(
+    userId: string,
+    groups: Array<{ label: string; confidence: number; documentIds: string[] }>
+  ): Promise<IntakeBatchRecord> {
+    const batch = await prisma.intakeBatch.create({
+      data: {
+        userId,
+        status: "review",
+        groups: {
+          create: groups.map((group) => ({
+            label: group.label,
+            confidence: group.confidence,
+            documentIds: group.documentIds,
+            status: "pending"
+          }))
+        }
+      },
+      include: { groups: true }
+    });
+
+    return toBatchRecord(batch, batch.groups);
+  }
+
+  async getBatch(userId: string, batchId: string): Promise<IntakeBatchRecord | null> {
+    const batch = await prisma.intakeBatch.findFirst({
+      where: { id: batchId, userId },
+      include: { groups: { orderBy: { createdAt: "asc" } } }
+    });
+
+    if (!batch) return null;
+    return toBatchRecord(batch, batch.groups);
+  }
+
+  async updateBatchGroup(
+    groupId: string,
+    patch: Partial<Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">>
+  ) {
+    const saved = await prisma.intakeBatchGroup.update({
+      where: { id: groupId },
+      data: {
+        label: patch.label,
+        status: patch.status,
+        intakeSessionId: patch.intakeSessionId,
+        documentIds: patch.documentIds
+      }
+    });
+
+    return toBatchGroupRecord(saved);
+  }
+
+  async updateBatchStatus(batchId: string, status: string) {
+    await prisma.intakeBatch.update({
+      where: { id: batchId },
+      data: { status }
+    });
   }
 }

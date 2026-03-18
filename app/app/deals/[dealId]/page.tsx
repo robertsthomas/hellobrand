@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Fragment } from "react";
 
+import { BriefOverview } from "@/components/brief-overview";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { DealNotesPanel } from "@/components/deal-notes-panel";
@@ -68,7 +69,10 @@ export default async function WorkspaceDealDetailPage({
     latestDocument,
     documents,
     terms,
-    riskFlags
+    riskFlags,
+    extractionEvidence,
+    documentSections,
+    extractionResults
   } = aggregate;
   const summaryBody =
     aggregate.currentSummary?.body ??
@@ -169,6 +173,9 @@ export default async function WorkspaceDealDetailPage({
             </TabsTrigger>
             <TabsTrigger value="deliverables" className="px-4 py-2">
               Deliverables
+            </TabsTrigger>
+            <TabsTrigger value="brief" className="px-4 py-2">
+              Brief
             </TabsTrigger>
             <TabsTrigger value="emails" className="px-4 py-2">
               Emails
@@ -290,6 +297,10 @@ export default async function WorkspaceDealDetailPage({
 
           <TabsContent value="deliverables" className="mt-0 space-y-6">
             <DeliverablesList deliverables={terms?.deliverables ?? []} />
+          </TabsContent>
+
+          <TabsContent value="brief" className="mt-0 space-y-6">
+            <BriefOverview briefData={terms?.briefData} documents={documents} />
           </TabsContent>
 
           <TabsContent value="emails" className="mt-0 space-y-6">

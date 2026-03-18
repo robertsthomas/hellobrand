@@ -5,9 +5,12 @@ import { redirect } from "next/navigation";
 
 import { requireViewer } from "@/lib/auth";
 import {
+  confirmBatchGroupForViewer,
   confirmIntakeSessionForViewer,
+  createBulkIntakeForViewer,
   createIntakeSessionForViewer,
   deleteIntakeDraftForViewer,
+  reassignDocumentInBatch,
   retryIntakeSessionForViewer
 } from "@/lib/intake";
 import {
@@ -252,11 +255,42 @@ export async function startIntakeAction(formData: FormData) {
   const files = formData
     .getAll("documents")
     .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  const pastedText = parseNullableString(formData.get("pastedText"));
+
+  if (files.length > 1 && !pastedText) {
+    try {
+      const notes = parseNullableString(formData.get("notes"));
+      const batch = await createBulkIntakeForViewer(viewer, { files, notes });
+
+      debug.complete({
+        viewerId: viewer.id,
+        batchId: batch.id,
+        groupCount: batch.groups.length,
+        fileCount: files.length
+      });
+
+      if (batch.groups.length <= 1) {
+        const group = batch.groups[0];
+        if (group?.intakeSessionId) {
+          redirect(`/app/intake/${group.intakeSessionId}`);
+        }
+      }
+
+      redirect(`/app/intake/batch/${batch.id}`);
+    } catch (error) {
+      debug.fail(error, {
+        viewerId: viewer.id,
+        fileCount: files.length
+      });
+      throw error;
+    }
+  }
+
   const input = createIntakeSessionSchema.parse({
     brandName: parseNullableString(formData.get("brandName")),
     campaignName: parseNullableString(formData.get("campaignName")),
     notes: parseNullableString(formData.get("notes")),
-    pastedText: parseNullableString(formData.get("pastedText"))
+    pastedText
   });
 
   try {
@@ -480,4 +514,98 @@ export async function saveProfileAction(formData: FormData) {
   await updateProfileForViewer(viewer, input);
   revalidatePath("/app/profile");
   revalidatePath("/app");
+}
+
+export async function startBulkIntakeAction(formData: FormData) {
+  const debug = startServerDebug("action_start_bulk_intake", {
+    action: "startBulkIntakeAction"
+  });
+
+  const viewer = await requireViewer();
+  const files = formData
+    .getAll("documents")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  const notes = parseNullableString(formData.get("notes"));
+
+  try {
+    const batch = await createBulkIntakeForViewer(viewer, { files, notes });
+
+    debug.complete({
+      viewerId: viewer.id,
+      batchId: batch.id,
+      groupCount: batch.groups.length,
+      fileCount: files.length
+    });
+
+    if (batch.groups.length <= 1) {
+      const group = batch.groups[0];
+      if (group?.intakeSessionId) {
+        redirect(`/app/intake/${group.intakeSessionId}`);
+      }
+    }
+
+    redirect(`/app/intake/batch/${batch.id}`);
+  } catch (error) {
+    debug.fail(error, {
+      viewerId: viewer.id,
+      fileCount: files.length
+    });
+    throw error;
+  }
+}
+
+export async function confirmBatchGroupAction(formData: FormData) {
+  const batchId = String(formData.get("batchId") ?? "");
+  const groupId = String(formData.get("groupId") ?? "");
+  const debug = startServerDebug("action_confirm_batch_group", {
+    action: "confirmBatchGroupAction",
+    batchId,
+    groupId
+  });
+
+  const viewer = await requireViewer();
+
+  try {
+    const result = await confirmBatchGroupForViewer(viewer, batchId, groupId, {
+      brandName: String(formData.get("brandName") ?? "").trim(),
+      campaignName: String(formData.get("campaignName") ?? "").trim()
+    });
+
+    debug.complete({
+      viewerId: viewer.id,
+      dealId: result.dealId
+    });
+  } catch (error) {
+    debug.fail(error, { viewerId: viewer.id });
+    throw error;
+  }
+
+  revalidatePath(`/app/intake/batch/${batchId}`);
+}
+
+export async function reassignDocumentAction(formData: FormData) {
+  const batchId = String(formData.get("batchId") ?? "");
+  const debug = startServerDebug("action_reassign_document", {
+    action: "reassignDocumentAction",
+    batchId
+  });
+
+  const viewer = await requireViewer();
+
+  try {
+    await reassignDocumentInBatch(
+      viewer,
+      batchId,
+      String(formData.get("documentId") ?? ""),
+      String(formData.get("fromGroupId") ?? ""),
+      String(formData.get("toGroupId") ?? "")
+    );
+
+    debug.complete({ viewerId: viewer.id });
+  } catch (error) {
+    debug.fail(error, { viewerId: viewer.id });
+    throw error;
+  }
+
+  revalidatePath(`/app/intake/batch/${batchId}`);
 }
