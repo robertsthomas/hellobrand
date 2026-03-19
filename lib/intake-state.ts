@@ -13,6 +13,11 @@ function toIntakeSessionRecord(session: {
   status: string;
   errorMessage: string | null;
   inputSource: string | null;
+  draftBrandName?: string | null;
+  draftCampaignName?: string | null;
+  draftNotes?: string | null;
+  draftPastedText?: string | null;
+  draftPastedTextTitle?: string | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -25,6 +30,11 @@ function toIntakeSessionRecord(session: {
     status: session.status as IntakeSessionStatus,
     errorMessage: session.errorMessage,
     inputSource: (session.inputSource ?? null) as IntakeSessionRecord["inputSource"],
+    draftBrandName: session.draftBrandName ?? null,
+    draftCampaignName: session.draftCampaignName ?? null,
+    draftNotes: session.draftNotes ?? null,
+    draftPastedText: session.draftPastedText ?? null,
+    draftPastedTextTitle: session.draftPastedTextTitle ?? null,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: iso(session.completedAt),

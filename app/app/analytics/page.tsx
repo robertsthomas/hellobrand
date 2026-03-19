@@ -1,14 +1,15 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { BarChart3, CheckCircle2, CircleAlert, RefreshCcw } from "lucide-react";
 
+import { AnalyticsSkeleton } from "@/components/skeletons";
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import { requireViewer } from "@/lib/auth";
-import { listDealsForViewer } from "@/lib/deals";
-import { getProfileForViewer } from "@/lib/profile";
+import { getCachedDealAggregates, getCachedProfile } from "@/lib/cached-data";
 import { parseProfileMetadata, type ProfilePlatform } from "@/lib/profile-metadata";
-import { getRepository } from "@/lib/repository";
 import type { DealAggregate } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+
 
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -32,24 +33,22 @@ function getPlatformStatus(handle: string, audienceLabel: string | null) {
   };
 }
 
-function isDealAggregate(
-  aggregate: Awaited<ReturnType<ReturnType<typeof getRepository>["getDealAggregate"]>>
-): aggregate is DealAggregate {
-  return aggregate !== null;
+export default function AnalyticsPage() {
+  return (
+    <Suspense fallback={<AnalyticsSkeleton />}>
+      <AnalyticsContent />
+    </Suspense>
+  );
 }
 
-export default async function AnalyticsPage() {
+async function AnalyticsContent() {
   const viewer = await requireViewer();
-  const [deals, profile] = await Promise.all([
-    listDealsForViewer(viewer),
-    getProfileForViewer(viewer)
+  const [aggregatesWithConflicts, profile] = await Promise.all([
+    getCachedDealAggregates(viewer),
+    getCachedProfile(viewer)
   ]);
 
-  const aggregates = await Promise.all(
-    deals.map((deal) => getRepository().getDealAggregate(viewer.id, deal.id))
-  );
-
-  const safeAggregates = aggregates.filter(isDealAggregate);
+  const safeAggregates = aggregatesWithConflicts as DealAggregate[];
   const totalRevenue = safeAggregates.reduce(
     (sum, aggregate) => sum + (aggregate?.terms?.paymentAmount ?? 0),
     0

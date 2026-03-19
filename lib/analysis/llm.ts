@@ -22,7 +22,10 @@ import {
   toPlainDealSummary
 } from "@/lib/deal-summary";
 
-type TermsData = Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
+type TermsData = Omit<
+  DealTermsRecord,
+  "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"
+>;
 type LlmTask = "extract_section" | "analyze_risks" | "generate_summary" | "generate_brief";
 type LlmRoute = {
   primary: string;

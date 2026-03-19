@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, Suspense } from "react";
 
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { BriefGenerator } from "@/components/brief-generator";
@@ -15,6 +15,7 @@ import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { RiskFlags } from "@/components/risk-flags";
+import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
 import {
@@ -25,11 +26,12 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
+import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
-import { getDealForViewer } from "@/lib/deals";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+
 
 function renderSummaryParagraph(paragraph: string) {
   const pattern =
@@ -54,7 +56,21 @@ function renderSummaryParagraph(paragraph: string) {
   });
 }
 
-export default async function WorkspaceDealDetailPage({
+export default function WorkspaceDealDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ dealId: string }>;
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  return (
+    <Suspense fallback={<DealDetailSkeleton />}>
+      <DealDetailContent params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function DealDetailContent({
   params,
   searchParams
 }: {
@@ -65,7 +81,7 @@ export default async function WorkspaceDealDetailPage({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const viewer = await requireViewer();
 
-  const aggregate = await getDealForViewer(viewer, dealId);
+  const aggregate = await getCachedDealForViewer(viewer, dealId);
 
   if (!aggregate) {
     notFound();

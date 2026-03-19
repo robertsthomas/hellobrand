@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -21,16 +22,18 @@ import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { QuickActionsPanel } from "@/components/quick-actions-panel";
 import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
+import { DashboardSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
+import { getCachedDealAggregates } from "@/lib/cached-data";
 import { countConflictSeverity } from "@/lib/conflict-intelligence";
-import { listDealAggregatesForViewer } from "@/lib/deals";
 import { listIntakeDraftsForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { cn, formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+
 
 function daysUntil(date: string | null) {
   if (!date) {
@@ -91,10 +94,20 @@ function paymentBadgeClass(status: string) {
   return "border-black/8 bg-[#f5f6f8] text-[#667085] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#a3acb9]";
 }
 
-export default async function WorkspaceDashboardPage() {
+export default function WorkspaceDashboardPage() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+async function DashboardContent() {
   const viewer = await requireViewer();
-  const aggregates = await listDealAggregatesForViewer(viewer);
-  const intakeDrafts = await listIntakeDraftsForViewer(viewer);
+  const [aggregates, intakeDrafts] = await Promise.all([
+    getCachedDealAggregates(viewer),
+    listIntakeDraftsForViewer(viewer)
+  ]);
   const queuedIntakeWorkspaces = intakeDrafts.filter(
     ({ session }) => session.status === "queued"
   );

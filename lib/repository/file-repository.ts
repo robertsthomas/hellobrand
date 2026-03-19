@@ -33,16 +33,19 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
     deals: (store.deals ?? []).map((deal) => ({
       ...deal,
       confirmedAt: deal.confirmedAt ?? deal.createdAt ?? null,
-      status:
-        deal.status === "ready"
-          ? "negotiating"
-          : deal.status === "processing"
-            ? "contract_received"
-            : deal.status === "needs_attention"
-              ? "negotiating"
-              : deal.status === "draft"
-                ? "contract_received"
-                : deal.status,
+      status: (() => {
+        const legacyStatus = deal.status as string;
+
+        if (legacyStatus === "ready" || legacyStatus === "needs_attention") {
+          return "negotiating";
+        }
+
+        if (legacyStatus === "processing" || legacyStatus === "draft") {
+          return "contract_received";
+        }
+
+        return deal.status;
+      })(),
       paymentStatus:
         deal.paymentStatus === "not_invoiced"
           ? "not_invoiced"
@@ -57,15 +60,22 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
         deal.legalDisclaimer ||
         "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice."
     })),
-    documents: (store.documents ?? []).map((document) => ({
-      ...document,
-      rawText: document.rawText ?? null,
-      normalizedText: document.normalizedText ?? null,
-      documentKind: document.documentKind ?? document.type ?? "unknown",
-      classificationConfidence: document.classificationConfidence ?? null,
-      sourceType: document.sourceType ?? "file",
-      errorMessage: document.errorMessage ?? document.failureReason ?? null
-    })),
+    documents: (store.documents ?? []).map((document) => {
+      const legacyDocument = document as DocumentRecord & {
+        type?: string;
+        failureReason?: string | null;
+      };
+
+      return {
+        ...document,
+        rawText: document.rawText ?? null,
+        normalizedText: document.normalizedText ?? null,
+        documentKind: document.documentKind ?? legacyDocument.type ?? "unknown",
+        classificationConfidence: document.classificationConfidence ?? null,
+        sourceType: document.sourceType ?? "file",
+        errorMessage: document.errorMessage ?? legacyDocument.failureReason ?? null
+      };
+    }),
     dealTerms: (store.dealTerms ?? []).map((terms) => ({
       ...terms,
       brandName: terms.brandName ?? null,

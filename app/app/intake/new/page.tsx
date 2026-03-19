@@ -1,14 +1,28 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
+import { CardSkeleton } from "@/components/skeletons";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { IntakeDraftEditor } from "@/components/intake-draft-editor";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer, listIntakeDraftsForViewer } from "@/lib/intake";
 
-export default async function NewIntakePage({
+export default function NewIntakePage({
+  searchParams
+}: {
+  searchParams: Promise<{ mode?: string; draft?: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="p-8"><div className="mx-auto max-w-6xl"><CardSkeleton /></div></div>}>
+      <NewIntakeContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function NewIntakeContent({
   searchParams
 }: {
   searchParams: Promise<{ mode?: string; draft?: string }>;

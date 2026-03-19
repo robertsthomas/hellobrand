@@ -1,12 +1,24 @@
-import { ProfileEditor } from "@/components/profile-editor";
-import { requireViewer } from "@/lib/auth";
-import { getProfileForViewer, listProfileAuditForViewer } from "@/lib/profile";
+import { Suspense } from "react";
 
-export default async function ProfilePage() {
+import { ProfileEditor } from "@/components/profile-editor";
+import { ProfileSkeleton } from "@/components/skeletons";
+import { requireViewer } from "@/lib/auth";
+import { getCachedProfile, getCachedProfileAudit } from "@/lib/cached-data";
+
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<ProfileSkeleton />}>
+      <ProfileContent />
+    </Suspense>
+  );
+}
+
+async function ProfileContent() {
   const viewer = await requireViewer();
   const [profile, recentChanges] = await Promise.all([
-    getProfileForViewer(viewer),
-    listProfileAuditForViewer(viewer)
+    getCachedProfile(viewer),
+    getCachedProfileAudit(viewer)
   ]);
 
   return (

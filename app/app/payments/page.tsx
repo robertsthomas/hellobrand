@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { savePaymentAction } from "@/app/actions";
+import { PaymentsSkeleton } from "@/components/skeletons";
 import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { requireViewer } from "@/lib/auth";
-import { listPaymentsForViewer } from "@/lib/payments";
+import { getCachedPayments } from "@/lib/cached-data";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+
 
 function paymentBadgeClass(status: string) {
   if (status === "paid") {
@@ -23,9 +26,17 @@ function paymentBadgeClass(status: string) {
   return "border-black/8 bg-[#f5f6f8] text-[#667085] hover:bg-[#f5f6f8]";
 }
 
-export default async function PaymentsPage() {
+export default function PaymentsPage() {
+  return (
+    <Suspense fallback={<PaymentsSkeleton />}>
+      <PaymentsContent />
+    </Suspense>
+  );
+}
+
+async function PaymentsContent() {
   const viewer = await requireViewer();
-  const rows = await listPaymentsForViewer(viewer);
+  const rows = await getCachedPayments(viewer);
 
   const totals = rows.reduce(
     (accumulator, row) => {

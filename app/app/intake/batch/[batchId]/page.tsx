@@ -1,13 +1,27 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 
 import { BatchReviewPanel } from "@/components/batch-review-panel";
+import { CardSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
 import { getBatchForViewer } from "@/lib/intake";
 import { getRepository } from "@/lib/repository";
 
-export default async function BatchReviewPage({
+export default function BatchReviewPage({
+  params
+}: {
+  params: Promise<{ batchId: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="p-8"><div className="mx-auto max-w-4xl"><CardSkeleton /></div></div>}>
+      <BatchReviewContent params={params} />
+    </Suspense>
+  );
+}
+
+async function BatchReviewContent({
   params
 }: {
   params: Promise<{ batchId: string }>;

@@ -494,7 +494,7 @@ function campaignWindowFromTimelineItems(timelineItems: IntakeTimelineItem[]) {
     .map((item) => presentText(item.date))
     .filter(
       (value): value is string =>
-        Boolean(value) &&
+        typeof value === "string" &&
         (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value) ||
           /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(
             value

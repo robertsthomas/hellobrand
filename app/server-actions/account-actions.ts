@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { requireViewer } from "@/lib/auth";
 import { updatePaymentForViewer } from "@/lib/payments";
@@ -32,6 +32,9 @@ export async function savePaymentAction(formData: FormData) {
   revalidatePath("/app/payments");
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  updateTag(`user-${viewer.id}-payments`);
+  updateTag(`user-${viewer.id}-deals`);
+  updateTag(`deal-${dealId}`);
 }
 
 export async function saveProfileAction(formData: FormData) {
@@ -48,4 +51,5 @@ export async function saveProfileAction(formData: FormData) {
   await updateProfileForViewer(viewer, input);
   revalidatePath("/app/profile");
   revalidatePath("/app");
+  updateTag(`user-${viewer.id}-profile`);
 }

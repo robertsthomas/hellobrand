@@ -423,9 +423,9 @@ export function TermsEditor({
               className={SELECT_CLASS}
             name="usageRightsOrganicAllowed"
             defaultValue={
-              terms?.usageRightsOrganicAllowed === null
+              terms?.usageRightsOrganicAllowed == null
                 ? ""
-                : String(terms.usageRightsOrganicAllowed)
+                : String(terms?.usageRightsOrganicAllowed)
             }
           >
             <option value="">Unknown</option>
@@ -439,9 +439,9 @@ export function TermsEditor({
               className={SELECT_CLASS}
             name="usageRightsPaidAllowed"
             defaultValue={
-              terms?.usageRightsPaidAllowed === null
+              terms?.usageRightsPaidAllowed == null
                 ? ""
-                : String(terms.usageRightsPaidAllowed)
+                : String(terms?.usageRightsPaidAllowed)
             }
           >
             <option value="">Unknown</option>
@@ -455,9 +455,9 @@ export function TermsEditor({
               className={SELECT_CLASS}
             name="whitelistingAllowed"
             defaultValue={
-              terms?.whitelistingAllowed === null
+              terms?.whitelistingAllowed == null
                 ? ""
-                : String(terms.whitelistingAllowed)
+                : String(terms?.whitelistingAllowed)
             }
           >
             <option value="">Unknown</option>
@@ -546,9 +546,9 @@ export function TermsEditor({
               className={SELECT_CLASS}
             name="exclusivityApplies"
             defaultValue={
-              terms?.exclusivityApplies === null
+              terms?.exclusivityApplies == null
                 ? ""
-                : String(terms.exclusivityApplies)
+                : String(terms?.exclusivityApplies)
             }
           >
             <option value="">Unknown</option>
@@ -632,9 +632,9 @@ export function TermsEditor({
               className={SELECT_CLASS}
             name="terminationAllowed"
             defaultValue={
-              terms?.terminationAllowed === null
+              terms?.terminationAllowed == null
                 ? ""
-                : String(terms.terminationAllowed)
+                : String(terms?.terminationAllowed)
             }
           >
             <option value="">Unknown</option>

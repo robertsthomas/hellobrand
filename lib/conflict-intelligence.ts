@@ -8,7 +8,10 @@ import type {
   FieldEvidence
 } from "@/lib/types";
 
-type TermsData = Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
+type TermsData = Omit<
+  DealTermsRecord,
+  "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"
+>;
 
 const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
   beauty_personal_care: [
@@ -535,10 +538,12 @@ function extractDisclosureObligationsFromText(
 
 function campaignDateWindowFromTerms(terms: TermsData) {
   const dates = uniqueStrings(
-    terms.deliverables.map((item) => item.dueDate).concat(
-      terms.campaignDateWindow?.startDate,
-      terms.campaignDateWindow?.endDate
-    )
+    terms.deliverables
+      .map((item) => item.dueDate)
+      .concat([
+        terms.campaignDateWindow?.startDate ?? null,
+        terms.campaignDateWindow?.endDate ?? null
+      ])
   )
     .map((value) => parseDate(value))
     .filter((value): value is Date => Boolean(value))

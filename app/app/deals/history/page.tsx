@@ -1,8 +1,12 @@
+import { Suspense } from "react";
+
 import { DealHistoryTable, type DealHistoryRow } from "@/components/deal-history-table";
+import { TableSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
-import { listDealAggregatesForViewer } from "@/lib/deals";
+import { getCachedDealAggregates } from "@/lib/cached-data";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import type { DealRecord } from "@/lib/types";
+
 
 function mapStageGroup(
   deal: Pick<DealRecord, "status" | "paymentStatus">
@@ -48,9 +52,17 @@ function getDeliverablesLabel(count: number) {
   return `${count} pending`;
 }
 
-export default async function DealHistoryPage() {
+export default function DealHistoryPage() {
+  return (
+    <Suspense fallback={<div className="px-6 py-8 lg:px-10 lg:py-10"><div className="mx-auto max-w-[1400px]"><TableSkeleton rows={6} /></div></div>}>
+      <DealHistoryContent />
+    </Suspense>
+  );
+}
+
+async function DealHistoryContent() {
   const viewer = await requireViewer();
-  const aggregates = await listDealAggregatesForViewer(viewer);
+  const aggregates = await getCachedDealAggregates(viewer);
 
   const rows: DealHistoryRow[] = aggregates.map((aggregate) => {
     const normalized = buildNormalizedIntakeRecord(aggregate);

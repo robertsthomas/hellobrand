@@ -252,7 +252,9 @@ export function createSeedStore(): AppStore {
           terminationNotice: terms.terminationNotice,
           terminationConditions: terms.terminationConditions,
           governingLaw: terms.governingLaw,
-          notes: terms.notes
+          notes: terms.notes,
+          manuallyEditedFields: terms.manuallyEditedFields,
+          briefData: terms.briefData
         },
         createdAt: now
       }

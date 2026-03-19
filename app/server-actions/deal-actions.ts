@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { normalizeDealCategory } from "@/lib/conflict-intelligence";
@@ -30,6 +30,13 @@ import {
   parseNullableNumber,
   parseNullableString
 } from "@/app/action-helpers";
+
+function invalidateDeals(viewerId: string, dealId?: string) {
+  updateTag(`user-${viewerId}-deals`);
+  if (dealId) {
+    updateTag(`deal-${dealId}`);
+  }
+}
 
 export async function createDealAction(formData: FormData) {
   const viewer = await requireViewer();
@@ -76,6 +83,7 @@ export async function uploadDocumentsAction(formData: FormData) {
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
   revalidatePath("/app/deals/history");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function reprocessDocumentAction(formData: FormData) {
@@ -84,6 +92,7 @@ export async function reprocessDocumentAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   await reprocessDocumentFromDeals(viewer, documentId);
   revalidatePath(`/app/deals/${dealId}`);
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function saveDealMetaAction(formData: FormData) {
@@ -98,6 +107,7 @@ export async function saveDealMetaAction(formData: FormData) {
   await updateDealFromDeals(viewer, dealId, input);
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function saveTermsAction(formData: FormData) {
@@ -166,6 +176,7 @@ export async function saveTermsAction(formData: FormData) {
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function saveDealNotesAction(formData: FormData) {
@@ -176,6 +187,7 @@ export async function saveDealNotesAction(formData: FormData) {
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function generateDraftAction(formData: FormData) {
@@ -185,6 +197,7 @@ export async function generateDraftAction(formData: FormData) {
 
   await generateDraftFromDeals(viewer, dealId, intent);
   revalidatePath(`/app/deals/${dealId}`);
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function deleteWorkspaceAction(formData: FormData) {
@@ -219,6 +232,8 @@ export async function deleteWorkspaceAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/deals/history");
   revalidatePath("/app/payments");
+  invalidateDeals(viewer.id, dealId);
+  updateTag(`user-${viewer.id}-payments`);
   redirect(redirectTo);
 }
 
@@ -232,6 +247,7 @@ export async function applyPendingChangesAction(formData: FormData) {
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function dismissPendingChangesAction(formData: FormData) {
@@ -242,6 +258,7 @@ export async function dismissPendingChangesAction(formData: FormData) {
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }
 
 export async function updateDeliverablesAction(dealId: string, deliverables: unknown[]) {
@@ -249,4 +266,5 @@ export async function updateDeliverablesAction(dealId: string, deliverables: unk
   await updateTermsFromDeals(viewer, dealId, { deliverables: deliverables as never });
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
 }

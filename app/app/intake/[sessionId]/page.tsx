@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
@@ -12,9 +13,19 @@ import { StartQueuedAnalysisButton } from "@/components/start-queued-analysis-bu
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 
-export const dynamic = "force-dynamic";
+export default function IntakeProcessingPage({
+  params
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
+      <IntakeProcessingContent params={params} />
+    </Suspense>
+  );
+}
 
-export default async function IntakeProcessingPage({
+async function IntakeProcessingContent({
   params
 }: {
   params: Promise<{ sessionId: string }>;

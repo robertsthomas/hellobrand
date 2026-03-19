@@ -156,5 +156,5 @@ export function toPlainDealSummary(body: string | null | undefined) {
     return serializeDealSummarySections(sections);
   }
 
-  return presentText(body) ? cleanParagraph(body) : null;
+  return typeof body === "string" && presentText(body) ? cleanParagraph(body) : null;
 }

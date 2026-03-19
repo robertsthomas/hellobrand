@@ -122,7 +122,7 @@ export const dealTermsInputSchema = z.object({
   exclusivityCategory: z.string().nullable(),
   exclusivityDuration: z.string().nullable(),
   exclusivityRestrictions: z.string().nullable(),
-  brandCategory: z.string().nullable().optional(),
+  brandCategory: z.enum(dealCategoryValues).nullable().optional(),
   competitorCategories: z.array(z.string()).optional().default([]),
   restrictedCategories: z.array(z.string()).optional().default([]),
   campaignDateWindow: campaignDateWindowSchema.nullable().optional(),

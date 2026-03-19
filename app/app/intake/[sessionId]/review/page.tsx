@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { LoaderCircle, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
@@ -142,9 +142,19 @@ function intakeConflictMessagesByField(conflicts: Array<{ type: string; title: s
   return messages;
 }
 
-export const dynamic = "force-dynamic";
+export default function IntakeSessionPage({
+  params
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
+      <IntakeReviewContent params={params} />
+    </Suspense>
+  );
+}
 
-export default async function IntakeSessionPage({
+async function IntakeReviewContent({
   params
 }: {
   params: Promise<{ sessionId: string }>;

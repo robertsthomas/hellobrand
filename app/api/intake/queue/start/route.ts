@@ -15,7 +15,9 @@ export async function POST(request: NextRequest) {
     const viewer = await requireApiViewer();
     const body = await request.json().catch(() => ({}));
     const sessionIds = Array.isArray(body.sessionIds)
-      ? body.sessionIds.filter((value): value is string => typeof value === "string")
+      ? body.sessionIds.filter(
+          (value: unknown): value is string => typeof value === "string"
+        )
       : undefined;
 
     const session = await startQueuedIntakeAnalysisForViewer(viewer, {

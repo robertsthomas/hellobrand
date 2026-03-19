@@ -6,7 +6,7 @@ import {
   UserButton
 } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import "@/app/globals.css";
 import { Show } from "@/components/clerk-show";
@@ -30,24 +30,26 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
-        <ClerkProvider
-          appearance={{
-            layout: {
-              showOptionalFields: false
-            }
-          }}
-        >
-          <header className="sr-only">
-            <Show when="signed-out">
-              <SignInButton />
-              <SignUpButton />
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </header>
-          <ThemeProvider>{children}</ThemeProvider>
-        </ClerkProvider>
+        <Suspense>
+          <ClerkProvider
+            appearance={{
+              layout: {
+                showOptionalFields: false
+              }
+            }}
+          >
+            <header className="sr-only">
+              <Show when="signed-out">
+                <SignInButton />
+                <SignUpButton />
+              </Show>
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+            </header>
+            <ThemeProvider>{children}</ThemeProvider>
+          </ClerkProvider>
+        </Suspense>
       </body>
     </html>
   );

@@ -1,8 +1,12 @@
+import { Suspense } from "react";
+
+import { NotificationsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
-import { listDealAggregatesForViewer } from "@/lib/deals";
+import { getCachedDealAggregates } from "@/lib/cached-data";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { NotificationsView } from "@/components/notifications-view";
 import type { DealAggregate } from "@/lib/types";
+
 
 export type NotificationType =
   | "payment_overdue"
@@ -121,9 +125,17 @@ function generateNotifications(aggregates: DealAggregate[]): NotificationItem[] 
   );
 }
 
-export default async function NotificationsPage() {
+export default function NotificationsPage() {
+  return (
+    <Suspense fallback={<NotificationsSkeleton />}>
+      <NotificationsContent />
+    </Suspense>
+  );
+}
+
+async function NotificationsContent() {
   const viewer = await requireViewer();
-  const aggregates = await listDealAggregatesForViewer(viewer);
+  const aggregates = await getCachedDealAggregates(viewer);
   const notifications = generateNotifications(aggregates);
 
   return (
