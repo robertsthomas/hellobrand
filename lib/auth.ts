@@ -44,28 +44,38 @@ async function upsertViewerFromSession() {
     return null;
   }
 
-  const defaults = deriveViewerDefaults(
-    session.userId,
-    (session.sessionClaims as Record<string, unknown> | undefined) ?? null
+  const claims = (session.sessionClaims as Record<string, unknown> | undefined) ?? null;
+  const defaults = deriveViewerDefaults(session.userId, claims);
+
+  // Prefer the real Clerk email, even if db has the @clerk.local fallback
+  const realEmail = firstString(
+    claims?.email,
+    claims?.primaryEmailAddress,
+    claims?.primary_email_address,
+    claims?.["email_address"]
   );
+
+  // Read display name from Clerk public metadata if synced from profile
+  const publicMeta = (claims?.publicMetadata ?? claims?.public_metadata) as Record<string, unknown> | undefined;
+  const metaDisplayName = firstString(publicMeta?.displayName);
 
   const user = await prisma.user.upsert({
     where: { id: session.userId },
     update: {
       email: defaults.email,
-      displayName: defaults.displayName
+      displayName: metaDisplayName ?? defaults.displayName
     },
     create: {
       id: session.userId,
       email: defaults.email,
-      displayName: defaults.displayName
+      displayName: metaDisplayName ?? defaults.displayName
     }
   });
 
   return {
     id: user.id,
-    email: user.email,
-    displayName: user.displayName,
+    email: realEmail ?? user.email,
+    displayName: metaDisplayName ?? user.displayName,
     mode: "clerk"
   } satisfies Viewer;
 }

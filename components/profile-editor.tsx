@@ -512,13 +512,13 @@ export function ProfileEditor({
           description="Keep your core channels here so intake and deal setup can reference the right public handles."
         />
 
-        <div className="space-y-4">
+        <div className="space-y-0">
           {form.generalHandles.map((entry) => (
             <div
               key={entry.id}
-              className="grid gap-3 border-b border-border pb-4 md:grid-cols-[40px_minmax(0,1fr)_160px]"
+              className="grid items-end gap-4 border-b border-border py-5 md:grid-cols-[44px_1fr_140px]"
             >
-              <div className="flex h-10 w-10 items-center justify-center border border-border bg-secondary">
+              <div className="flex h-12 w-11 items-center justify-center border border-border bg-secondary">
                 {iconForPlatform(entry.platform)}
               </div>
               <div className="space-y-2">

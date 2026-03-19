@@ -1,6 +1,5 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +15,6 @@ import {
   SheetHeader,
   SheetTitle
 } from "@/components/ui/sheet";
-import { Show } from "@/components/clerk-show";
 import { ThemeSwitch } from "@/components/theme-switch";
 import {
   getAppRouteMeta,
@@ -70,13 +68,13 @@ export function AppFrame({
     const normalizedQuery = sidebarQuery.trim();
 
     if (normalizedQuery.length === 0) {
-      router.push("/app/deals/history");
+      router.push("/app/search");
       return;
     }
 
     const params = new URLSearchParams();
     params.set("q", normalizedQuery);
-    router.push(`/app/deals/history?${params.toString()}`);
+    router.push(`/app/search?${params.toString()}`);
   };
 
   const renderNavItem = (item: (typeof primaryAppNavItems)[number]) => {
@@ -162,17 +160,17 @@ export function AppFrame({
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Show when="signed-in">
-                  <UserButton />
-                </Show>
+              <Link href="/app/profile" className="flex items-center gap-3 transition-colors hover:opacity-80">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
+                  {viewer.displayName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "HB"}
+                </div>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold text-foreground">
                     {viewer.displayName}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{handle}</p>
                 </div>
-              </div>
+              </Link>
 
               <Link
                 href="/app/intake/new"
@@ -290,17 +288,17 @@ export function AppFrame({
 
               <div className="border-t border-border px-5 py-5 dark:border-white/8">
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Show when="signed-in">
-                      <UserButton />
-                    </Show>
+                  <Link href="/app/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 transition-colors hover:opacity-80">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
+                      {viewer.displayName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "HB"}
+                    </div>
                     <div className="min-w-0">
                       <p className="truncate text-[13px] font-semibold text-foreground">
                         {viewer.displayName}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">{handle}</p>
                     </div>
-                  </div>
+                  </Link>
                   <Link
                     href="/app/intake/new"
                     onClick={() => setMobileMenuOpen(false)}

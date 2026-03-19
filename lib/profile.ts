@@ -1,4 +1,7 @@
+import { clerkClient } from "@clerk/nextjs/server";
+
 import { prisma } from "@/lib/prisma";
+import { parseProfileMetadata, type ProfileMetadata } from "@/lib/profile-metadata";
 import type { ProfileAuditRecord, ProfileRecord, Viewer } from "@/lib/types";
 
 function getProfileAuditDelegate() {
@@ -102,7 +105,12 @@ export async function getProfileForViewer(viewer: Viewer) {
     }
   });
 
-  return toProfileRecord(created);
+  const record = toProfileRecord(created);
+
+  // Sync initial profile to Clerk
+  void syncProfileToClerk(viewer.id, record).catch(() => undefined);
+
+  return record;
 }
 
 export async function updateProfileForViewer(
@@ -197,6 +205,9 @@ export async function updateProfileForViewer(
     });
   }
 
+  // Sync to Clerk metadata in the background
+  void syncProfileToClerk(viewer.id, toProfileRecord(profile)).catch(() => undefined);
+
   return toProfileRecord(profile);
 }
 
@@ -222,4 +233,51 @@ export async function listProfileAuditForViewer(viewer: Viewer, limit = 8) {
   });
 
   return events.map(toProfileAuditRecord);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Clerk metadata sync                                                */
+/* ------------------------------------------------------------------ */
+
+async function syncProfileToClerk(userId: string, profile: ProfileRecord) {
+  const client = await clerkClient();
+  const metadata = parseProfileMetadata(profile.payoutDetails).metadata;
+
+  const generalHandles = metadata.socialHandles
+    .filter((h) => !h.dealContext && h.handle.trim())
+    .map((h) => ({ platform: h.platform, handle: h.handle, audience: h.audienceLabel }));
+
+  // Public metadata: visible from frontend, used for display
+  const publicMetadata: Record<string, unknown> = {
+    displayName: profile.displayName,
+    businessName: profile.businessName,
+    bio: metadata.bio,
+    location: metadata.location,
+    primaryPlatform: metadata.primaryPlatform,
+    contentCategory: metadata.contentCategory,
+    socialHandles: generalHandles,
+    defaultCurrency: profile.defaultCurrency,
+    profileUpdatedAt: profile.updatedAt
+  };
+
+  // Private metadata: server-only, never exposed to browser
+  const privateMetadata: Record<string, unknown> = {
+    creatorLegalName: profile.creatorLegalName,
+    contactEmail: profile.contactEmail,
+    preferredSignature: profile.preferredSignature,
+    taxId: metadata.taxId,
+    rateCardUrl: metadata.rateCardUrl,
+    payoutNotes: metadata.payoutNotes,
+    reminderLeadDays: profile.reminderLeadDays,
+    conflictAlertsEnabled: profile.conflictAlertsEnabled,
+    paymentRemindersEnabled: profile.paymentRemindersEnabled
+  };
+
+  // Update Clerk user profile + metadata
+  await client.users.updateUser(userId, {
+    firstName: profile.displayName?.split(/\s+/)[0] ?? undefined,
+    lastName: profile.displayName?.split(/\s+/).slice(1).join(" ") || undefined,
+    publicMetadata,
+    privateMetadata
+  });
 }

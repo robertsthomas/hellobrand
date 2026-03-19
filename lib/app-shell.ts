@@ -76,5 +76,9 @@ export function getAppRouteMeta(pathname: string): AppRouteMeta {
     return { section: "Workspace", title: "Help" };
   }
 
+  if (pathname.startsWith("/app/search")) {
+    return { section: "Workspace", title: "Search" };
+  }
+
   return { section: "Workspace", title: "HelloBrand" };
 }
