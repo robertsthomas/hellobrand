@@ -7,6 +7,7 @@ import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { BriefGenerator } from "@/components/brief-generator";
 import { BriefOverview } from "@/components/brief-overview";
 import { DealContextPanel } from "@/components/deal-context-panel";
+import { DealEmailPanel } from "@/components/deal-email-panel";
 import { DeliverableTracker } from "@/components/deliverable-tracker";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
@@ -28,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
+import { listEmailAccountsForViewer, listInboxThreadsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -86,6 +88,12 @@ async function DealDetailContent({
   if (!aggregate) {
     notFound();
   }
+
+  const [linkedEmailThreads, recentEmailThreads, emailAccounts] = await Promise.all([
+    listLinkedEmailThreadsForViewerDeal(viewer, dealId),
+    listInboxThreadsForViewer(viewer, { limit: 12 }),
+    listEmailAccountsForViewer(viewer)
+  ]);
 
   const {
     deal,
@@ -341,21 +349,12 @@ async function DealDetailContent({
           </TabsContent>
 
           <TabsContent value="emails" className="mt-0 space-y-6">
-            <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-                    Emails
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-                    Email drafting will be available after you connect an email provider.
-                  </p>
-                </div>
-              </div>
-              <button className="mt-5 border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20">
-                Connect email
-              </button>
-            </section>
+            <DealEmailPanel
+              dealId={deal.id}
+              linkedThreads={linkedEmailThreads}
+              recentThreads={recentEmailThreads}
+              hasConnectedAccounts={emailAccounts.some((account) => account.status !== "disconnected")}
+            />
           </TabsContent>
 
           <TabsContent value="documents" className="mt-0 space-y-6">

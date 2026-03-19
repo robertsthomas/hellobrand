@@ -4,6 +4,7 @@ import {
   Bell,
   CircleHelp,
   Home,
+  Inbox,
   Receipt,
   Settings,
   UserRound
@@ -24,6 +25,7 @@ export type AppNavItem = {
 export const appNavItems: AppNavItem[] = [
   { href: "/app", label: "Dashboard", icon: Home },
   { href: "/app/deals/history", label: "All deals", icon: Archive },
+  { href: "/app/inbox", label: "Inbox", icon: Inbox },
   { href: "/app/payments", label: "Payments", icon: Receipt },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/notifications", label: "Notifications", icon: Bell },
@@ -46,6 +48,10 @@ export function getAppRouteMeta(pathname: string): AppRouteMeta {
 
   if (pathname.startsWith("/app/deals/")) {
     return { section: "Deals", title: "Deal workspace" };
+  }
+
+  if (pathname.startsWith("/app/inbox")) {
+    return { section: "Workspace", title: "Inbox" };
   }
 
   if (pathname.startsWith("/app/payments")) {

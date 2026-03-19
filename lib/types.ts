@@ -52,6 +52,21 @@ export type DraftIntent =
   | "confirm-deliverables"
   | "confirm-revised-brief";
 
+export type EmailProvider = "gmail" | "outlook";
+export type EmailAccountStatus =
+  | "connected"
+  | "syncing"
+  | "reconnect_required"
+  | "error"
+  | "disconnected";
+export type EmailDirection = "inbound" | "outbound";
+export type EmailLinkSource = "manual" | "ai_suggested" | "rule_based";
+
+export interface EmailParticipant {
+  name: string | null;
+  email: string;
+}
+
 export interface Viewer {
   id: string;
   email: string;
@@ -321,6 +336,125 @@ export interface EmailDraftRecord {
   body: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConnectedEmailAccountRecord {
+  id: string;
+  userId: string;
+  provider: EmailProvider;
+  providerAccountId: string;
+  emailAddress: string;
+  displayName: string | null;
+  status: EmailAccountStatus;
+  scopes: string[];
+  accessTokenEncrypted: string | null;
+  refreshTokenEncrypted: string | null;
+  tokenExpiresAt: string | null;
+  lastSyncAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailThreadRecord {
+  id: string;
+  accountId: string;
+  provider: EmailProvider;
+  providerThreadId: string;
+  subject: string;
+  snippet: string | null;
+  participants: EmailParticipant[];
+  lastMessageAt: string;
+  messageCount: number;
+  isContractRelated: boolean;
+  aiSummary: string | null;
+  aiSummaryUpdatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailAttachmentRecord {
+  id: string;
+  messageId: string;
+  providerAttachmentId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  storageKey: string | null;
+  extractedText: string | null;
+  createdAt: string;
+}
+
+export interface EmailMessageRecord {
+  id: string;
+  threadId: string;
+  providerMessageId: string;
+  internetMessageId: string | null;
+  from: EmailParticipant | null;
+  to: EmailParticipant[];
+  cc: EmailParticipant[];
+  bcc: EmailParticipant[];
+  subject: string;
+  textBody: string | null;
+  htmlBody: string | null;
+  sentAt: string | null;
+  receivedAt: string | null;
+  direction: EmailDirection;
+  hasAttachments: boolean;
+  rawStorageKey: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments: EmailAttachmentRecord[];
+}
+
+export interface EmailSyncStateRecord {
+  id: string;
+  accountId: string;
+  providerCursor: string | null;
+  providerSubscriptionId: string | null;
+  subscriptionExpiresAt: string | null;
+  lastHistoryId: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastErrorAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DealEmailLinkRecord {
+  id: string;
+  dealId: string;
+  threadId: string;
+  linkSource: EmailLinkSource;
+  confidence: number | null;
+  createdAt: string;
+}
+
+export interface EmailThreadLinkView {
+  id: string;
+  dealId: string;
+  threadId: string;
+  dealName: string;
+  brandName: string;
+  campaignName: string;
+  linkSource: EmailLinkSource;
+  confidence: number | null;
+  createdAt: string;
+}
+
+export interface EmailThreadListItem {
+  thread: EmailThreadRecord;
+  account: ConnectedEmailAccountRecord;
+  links: EmailThreadLinkView[];
+}
+
+export interface EmailThreadDetail {
+  thread: EmailThreadRecord;
+  account: ConnectedEmailAccountRecord;
+  messages: EmailMessageRecord[];
+  links: EmailThreadLinkView[];
 }
 
 export interface JobRecord {
@@ -618,6 +752,11 @@ export interface AppStore {
   dealTerms: DealTermsRecord[];
   riskFlags: RiskFlagRecord[];
   emailDrafts: EmailDraftRecord[];
+  emailAccounts: ConnectedEmailAccountRecord[];
+  emailThreads: EmailThreadRecord[];
+  emailMessages: EmailMessageRecord[];
+  emailSyncStates: EmailSyncStateRecord[];
+  dealEmailLinks: DealEmailLinkRecord[];
   assistantThreads: AssistantThreadRecord[];
   assistantMessages: AssistantMessageRecord[];
   assistantContextSnapshots: AssistantContextSnapshotRecord[];

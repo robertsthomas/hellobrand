@@ -172,6 +172,11 @@ export function createSeedStore(): AppStore {
         updatedAt: now
       }
     ],
+    emailAccounts: [],
+    emailThreads: [],
+    emailMessages: [],
+    emailSyncStates: [],
+    dealEmailLinks: [],
     assistantThreads: [],
     assistantMessages: [],
     assistantContextSnapshots: [],

@@ -8,22 +8,23 @@ datasource db {
 }
 
 model User {
-  id          String @id
-  email       String @unique
+  id          String   @id
+  email       String   @unique
   displayName String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  profile        Profile?
-  intakeSessions IntakeSession[]
-  intakeBatches  IntakeBatch[]
-  deals          Deal[]
+  profile            Profile?
+  intakeSessions     IntakeSession[]
+  intakeBatches      IntakeBatch[]
+  deals              Deal[]
+  emailAccounts      ConnectedEmailAccount[]
   assistantThreads   AssistantThread[]
   assistantSnapshots AssistantContextSnapshot[]
 }
 
 model Deal {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   userId              String
   brandName           String
   campaignName        String
@@ -35,20 +36,21 @@ model Deal {
   nextDeliverableDate DateTime?
   analyzedAt          DateTime?
   confirmedAt         DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  intakeSession     IntakeSession?
-  paymentRecord     PaymentRecord?
-  documents         Document[]
-  terms             DealTerms?
-  riskFlags         RiskFlag[]
-  emailDrafts       EmailDraft[]
-  assistantThreads  AssistantThread[]
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intakeSession      IntakeSession?
+  paymentRecord      PaymentRecord?
+  documents          Document[]
+  terms              DealTerms?
+  riskFlags          RiskFlag[]
+  emailDrafts        EmailDraft[]
+  assistantThreads   AssistantThread[]
   assistantSnapshots AssistantContextSnapshot[]
-  jobs              Job[]
-  summaries         Summary[]
+  jobs               Job[]
+  summaries          Summary[]
+  emailLinks         DealEmailLink[]
 }
 
 model Document {
@@ -68,13 +70,13 @@ model Document {
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
-  deal              Deal                 @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  sections          DocumentSection[]
-  extractionResult  ExtractionResult?
-  evidence          ExtractionEvidence[]
-  summaries         Summary[]
-  jobs              Job[]
-  intakeDocument    IntakeDocument?
+  deal             Deal                 @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  sections         DocumentSection[]
+  extractionResult ExtractionResult?
+  evidence         ExtractionEvidence[]
+  summaries        Summary[]
+  jobs             Job[]
+  intakeDocument   IntakeDocument?
 
   @@index([dealId])
 }
@@ -263,8 +265,134 @@ model EmailDraft {
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
-  @@index([dealId])
   @@unique([dealId, intent])
+  @@index([dealId])
+}
+
+model ConnectedEmailAccount {
+  id                    String    @id @default(uuid())
+  userId                String
+  provider              String
+  providerAccountId     String
+  emailAddress          String
+  displayName           String?
+  status                String
+  scopes                Json
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  lastSyncAt            DateTime?
+  lastErrorCode         String?
+  lastErrorMessage      String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threads   EmailThread[]
+  syncState EmailSyncState?
+
+  @@unique([userId, provider, providerAccountId])
+  @@index([userId, provider, status])
+}
+
+model EmailThread {
+  id                 String    @id @default(uuid())
+  accountId          String
+  provider           String
+  providerThreadId   String
+  subject            String
+  snippet            String?
+  participantsJson   Json
+  lastMessageAt      DateTime
+  messageCount       Int       @default(0)
+  isContractRelated  Boolean   @default(false)
+  aiSummary          String?
+  aiSummaryUpdatedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  account   ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages  EmailMessage[]
+  dealLinks DealEmailLink[]
+
+  @@unique([accountId, providerThreadId])
+  @@index([accountId, lastMessageAt])
+}
+
+model EmailMessage {
+  id                String    @id @default(uuid())
+  threadId          String
+  providerMessageId String
+  internetMessageId String?
+  fromJson          Json
+  toJson            Json
+  ccJson            Json
+  bccJson           Json
+  subject           String
+  textBody          String?
+  htmlBody          String?
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  direction         String
+  hasAttachments    Boolean   @default(false)
+  rawStorageKey     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  attachments EmailAttachment[]
+
+  @@unique([threadId, providerMessageId])
+  @@index([threadId, receivedAt])
+}
+
+model EmailAttachment {
+  id                   String   @id @default(uuid())
+  messageId            String
+  providerAttachmentId String
+  filename             String
+  mimeType             String
+  sizeBytes            Int
+  storageKey           String?
+  extractedText        String?
+  createdAt            DateTime @default(now())
+
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, providerAttachmentId])
+  @@index([messageId])
+}
+
+model EmailSyncState {
+  id                     String    @id @default(uuid())
+  accountId              String    @unique
+  providerCursor         String?
+  providerSubscriptionId String?
+  subscriptionExpiresAt  DateTime?
+  lastHistoryId          String?
+  lastSuccessfulSyncAt   DateTime?
+  lastErrorAt            DateTime?
+  lastErrorCode          String?
+  lastErrorMessage       String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  account ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model DealEmailLink {
+  id         String   @id @default(uuid())
+  dealId     String
+  threadId   String
+  linkSource String
+  confidence Float?
+  createdAt  DateTime @default(now())
+
+  deal   Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, threadId])
+  @@index([threadId])
 }
 
 model Job {
@@ -285,32 +413,32 @@ model Job {
 }
 
 model Profile {
-  id                 String   @id @default(uuid())
-  userId             String   @unique
-  displayName        String?
-  creatorLegalName   String?
-  businessName       String?
-  contactEmail       String?
-  preferredSignature String?
-  payoutDetails      String?
-  defaultCurrency    String?
-  reminderLeadDays   Int?
-  conflictAlertsEnabled Boolean @default(true)
-  paymentRemindersEnabled Boolean @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  userId                  String   @unique
+  displayName             String?
+  creatorLegalName        String?
+  businessName            String?
+  contactEmail            String?
+  preferredSignature      String?
+  payoutDetails           String?
+  defaultCurrency         String?
+  reminderLeadDays        Int?
+  conflictAlertsEnabled   Boolean  @default(true)
+  paymentRemindersEnabled Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditEvents ProfileAuditEvent[]
 }
 
 model ProfileAuditEvent {
-  id           String   @id @default(uuid())
-  profileId    String
-  actorUserId  String
+  id            String   @id @default(uuid())
+  profileId     String
+  actorUserId   String
   changedFields Json
-  snapshot     Json
-  createdAt    DateTime @default(now())
+  snapshot      Json
+  createdAt     DateTime @default(now())
 
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
@@ -318,9 +446,9 @@ model ProfileAuditEvent {
 }
 
 model IntakeSession {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   userId               String
-  dealId               String   @unique
+  dealId               String    @unique
   status               String
   errorMessage         String?
   inputSource          String?
@@ -331,8 +459,8 @@ model IntakeSession {
   draftPastedTextTitle String?
   completedAt          DateTime?
   expiresAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal       Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -355,8 +483,8 @@ model IntakeDocument {
 }
 
 model PaymentRecord {
-  id          String   @id @default(uuid())
-  dealId      String   @unique
+  id          String    @id @default(uuid())
+  dealId      String    @unique
   amount      Float?
   currency    String?
   invoiceDate DateTime?
@@ -365,8 +493,8 @@ model PaymentRecord {
   status      String
   notes       String?
   source      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 }

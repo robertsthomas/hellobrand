@@ -13,6 +13,7 @@ import { buildConflictResults } from "@/lib/conflict-intelligence";
 import { generateEmailDraft } from "@/lib/email/generate";
 import { createSeedStore } from "@/lib/repository/seed";
 import { extractDocumentText } from "@/lib/documents/extract";
+import type { DealAggregate } from "@/lib/types";
 
 const fixture = readFileSync(
   path.join(process.cwd(), "fixtures/contracts/sample-influencer-contract.txt"),
@@ -104,7 +105,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
 
   test("builds cross-deal conflict warnings for overlapping categories", () => {
     const seed = createSeedStore();
-    const first = {
+    const first: DealAggregate = {
       deal: seed.deals[0],
       latestDocument: seed.documents[0],
       documents: seed.documents,
@@ -120,7 +121,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       summaries: seed.summaries,
       currentSummary: seed.summaries[0]
     };
-    const second = {
+    const second: DealAggregate = {
       ...first,
       deal: {
         ...first.deal,
@@ -147,7 +148,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
 
   test("keeps unrelated category deals quiet when evidence is weak", () => {
     const seed = createSeedStore();
-    const first = {
+    const first: DealAggregate = {
       deal: seed.deals[0],
       latestDocument: seed.documents[0],
       documents: seed.documents,
@@ -163,7 +164,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       summaries: seed.summaries,
       currentSummary: seed.summaries[0]
     };
-    const second = {
+    const second: DealAggregate = {
       ...first,
       deal: {
         ...first.deal,

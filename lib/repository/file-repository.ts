@@ -120,6 +120,11 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       sourceDocumentId: flag.sourceDocumentId ?? null
     })),
     emailDrafts: store.emailDrafts ?? [],
+    emailAccounts: store.emailAccounts ?? [],
+    emailThreads: store.emailThreads ?? [],
+    emailMessages: store.emailMessages ?? [],
+    emailSyncStates: store.emailSyncStates ?? [],
+    dealEmailLinks: store.dealEmailLinks ?? [],
     assistantThreads: store.assistantThreads ?? [],
     assistantMessages: store.assistantMessages ?? [],
     assistantContextSnapshots: store.assistantContextSnapshots ?? [],

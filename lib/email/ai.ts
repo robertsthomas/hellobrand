@@ -1,0 +1,152 @@
+import OpenAI from "openai";
+
+import { getEmailDraftModel, getEmailSummaryModel } from "@/lib/email/config";
+import type { DealAggregate, EmailThreadDetail, ProfileRecord } from "@/lib/types";
+
+function providerConfig() {
+  if (!process.env.OPENROUTER_API_KEY) {
+    return null;
+  }
+
+  return {
+    apiKey: process.env.OPENROUTER_API_KEY,
+    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer":
+        process.env.OPENROUTER_SITE_URL ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        "http://localhost:3011",
+      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
+    }
+  };
+}
+
+function client() {
+  const config = providerConfig();
+  if (!config) {
+    return null;
+  }
+
+  return new OpenAI(config);
+}
+
+function plainTextThread(thread: EmailThreadDetail) {
+  return thread.messages
+    .map((message) => {
+      const from = message.from?.email ?? "unknown";
+      const receivedAt = message.receivedAt ?? message.sentAt ?? "unknown time";
+      return `From: ${from}\nAt: ${receivedAt}\nSubject: ${message.subject}\n\n${message.textBody ?? ""}`;
+    })
+    .join("\n\n---\n\n");
+}
+
+function fallbackSummary(thread: EmailThreadDetail) {
+  const participants = thread.thread.participants.map((participant) => participant.email).join(", ");
+  const latest = thread.messages[thread.messages.length - 1];
+  const latestBody = latest?.textBody?.trim() || latest?.htmlBody?.replace(/<[^>]+>/g, " ").trim() || "";
+
+  return [
+    `Subject: ${thread.thread.subject}`,
+    `Participants: ${participants || "Unknown"}`,
+    `Last activity: ${thread.thread.lastMessageAt}`,
+    latestBody ? `Latest message: ${latestBody.slice(0, 500)}` : null
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
+  const api = client();
+  if (!api) {
+    return fallbackSummary(thread);
+  }
+
+  const response = await api.chat.completions.create({
+    model: getEmailSummaryModel(),
+    temperature: 0.2,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Summarize the email thread for a creator managing brand deals. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps."
+      },
+      {
+        role: "user",
+        content: plainTextThread(thread)
+      }
+    ]
+  });
+
+  return response.choices[0]?.message?.content?.trim() || fallbackSummary(thread);
+}
+
+function fallbackDraft(thread: EmailThreadDetail, deal: DealAggregate | null, profile: ProfileRecord) {
+  const signoff = profile.preferredSignature?.trim() || profile.displayName?.trim() || "Creator";
+  const intro = deal
+    ? `Thanks for the note on ${deal.deal.campaignName}.`
+    : "Thanks for the note.";
+
+  return {
+    subject: thread.thread.subject.startsWith("Re:")
+      ? thread.thread.subject
+      : `Re: ${thread.thread.subject}`,
+    body: `${intro}\n\nI reviewed the thread and I’m aligned on the next steps. If there are any updates on timing, deliverables, or contract details, send them over and I’ll keep things moving.\n\nBest,\n${signoff}`
+  };
+}
+
+export async function generateEmailReplyDraft(
+  thread: EmailThreadDetail,
+  deal: DealAggregate | null,
+  profile: ProfileRecord
+) {
+  const api = client();
+  if (!api) {
+    return fallbackDraft(thread, deal, profile);
+  }
+
+  const dealContext = deal
+    ? [
+        `Brand: ${deal.deal.brandName}`,
+        `Campaign: ${deal.deal.campaignName}`,
+        `Payment terms: ${deal.terms?.paymentTerms ?? "Unknown"}`,
+        `Usage rights: ${deal.terms?.usageRights ?? "Unknown"}`,
+        `Deliverables: ${(deal.terms?.deliverables ?? []).map((item) => `${item.quantity ?? "TBD"} ${item.title}`).join(", ") || "Unknown"}`,
+        `Deal summary: ${deal.currentSummary?.body ?? deal.deal.summary ?? "None"}`
+      ].join("\n")
+    : "No linked deal context.";
+
+  const response = await api.chat.completions.create({
+    model: getEmailDraftModel(),
+    temperature: 0.35,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Write a concise creator-professional email reply. Use the thread and deal context, do not invent commitments, and keep the tone practical and clear. Return JSON with subject and body."
+      },
+      {
+        role: "user",
+        content: `Deal context:\n${dealContext}\n\nProfile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}\n\nThread:\n${plainTextThread(thread)}`
+      }
+    ],
+    response_format: { type: "json_object" }
+  });
+
+  try {
+    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as {
+      subject?: string;
+      body?: string;
+    };
+
+    if (parsed.subject?.trim() && parsed.body?.trim()) {
+      return {
+        subject: parsed.subject.trim(),
+        body: parsed.body.trim()
+      };
+    }
+  } catch {
+    // fall through to fallback
+  }
+
+  return fallbackDraft(thread, deal, profile);
+}
