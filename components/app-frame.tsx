@@ -187,7 +187,13 @@ export function AppFrame({
 
         <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetContent side="left" className="w-64 p-0 dark:bg-[#121419]">
+            <SheetContent
+              side="left"
+              className="w-64 p-0 dark:bg-[#121419]"
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+              }}
+            >
               <SheetHeader className="sr-only">
                 <SheetTitle>Navigation menu</SheetTitle>
                 <SheetDescription>App navigation and account actions.</SheetDescription>
@@ -335,9 +341,9 @@ export function AppFrame({
 
           <main
             ref={mainRef}
-            className="workspace-dot-grid flex-1 overflow-auto bg-white dark:bg-[#111318]"
+            className="workspace-dot-grid flex-1 overflow-hidden bg-white dark:bg-[#111318]"
           >
-            <div className="min-h-full">{children}</div>
+            <div className="flex h-full min-h-0 flex-col">{children}</div>
           </main>
         </div>
       </div>

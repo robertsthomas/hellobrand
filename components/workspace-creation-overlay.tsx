@@ -16,7 +16,7 @@ export function WorkspaceCreationOverlay() {
         <LoaderCircle className="h-8 w-8 animate-spin text-ocean" />
         <div className="space-y-2">
           <p className="text-2xl font-semibold tracking-[-0.02em] text-ink">
-            Creating workspace
+            Generating workspace
           </p>
           <p className="text-sm text-black/55 dark:text-white/60">
             Organizing your documents, extracted terms, and creator workflow details.

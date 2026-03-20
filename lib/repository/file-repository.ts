@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import path from "node:path";
 
+import { getRuntimeDir, getRuntimePath } from "@/lib/runtime-path";
 import { createSeedStore } from "@/lib/repository/seed";
 import type {
   AssistantContextSnapshotRecord,
@@ -24,8 +24,8 @@ import type {
   SummaryRecord
 } from "@/lib/types";
 
-const runtimeDir = path.join(process.cwd(), ".runtime");
-const dataFile = path.join(runtimeDir, "app-store.json");
+const runtimeDir = getRuntimeDir();
+const dataFile = getRuntimePath("app-store.json");
 
 function normalizeStore(store: Partial<AppStore>): AppStore {
   return {

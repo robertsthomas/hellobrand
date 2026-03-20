@@ -69,12 +69,12 @@ async function InboxContent({
 
 function InboxSkeleton() {
   return (
-    <div className="px-6 py-8 lg:px-10 lg:py-10">
-      <div className="mx-auto max-w-[1320px] animate-pulse space-y-6">
-        <div className="h-24 border border-black/8 bg-black/[0.04]" />
-        <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="h-[640px] border border-black/8 bg-black/[0.04]" />
-          <div className="h-[640px] border border-black/8 bg-black/[0.04]" />
+    <div className="flex h-full min-h-0 flex-col px-5 py-4 lg:px-8 lg:py-5">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1520px] animate-pulse flex-col gap-4">
+        <div className="h-20 border border-black/8 bg-black/[0.04]" />
+        <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <div className="min-h-[620px] border border-black/8 bg-black/[0.04]" />
+          <div className="min-h-[620px] border border-black/8 bg-black/[0.04]" />
         </div>
       </div>
     </div>

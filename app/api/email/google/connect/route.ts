@@ -10,6 +10,13 @@ export async function GET(_request: NextRequest) {
     const url = await createGoogleConnectUrlForViewer(viewer);
     return NextResponse.redirect(url);
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      const params = new URLSearchParams({
+        redirect_url: `${getAppBaseUrl()}/app/settings`
+      });
+      return NextResponse.redirect(`${getAppBaseUrl()}/sign-in?${params.toString()}`);
+    }
+
     const params = new URLSearchParams({
       email_error: error instanceof Error ? error.message : "Could not start Google connection.",
       email_provider: "gmail"

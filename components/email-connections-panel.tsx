@@ -32,6 +32,12 @@ function providerLabel(provider: SafeEmailAccount["provider"]) {
   return provider === "gmail" ? "Gmail" : "Outlook";
 }
 
+function providerConnectPath(provider: SafeEmailAccount["provider"]) {
+  return provider === "gmail"
+    ? "/api/email/google/connect"
+    : "/api/email/outlook/connect";
+}
+
 export function EmailConnectionsPanel({
   accounts,
   statusMessage,
@@ -125,7 +131,7 @@ export function EmailConnectionsPanel({
                 </div>
 
                 <a
-                  href={`/api/email/${provider}/connect`}
+                  href={providerConnectPath(provider)}
                   className="border border-black/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20"
                 >
                   {records.some((record) => ["connected", "syncing", "error", "reconnect_required"].includes(record.status))

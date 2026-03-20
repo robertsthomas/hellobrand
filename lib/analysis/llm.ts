@@ -60,6 +60,7 @@ function providerConfig() {
       defaultHeaders: {
         "HTTP-Referer":
           process.env.OPENROUTER_SITE_URL ||
+          process.env.INTEGRATIONS_APP_URL ||
           process.env.NEXT_PUBLIC_APP_URL ||
           "http://localhost:3011",
         "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"

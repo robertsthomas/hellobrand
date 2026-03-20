@@ -1,4 +1,10 @@
-import { getMicrosoftTenantId, getMicrosoftWebhookClientState, getOutlookRedirectUri, outlookScopes } from "@/lib/email/config";
+import {
+  getIntegrationBaseUrl,
+  getMicrosoftTenantId,
+  getMicrosoftWebhookClientState,
+  getOutlookRedirectUri,
+  outlookScopes
+} from "@/lib/email/config";
 import type { ProviderThreadPayload } from "@/lib/email/providers/types";
 import type { EmailParticipant } from "@/lib/types";
 
@@ -402,7 +408,7 @@ export async function createOutlookSubscription(accessToken: string) {
     method: "POST",
     body: JSON.stringify({
       changeType: "created,updated",
-      notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3011"}/api/email/outlook/webhook`,
+      notificationUrl: `${getIntegrationBaseUrl()}/api/email/outlook/webhook`,
       resource: "/me/mailFolders/inbox/messages",
       expirationDateTime,
       clientState: getMicrosoftWebhookClientState() ?? undefined

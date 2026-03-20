@@ -10,12 +10,19 @@ export function getAppBaseUrl() {
   return normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL);
 }
 
+export function getIntegrationBaseUrl() {
+  return normalizeBaseUrl(
+    process.env.INTEGRATIONS_APP_URL ||
+      process.env.NEXT_PUBLIC_APP_URL
+  );
+}
+
 export function getGoogleRedirectUri() {
-  return `${getAppBaseUrl()}/api/email/google/callback`;
+  return `${getIntegrationBaseUrl()}/api/email/google/callback`;
 }
 
 export function getOutlookRedirectUri() {
-  return `${getAppBaseUrl()}/api/email/outlook/callback`;
+  return `${getIntegrationBaseUrl()}/api/email/outlook/callback`;
 }
 
 export function getMicrosoftTenantId() {

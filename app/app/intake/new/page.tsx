@@ -16,7 +16,7 @@ export default function NewIntakePage({
   searchParams: Promise<{ mode?: string; draft?: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="p-8"><div className="mx-auto max-w-6xl"><CardSkeleton /></div></div>}>
+    <Suspense fallback={<div className="p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-6xl"><CardSkeleton /></div></div>}>
       <NewIntakeContent searchParams={searchParams} />
     </Suspense>
   );
@@ -60,18 +60,15 @@ async function NewIntakeContent({
   }
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <section className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
-              Documents
-            </p>
-            <h1 className="text-4xl font-semibold text-ink">New workspace</h1>
-            <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
-              Build one or more workspaces from uploaded documents or pasted text.
-              Start analysis when the queue is ready, then confirm each deal before
-              the workspace goes live.
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl space-y-5 sm:space-y-8">
+        <section className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+          <div className="max-w-3xl space-y-1.5 sm:space-y-3">
+            <h1 className="text-[2.45rem] font-semibold leading-none tracking-[-0.05em] text-ink sm:text-4xl">
+              New workspace
+            </h1>
+            <p className="hidden text-[15px] leading-7 text-black/60 dark:text-white/65 sm:block">
+              Add your sources, save each workspace, then start analysis.
             </p>
           </div>
           {initialDraft?.sessionId ? (

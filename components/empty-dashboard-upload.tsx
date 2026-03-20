@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, MessageSquareText, Play, Plus, Trash2 } from "lucide-react";
 
+import { InfoTooltip } from "@/components/app-tooltip";
 import { DuplicateDealDialog } from "@/components/duplicate-deal-dialog";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
@@ -19,7 +20,7 @@ import {
   type LocalWorkspaceManifestItem
 } from "@/lib/browser/local-workspace-queue";
 import type { IntakeDraftListItem } from "@/lib/types";
-import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
+import { useIntakeUiStore, type SelectedFileMeta } from "@/lib/stores/intake-ui-store";
 import { cn } from "@/lib/utils";
 
 interface ServerQueuedWorkspaceItem {
@@ -97,6 +98,24 @@ function sourceSummary(inputSource: "upload" | "paste" | "mixed" | null) {
   return "Uploaded documents";
 }
 
+function pendingSourceSummary(files: SelectedFileMeta[], pastedText: string) {
+  const hasText = pastedText.trim().length > 0;
+
+  if (files.length > 0 && hasText) {
+    return `${files.length} file${files.length === 1 ? "" : "s"} and text added`;
+  }
+
+  if (files.length > 0) {
+    return `${files.length} file${files.length === 1 ? "" : "s"} added`;
+  }
+
+  if (hasText) {
+    return "Text added";
+  }
+
+  return "No sources yet";
+}
+
 function toServerQueuedWorkspaceItem(item: IntakeDraftListItem): ServerQueuedWorkspaceItem {
   return {
     sessionId: item.session.id,
@@ -125,6 +144,10 @@ export function EmptyDashboardUpload({
   const [isComposerVisible, setIsComposerVisible] = useState(
     initialQueuedWorkspaces.length === 0
   );
+  const [duplicateLocalWorkspaceId, setDuplicateLocalWorkspaceId] = useState<string | null>(
+    null
+  );
+  const [ignoredDuplicateLocalIds, setIgnoredDuplicateLocalIds] = useState<string[]>([]);
 
   const mode = useIntakeUiStore((state) => state.mode);
   const pendingFiles = useIntakeUiStore((state) => state.pendingFiles);
@@ -156,18 +179,10 @@ export function EmptyDashboardUpload({
 
   const hasDraftSource = pendingFiles.length > 0 || pastedText.trim().length > 0;
   const queuedCount = localWorkspaces.length + serverQueuedWorkspaces.length;
-
-  const selectedFilesLabel = useMemo(() => {
-    if (selectedFiles.length === 0) {
-      return "No documents added yet.";
-    }
-
-    if (selectedFiles.length === 1) {
-      return selectedFiles[0]?.name ?? "1 document selected";
-    }
-
-    return `${selectedFiles.length} documents selected`;
-  }, [selectedFiles]);
+  const pendingSummary = useMemo(
+    () => pendingSourceSummary(selectedFiles, pastedText),
+    [pastedText, selectedFiles]
+  );
 
   async function createDraftSessionId(input: {
     brandName: string;
@@ -190,14 +205,17 @@ export function EmptyDashboardUpload({
     return payload.session.id as string;
   }
 
-  async function checkForDuplicates(): Promise<DuplicateMatch[]> {
+  async function checkForDuplicates(input: {
+    files: File[];
+    pastedText: string;
+  }): Promise<DuplicateMatch[]> {
     try {
       const formData = new FormData();
-      for (const file of pendingFiles) {
+      for (const file of input.files) {
         formData.append("documents", file);
       }
-      if (pastedText.trim()) {
-        formData.append("pastedText", pastedText.trim());
+      if (input.pastedText.trim()) {
+        formData.append("pastedText", input.pastedText.trim());
       }
 
       const response = await fetch("/api/intake/check-duplicates", {
@@ -211,7 +229,7 @@ export function EmptyDashboardUpload({
     }
   }
 
-  async function saveWorkspaceLocally() {
+  async function persistWorkspaceLocally() {
     const item = await saveLocalWorkspace({
       files: pendingFiles,
       pastedText: pastedText.trim(),
@@ -241,27 +259,15 @@ export function EmptyDashboardUpload({
 
     setIsSubmitting(true);
     setErrorMessage(null);
-    setIsDuplicateCheckPending(true);
 
     try {
-      const matches = await checkForDuplicates();
-
-      if (matches.length > 0) {
-        setDuplicateMatches(matches);
-        setIsDuplicateCheckPending(false);
-        setIsSubmitting(false);
-        return;
-      }
-
-      await saveWorkspaceLocally();
+      await persistWorkspaceLocally();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not save this workspace."
       );
-      clearDuplicateMatches();
     } finally {
       setIsSubmitting(false);
-      setIsDuplicateCheckPending(false);
     }
   }
 
@@ -270,17 +276,31 @@ export function EmptyDashboardUpload({
     setErrorMessage(null);
 
     try {
+      const localId = duplicateLocalWorkspaceId;
+      const payload = localId ? await loadLocalWorkspace(localId) : null;
+      const files = payload?.files ?? pendingFiles;
+      const nextPastedText = payload?.pastedText ?? pastedText;
+      const brandName =
+        payload?.brandName ?? buildWorkspaceBrand({ pastedText, fallbackBrandName: null });
+      const campaignName =
+        payload?.campaignName ??
+        buildWorkspaceLabel({
+          files: pendingFiles,
+          pastedText,
+          fallbackCampaignName: null
+        });
+
       const sessionId = await createDraftSessionId({
-        brandName: buildWorkspaceBrand({ pastedText, fallbackBrandName: null }),
-        campaignName: buildWorkspaceLabel({ files: pendingFiles, pastedText, fallbackCampaignName: null })
+        brandName,
+        campaignName
       });
 
       const formData = new FormData();
-      for (const file of pendingFiles) {
+      for (const file of files) {
         formData.append("documents", file);
       }
-      if (pastedText.trim()) {
-        formData.append("pastedText", pastedText.trim());
+      if (nextPastedText.trim()) {
+        formData.append("pastedText", nextPastedText.trim());
       }
       formData.append("startProcessing", "1");
       formData.append("targetDealId", dealId);
@@ -296,6 +316,14 @@ export function EmptyDashboardUpload({
       }
 
       clearDuplicateMatches();
+      setDuplicateLocalWorkspaceId(null);
+      setIgnoredDuplicateLocalIds([]);
+      if (localId) {
+        await deleteLocalWorkspace(localId);
+        setLocalWorkspaces((current) =>
+          current.filter((workspace) => workspace.localId !== localId)
+        );
+      }
       reset(initialMode);
       router.push(`/app/deals/${dealId}`);
       router.refresh();
@@ -309,16 +337,18 @@ export function EmptyDashboardUpload({
   }
 
   async function handleCreateNewAnyway() {
-    setIsSubmitting(true);
-    try {
-      await saveWorkspaceLocally();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not save this workspace."
-      );
-    } finally {
-      setIsSubmitting(false);
+    if (!duplicateLocalWorkspaceId) {
+      return;
     }
+
+    setIgnoredDuplicateLocalIds((current) =>
+      current.includes(duplicateLocalWorkspaceId)
+        ? current
+        : [...current, duplicateLocalWorkspaceId]
+    );
+    clearDuplicateMatches();
+    setDuplicateLocalWorkspaceId(null);
+    await startAnalysis();
   }
 
   async function removeLocalWorkspace(localId: string) {
@@ -337,6 +367,7 @@ export function EmptyDashboardUpload({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    setIsDuplicateCheckPending(true);
 
     try {
       const createdSessionIds: string[] = [];
@@ -346,6 +377,21 @@ export function EmptyDashboardUpload({
         const payload = await loadLocalWorkspace(workspace.localId);
         if (!payload) {
           throw new Error("A saved workspace is missing its local source data.");
+        }
+
+        if (!ignoredDuplicateLocalIds.includes(workspace.localId)) {
+          const matches = await checkForDuplicates({
+            files: payload.files,
+            pastedText: payload.pastedText
+          });
+
+          if (matches.length > 0) {
+            setDuplicateMatches(matches);
+            setDuplicateLocalWorkspaceId(workspace.localId);
+            setIsSubmitting(false);
+            setIsDuplicateCheckPending(false);
+            return;
+          }
         }
 
         const sessionId = await createDraftSessionId({
@@ -411,6 +457,9 @@ export function EmptyDashboardUpload({
       }
 
       reset(initialMode);
+      clearDuplicateMatches();
+      setDuplicateLocalWorkspaceId(null);
+      setIgnoredDuplicateLocalIds([]);
       router.push(`/app/intake/${payload.session.id}`);
       router.refresh();
     } catch (error) {
@@ -418,56 +467,68 @@ export function EmptyDashboardUpload({
         error instanceof Error ? error.message : "Could not start analysis."
       );
       setIsSubmitting(false);
+    } finally {
+      setIsDuplicateCheckPending(false);
     }
   }
 
   return (
-    <div className="flex w-full flex-col gap-6">
+    <div className="flex w-full flex-col gap-4 sm:gap-6">
       {isComposerVisible ? (
-        <div className="space-y-5 border-t border-black/8 pt-5 dark:border-white/10">
-          <div className="inline-flex border border-black/10 bg-white p-1 dark:border-white/10 dark:bg-white/[0.04]">
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => {
-                setMode("upload");
-                setErrorMessage(null);
-              }}
-              className={cn(
-                "px-4 py-2 text-sm font-medium transition-colors duration-200",
+        <div className="space-y-3 border-t border-black/8 pt-4 dark:border-white/10 sm:space-y-5 sm:pt-5">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex w-full max-w-[290px] border border-black/10 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/[0.04] sm:max-w-[320px]">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setMode("upload");
+                  setErrorMessage(null);
+                }}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-2.5 text-sm font-semibold transition-colors duration-200",
+                  mode === "upload"
+                    ? "bg-ocean text-white shadow-sm"
+                    : "text-black/60 hover:bg-black/[0.03] hover:text-black dark:text-white/60 dark:hover:bg-white/[0.04] dark:hover:text-white"
+                )}
+              >
+                Upload files
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setMode("paste");
+                  setErrorMessage(null);
+                }}
+                className={cn(
+                  "flex-1 rounded-sm px-3 py-2.5 text-sm font-semibold transition-colors duration-200",
+                  mode === "paste"
+                    ? "bg-ocean text-white shadow-sm"
+                    : "text-black/60 hover:bg-black/[0.03] hover:text-black dark:text-white/60 dark:hover:bg-white/[0.04] dark:hover:text-white"
+                )}
+              >
+                Paste text
+              </button>
+            </div>
+            <InfoTooltip
+              label="Workspace help"
+              content={
                 mode === "upload"
-                  ? "bg-ocean text-white shadow-sm"
-                  : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
-              )}
-            >
-              Upload files
-            </button>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => {
-                setMode("paste");
-                setErrorMessage(null);
-              }}
-              className={cn(
-                "px-4 py-2 text-sm font-medium transition-colors duration-200",
-                mode === "paste"
-                  ? "bg-ocean text-white shadow-sm"
-                  : "text-black/60 hover:text-black dark:text-white/60 dark:hover:text-white"
-              )}
-            >
-              Paste text
-            </button>
+                  ? "Add one workspace, save it, then start analysis. Contracts, briefs, and email files all work."
+                  : "Paste the contract, brief, or email text for one workspace, then save it and start analysis."
+              }
+              className="shrink-0 sm:hidden"
+            />
           </div>
 
-          <div className="grid gap-4 text-left">
-            <p className="text-sm text-muted-foreground">
-              Add sources for one workspace. When this workspace looks complete,
-              save it and add another if needed.
+          <div className="grid gap-3 text-left sm:gap-4">
+            <p className="hidden text-sm text-muted-foreground sm:block">
+              Add one workspace, save it, then start analysis.
             </p>
 
             {mode === "upload" ? (
-              <div className="grid gap-3 border border-dashed border-black/10 p-4 dark:border-white/10">
+              <div className="grid gap-3 border border-dashed border-black/10 p-3 dark:border-white/10 sm:gap-4 sm:p-4">
                 <input
                   ref={inputRef}
                   className="hidden"
@@ -479,34 +540,56 @@ export function EmptyDashboardUpload({
                     setErrorMessage(null);
                   }}
                 />
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="hidden text-sm text-muted-foreground sm:block">
+                    {selectedFiles.length > 0
+                      ? pendingSummary
+                      : "PDF, DOCX, PPTX, XLSX, TXT, and email files."}
+                  </div>
                   <button
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => inputRef.current?.click()}
-                    className={cn(buttonVariants({ className: "gap-2" }))}
+                    className={cn(
+                      buttonVariants({
+                        size: "sm",
+                        className:
+                          "w-auto self-start justify-center gap-2 px-4 sm:self-auto"
+                      })
+                    )}
                   >
                     <Plus className="h-4 w-4" />
-                    Add documents
+                    {selectedFiles.length > 0 ? "Add more" : "Add documents"}
                   </button>
-                  <span className="text-sm text-muted-foreground">{selectedFilesLabel}</span>
                 </div>
                 {selectedFiles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedFiles.map((file) => (
-                      <span
+                  <div className="grid gap-2 border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                    {selectedFiles.slice(0, 4).map((file) => (
+                      <div
                         key={`${file.name}:${file.size}:${file.type}`}
-                        className="inline-flex items-center gap-2 border border-black/8 px-3 py-1.5 text-xs text-[#667085] dark:border-white/10 dark:text-[#a3acb9]"
+                        className="flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
                       >
-                        <FileText className="h-3.5 w-3.5" />
-                        {file.name}
-                      </span>
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                      </div>
                     ))}
+                    {selectedFiles.length > 4 ? (
+                      <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                        +{selectedFiles.length - 4} more
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
+                ) : (
+                  <div className="hidden text-xs text-black/45 dark:text-white/45 sm:block">
+                    Add a contract, brief, or email file.
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="grid gap-3 border border-dashed border-black/10 p-4 dark:border-white/10">
+              <div className="grid gap-3 border border-dashed border-black/10 p-3 dark:border-white/10 sm:p-4">
+                <p className="hidden text-sm text-muted-foreground sm:block">
+                  Paste the brief, email, or contract text.
+                </p>
                 <Textarea
                   name="pastedText"
                   value={pastedText}
@@ -514,55 +597,42 @@ export function EmptyDashboardUpload({
                     setPastedText(event.currentTarget.value);
                     setErrorMessage(null);
                   }}
-                  placeholder="Paste a contract, email thread, brief, deliverables notes, or any brand context here."
-                  className="min-h-44 border-black/10 bg-white px-4 py-3 text-sm shadow-none dark:border-white/12 dark:bg-white/[0.04]"
+                  placeholder="Paste text"
+                  className="min-h-28 border-black/10 bg-white px-4 py-3 text-sm shadow-none dark:border-white/12 dark:bg-white/[0.04] sm:min-h-44"
                 />
-                <p className="text-xs text-black/45 dark:text-white/45">
-                  This text stays local until you start analysis.
-                </p>
+                {pastedText.trim() ? (
+                  <p className="hidden text-xs text-black/45 dark:text-white/45 sm:block">
+                    {pendingSummary}
+                  </p>
+                ) : null}
               </div>
             )}
 
             {(selectedFiles.length > 0 || pastedText.trim()) && (
-              <div className="grid gap-3 pt-1">
-                <div className="flex flex-wrap gap-2 text-xs text-[#667085] dark:text-[#a3acb9]">
-                  {selectedFiles.length > 0 ? (
-                    <span className="inline-flex items-center gap-2 border border-black/8 px-3 py-1.5 dark:border-white/10">
-                      <FileText className="h-3.5 w-3.5" />
-                      {selectedFiles.length} document{selectedFiles.length === 1 ? "" : "s"}
-                    </span>
-                  ) : null}
-                  {pastedText.trim() ? (
-                    <span className="inline-flex items-center gap-2 border border-black/8 px-3 py-1.5 dark:border-white/10">
-                      <MessageSquareText className="h-3.5 w-3.5" />
-                      Pasted text added
-                    </span>
-                  ) : null}
-                </div>
-
-                {duplicateMatches.length > 0 ? (
-                  <DuplicateDealDialog
-                    matches={duplicateMatches}
-                    onAddToExisting={(dealId) => void handleAddToExisting(dealId)}
-                    onCreateNew={() => void handleCreateNewAnyway()}
-                    isSubmitting={isSubmitting}
-                  />
-                ) : (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      disabled={isSubmitting}
-                      onClick={() => void finishWorkspace()}
-                      className={cn(buttonVariants({ className: "gap-2" }))}
-                    >
-                      {isSubmitting
-                        ? isDuplicateCheckPending
-                          ? "Checking for duplicates..."
-                          : "Saving..."
-                        : "Done adding sources"}
-                    </button>
+              <div className="grid gap-2 pt-1">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:inline-flex">
+                    {selectedFiles.length > 0 ? (
+                      <FileText className="h-4 w-4" />
+                    ) : (
+                      <MessageSquareText className="h-4 w-4" />
+                    )}
+                    <span>{pendingSummary}</span>
                   </div>
-                )}
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void finishWorkspace()}
+                    className={cn(
+                      buttonVariants({
+                        className:
+                          "w-full justify-center gap-2"
+                      })
+                    )}
+                  >
+                    {isSubmitting ? "Generating..." : "Generate workspace"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -571,14 +641,110 @@ export function EmptyDashboardUpload({
 
       {queuedCount > 0 ? (
         <div className="grid gap-5 border-t border-black/8 pt-5 text-left dark:border-white/10">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          {duplicateMatches.length > 0 ? (
+            <DuplicateDealDialog
+              matches={duplicateMatches}
+              onAddToExisting={(dealId) => void handleAddToExisting(dealId)}
+              onCreateNew={() => void handleCreateNewAnyway()}
+              isSubmitting={isSubmitting}
+            />
+          ) : null}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-foreground">Workspaces ready</h3>
-              <p className="text-sm text-muted-foreground">
-                Each workspace stays separate. Start analysis when you are ready.
+              <h3 className="text-base font-semibold text-foreground">Ready to analyze</h3>
+              <p className="text-sm text-muted-foreground sm:hidden">
+                {queuedCount} workspace{queuedCount === 1 ? "" : "s"} generated.
+              </p>
+              <p className="hidden text-sm text-muted-foreground sm:block">
+                {queuedCount} workspace{queuedCount === 1 ? "" : "s"} generated and ready to queue.
               </p>
             </div>
+          </div>
+
+          {localWorkspaces.length > 0 ? (
+            <div className="grid gap-3">
+              <div className="grid gap-3">
+                {localWorkspaces.map((workspace) => (
+                  <div
+                    key={workspace.localId}
+                    className="grid gap-3 border border-black/8 p-4 dark:border-white/10 md:grid-cols-[minmax(0,1fr)_auto]"
+                  >
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="truncate font-semibold text-foreground">
+                        {workspace.campaignName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{workspace.brandName}</p>
+                      <p className="text-sm text-[#667085] dark:text-[#a3acb9]">
+                        {sourceSummary(workspace.inputSource)}
+                        {workspace.fileCount > 0
+                          ? ` • ${workspace.fileCount} file${workspace.fileCount === 1 ? "" : "s"}`
+                          : ""}
+                        {workspace.hasPastedText ? " • text added" : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
+                      <button
+                        type="button"
+                        onClick={() => void removeLocalWorkspace(workspace.localId)}
+                        className="text-sm text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
+                        aria-label={`Remove ${workspace.campaignName}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <span className="text-xs font-medium uppercase tracking-[0.14em] text-black/55 dark:text-white/55">
+                        Waiting to start
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => void startAnalysis()}
+                  className={cn(buttonVariants({ className: "gap-2" }))}
+                >
+                  <Play className="h-4 w-4" />
+                  {isSubmitting
+                    ? isDuplicateCheckPending
+                      ? "Checking duplicates..."
+                      : "Generating workspace..."
+                    : "Generate workspace"}
+                </button>
+                {!isComposerVisible ? (
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      reset(initialMode);
+                      setErrorMessage(null);
+                      setIsComposerVisible(true);
+                    }}
+                    className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
+                  >
+                    Add another workspace
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {localWorkspaces.length === 0 ? (
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => void startAnalysis()}
+                className={cn(buttonVariants({ className: "gap-2" }))}
+              >
+                <Play className="h-4 w-4" />
+                {isSubmitting
+                  ? isDuplicateCheckPending
+                    ? "Checking duplicates..."
+                    : "Generating workspace..."
+                  : "Generate workspace"}
+              </button>
               {!isComposerVisible ? (
                 <button
                   type="button"
@@ -593,63 +759,6 @@ export function EmptyDashboardUpload({
                   Add another workspace
                 </button>
               ) : null}
-              <button
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void startAnalysis()}
-                className={cn(buttonVariants({ className: "gap-2" }))}
-              >
-                <Play className="h-4 w-4" />
-                {isSubmitting ? "Starting analysis..." : "Start analysis"}
-              </button>
-            </div>
-          </div>
-
-          {localWorkspaces.length > 0 ? (
-            <div className="grid gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-[#8f98a6]">
-                Saved locally
-              </p>
-              <div className="grid gap-3">
-                {localWorkspaces.map((workspace) => (
-                  <div
-                    key={workspace.localId}
-                    className="grid gap-3 border border-black/8 p-4 md:grid-cols-[minmax(0,1fr)_auto] dark:border-white/10"
-                  >
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate font-semibold text-foreground">
-                          {workspace.campaignName}
-                        </p>
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
-                          Saved locally
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{workspace.brandName}</p>
-                      <p className="text-xs text-[#98a2b3] dark:text-[#8f98a6]">
-                        {sourceSummary(workspace.inputSource)}
-                        {workspace.fileCount > 0
-                          ? ` • ${workspace.fileCount} file${workspace.fileCount === 1 ? "" : "s"}`
-                          : ""}
-                        {workspace.hasPastedText ? " • text added" : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-start justify-between gap-3 md:flex-col md:items-end">
-                      <button
-                        type="button"
-                        onClick={() => void removeLocalWorkspace(workspace.localId)}
-                        className="text-sm text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
-                        aria-label={`Remove ${workspace.campaignName}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <span className="text-xs font-medium text-black/55 dark:text-white/55">
-                        Waiting to start
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : null}
 
@@ -671,7 +780,7 @@ export function EmptyDashboardUpload({
                       <p className="mt-1 text-sm text-muted-foreground">
                         {workspace.brandName}
                       </p>
-                      <p className="mt-2 text-xs text-[#98a2b3] dark:text-[#8f98a6]">
+                      <p className="mt-2 text-sm text-[#667085] dark:text-[#a3acb9]">
                         {sourceSummary(workspace.inputSource)}
                       </p>
                     </div>

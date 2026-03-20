@@ -660,11 +660,11 @@ async function IntakeReviewContent({
                       Review complete?
                     </span>
                     <SubmitButton
-                      pendingLabel="Creating workspace..."
+                      pendingLabel="Generating workspace..."
                       className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={!showConfirmation}
                     >
-                      Create deal workspace
+                      Generate deal workspace
                     </SubmitButton>
                   </div>
                 </div>

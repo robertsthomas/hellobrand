@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
 
+import { getRuntimePath } from "@/lib/runtime-path";
+
 const DEFAULT_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "documents";
 const supabaseUrl =
   process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -26,7 +28,7 @@ function supabaseAdmin() {
 }
 
 async function ensureUploadDirectory() {
-  const target = path.join(process.cwd(), ".runtime", "uploads");
+  const target = getRuntimePath("uploads");
   await mkdir(target, { recursive: true });
   return target;
 }

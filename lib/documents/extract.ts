@@ -4,6 +4,7 @@ import path from "node:path";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
+import { getRuntimePath } from "@/lib/runtime-path";
 import { slugify } from "@/lib/utils";
 
 export class UnreadableDocumentError extends Error {
@@ -238,7 +239,7 @@ export async function persistExtractedText(
   fileName: string,
   text: string
 ) {
-  const directory = path.join(process.cwd(), ".runtime", "extracted");
+  const directory = getRuntimePath("extracted");
   await mkdir(directory, { recursive: true });
   const outputPath = path.join(
     directory,
