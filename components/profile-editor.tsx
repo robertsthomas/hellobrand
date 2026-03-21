@@ -74,7 +74,7 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
 
   return platforms.map((platform) => {
     const existing = initialHandles.find(
-      (entry) => entry.platform === platform && !entry.dealContext
+      (entry) => entry.platform === platform && !entry.partnershipContext
     );
 
     return (
@@ -83,7 +83,7 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
         platform,
         handle: "",
         audienceLabel: "",
-        dealContext: null
+        partnershipContext: null
       }
     );
   });
@@ -95,7 +95,7 @@ function emptyDealHandle(): SocialHandleEntry {
     platform: "instagram",
     handle: "",
     audienceLabel: "",
-    dealContext: ""
+    partnershipContext: ""
   };
 }
 
@@ -204,7 +204,7 @@ export function ProfileEditor({
         ? splitHandles.dealSpecificHandles.map((entry) => ({
             ...entry,
             audienceLabel: entry.audienceLabel ?? "",
-            dealContext: entry.dealContext ?? ""
+            partnershipContext: entry.partnershipContext ?? ""
           }))
         : [emptyDealHandle()]
   });
@@ -255,7 +255,7 @@ export function ProfileEditor({
 
   function updateDealHandle(
     id: string,
-    field: "dealContext" | "platform" | "handle" | "audienceLabel",
+    field: "partnershipContext" | "platform" | "handle" | "audienceLabel",
     value: string
   ) {
     setForm((current) => ({
@@ -281,7 +281,7 @@ export function ProfileEditor({
         ...form.dealHandles.map((entry) => ({
           ...entry,
           audienceLabel: entry.audienceLabel?.trim() || null,
-          dealContext: entry.dealContext?.trim() || null
+          partnershipContext: entry.partnershipContext?.trim() || null
         }))
       ];
 
@@ -570,12 +570,12 @@ export function ProfileEditor({
                 <FieldLabel htmlFor={`${entry.id}-context`}>Use for</FieldLabel>
                 <FlatInput
                   id={`${entry.id}-context`}
-                  value={entry.dealContext ?? ""}
+                  value={entry.partnershipContext ?? ""}
                   placeholder="Beauty brand partnerships, paid TikTok campaigns, parenthood content"
                   onChange={(event) =>
                     updateDealHandle(
                       entry.id,
-                      "dealContext",
+                      "partnershipContext",
                       event.currentTarget.value
                     )
                   }

@@ -33,7 +33,7 @@ export interface SocialHandleEntry {
   platform: ProfilePlatform;
   handle: string;
   audienceLabel: string | null;
-  dealContext: string | null;
+  partnershipContext: string | null;
 }
 
 export interface ProfileMetadata {
@@ -89,9 +89,11 @@ function normalizeSocialHandleEntry(
   const platform = normalizePlatform(record.platform) ?? "instagram";
   const handle = normalizeNullableString(record.handle);
   const audienceLabel = normalizeNullableString(record.audienceLabel);
-  const dealContext = normalizeNullableString(record.dealContext);
+  const partnershipContext =
+    normalizeNullableString(record.partnershipContext) ??
+    normalizeNullableString(record.dealContext);
 
-  if (!handle && !dealContext) {
+  if (!handle && !partnershipContext) {
     return null;
   }
 
@@ -102,7 +104,7 @@ function normalizeSocialHandleEntry(
     platform,
     handle: handle ?? "",
     audienceLabel,
-    dealContext
+    partnershipContext
   };
 }
 
@@ -178,7 +180,7 @@ export function splitSocialHandles(handles: SocialHandleEntry[]) {
   const dealSpecificHandles: SocialHandleEntry[] = [];
 
   handles.forEach((entry) => {
-    if (entry.dealContext) {
+    if (entry.partnershipContext) {
       dealSpecificHandles.push(entry);
       return;
     }

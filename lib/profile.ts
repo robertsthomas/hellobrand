@@ -249,7 +249,7 @@ async function syncProfileToClerk(userId: string, profile: ProfileRecord) {
   const metadata = parseProfileMetadata(profile.payoutDetails).metadata;
 
   const generalHandles = metadata.socialHandles
-    .filter((h) => !h.dealContext && h.handle.trim())
+    .filter((h) => !h.partnershipContext && h.handle.trim())
     .map((h) => ({ platform: h.platform, handle: h.handle, audience: h.audienceLabel }));
 
   // Public metadata: visible from frontend, used for display

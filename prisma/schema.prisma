@@ -7,6 +7,49 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PlanTier {
+  basic
+  standard
+  premium
+}
+
+enum BillingProvider {
+  stripe
+}
+
+enum BillingInterval {
+  month
+  year
+}
+
+enum BillingSubscriptionStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
+enum BillingTrialStatus {
+  granted
+  active
+  converted
+  expired
+  canceled
+  revoked
+}
+
+enum BillingWebhookEventStatus {
+  pending
+  processing
+  processed
+  ignored
+  failed
+}
+
 model User {
   id          String   @id
   email       String   @unique
@@ -14,18 +57,19 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  profile            Profile?
-  intakeSessions     IntakeSession[]
-  intakeBatches      IntakeBatch[]
-  deals              Deal[]
-  emailAccounts      ConnectedEmailAccount[]
+  profile               Profile?
+  intakeSessions        IntakeSession[]
+  intakeBatches         IntakeBatch[]
+  deals                 Deal[]
+  emailAccounts         ConnectedEmailAccount[]
   emailCandidateMatches EmailDealCandidateMatch[]
-  emailDealEvents    EmailDealEvent[]
-  emailTermSuggestions EmailDealTermSuggestion[]
-  emailActionItems   EmailActionItem[]
-  brandContacts      BrandContact[]
-  assistantThreads   AssistantThread[]
-  assistantSnapshots AssistantContextSnapshot[]
+  emailDealEvents       EmailDealEvent[]
+  emailTermSuggestions  EmailDealTermSuggestion[]
+  emailActionItems      EmailActionItem[]
+  brandContacts         BrandContact[]
+  assistantThreads      AssistantThread[]
+  assistantSnapshots    AssistantContextSnapshot[]
+  billingAccount        BillingAccount?
 }
 
 model Deal {
@@ -44,23 +88,23 @@ model Deal {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  intakeSession      IntakeSession?
-  paymentRecord      PaymentRecord?
-  documents          Document[]
-  terms              DealTerms?
-  riskFlags          RiskFlag[]
-  emailDrafts        EmailDraft[]
-  assistantThreads   AssistantThread[]
-  assistantSnapshots AssistantContextSnapshot[]
-  jobs               Job[]
-  summaries          Summary[]
-  emailLinks         DealEmailLink[]
+  user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intakeSession         IntakeSession?
+  paymentRecord         PaymentRecord?
+  documents             Document[]
+  terms                 DealTerms?
+  riskFlags             RiskFlag[]
+  emailDrafts           EmailDraft[]
+  assistantThreads      AssistantThread[]
+  assistantSnapshots    AssistantContextSnapshot[]
+  jobs                  Job[]
+  summaries             Summary[]
+  emailLinks            DealEmailLink[]
   emailCandidateMatches EmailDealCandidateMatch[]
-  emailDealEvents    EmailDealEvent[]
-  emailTermSuggestions EmailDealTermSuggestion[]
-  emailActionItems   EmailActionItem[]
-  brandContacts      BrandContact[]
+  emailDealEvents       EmailDealEvent[]
+  emailTermSuggestions  EmailDealTermSuggestion[]
+  emailActionItems      EmailActionItem[]
+  brandContacts         BrandContact[]
 }
 
 model Document {
@@ -323,13 +367,13 @@ model EmailThread {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  account   ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  messages  EmailMessage[]
-  dealLinks DealEmailLink[]
+  account          ConnectedEmailAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages         EmailMessage[]
+  dealLinks        DealEmailLink[]
   candidateMatches EmailDealCandidateMatch[]
-  dealEvents EmailDealEvent[]
-  termSuggestions EmailDealTermSuggestion[]
-  actionItems EmailActionItem[]
+  dealEvents       EmailDealEvent[]
+  termSuggestions  EmailDealTermSuggestion[]
+  actionItems      EmailActionItem[]
 
   @@unique([accountId, providerThreadId])
   @@index([accountId, lastMessageAt])
@@ -355,11 +399,11 @@ model EmailMessage {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  attachments EmailAttachment[]
-  dealEvents EmailDealEvent[]
+  thread          EmailThread               @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  attachments     EmailAttachment[]
+  dealEvents      EmailDealEvent[]
   termSuggestions EmailDealTermSuggestion[]
-  actionItems EmailActionItem[]
+  actionItems     EmailActionItem[]
 
   @@unique([threadId, providerMessageId])
   @@index([threadId, receivedAt])
@@ -415,7 +459,7 @@ model DealEmailLink {
 }
 
 model EmailDealCandidateMatch {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
   dealId       String
   threadId     String
@@ -424,8 +468,8 @@ model EmailDealCandidateMatch {
   reasonsJson  Json
   evidenceJson Json
   reviewedAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal   Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -437,17 +481,17 @@ model EmailDealCandidateMatch {
 }
 
 model EmailDealEvent {
-  id          String   @id @default(uuid())
-  userId      String
-  dealId      String
-  threadId    String
-  messageId   String
-  category    String
-  title       String
-  body        String
+  id           String   @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  messageId    String
+  category     String
+  title        String
+  body         String
   metadataJson Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -460,18 +504,18 @@ model EmailDealEvent {
 }
 
 model EmailDealTermSuggestion {
-  id          String   @id @default(uuid())
-  userId      String
-  dealId      String
-  threadId    String
-  messageId   String
-  status      String
-  title       String
-  summary     String
-  patchJson   Json
+  id           String   @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  messageId    String
+  status       String
+  title        String
+  summary      String
+  patchJson    Json
   evidenceJson Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -484,18 +528,18 @@ model EmailDealTermSuggestion {
 }
 
 model EmailActionItem {
-  id          String    @id @default(uuid())
-  userId      String
-  dealId      String
-  threadId    String
-  messageId   String
-  action      String
-  dueDate     DateTime?
-  urgency     String
-  status      String
-  sourceText  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String    @id @default(uuid())
+  userId     String
+  dealId     String
+  threadId   String
+  messageId  String
+  action     String
+  dueDate    DateTime?
+  urgency    String
+  status     String
+  sourceText String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -509,17 +553,17 @@ model EmailActionItem {
 }
 
 model BrandContact {
-  id              String    @id @default(uuid())
-  userId          String
-  dealId          String
-  name            String
-  email           String
-  organization    String?
-  inferredRole    String?
-  lastSeenAt      DateTime?
-  messageCount    Int       @default(1)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  userId       String
+  dealId       String
+  name         String
+  email        String
+  organization String?
+  inferredRole String?
+  lastSeenAt   DateTime?
+  messageCount Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
@@ -631,6 +675,132 @@ model PaymentRecord {
   updatedAt   DateTime  @updatedAt
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model BillingAccount {
+  id                        String                     @id @default(uuid())
+  userId                    String                     @unique
+  provider                  BillingProvider            @default(stripe)
+  billingEmail              String?
+  stripeCustomerId          String?                    @unique
+  currentPlanTier           PlanTier?
+  currentPlanInterval       BillingInterval?
+  currentSubscriptionStatus BillingSubscriptionStatus?
+  currentTrialPlanTier      PlanTier?
+  currentTrialStartedAt     DateTime?
+  currentTrialEndsAt        DateTime?
+  currentPeriodStart        DateTime?
+  currentPeriodEnd          DateTime?
+  cancelAtPeriodEnd         Boolean                    @default(false)
+  lastSyncedAt              DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions BillingSubscription[]
+  trialLedgers  BillingTrialLedger[]
+  usageLedgers  BillingUsageLedger[]
+  webhookEvents BillingWebhookEvent[]
+
+  @@index([currentPlanTier, currentSubscriptionStatus])
+}
+
+model BillingSubscription {
+  id                      String                    @id @default(uuid())
+  billingAccountId        String
+  provider                BillingProvider           @default(stripe)
+  planTier                PlanTier
+  interval                BillingInterval
+  status                  BillingSubscriptionStatus
+  stripeSubscriptionId    String?                   @unique
+  stripeCustomerId        String?
+  stripeProductId         String?
+  stripePriceId           String?
+  stripeCheckoutSessionId String?
+  startedAt               DateTime?
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  trialStartedAt          DateTime?
+  trialEndsAt             DateTime?
+  cancelAtPeriodEnd       Boolean                   @default(false)
+  canceledAt              DateTime?
+  endedAt                 DateTime?
+  latestInvoiceId         String?
+  metadataJson            Json?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  billingAccount BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  trialLedgers   BillingTrialLedger[]
+
+  @@index([billingAccountId, status, createdAt])
+  @@index([stripeCustomerId])
+}
+
+model BillingTrialLedger {
+  id                    String             @id @default(uuid())
+  billingAccountId      String
+  billingSubscriptionId String?
+  planTier              PlanTier
+  source                String
+  status                BillingTrialStatus
+  startedAt             DateTime
+  endsAt                DateTime
+  convertedAt           DateTime?
+  expiredAt             DateTime?
+  canceledAt            DateTime?
+  metadataJson          Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  billingAccount      BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  billingSubscription BillingSubscription? @relation(fields: [billingSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([billingAccountId, planTier, status])
+  @@index([billingSubscriptionId])
+  @@index([endsAt])
+}
+
+model BillingUsageLedger {
+  id               String    @id @default(uuid())
+  billingAccountId String
+  featureKey       String
+  windowKey        String
+  quantity         Int       @default(0)
+  limit            Int?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  metadataJson     Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  billingAccount BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([billingAccountId, featureKey, windowKey])
+  @@index([billingAccountId, periodEnd])
+}
+
+model BillingWebhookEvent {
+  id               String                    @id @default(uuid())
+  billingAccountId String?
+  provider         BillingProvider           @default(stripe)
+  stripeEventId    String                    @unique
+  stripeEventType  String
+  apiVersion       String?
+  livemode         Boolean                   @default(false)
+  status           BillingWebhookEventStatus @default(pending)
+  processingRuns   Int                       @default(0)
+  lastReceivedAt   DateTime                  @default(now())
+  processedAt      DateTime?
+  errorMessage     String?
+  payloadJson      Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  billingAccount BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
+
+  @@index([billingAccountId, createdAt])
+  @@index([status, updatedAt])
 }
 
 model IntakeBatch {

@@ -20,3 +20,5 @@ export { reassignDocumentAction } from "@/app/server-actions/intake-actions";
 
 export { savePaymentAction } from "@/app/server-actions/account-actions";
 export { saveProfileAction } from "@/app/server-actions/account-actions";
+export { startCheckoutAction } from "@/app/server-actions/account-actions";
+export { openBillingPortalAction } from "@/app/server-actions/account-actions";

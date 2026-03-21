@@ -1,8 +1,14 @@
 "use server";
 
+import { BillingInterval, PlanTier } from "@prisma/client";
 import { revalidatePath, updateTag } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { requireViewer } from "@/lib/auth";
+import {
+  createBillingPortalSessionForViewer,
+  createCheckoutSessionForViewer
+} from "@/lib/billing/service";
 import { updatePaymentForViewer } from "@/lib/payments";
 import { updateProfileForViewer } from "@/lib/profile";
 import {
@@ -52,4 +58,45 @@ export async function saveProfileAction(formData: FormData) {
   revalidatePath("/app/profile");
   revalidatePath("/app");
   updateTag(`user-${viewer.id}-profile`);
+}
+
+export async function startCheckoutAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const planTier = String(formData.get("planTier") ?? "");
+  const interval = String(formData.get("interval") ?? "");
+  const validPlanTiers = [PlanTier.basic, PlanTier.standard, PlanTier.premium];
+  const validIntervals = [BillingInterval.month, BillingInterval.year];
+
+  if (!validPlanTiers.includes(planTier as PlanTier)) {
+    redirect("/app/billing?billing_error=Invalid%20plan%20selection.");
+  }
+
+  if (!validIntervals.includes(interval as BillingInterval)) {
+    redirect("/app/billing?billing_error=Invalid%20billing%20interval.");
+  }
+
+  try {
+    const result = await createCheckoutSessionForViewer(viewer, {
+      planTier: planTier as PlanTier,
+      interval: interval as BillingInterval
+    });
+    redirect(result.url);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not start billing checkout.";
+    redirect(`/app/billing?billing_error=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function openBillingPortalAction() {
+  const viewer = await requireViewer();
+
+  try {
+    const result = await createBillingPortalSessionForViewer(viewer);
+    redirect(result.url);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not open Stripe billing portal.";
+    redirect(`/app/billing?billing_error=${encodeURIComponent(message)}`);
+  }
 }

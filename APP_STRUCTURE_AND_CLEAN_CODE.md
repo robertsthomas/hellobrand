@@ -72,6 +72,7 @@ Responsibilities:
 - Non-UI business rules
 - Assistant runtime, prompt, and snapshot logic
 - Email sync, linking, AI drafting, and inbox intelligence
+- Billing plan metadata, Stripe checkout orchestration, portal flows, and webhook reconciliation
 - Cached read models that sit between routes and domain services
 - External-service adapters such as Prisma, Supabase, and Inngest
 
@@ -105,6 +106,7 @@ These boundaries reflect the repo as it exists today and should be treated as th
 - `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: primary domain commands and orchestration
 - `lib/analysis/`: extraction, fallback parsing, LLM orchestration, and summary generation
 - `lib/email/`: provider-agnostic email domain logic, AI helpers, repository helpers, and smart inbox behavior
+- `lib/billing/`: plan catalog metadata, Stripe config helpers, checkout and portal orchestration, and webhook reconciliation
 - `lib/assistant/`: prompt assembly, runtime, tool wiring, snapshot generation, and UI block definitions
 - `lib/repository/`: persistence abstraction for Prisma-backed and file-backed modes
 - `lib/cached-data.ts`: route-facing cached loaders for read-heavy pages
@@ -331,6 +333,7 @@ Whenever a shared helper is introduced, add a test that proves:
 - `lib/analysis/`: extraction, scoring, merging, summary logic
 - `lib/deals.ts` and `lib/intake.ts`: domain orchestration
 - `lib/email/`: inbox linking, email AI, and email-domain coordination
+- `lib/billing/`: billing-domain coordination, Stripe adapters, and entitlement snapshot logic
 - `lib/assistant/`: assistant prompt/runtime/tool layers
 - `lib/repository/`: persistence adapters and mapping
 - `lib/cached-data.ts`: cached read-model composition for pages
@@ -348,6 +351,49 @@ Some current patterns are acceptable even though they are not the end-state idea
 
 These should stay thin. If they start absorbing business logic, split them immediately.
 
+## Billing Flow Structure
+
+Billing is now a first-class domain slice and should follow these boundaries.
+
+### Source of truth
+
+- Subscription tier, trial state, and entitlement snapshots live in Prisma/Postgres.
+- Clerk remains identity/auth, not the billing source of truth.
+- Stripe is the external billing system of record for checkout, subscriptions, invoices, and the customer portal.
+- Clerk metadata may mirror billing state later, but only as a read-only convenience layer.
+
+### Billing layer map
+
+- `app/app/billing/page.tsx`: route composition and billing UI only
+- `app/server-actions/account-actions.ts`: authenticated entrypoints for checkout and portal redirects
+- `app/api/stripe/webhook/route.ts`: webhook boundary only, with signature verification and delegation into billing-domain reconciliation
+- `lib/billing/config.ts`: environment and Stripe config lookups only
+- `lib/billing/plans.ts`: pricing matrix, plan metadata, and billing page view-model helpers
+- `lib/billing/service.ts`: billing-account orchestration, checkout creation, portal session creation, trial enforcement, and Stripe reconciliation
+- `prisma/schema.prisma`: billing entities, trial ledgers, usage ledgers, and webhook event persistence
+
+### Billing rules
+
+- Pricing copy and feature matrices should not live inline in route files.
+- Trial eligibility rules should live in billing-domain helpers, not in components.
+- Stripe webhook routes should not implement business decisions inline beyond event routing and failure handling.
+- Billing page components should render the current entitlement snapshot and submit actions, not inspect raw Stripe payloads.
+- Idempotency for webhook events must be persisted in the database, not handled only in memory.
+- Active subscription changes should use Stripe-managed flows such as the customer portal unless there is a clear app-owned need to diverge.
+
+### Billing clean-code expectations
+
+- Keep plan catalog data separate from subscription lifecycle code.
+- Keep Stripe payload parsing helpers separate from UI-facing billing copy.
+- Prefer one place for trial-duration rules and one place for plan-availability rules.
+- Keep webhook reconciliation resilient to event ordering; `checkout.session.completed` cannot be assumed to arrive before `customer.subscription.*`.
+- When the billing service grows, split by responsibility:
+  - `plans`
+  - `checkout`
+  - `portal`
+  - `reconciliation`
+  - `webhook-events`
+
 ## Current Refactor Priorities
 
 The following files are beyond the "easy to understand in one pass" bar and should be treated as refactor targets when touched next:
@@ -355,6 +401,7 @@ The following files are beyond the "easy to understand in one pass" bar and shou
 - `lib/deals.ts`
 - `lib/intake.ts`
 - `lib/email/service.ts`
+- `lib/billing/service.ts`
 - `lib/analysis/llm.ts`
 - `app/app/page.tsx`
 - `components/profile-editor.tsx`
@@ -366,6 +413,13 @@ For these files, the default expectation is:
 - separate read-model composition from write commands
 - move repeated form section logic into smaller helpers or subcomponents
 - keep route pages focused on composition instead of accumulating dashboard business rules
+
+For `lib/billing/service.ts` specifically, the next split should move toward:
+
+- `lib/billing/checkout.ts` for checkout-session creation and trial-offer selection
+- `lib/billing/portal.ts` for Stripe billing-portal session creation
+- `lib/billing/reconciliation.ts` for subscription and invoice reconciliation
+- `lib/billing/webhook-events.ts` for durable event processing state and idempotency
 
 ## Clean Code Checklist
 
