@@ -1,11 +1,6 @@
 import { BillingInterval, BillingSubscriptionStatus, PlanTier } from "@prisma/client";
-import Stripe from "stripe";
 
-import {
-  getStripePriceId,
-  getStripeSecretKey,
-  hasStripePriceId
-} from "@/lib/billing/config";
+import { hasStripePriceId } from "@/lib/billing/config";
 
 export type BillingPlanCatalogEntry = {
   tier: PlanTier;
@@ -133,78 +128,6 @@ function formatTrialLabel(tier: PlanTier) {
   return tier === PlanTier.premium ? "7-day trial" : "14-day trial";
 }
 
-function formatPriceAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-    maximumFractionDigits: amount % 1 === 0 ? 0 : 2
-  }).format(amount);
-}
-
-function formatRecurringLabel(unitAmount: number, currency: string, suffix: "mo" | "yr") {
-  return `${formatPriceAmount(unitAmount, currency)}/${suffix}`;
-}
-
-function annualEquivalentFromYearly(unitAmount: number, currency: string) {
-  const monthlyAmount = unitAmount / 12;
-  return `${formatPriceAmount(monthlyAmount, currency)}/mo billed annually`;
-}
-
-async function fetchStripePriceDisplay(
-  stripe: Stripe,
-  plan: BillingPlanAvailability
-) {
-  if (!plan.monthlyAvailable) {
-    return {
-      displayMonthlyPriceLabel: plan.monthlyPriceLabel,
-      displayAnnualEquivalentLabel: plan.yearlyAvailable
-        ? plan.annualEquivalentLabel
-        : "Monthly billing only right now"
-    };
-  }
-
-  try {
-    const monthlyPrice = await stripe.prices.retrieve(
-      getStripePriceId(plan.tier, BillingInterval.month)
-    );
-    const monthlyUnitAmount =
-      typeof monthlyPrice.unit_amount === "number" ? monthlyPrice.unit_amount / 100 : null;
-    const currency = monthlyPrice.currency ?? "usd";
-    const displayMonthlyPriceLabel =
-      monthlyUnitAmount === null
-        ? plan.monthlyPriceLabel
-        : formatRecurringLabel(monthlyUnitAmount, currency, "mo");
-
-    if (!plan.yearlyAvailable) {
-      return {
-        displayMonthlyPriceLabel,
-        displayAnnualEquivalentLabel: "Monthly billing only right now"
-      };
-    }
-
-    const yearlyPrice = await stripe.prices.retrieve(
-      getStripePriceId(plan.tier, BillingInterval.year)
-    );
-    const yearlyUnitAmount =
-      typeof yearlyPrice.unit_amount === "number" ? yearlyPrice.unit_amount / 100 : null;
-
-    return {
-      displayMonthlyPriceLabel,
-      displayAnnualEquivalentLabel:
-        yearlyUnitAmount === null
-          ? plan.annualEquivalentLabel
-          : annualEquivalentFromYearly(yearlyUnitAmount, yearlyPrice.currency ?? currency)
-    };
-  } catch {
-    return {
-      displayMonthlyPriceLabel: plan.monthlyPriceLabel,
-      displayAnnualEquivalentLabel: plan.yearlyAvailable
-        ? plan.annualEquivalentLabel
-        : "Monthly billing only right now"
-    };
-  }
-}
-
 export function getPlanCatalogFeatures(tier: PlanTier): string[] {
   return BILLING_PLAN_CATALOG.find((p) => p.tier === tier)?.features ?? [];
 }
@@ -220,23 +143,11 @@ export function buildPlanAvailability() {
 
 export async function buildMarketingPlanAvailability(): Promise<MarketingPlanAvailability[]> {
   const plans = buildPlanAvailability();
-  const secretKey = getStripeSecretKey();
-
-  if (!secretKey) {
-    return plans.map((plan) => ({
-      ...plan,
-      displayMonthlyPriceLabel: plan.monthlyPriceLabel,
-      displayAnnualEquivalentLabel: plan.yearlyAvailable
-        ? plan.annualEquivalentLabel
-        : "Monthly billing only right now"
-    }));
-  }
-
-  const stripe = new Stripe(secretKey);
-  return Promise.all(
-    plans.map(async (plan) => ({
-      ...plan,
-      ...(await fetchStripePriceDisplay(stripe, plan))
-    }))
-  );
+  return plans.map((plan) => ({
+    ...plan,
+    displayMonthlyPriceLabel: plan.monthlyPriceLabel,
+    displayAnnualEquivalentLabel: plan.yearlyAvailable
+      ? plan.annualEquivalentLabel
+      : "Monthly billing only right now"
+  }));
 }
