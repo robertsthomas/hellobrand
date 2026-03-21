@@ -27,6 +27,10 @@ import { generateEmailDraft } from "@/lib/email/generate";
 import { inngest } from "@/lib/inngest/client";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
+import {
+  assertViewerWithinUsageLimit,
+  recordViewerUsage
+} from "@/lib/billing/entitlements";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
@@ -1012,6 +1016,7 @@ export async function createDealForViewer(
   viewer: Viewer,
   input: Pick<DealRecord, "brandName" | "campaignName"> & { notes?: string | null }
 ) {
+  await assertViewerWithinUsageLimit(viewer, "active_workspaces");
   const deal = await getRepository().createDeal(viewer.id, input);
 
   if (input.notes?.trim()) {
@@ -1222,6 +1227,7 @@ export async function generateDraftForViewer(
   dealId: string,
   intent: DraftIntent
 ) {
+  await assertViewerWithinUsageLimit(viewer, "deal_drafts_monthly");
   const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
   if (!aggregate) {
     return null;
@@ -1236,6 +1242,7 @@ export async function generateDraftForViewer(
     viewer.displayName;
   const draft = generateEmailDraft(aggregate, intent, senderName);
   const saved = await getRepository().saveEmailDraft(dealId, intent, draft);
+  await recordViewerUsage(viewer, "deal_drafts_monthly");
   void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
   return saved;
 }

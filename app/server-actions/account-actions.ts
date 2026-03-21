@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireViewer } from "@/lib/auth";
 import {
+  cancelCurrentSubscriptionForViewer,
   createBillingPortalSessionForViewer,
   createCheckoutSessionForViewer
 } from "@/lib/billing/service";
@@ -55,7 +56,7 @@ export async function saveProfileAction(formData: FormData) {
   });
 
   await updateProfileForViewer(viewer, input);
-  revalidatePath("/app/profile");
+  revalidatePath("/app/settings/profile");
   revalidatePath("/app");
   updateTag(`user-${viewer.id}-profile`);
 }
@@ -68,11 +69,11 @@ export async function startCheckoutAction(formData: FormData) {
   const validIntervals = [BillingInterval.month, BillingInterval.year];
 
   if (!validPlanTiers.includes(planTier as PlanTier)) {
-    redirect("/app/billing?billing_error=Invalid%20plan%20selection.");
+    redirect("/app/settings/billing?billing_error=Invalid%20plan%20selection.");
   }
 
   if (!validIntervals.includes(interval as BillingInterval)) {
-    redirect("/app/billing?billing_error=Invalid%20billing%20interval.");
+    redirect("/app/settings/billing?billing_error=Invalid%20billing%20interval.");
   }
 
   try {
@@ -84,7 +85,7 @@ export async function startCheckoutAction(formData: FormData) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not start billing checkout.";
-    redirect(`/app/billing?billing_error=${encodeURIComponent(message)}`);
+    redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
   }
 }
 
@@ -97,6 +98,31 @@ export async function openBillingPortalAction() {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not open Stripe billing portal.";
-    redirect(`/app/billing?billing_error=${encodeURIComponent(message)}`);
+    redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function cancelSubscriptionAction() {
+  const viewer = await requireViewer();
+
+  try {
+    const result = await cancelCurrentSubscriptionForViewer(viewer);
+    revalidatePath("/app/settings/billing");
+    revalidatePath("/app");
+    updateTag(`user-${viewer.id}-deals`);
+    updateTag(`user-${viewer.id}-payments`);
+
+    const message =
+      result.mode === "trial_scheduled"
+        ? `Your trial will stay active until ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the end of the trial"}. You will not be charged after it ends.`
+        : result.mode === "scheduled"
+          ? `Your trial is already set to end on ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the trial end date"}.`
+          : "Your subscription has been canceled and access has ended.";
+
+    redirect(`/app/settings/billing?billing_notice=${encodeURIComponent(message)}`);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not cancel the subscription.";
+    redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
   }
 }

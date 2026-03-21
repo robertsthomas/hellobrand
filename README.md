@@ -52,16 +52,24 @@ doppler secrets upload .env --project hellobrand --config dev
    - optional `*_FALLBACKS` secrets for per-task failover
    If the task-specific model is unset, it falls back to `OPENROUTER_MODEL`. If no provider is configured, the fallback parser is used.
 7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
-8. Install dependencies:
+8. For Stripe-backed billing flows, set:
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_PRICE_BASIC_MONTHLY`
+   - `STRIPE_PRICE_STANDARD_MONTHLY`
+   - `STRIPE_PRICE_PREMIUM_MONTHLY`
+   - optional yearly price IDs if annual billing is enabled later
+9. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=basic|standard|premium` in a non-production environment to override the effective tier.
+10. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-9. Start the app:
+11. Apply Prisma migrations and start the app:
 
 ```bash
-pnpm exec prisma db push
+pnpm exec prisma migrate deploy
 pnpm exec prisma generate
 pnpm run dev
 ```
@@ -86,6 +94,7 @@ pnpm run start:prd
 - Uploaded files use Supabase Storage when configured, otherwise local `.runtime/uploads`.
 - The app enqueues document processing. With Inngest credentials it uses the worker route under `/api/inngest`; without them it falls back to local fire-and-forget execution.
 - The extraction pipeline is section-based: extract text -> classify -> split sections -> section extraction -> merge -> risk analysis -> summary.
+- Billing entitlements resolve from Prisma/Postgres. Stripe drives checkout, subscriptions, invoices, and the customer portal.
 
 ## API surface
 
@@ -119,3 +128,48 @@ pnpm test
 ```
 
 The included tests cover fallback extraction, document parsing behavior, email draft generation, and unreadable document handling.
+
+## Stripe billing verification
+
+Use Stripe sandbox/test mode first.
+
+1. Create the `Basic`, `Standard`, and `Premium` products with monthly recurring prices in Stripe.
+2. Put the Stripe secret, webhook secret, and price IDs into Doppler or your local env.
+3. Apply Prisma migrations before testing billing:
+
+```bash
+pnpm exec prisma migrate deploy
+pnpm exec prisma generate
+```
+
+4. Type-check the app before testing checkout:
+
+```bash
+pnpm exec tsc --noEmit
+```
+
+5. Run the focused billing rule tests:
+
+```bash
+pnpm exec vitest run tests/billing-rules.test.ts
+```
+
+6. Point the Stripe webhook endpoint at `/api/stripe/webhook` on your Vercel preview URL or a public local tunnel.
+7. Subscribe the webhook to:
+   - `checkout.session.completed`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`
+   - `invoice.paid`
+8. Complete a sandbox checkout from `/app/billing`, then confirm:
+   - Stripe checkout succeeds or cancels cleanly
+   - the webhook returns `200`
+   - billing tables reflect the new state
+   - locked upgrade surfaces route to billing or the Stripe portal correctly
+
+For local webhook forwarding with Stripe CLI, use a listener instead of raw `localhost`, for example:
+
+```bash
+stripe listen --forward-to localhost:3011/api/stripe/webhook
+```

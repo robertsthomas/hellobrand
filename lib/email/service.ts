@@ -24,6 +24,9 @@ import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoog
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { hasProviderConfig } from "@/lib/email/config";
+import {
+  assertViewerHasFeature
+} from "@/lib/billing/entitlements";
 import { listDealAggregatesForViewer, mergeTerms } from "@/lib/deals";
 import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
 import {
@@ -80,6 +83,14 @@ function tokenExpiresAt(expiresIn: number | undefined) {
   }
 
   return new Date(Date.now() + expiresIn * 1000).toISOString();
+}
+
+async function assertPremiumInboxAccess(viewer: Viewer) {
+  await assertViewerHasFeature(viewer, "premium_inbox");
+}
+
+async function assertEmailConnectionsAccess(viewer: Viewer) {
+  await assertViewerHasFeature(viewer, "email_connections");
 }
 
 function groupCandidateMatches(
@@ -733,6 +744,7 @@ export async function renewExpiringEmailSubscriptions() {
 }
 
 export async function listEmailAccountsForViewer(viewer: Viewer) {
+  await assertEmailConnectionsAccess(viewer);
   return listConnectedEmailAccounts(viewer.id);
 }
 
@@ -747,10 +759,12 @@ export async function listInboxThreadsForViewer(
     limit?: number;
   }
 ) {
+  await assertPremiumInboxAccess(viewer);
   return listEmailThreadsForUser(viewer.id, filters);
 }
 
 export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) {
+  await assertPremiumInboxAccess(viewer);
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
   if (!detail || detail.links.length === 0) {
     return detail;
@@ -785,6 +799,7 @@ export async function listLinkedEmailThreadsForViewerDeal(viewer: Viewer, dealId
 }
 
 export async function linkThreadToDealForViewer(viewer: Viewer, threadId: string, dealId: string) {
+  await assertPremiumInboxAccess(viewer);
   const link = await linkEmailThreadToDeal(viewer.id, threadId, dealId, "manual");
   if (link) {
     await markEmailCandidateMatchForDealThread(viewer.id, dealId, threadId, "confirmed");
@@ -794,6 +809,7 @@ export async function linkThreadToDealForViewer(viewer: Viewer, threadId: string
 }
 
 export async function unlinkThreadFromDealForViewer(viewer: Viewer, threadId: string, dealId: string) {
+  await assertPremiumInboxAccess(viewer);
   const unlinked = await unlinkEmailThreadFromDeal(viewer.id, threadId, dealId);
   if (unlinked) {
     await markEmailCandidateMatchForDealThread(viewer.id, dealId, threadId, "rejected");
@@ -802,11 +818,13 @@ export async function unlinkThreadFromDealForViewer(viewer: Viewer, threadId: st
 }
 
 export async function listDealEmailCandidatesForViewer(viewer: Viewer) {
+  await assertPremiumInboxAccess(viewer);
   const matches = await listEmailCandidateMatchesForUser(viewer.id, "suggested");
   return groupCandidateMatches(matches);
 }
 
 export async function discoverDealEmailCandidatesForViewer(viewer: Viewer) {
+  await assertPremiumInboxAccess(viewer);
   await refreshEmailDealSuggestionsForViewer(viewer, { limit: 250 });
   const accounts = await listConnectedEmailAccounts(viewer.id);
   await queueSmartInboxExpansion(accounts.map((account) => account.id), 100);
@@ -820,6 +838,7 @@ export async function reviewDealEmailCandidatesForViewer(
     rejectIds?: string[];
   }
 ) {
+  await assertPremiumInboxAccess(viewer);
   const confirmed: EmailDealCandidateMatchRecord[] = [];
   const rejected: EmailDealCandidateMatchRecord[] = [];
 
@@ -861,10 +880,12 @@ export async function reviewDealEmailCandidatesForViewer(
 }
 
 export async function disconnectEmailAccountForViewer(viewer: Viewer, accountId: string) {
+  await assertEmailConnectionsAccess(viewer);
   return disconnectConnectedEmailAccount(viewer.id, accountId);
 }
 
 export async function createGoogleConnectUrlForViewer(viewer: Viewer) {
+  await assertEmailConnectionsAccess(viewer);
   if (!hasProviderConfig("gmail")) {
     throw new Error("Google email is not configured.");
   }
@@ -874,6 +895,7 @@ export async function createGoogleConnectUrlForViewer(viewer: Viewer) {
 }
 
 export async function createOutlookConnectUrlForViewer(viewer: Viewer) {
+  await assertEmailConnectionsAccess(viewer);
   if (!hasProviderConfig("outlook")) {
     throw new Error("Outlook email is not configured.");
   }
@@ -1026,6 +1048,7 @@ async function loadLinkedDealAggregate(
 }
 
 export async function summarizeEmailThreadForViewer(viewer: Viewer, threadId: string) {
+  await assertPremiumInboxAccess(viewer);
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
   if (!detail) {
     return null;
@@ -1042,6 +1065,7 @@ export async function draftReplyForViewer(
   explicitDealId?: string | null,
   stance?: NegotiationStance | null
 ) {
+  await assertPremiumInboxAccess(viewer);
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
   if (!detail) {
     return null;

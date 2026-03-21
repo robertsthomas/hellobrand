@@ -103,13 +103,16 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
   const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const generate = useCallback(async () => {
     setIsGenerating(true);
+    setErrorMessage(null);
     try {
       const response = await fetch(`/api/deals/${dealId}/brief`, { method: "POST" });
       if (!response.ok) {
-        throw new Error("Failed to generate brief");
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Failed to generate brief");
       }
       const data = await response.json();
       const generated = data.brief as GeneratedBrief;
@@ -124,8 +127,10 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
       }
       setEditedSections(initial);
       setEditingIds(new Set());
-    } catch {
-      // Silently handle — user can retry
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not generate the campaign brief."
+      );
     } finally {
       setIsGenerating(false);
     }
@@ -185,6 +190,11 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
             {isGenerating ? "Generating…" : "Generate Campaign Brief"}
           </button>
         </div>
+        {errorMessage ? (
+          <div className="mt-4 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -192,6 +202,11 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
   return (
     <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
       <div className="space-y-6">
+        {errorMessage ? (
+          <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { getEmailThreadForViewer } from "@/lib/email/service";
 
@@ -10,6 +11,7 @@ export async function GET(
 ) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "premium_inbox");
     const { threadId } = await params;
     const thread = await getEmailThreadForViewer(viewer, threadId);
 

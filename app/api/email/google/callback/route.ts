@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { handleGoogleCallbackForViewer } from "@/lib/email/service";
 
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "email_connections");
     const redirectPath = await handleGoogleCallbackForViewer(viewer, { code, state });
     return NextResponse.redirect(`${getAppBaseUrl()}${redirectPath}`);
   } catch (error) {

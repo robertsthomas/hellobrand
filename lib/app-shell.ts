@@ -1,13 +1,11 @@
 import {
   Archive,
   BarChart3,
-  Bell,
   CircleHelp,
   Home,
   Inbox,
   Receipt,
-  Settings,
-  UserRound
+  Settings
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -28,9 +26,7 @@ export const appNavItems: AppNavItem[] = [
   { href: "/app/inbox", label: "Inbox", icon: Inbox },
   { href: "/app/payments", label: "Payments", icon: Receipt },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/app/notifications", label: "Notifications", icon: Bell },
   { href: "/app/help", label: "Help", icon: CircleHelp },
-  { href: "/app/profile", label: "Profile", icon: UserRound },
   { href: "/app/settings", label: "Settings", icon: Settings }
 ];
 
@@ -66,16 +62,20 @@ export function getAppRouteMeta(pathname: string): AppRouteMeta {
     return { section: "Workspace", title: "New workspace" };
   }
 
-  if (pathname.startsWith("/app/profile")) {
+  if (pathname.startsWith("/app/settings/billing") || pathname.startsWith("/app/billing")) {
+    return { section: "Settings", title: "Billing" };
+  }
+
+  if (pathname.startsWith("/app/settings/profile") || pathname.startsWith("/app/profile")) {
     return { section: "Settings", title: "Profile" };
+  }
+
+  if (pathname.startsWith("/app/settings/notifications") || pathname.startsWith("/app/notifications")) {
+    return { section: "Settings", title: "Notifications" };
   }
 
   if (pathname.startsWith("/app/settings")) {
     return { section: "Settings", title: "Settings" };
-  }
-
-  if (pathname.startsWith("/app/notifications")) {
-    return { section: "Workspace", title: "Notifications" };
   }
 
   if (pathname.startsWith("/app/help")) {

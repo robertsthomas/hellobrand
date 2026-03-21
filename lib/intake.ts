@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getProfileForViewer } from "@/lib/profile";
+import { assertViewerWithinUsageLimit } from "@/lib/billing/entitlements";
 import { getRepository } from "@/lib/repository";
 import { createPersistedIntakeRecord } from "@/lib/intake-normalization";
 import { startNextQueuedIntakeSessionForUser, startQueuedIntakeSessionById } from "@/lib/intake-queue";
@@ -360,6 +361,7 @@ export async function createIntakeSessionForViewer(
     files?: File[];
   }
 ) {
+  await assertViewerWithinUsageLimit(viewer, "active_workspaces");
   const profile = process.env.DATABASE_URL
     ? await getProfileForViewer(viewer).catch(() => null)
     : null;
@@ -439,6 +441,7 @@ export async function createDraftIntakeSessionForViewer(
     notes?: string | null;
   }
 ) {
+  await assertViewerWithinUsageLimit(viewer, "active_workspaces");
   const profile = process.env.DATABASE_URL
     ? await getProfileForViewer(viewer).catch(() => null)
     : null;
@@ -975,6 +978,7 @@ export async function createBulkIntakeForViewer(
     notes?: string | null;
   }
 ): Promise<IntakeBatchRecord> {
+  await assertViewerWithinUsageLimit(viewer, "active_workspaces");
   const files = input.files.filter((file) => file.size > 0);
   if (files.length === 0) {
     throw new Error("Please upload at least one file.");

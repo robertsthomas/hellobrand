@@ -16,33 +16,36 @@ import {
   buildPlanAvailability,
   type BillingOverview
 } from "@/lib/billing/plans";
+import {
+  isFinalizedWebhookStatus,
+  resolveCheckoutSessionMerge,
+  resolveSubscriptionMerge,
+  selectCurrentSubscription
+} from "@/lib/billing/reconciliation-rules";
+import {
+  getTrialOffer,
+  isActiveBillingSubscriptionStatus,
+  recommendedUpgradeForCurrentPlan
+} from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
 import {
   getBillingBaseUrl,
+  getDevBillingIntervalOverride,
+  getDevBillingStatusOverride,
+  getDevPlanOverride,
+  getDevTrialDaysLeftOverride,
   getStripePriceId,
   getStripeSecretKey,
   getStripeWebhookSecret,
   isStripeConfigured
 } from "@/lib/billing/config";
 
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set<BillingSubscriptionStatus>([
-  BillingSubscriptionStatus.active,
-  BillingSubscriptionStatus.trialing,
-  BillingSubscriptionStatus.past_due,
-  BillingSubscriptionStatus.paused
-]);
-
 let stripeClient: Stripe | null = null;
 
 type BillingAccountWithHistory = BillingAccount & {
   subscriptions: BillingSubscription[];
   trialLedgers: BillingTrialLedger[];
-};
-
-type TrialOffer = {
-  days: number;
-  source: string;
 };
 
 type StripeWebhookProcessingState = {
@@ -74,7 +77,7 @@ export async function createBillingPortalSessionForViewer(viewer: Viewer) {
 
   const session = await getStripeClient().billingPortal.sessions.create({
     customer: stripeCustomerId,
-    return_url: `${baseUrl}/app/billing`
+    return_url: `${baseUrl}/app/settings/billing`
   });
 
   if (!session.url) {
@@ -83,6 +86,50 @@ export async function createBillingPortalSessionForViewer(viewer: Viewer) {
 
   return {
     url: session.url
+  };
+}
+
+export async function cancelCurrentSubscriptionForViewer(viewer: Viewer) {
+  const billingAccount = await findBillingAccountWithHistory(viewer.id);
+
+  if (!billingAccount) {
+    throw new Error("No billing account found.");
+  }
+
+  const current = selectCurrentSubscription(billingAccount.subscriptions);
+
+  if (!current?.stripeSubscriptionId) {
+    throw new Error("No active Stripe subscription found.");
+  }
+
+  if (current.status === BillingSubscriptionStatus.trialing) {
+    if (current.cancelAtPeriodEnd) {
+      return {
+        mode: "scheduled" as const,
+        endsAt: current.currentPeriodEnd?.toISOString() ?? current.trialEndsAt?.toISOString() ?? null
+      };
+    }
+
+    const subscription = await getStripeClient().subscriptions.update(
+      current.stripeSubscriptionId,
+      {
+        cancel_at_period_end: true
+      }
+    );
+    const saved = await reconcileStripeSubscription(subscription);
+
+    return {
+      mode: "trial_scheduled" as const,
+      endsAt: saved.currentPeriodEnd?.toISOString() ?? saved.trialEndsAt?.toISOString() ?? null
+    };
+  }
+
+  const canceled = await getStripeClient().subscriptions.cancel(current.stripeSubscriptionId);
+  await reconcileStripeSubscription(canceled);
+
+  return {
+    mode: "canceled_now" as const,
+    endsAt: canceled.ended_at ? new Date(canceled.ended_at * 1000).toISOString() : null
   };
 }
 
@@ -213,40 +260,6 @@ async function ensureStripeCustomer(
   return customer.id;
 }
 
-function hasUsedTrialForPlan(
-  billingAccount: BillingAccountWithHistory | null,
-  planTier: PlanTier
-) {
-  return billingAccount?.trialLedgers.some((entry) => entry.planTier === planTier) ?? false;
-}
-
-function getTrialOffer(
-  billingAccount: BillingAccountWithHistory | null,
-  planTier: PlanTier
-): TrialOffer | null {
-  if (hasUsedTrialForPlan(billingAccount, planTier)) {
-    return null;
-  }
-
-  const isPremiumUpsell =
-    planTier === PlanTier.premium &&
-    billingAccount?.currentSubscriptionStatus === BillingSubscriptionStatus.active &&
-    (billingAccount.currentPlanTier === PlanTier.basic ||
-      billingAccount.currentPlanTier === PlanTier.standard);
-
-  if (isPremiumUpsell) {
-    return {
-      days: 14,
-      source: "premium_paid_upsell"
-    };
-  }
-
-  return {
-    days: planTier === PlanTier.premium ? 7 : 14,
-    source: "new_plan_trial"
-  };
-}
-
 function assertPlanSelection(
   billingAccount: BillingAccountWithHistory | null,
   requestedPlanTier: PlanTier
@@ -254,7 +267,7 @@ function assertPlanSelection(
   if (
     billingAccount?.currentPlanTier === requestedPlanTier &&
     billingAccount.currentSubscriptionStatus &&
-    ACTIVE_SUBSCRIPTION_STATUSES.has(billingAccount.currentSubscriptionStatus)
+    isActiveBillingSubscriptionStatus(billingAccount.currentSubscriptionStatus)
   ) {
     throw new Error(`You are already on the ${requestedPlanTier} plan.`);
   }
@@ -263,10 +276,10 @@ function assertPlanSelection(
     billingAccount?.currentPlanTier &&
     billingAccount.currentPlanTier !== requestedPlanTier &&
     billingAccount.currentSubscriptionStatus &&
-    ACTIVE_SUBSCRIPTION_STATUSES.has(billingAccount.currentSubscriptionStatus)
+    isActiveBillingSubscriptionStatus(billingAccount.currentSubscriptionStatus)
   ) {
     throw new Error(
-      "Plan changes for active subscriptions will use the billing portal once it is enabled."
+      "Manage plan changes in the Stripe billing portal."
     );
   }
 }
@@ -279,21 +292,48 @@ export async function getBillingOverviewForViewer(
 
   try {
     const billingAccount = await findBillingAccountWithHistory(viewer.id);
+    const overridePlanTier = getDevPlanOverride();
+    const overrideInterval = getDevBillingIntervalOverride();
+    const overrideStatus = getDevBillingStatusOverride();
+    const overrideTrialDaysLeft = getDevTrialDaysLeftOverride();
+    const effectivePlanTier = overridePlanTier ?? billingAccount?.currentPlanTier ?? null;
+    const effectiveTrialPlanTier =
+      overrideStatus === BillingSubscriptionStatus.trialing
+        ? overridePlanTier ??
+          billingAccount?.currentTrialPlanTier ??
+          billingAccount?.currentPlanTier ??
+          null
+        : billingAccount?.currentTrialPlanTier ?? null;
+    const effectiveTrialEndsAt =
+      overrideStatus === BillingSubscriptionStatus.trialing
+        ? new Date(
+            Date.now() + (overrideTrialDaysLeft ?? 14) * 24 * 60 * 60 * 1000
+          ).toISOString()
+        : billingAccount?.currentTrialEndsAt?.toISOString() ?? null;
+    const effectiveSubscriptionStatus =
+      overrideStatus ?? billingAccount?.currentSubscriptionStatus ?? null;
+    const recommendedUpgrade = recommendedUpgradeForCurrentPlan(
+      effectivePlanTier
+    );
 
     return {
       stripeConfigured,
       billingReady: true,
       billingErrorMessage: null,
-      currentPlanTier: billingAccount?.currentPlanTier ?? null,
-      currentPlanInterval: billingAccount?.currentPlanInterval ?? null,
-      currentSubscriptionStatus: billingAccount?.currentSubscriptionStatus ?? null,
-      currentTrialPlanTier: billingAccount?.currentTrialPlanTier ?? null,
-      currentTrialEndsAt: billingAccount?.currentTrialEndsAt?.toISOString() ?? null,
+      currentPlanTier: effectivePlanTier,
+      currentPlanInterval: overrideInterval ?? billingAccount?.currentPlanInterval ?? null,
+      currentSubscriptionStatus: effectiveSubscriptionStatus,
+      currentTrialPlanTier: effectiveTrialPlanTier,
+      currentTrialEndsAt: effectiveTrialEndsAt,
+      currentPeriodStart: billingAccount?.currentPeriodStart?.toISOString() ?? null,
+      currentPeriodEnd: billingAccount?.currentPeriodEnd?.toISOString() ?? null,
+      cancelAtPeriodEnd: billingAccount?.cancelAtPeriodEnd ?? false,
       planCatalog,
-      hasActiveSubscription: Boolean(
-        billingAccount?.currentSubscriptionStatus &&
-          ACTIVE_SUBSCRIPTION_STATUSES.has(billingAccount.currentSubscriptionStatus)
-      )
+      hasActiveSubscription: isActiveBillingSubscriptionStatus(
+        effectiveSubscriptionStatus
+      ),
+      recommendedUpgradeTier: recommendedUpgrade.tier,
+      recommendedUpgradeLabel: recommendedUpgrade.label
     };
   } catch (error) {
     if (!isKnownBillingSetupError(error)) {
@@ -310,8 +350,13 @@ export async function getBillingOverviewForViewer(
       currentSubscriptionStatus: null,
       currentTrialPlanTier: null,
       currentTrialEndsAt: null,
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
       planCatalog,
-      hasActiveSubscription: false
+      hasActiveSubscription: false,
+      recommendedUpgradeTier: PlanTier.standard,
+      recommendedUpgradeLabel: "Start with Standard for the full solo-creator workflow."
     };
   }
 }
@@ -343,8 +388,8 @@ export async function createCheckoutSessionForViewer(
         quantity: 1
       }
     ],
-    success_url: `${baseUrl}/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/app/billing?checkout=canceled`,
+    success_url: `${baseUrl}/app/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/app/settings/billing?checkout=canceled`,
     allow_promotion_codes: true,
     metadata: {
       clerkUserId: viewer.id,
@@ -399,8 +444,7 @@ export async function beginStripeWebhookProcessing(
 
   if (
     existing &&
-    (existing.status === BillingWebhookEventStatus.processed ||
-      existing.status === BillingWebhookEventStatus.ignored)
+    isFinalizedWebhookStatus(existing.status)
   ) {
     await prisma.billingWebhookEvent.update({
       where: { id: existing.id },
@@ -719,9 +763,7 @@ async function refreshBillingAccountSnapshot(billingAccountId: string) {
   });
 
   const current =
-    subscriptions.find((entry) => ACTIVE_SUBSCRIPTION_STATUSES.has(entry.status)) ??
-    subscriptions[0] ??
-    null;
+    selectCurrentSubscription(subscriptions);
 
   const trial = await prisma.billingTrialLedger.findFirst({
     where: {
@@ -779,8 +821,13 @@ export async function reconcileStripeCheckoutSession(
     session.payment_status === "paid"
       ? BillingSubscriptionStatus.active
       : BillingSubscriptionStatus.incomplete;
+  const resolution = resolveCheckoutSessionMerge({
+    existingId: existing?.id ?? null,
+    provisionalId: provisional?.id ?? null,
+    stripeSubscriptionId
+  });
 
-  if (existing) {
+  if (resolution.action === "update-existing" && existing) {
     await prisma.billingSubscription.update({
       where: { id: existing.id },
       data: {
@@ -790,12 +837,12 @@ export async function reconcileStripeCheckoutSession(
       }
     });
 
-    if (provisional && provisional.id !== existing.id) {
+    if (resolution.deleteProvisionalId) {
       await prisma.billingSubscription.delete({
-        where: { id: provisional.id }
+        where: { id: resolution.deleteProvisionalId }
       });
     }
-  } else if (provisional) {
+  } else if (resolution.action === "update-provisional" && provisional) {
     await prisma.billingSubscription.update({
       where: { id: provisional.id },
       data: {
@@ -804,7 +851,7 @@ export async function reconcileStripeCheckoutSession(
         status
       }
     });
-  } else if (stripeSubscriptionId) {
+  } else if (resolution.action === "create" && stripeSubscriptionId) {
     await prisma.billingSubscription.create({
       data: {
         billingAccountId: billingAccount.id,
@@ -871,58 +918,43 @@ export async function reconcileStripeSubscription(
       planTier,
       interval
     ));
-  const saved = provisional
-    ? await prisma.billingSubscription.update({
-        where: { id: provisional.id },
+  const subscriptionData = {
+    billingAccountId: billingAccount.id,
+    provider: BillingProvider.stripe,
+    planTier,
+    interval,
+    status: coerceSubscriptionStatus(subscription.status),
+    stripeSubscriptionId: subscription.id,
+    stripeCustomerId: customerId,
+    stripeProductId: productId,
+    stripePriceId: priceId,
+    startedAt: timestampToDate(subscription.start_date),
+    currentPeriodStart: timestampToDate(period.start),
+    currentPeriodEnd: timestampToDate(period.end),
+    trialStartedAt: timestampToDate(subscription.trial_start),
+    trialEndsAt: timestampToDate(subscription.trial_end),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    canceledAt: timestampToDate(subscription.canceled_at),
+    endedAt: timestampToDate(subscription.ended_at),
+    latestInvoiceId:
+      typeof subscription.latest_invoice === "string"
+        ? subscription.latest_invoice
+        : subscription.latest_invoice?.id ?? null,
+    metadataJson: subscription.metadata
+  } satisfies Prisma.BillingSubscriptionUncheckedCreateInput;
+  const mergeAction = resolveSubscriptionMerge({
+    existingId: existing?.id ?? null,
+    provisionalId: provisional?.id ?? null
+  });
+  const saved =
+    mergeAction === "update-existing" || mergeAction === "update-provisional"
+      ? await prisma.billingSubscription.update({
+          where: { id: (mergeAction === "update-existing" ? existing : provisional)!.id },
+          data: subscriptionData
+        })
+      : await prisma.billingSubscription.create({
         data: {
-          billingAccountId: billingAccount.id,
-          provider: BillingProvider.stripe,
-          planTier,
-          interval,
-          status: coerceSubscriptionStatus(subscription.status),
-          stripeSubscriptionId: subscription.id,
-          stripeCustomerId: customerId,
-          stripeProductId: productId,
-          stripePriceId: priceId,
-          startedAt: timestampToDate(subscription.start_date),
-          currentPeriodStart: timestampToDate(period.start),
-          currentPeriodEnd: timestampToDate(period.end),
-          trialStartedAt: timestampToDate(subscription.trial_start),
-          trialEndsAt: timestampToDate(subscription.trial_end),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          canceledAt: timestampToDate(subscription.canceled_at),
-          endedAt: timestampToDate(subscription.ended_at),
-          latestInvoiceId:
-            typeof subscription.latest_invoice === "string"
-              ? subscription.latest_invoice
-              : subscription.latest_invoice?.id ?? null,
-          metadataJson: subscription.metadata
-        }
-      })
-    : await prisma.billingSubscription.create({
-        data: {
-          billingAccountId: billingAccount.id,
-          provider: BillingProvider.stripe,
-          planTier,
-          interval,
-          status: coerceSubscriptionStatus(subscription.status),
-          stripeSubscriptionId: subscription.id,
-          stripeCustomerId: customerId,
-          stripeProductId: productId,
-          stripePriceId: priceId,
-          startedAt: timestampToDate(subscription.start_date),
-          currentPeriodStart: timestampToDate(period.start),
-          currentPeriodEnd: timestampToDate(period.end),
-          trialStartedAt: timestampToDate(subscription.trial_start),
-          trialEndsAt: timestampToDate(subscription.trial_end),
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          canceledAt: timestampToDate(subscription.canceled_at),
-          endedAt: timestampToDate(subscription.ended_at),
-          latestInvoiceId:
-            typeof subscription.latest_invoice === "string"
-              ? subscription.latest_invoice
-              : subscription.latest_invoice?.id ?? null,
-          metadataJson: subscription.metadata
+          ...subscriptionData
         }
       });
 

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { disconnectEmailAccountForViewer } from "@/lib/email/service";
 
@@ -10,6 +11,7 @@ export async function POST(
 ) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "email_connections");
     const { accountId } = await params;
     const account = await disconnectEmailAccountForViewer(viewer, accountId);
 

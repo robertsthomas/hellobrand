@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { createOutlookConnectUrlForViewer } from "@/lib/email/service";
 
 export async function GET(_request: NextRequest) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "email_connections");
     const url = await createOutlookConnectUrlForViewer(viewer);
     return NextResponse.redirect(url);
   } catch (error) {

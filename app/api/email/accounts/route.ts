@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 
@@ -25,9 +26,12 @@ function sanitizeAccount(account: Awaited<ReturnType<typeof listEmailAccountsFor
 export async function GET(_request: NextRequest) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "email_connections");
     const accounts = await listEmailAccountsForViewer(viewer);
     return ok({ accounts: accounts.map(sanitizeAccount) });
   } catch (error) {
-    return fail(error instanceof Error ? error.message : "Unauthorized", 401);
+    const message = error instanceof Error ? error.message : "Unauthorized";
+    const isUnauthorized = message === "Unauthorized";
+    return fail(message, isUnauthorized ? 401 : 403);
   }
 }

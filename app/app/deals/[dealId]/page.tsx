@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Fragment, Suspense } from "react";
+import { PlanTier } from "@prisma/client";
 
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { BriefGenerator } from "@/components/brief-generator";
@@ -15,6 +16,7 @@ import { DealNotesPanel } from "@/components/deal-notes-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
+import { FeatureUpgradeCard } from "@/components/feature-locked-state";
 import { RiskFlags } from "@/components/risk-flags";
 import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
+import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { listEmailAccountsForViewer, listInboxThreadsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
@@ -82,6 +85,7 @@ async function DealDetailContent({
   const { dealId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const viewer = await requireViewer();
+  const entitlements = await getViewerEntitlements(viewer);
 
   const aggregate = await getCachedDealForViewer(viewer, dealId);
 
@@ -89,11 +93,15 @@ async function DealDetailContent({
     notFound();
   }
 
-  const [linkedEmailThreads, recentEmailThreads, emailAccounts] = await Promise.all([
-    listLinkedEmailThreadsForViewerDeal(viewer, dealId),
-    listInboxThreadsForViewer(viewer, { limit: 12 }),
-    listEmailAccountsForViewer(viewer)
-  ]);
+  const hasPremiumInbox = entitlements.features.premium_inbox;
+  const hasBriefGeneration = entitlements.features.brief_generation;
+  const [linkedEmailThreads, recentEmailThreads, emailAccounts] = hasPremiumInbox
+    ? await Promise.all([
+        listLinkedEmailThreadsForViewerDeal(viewer, dealId),
+        listInboxThreadsForViewer(viewer, { limit: 12 }),
+        listEmailAccountsForViewer(viewer)
+      ])
+    : [[], [], []];
 
   const {
     deal,
@@ -345,16 +353,40 @@ async function DealDetailContent({
 
           <TabsContent value="brief" className="mt-0 space-y-6">
             <BriefOverview briefData={terms?.briefData} documents={documents} />
-            <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} documents={documents} />
+            {hasBriefGeneration ? (
+              <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} documents={documents} />
+            ) : (
+              <FeatureUpgradeCard
+                eyebrow="Standard briefs"
+                title="AI brief generation unlocks on Standard"
+                description="Basic keeps the extracted brief overview, but generated campaign briefs and regenerations are part of the Standard and Premium workflow."
+                requiredTier={PlanTier.standard}
+                currentTier={entitlements.effectiveTier}
+                hasActiveSubscription={entitlements.hasActiveSubscription}
+                actionLabel="Upgrade for brief generation"
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="emails" className="mt-0 space-y-6">
-            <DealEmailPanel
-              dealId={deal.id}
-              linkedThreads={linkedEmailThreads}
-              recentThreads={recentEmailThreads}
-              hasConnectedAccounts={emailAccounts.some((account) => account.status !== "disconnected")}
-            />
+            {hasPremiumInbox ? (
+              <DealEmailPanel
+                dealId={deal.id}
+                linkedThreads={linkedEmailThreads}
+                recentThreads={recentEmailThreads}
+                hasConnectedAccounts={emailAccounts.some((account) => account.status !== "disconnected")}
+              />
+            ) : (
+              <FeatureUpgradeCard
+                eyebrow="Premium inbox"
+                title="Email intelligence unlocks on Premium"
+                description="Linked threads, synced inbox search, negotiation context, and communication intelligence for this partnership live on the Premium plan."
+                requiredTier={PlanTier.premium}
+                currentTier={entitlements.effectiveTier}
+                hasActiveSubscription={entitlements.hasActiveSubscription}
+                actionLabel="Upgrade for inbox intelligence"
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="documents" className="mt-0 space-y-6">

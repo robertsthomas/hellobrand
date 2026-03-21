@@ -3,6 +3,11 @@ import { NextRequest } from "next/server";
 import { buildFallbackBrief } from "@/lib/analysis/fallback";
 import { generateBriefWithLlm, hasLlmKey } from "@/lib/analysis/llm";
 import { requireApiViewer } from "@/lib/auth";
+import {
+  assertViewerHasFeature,
+  assertViewerWithinUsageLimit,
+  recordViewerUsage
+} from "@/lib/billing/entitlements";
 import { getDealForViewer } from "@/lib/deals";
 import { fail, ok } from "@/lib/http";
 
@@ -12,6 +17,8 @@ export async function POST(
 ) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "brief_generation");
+    await assertViewerWithinUsageLimit(viewer, "brief_generations_monthly");
     const { dealId } = await params;
     const aggregate = await getDealForViewer(viewer, dealId);
 
@@ -22,6 +29,7 @@ export async function POST(
     const brief = hasLlmKey()
       ? await generateBriefWithLlm(aggregate)
       : buildFallbackBrief(aggregate);
+    await recordViewerUsage(viewer, "brief_generations_monthly");
 
     return ok({ brief });
   } catch (error) {

@@ -6,6 +6,11 @@ import { requireApiViewer } from "@/lib/auth";
 import { assistantMessageText } from "@/lib/assistant/messages";
 import { streamAssistantResponse } from "@/lib/assistant/runtime";
 import { replaceDashesWithCommas } from "@/lib/assistant/text";
+import {
+  assertViewerHasFeature,
+  assertViewerWithinUsageLimit,
+  recordViewerUsage
+} from "@/lib/billing/entitlements";
 import { getRepository } from "@/lib/repository";
 import { assistantChatRequestSchema } from "@/lib/validation";
 import { fail } from "@/lib/http";
@@ -48,6 +53,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "assistant_chat");
+    await assertViewerWithinUsageLimit(viewer, "assistant_messages_monthly");
     rawBody = await request.json();
     const input = assistantChatRequestSchema.parse(rawBody);
     const repository = getRepository();
@@ -80,13 +87,15 @@ export async function POST(request: NextRequest) {
     const nextMessages = await repository.listAssistantMessages(viewer.id, thread.id);
 
     try {
-      return await streamAssistantResponse({
+      const response = await streamAssistantResponse({
         viewer,
         thread,
         persistedMessages: nextMessages,
         context: input.context,
         scope: input.scope
       });
+      await recordViewerUsage(viewer, "assistant_messages_monthly");
+      return response;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not stream assistant response.";

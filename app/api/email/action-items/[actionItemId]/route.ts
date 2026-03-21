@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { updateEmailActionItemStatus } from "@/lib/email/repository";
 
@@ -10,6 +11,7 @@ export async function PATCH(
 ) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "premium_inbox");
     const { actionItemId } = await params;
     const body = (await request.json()) as { status?: string };
     const validStatuses = ["pending", "completed", "dismissed"];

@@ -106,7 +106,7 @@ These boundaries reflect the repo as it exists today and should be treated as th
 - `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: primary domain commands and orchestration
 - `lib/analysis/`: extraction, fallback parsing, LLM orchestration, and summary generation
 - `lib/email/`: provider-agnostic email domain logic, AI helpers, repository helpers, and smart inbox behavior
-- `lib/billing/`: plan catalog metadata, Stripe config helpers, checkout and portal orchestration, and webhook reconciliation
+- `lib/billing/`: plan catalog metadata, entitlement resolution, Stripe config helpers, checkout and portal orchestration, and webhook reconciliation
 - `lib/assistant/`: prompt assembly, runtime, tool wiring, snapshot generation, and UI block definitions
 - `lib/repository/`: persistence abstraction for Prisma-backed and file-backed modes
 - `lib/cached-data.ts`: route-facing cached loaders for read-heavy pages
@@ -368,6 +368,7 @@ Billing is now a first-class domain slice and should follow these boundaries.
 - `app/server-actions/account-actions.ts`: authenticated entrypoints for checkout and portal redirects
 - `app/api/stripe/webhook/route.ts`: webhook boundary only, with signature verification and delegation into billing-domain reconciliation
 - `lib/billing/config.ts`: environment and Stripe config lookups only
+- `lib/billing/entitlements.ts`: effective tier resolution, feature gating, and usage-limit tracking only
 - `lib/billing/plans.ts`: pricing matrix, plan metadata, and billing page view-model helpers
 - `lib/billing/service.ts`: billing-account orchestration, checkout creation, portal session creation, trial enforcement, and Stripe reconciliation
 - `prisma/schema.prisma`: billing entities, trial ledgers, usage ledgers, and webhook event persistence
@@ -376,6 +377,8 @@ Billing is now a first-class domain slice and should follow these boundaries.
 
 - Pricing copy and feature matrices should not live inline in route files.
 - Trial eligibility rules should live in billing-domain helpers, not in components.
+- Entitlement checks should run in domain services or route boundaries before expensive work starts.
+- Usage ledgers should be written centrally from billing-domain helpers, not ad hoc from components.
 - Stripe webhook routes should not implement business decisions inline beyond event routing and failure handling.
 - Billing page components should render the current entitlement snapshot and submit actions, not inspect raw Stripe payloads.
 - Idempotency for webhook events must be persisted in the database, not handled only in memory.
@@ -386,6 +389,7 @@ Billing is now a first-class domain slice and should follow these boundaries.
 - Keep plan catalog data separate from subscription lifecycle code.
 - Keep Stripe payload parsing helpers separate from UI-facing billing copy.
 - Prefer one place for trial-duration rules and one place for plan-availability rules.
+- Prefer one place for feature flags and one place for usage-limit enforcement.
 - Keep webhook reconciliation resilient to event ordering; `checkout.session.completed` cannot be assumed to arrive before `customer.subscription.*`.
 - When the billing service grows, split by responsibility:
   - `plans`

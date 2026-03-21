@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { listEmailActionItemsForUser } from "@/lib/email/repository";
 
 export async function GET(request: NextRequest) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "premium_inbox");
     const status = request.nextUrl.searchParams.get("status") ?? "pending";
     const items = await listEmailActionItemsForUser(viewer.id, status);
     return ok({ items });

@@ -10,7 +10,7 @@ import {
   FileText,
   Settings
 } from "lucide-react";
-import type { NotificationItem, NotificationType } from "@/app/app/notifications/page";
+import type { NotificationItem, NotificationType } from "@/app/app/settings/notifications/page";
 import { Button } from "@/components/ui/button";
 
 const STORAGE_KEY = "hellobrand:notifications:read";
