@@ -166,6 +166,31 @@ Each Playwright app server runs with:
 - `HELLOBRAND_E2E_AUTH_SECRET=<local secret>`
 - `DATABASE_URL=`
 
+## CI/CD
+
+The repo is configured for this deployment split:
+
+- Vercel Git integration stays enabled for preview deployments on non-`main` branches
+- automatic Vercel Git deployments are disabled for `main` in [vercel.json](/Users/thomasroberts/Desktop/projects/hellobrand/vercel.json)
+- GitHub Actions runs unit + E2E tests on pull requests and on pushes to `main`
+- GitHub Actions deploys production to Vercel only after the test job passes on `main`
+
+Workflow file:
+
+- [.github/workflows/ci.yml](/Users/thomasroberts/Desktop/projects/hellobrand/.github/workflows/ci.yml)
+
+Required GitHub repository secrets for production deploys:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+Recommended repository settings:
+
+- add the `CI / Test` job as a required status check in GitHub branch protection for `main`
+- keep the Vercel project connected to GitHub for preview deployments
+- make sure the Vercel project uses `main` as the production branch
+
 ## Stripe billing verification
 
 Use Stripe sandbox/test mode first.

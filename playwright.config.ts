@@ -6,6 +6,8 @@ export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global.setup.ts",
   fullyParallel: true,
+  retries: 2,
+  workers: process.env.CI ? 3 : 4,
   reporter: "list",
   use: {
     trace: "retain-on-failure",
