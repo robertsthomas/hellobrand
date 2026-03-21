@@ -5,6 +5,7 @@ import type {
   ConnectedEmailAccountRecord,
   DealRecord,
   DealEmailLinkRecord,
+  EmailActionItemRecord,
   EmailDealCandidateMatchRecord,
   EmailDealCandidateMatchView,
   EmailDealEventRecord,
@@ -16,7 +17,8 @@ import type {
   EmailThreadDetail,
   EmailThreadListItem,
   EmailThreadLinkView,
-  EmailThreadRecord
+  EmailThreadRecord,
+  BrandContactRecord
 } from "@/lib/types";
 
 function iso(value: Date | string | null | undefined) {
@@ -396,6 +398,64 @@ function toTermSuggestionRecord(suggestion: {
         : {},
     createdAt: iso(suggestion.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(suggestion.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toActionItemRecord(item: {
+  id: string;
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  action: string;
+  dueDate: Date | null;
+  urgency: string;
+  status: string;
+  sourceText: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): EmailActionItemRecord {
+  return {
+    id: item.id,
+    userId: item.userId,
+    dealId: item.dealId,
+    threadId: item.threadId,
+    messageId: item.messageId,
+    action: item.action,
+    dueDate: iso(item.dueDate),
+    urgency: item.urgency as EmailActionItemRecord["urgency"],
+    status: item.status as EmailActionItemRecord["status"],
+    sourceText: item.sourceText,
+    createdAt: iso(item.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(item.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toBrandContactRecord(contact: {
+  id: string;
+  userId: string;
+  dealId: string;
+  name: string;
+  email: string;
+  organization: string | null;
+  inferredRole: string | null;
+  lastSeenAt: Date | null;
+  messageCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): BrandContactRecord {
+  return {
+    id: contact.id,
+    userId: contact.userId,
+    dealId: contact.dealId,
+    name: contact.name,
+    email: contact.email,
+    organization: contact.organization,
+    inferredRole: contact.inferredRole,
+    lastSeenAt: iso(contact.lastSeenAt),
+    messageCount: contact.messageCount,
+    createdAt: iso(contact.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(contact.updatedAt) ?? new Date().toISOString()
   };
 }
 
@@ -879,6 +939,14 @@ export async function listEmailThreadsForUser(
         select: {
           id: true
         }
+      },
+      actionItems: {
+        where: {
+          status: "pending"
+        },
+        select: {
+          id: true
+        }
       }
     },
     orderBy: {
@@ -895,7 +963,8 @@ export async function listEmailThreadsForUser(
       account: toAccountRecord(row.account),
       links: row.dealLinks.map(toLinkView),
       importantEventCount: row.dealEvents.length,
-      pendingTermSuggestionCount: row.termSuggestions.length
+      pendingTermSuggestionCount: row.termSuggestions.length,
+      pendingActionItemCount: row.actionItems.length
     }))
     .filter((row) => {
       if (filters?.linkedDealId && !row.links.some((link) => link.dealId === filters.linkedDealId)) {
@@ -957,6 +1026,13 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
         },
         orderBy: { createdAt: "desc" },
         take: 8
+      },
+      actionItems: {
+        where: {
+          status: "pending"
+        },
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        take: 20
       }
     }
   });
@@ -971,7 +1047,10 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
     messages: row.messages.map(toMessageRecord),
     links: row.dealLinks.map(toLinkView),
     importantEvents: row.dealEvents.map(toDealEventRecord),
-    termSuggestions: row.termSuggestions.map(toTermSuggestionRecord)
+    termSuggestions: row.termSuggestions.map(toTermSuggestionRecord),
+    actionItems: row.actionItems.map(toActionItemRecord),
+    promiseDiscrepancies: [],
+    crossDealConflicts: []
   };
 }
 
@@ -1001,6 +1080,12 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
             },
             select: { id: true }
           },
+          actionItems: {
+            where: {
+              status: "pending"
+            },
+            select: { id: true }
+          },
           dealLinks: {
             include: {
               deal: {
@@ -1024,7 +1109,8 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
     account: toAccountRecord(row.thread.account),
     links: row.thread.dealLinks.map(toLinkView),
     importantEventCount: row.thread.dealEvents.length,
-    pendingTermSuggestionCount: row.thread.termSuggestions.length
+    pendingTermSuggestionCount: row.thread.termSuggestions.length,
+    pendingActionItemCount: row.thread.actionItems.length
   })) satisfies EmailThreadListItem[];
 }
 
@@ -1462,4 +1548,184 @@ export async function listAccountsNeedingRenewal(beforeIso: string) {
   });
 
   return rows.map(toAccountRecord);
+}
+
+export async function saveEmailActionItem(input: {
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  action: string;
+  dueDate: string | null;
+  urgency: EmailActionItemRecord["urgency"];
+  status?: EmailActionItemRecord["status"];
+  sourceText: string | null;
+}) {
+  const saved = await prisma.emailActionItem.upsert({
+    where: {
+      dealId_messageId_action: {
+        dealId: input.dealId,
+        messageId: input.messageId,
+        action: input.action
+      }
+    },
+    update: {
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+      urgency: input.urgency,
+      sourceText: input.sourceText
+    },
+    create: {
+      userId: input.userId,
+      dealId: input.dealId,
+      threadId: input.threadId,
+      messageId: input.messageId,
+      action: input.action,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+      urgency: input.urgency,
+      status: input.status ?? "pending",
+      sourceText: input.sourceText
+    }
+  });
+
+  return toActionItemRecord(saved);
+}
+
+export async function listEmailActionItemsForDeal(userId: string, dealId: string, status?: string) {
+  const rows = await prisma.emailActionItem.findMany({
+    where: {
+      userId,
+      dealId,
+      status: status ?? "pending"
+    },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }]
+  });
+
+  return rows.map(toActionItemRecord);
+}
+
+export async function listEmailActionItemsForUser(userId: string, status?: string) {
+  const rows = await prisma.emailActionItem.findMany({
+    where: {
+      userId,
+      status: status ?? "pending"
+    },
+    orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    take: 50
+  });
+
+  return rows.map(toActionItemRecord);
+}
+
+export async function updateEmailActionItemStatus(
+  userId: string,
+  actionItemId: string,
+  status: EmailActionItemRecord["status"]
+) {
+  const existing = await prisma.emailActionItem.findFirst({
+    where: { id: actionItemId, userId },
+    select: { id: true }
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  const saved = await prisma.emailActionItem.update({
+    where: { id: actionItemId },
+    data: { status }
+  });
+
+  return toActionItemRecord(saved);
+}
+
+export async function upsertBrandContact(input: {
+  userId: string;
+  dealId: string;
+  name: string;
+  email: string;
+  organization: string | null;
+  inferredRole: string | null;
+  lastSeenAt: string | null;
+}) {
+  const saved = await prisma.brandContact.upsert({
+    where: {
+      userId_dealId_email: {
+        userId: input.userId,
+        dealId: input.dealId,
+        email: input.email.toLowerCase()
+      }
+    },
+    update: {
+      name: input.name,
+      organization: input.organization,
+      inferredRole: input.inferredRole,
+      lastSeenAt: input.lastSeenAt ? new Date(input.lastSeenAt) : null,
+      messageCount: { increment: 1 }
+    },
+    create: {
+      userId: input.userId,
+      dealId: input.dealId,
+      name: input.name,
+      email: input.email.toLowerCase(),
+      organization: input.organization,
+      inferredRole: input.inferredRole,
+      lastSeenAt: input.lastSeenAt ? new Date(input.lastSeenAt) : null,
+      messageCount: 1
+    }
+  });
+
+  return toBrandContactRecord(saved);
+}
+
+export async function listBrandContactsForDeal(userId: string, dealId: string) {
+  const rows = await prisma.brandContact.findMany({
+    where: { userId, dealId },
+    orderBy: [{ messageCount: "desc" }, { lastSeenAt: "desc" }]
+  });
+
+  return rows.map(toBrandContactRecord);
+}
+
+export async function saveEmailRiskFlag(input: {
+  dealId: string;
+  category: string;
+  title: string;
+  detail: string;
+  severity: string;
+  suggestedAction: string | null;
+  evidence: string[];
+  sourceType: string;
+  sourceMessageId: string | null;
+}) {
+  const saved = await prisma.riskFlag.create({
+    data: {
+      dealId: input.dealId,
+      category: input.category,
+      title: input.title,
+      detail: input.detail,
+      severity: input.severity,
+      suggestedAction: input.suggestedAction,
+      evidence: toJsonValue(input.evidence),
+      sourceType: input.sourceType,
+      sourceMessageId: input.sourceMessageId
+    }
+  });
+
+  return saved;
+}
+
+export async function listUpcomingActionItemDeadlines(beforeIso: string) {
+  const rows = await prisma.emailActionItem.findMany({
+    where: {
+      status: "pending",
+      dueDate: {
+        lte: new Date(beforeIso),
+        not: null
+      }
+    },
+    orderBy: { dueDate: "asc" },
+    take: 100
+  });
+
+  return rows.map(toActionItemRecord);
 }

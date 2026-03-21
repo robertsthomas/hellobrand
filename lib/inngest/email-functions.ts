@@ -1,5 +1,6 @@
 import { inngest } from "@/lib/inngest/client";
 import { renewExpiringEmailSubscriptions, syncEmailAccount } from "@/lib/email/service";
+import { listUpcomingActionItemDeadlines } from "@/lib/email/repository";
 
 export const emailInitialSyncFunction = inngest.createFunction(
   { id: "email-account-initial-sync" },
@@ -62,5 +63,66 @@ export const emailRenewalSweepFunction = inngest.createFunction(
     );
 
     return { ok: true, renewedCount };
+  }
+);
+
+export const emailActionItemDeadlineCheckFunction = inngest.createFunction(
+  { id: "email-action-item-deadline-check" },
+  { cron: "0 9 * * *" },
+  async ({ step }) => {
+    const upcomingDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const items = await step.run("check-upcoming-deadlines", async () =>
+      listUpcomingActionItemDeadlines(upcomingDeadline)
+    );
+
+    return { ok: true, upcomingCount: items.length, items: items.map((i) => ({ id: i.id, action: i.action, dueDate: i.dueDate })) };
+  }
+);
+
+export const emailPaymentOverdueCheckFunction = inngest.createFunction(
+  { id: "email-payment-overdue-check" },
+  { cron: "0 10 * * 1" },
+  async ({ step }) => {
+    const { prisma } = await import("@/lib/prisma");
+    const overduePayments = await step.run("check-overdue-payments", async () => {
+      const now = new Date();
+      return prisma.paymentRecord.findMany({
+        where: {
+          status: { in: ["invoiced", "awaiting_payment"] },
+          dueDate: { lte: now }
+        },
+        include: {
+          deal: {
+            select: {
+              id: true,
+              brandName: true,
+              campaignName: true,
+              userId: true
+            }
+          }
+        },
+        take: 50
+      });
+    });
+
+    for (const payment of overduePayments) {
+      await step.run(`flag-overdue-${payment.id}`, async () => {
+        await prisma.paymentRecord.update({
+          where: { id: payment.id },
+          data: { status: "late" }
+        });
+      });
+    }
+
+    return {
+      ok: true,
+      overdueCount: overduePayments.length,
+      deals: overduePayments.map((p) => ({
+        dealId: p.deal.id,
+        brand: p.deal.brandName,
+        campaign: p.deal.campaignName,
+        dueDate: String(p.dueDate ?? "")
+      }))
+    };
   }
 );

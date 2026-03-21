@@ -128,6 +128,8 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
     emailCandidateMatches: store.emailCandidateMatches ?? [],
     emailDealEvents: store.emailDealEvents ?? [],
     emailDealTermSuggestions: store.emailDealTermSuggestions ?? [],
+    emailActionItems: store.emailActionItems ?? [],
+    brandContacts: store.brandContacts ?? [],
     assistantThreads: store.assistantThreads ?? [],
     assistantMessages: store.assistantMessages ?? [],
     assistantContextSnapshots: store.assistantContextSnapshots ?? [],

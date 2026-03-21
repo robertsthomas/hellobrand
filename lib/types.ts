@@ -71,6 +71,10 @@ export type EmailDealEventCategory =
   | "attachment"
   | "ask";
 export type EmailTermSuggestionStatus = "pending" | "applied" | "dismissed";
+export type EmailActionItemStatus = "pending" | "completed" | "dismissed";
+export type EmailActionItemUrgency = "low" | "medium" | "high";
+export type NegotiationStance = "firm" | "collaborative" | "exploratory";
+export type RiskFlagSourceType = "document" | "email";
 
 export interface EmailParticipant {
   name: string | null;
@@ -335,6 +339,8 @@ export interface RiskFlagRecord {
   suggestedAction: string | null;
   evidence: string[];
   sourceDocumentId: string | null;
+  sourceType?: RiskFlagSourceType | null;
+  sourceMessageId?: string | null;
   createdAt: string;
 }
 
@@ -485,6 +491,44 @@ export interface EmailDealTermSuggestionRecord {
   updatedAt: string;
 }
 
+export interface EmailActionItemRecord {
+  id: string;
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  action: string;
+  dueDate: string | null;
+  urgency: EmailActionItemUrgency;
+  status: EmailActionItemStatus;
+  sourceText: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandContactRecord {
+  id: string;
+  userId: string;
+  dealId: string;
+  name: string;
+  email: string;
+  organization: string | null;
+  inferredRole: string | null;
+  lastSeenAt: string | null;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromiseDiscrepancy {
+  field: string;
+  emailClaim: string;
+  contractValue: string;
+  severity: "low" | "medium" | "high";
+  sourceText: string;
+  messageId: string;
+}
+
 export interface EmailThreadLinkView {
   id: string;
   dealId: string;
@@ -503,6 +547,7 @@ export interface EmailThreadListItem {
   links: EmailThreadLinkView[];
   importantEventCount: number;
   pendingTermSuggestionCount: number;
+  pendingActionItemCount: number;
 }
 
 export interface EmailThreadDetail {
@@ -512,6 +557,9 @@ export interface EmailThreadDetail {
   links: EmailThreadLinkView[];
   importantEvents: EmailDealEventRecord[];
   termSuggestions: EmailDealTermSuggestionRecord[];
+  actionItems: EmailActionItemRecord[];
+  promiseDiscrepancies: PromiseDiscrepancy[];
+  crossDealConflicts: ConflictResult[];
 }
 
 export interface EmailDealCandidateMatchView {
@@ -830,6 +878,8 @@ export interface AppStore {
   emailCandidateMatches: EmailDealCandidateMatchRecord[];
   emailDealEvents: EmailDealEventRecord[];
   emailDealTermSuggestions: EmailDealTermSuggestionRecord[];
+  emailActionItems: EmailActionItemRecord[];
+  brandContacts: BrandContactRecord[];
   assistantThreads: AssistantThreadRecord[];
   assistantMessages: AssistantMessageRecord[];
   assistantContextSnapshots: AssistantContextSnapshotRecord[];

@@ -180,6 +180,8 @@ export function createSeedStore(): AppStore {
     emailCandidateMatches: [],
     emailDealEvents: [],
     emailDealTermSuggestions: [],
+    emailActionItems: [],
+    brandContacts: [],
     assistantThreads: [],
     assistantMessages: [],
     assistantContextSnapshots: [],

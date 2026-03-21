@@ -187,6 +187,8 @@ function toRiskFlagRecord(flag: {
   suggestedAction: string | null;
   evidence: unknown;
   sourceDocumentId: string | null;
+  sourceType?: string | null;
+  sourceMessageId?: string | null;
   createdAt: Date;
 }): RiskFlagRecord {
   return {
@@ -194,6 +196,8 @@ function toRiskFlagRecord(flag: {
     category: flag.category as RiskFlagRecord["category"],
     severity: flag.severity as RiskFlagRecord["severity"],
     evidence: toStringArray(flag.evidence),
+    sourceType: (flag.sourceType as RiskFlagRecord["sourceType"]) ?? null,
+    sourceMessageId: flag.sourceMessageId ?? null,
     createdAt: iso(flag.createdAt) ?? new Date().toISOString()
   };
 }

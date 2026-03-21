@@ -11,8 +11,10 @@ export async function POST(
   try {
     const viewer = await requireApiViewer();
     const { threadId } = await params;
-    const body = (await request.json()) as { dealId?: string | null };
-    const draft = await draftReplyForViewer(viewer, threadId, body.dealId ?? null);
+    const body = (await request.json()) as { dealId?: string | null; stance?: string | null };
+    const validStances = ["firm", "collaborative", "exploratory"];
+    const stance = validStances.includes(body.stance ?? "") ? body.stance as "firm" | "collaborative" | "exploratory" : null;
+    const draft = await draftReplyForViewer(viewer, threadId, body.dealId ?? null, stance);
 
     if (!draft) {
       return fail("Email thread not found.", 404);

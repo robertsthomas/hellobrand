@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
+  Check,
+  CircleDot,
   File,
   FileImage,
   FileText,
@@ -10,6 +13,7 @@ import {
   Info,
   MoreHorizontal,
   Paperclip,
+  ShieldAlert,
   X,
   XCircle
 } from "lucide-react";
@@ -17,12 +21,14 @@ import {
 import { AppTooltip } from "@/components/app-tooltip";
 import type {
   DealRecord,
+  EmailActionItemRecord,
   EmailDealCandidateMatchGroup,
   EmailAttachmentRecord,
   EmailMessageRecord,
   EmailParticipant,
   EmailThreadDetail,
-  EmailThreadListItem
+  EmailThreadListItem,
+  NegotiationStance
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -232,6 +238,78 @@ function MessageStrip({
   );
 }
 
+function ActionItemRow({ item }: { item: EmailActionItemRecord }) {
+  const [status, setStatus] = useState(item.status);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  async function updateStatus(newStatus: "completed" | "dismissed") {
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/email/action-items/${item.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (response.ok) {
+        setStatus(newStatus);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  if (status !== "pending") {
+    return null;
+  }
+
+  return (
+    <div className="flex items-start gap-3 border-l-2 border-[#b42318]/30 pl-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold text-foreground">{item.action}</p>
+        {item.dueDate ? (
+          <p className="mt-1 text-[11px] text-[#b42318]">Due: {formatDate(item.dueDate)}</p>
+        ) : null}
+        {item.sourceText ? (
+          <p className="mt-1 text-[11px] italic text-muted-foreground">
+            &ldquo;{item.sourceText}&rdquo;
+          </p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <span className={`px-2 py-0.5 text-[9px] font-medium uppercase ${
+          item.urgency === "high"
+            ? "bg-[#fecaca] text-[#991b1b]"
+            : item.urgency === "medium"
+            ? "bg-[#fef3c7] text-[#92400e]"
+            : "bg-[#e0e7ff] text-[#3730a3]"
+        }`}>
+          {item.urgency}
+        </span>
+        <button
+          type="button"
+          onClick={() => void updateStatus("completed")}
+          disabled={isUpdating}
+          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground transition hover:text-[#16a34a] disabled:opacity-50"
+          aria-label="Complete"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void updateStatus("dismissed")}
+          disabled={isUpdating}
+          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+          aria-label="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function InboxWorkspace({
   threads,
   selectedThread: initialSelectedThread,
@@ -274,6 +352,7 @@ export function InboxWorkspace({
   const [candidateGroups, setCandidateGroups] = useState<EmailDealCandidateMatchGroup[]>([]);
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [replyStance, setReplyStance] = useState<NegotiationStance | "">("collaborative");
 
   useEffect(() => {
     setSelectedThread(initialSelectedThread);
@@ -462,7 +541,8 @@ export function InboxWorkspace({
           "content-type": "application/json"
         },
         body: JSON.stringify({
-          dealId: selectedDealId || null
+          dealId: selectedDealId || null,
+          stance: replyStance || null
         })
       });
       const payload = await response.json();
@@ -840,6 +920,11 @@ export function InboxWorkspace({
                                   Terms suggested
                                 </span>
                               ) : null}
+                              {item.pendingActionItemCount > 0 ? (
+                                <span className="bg-[#fef3f2] px-2.5 py-1 text-[10px] font-medium text-[#b42318]">
+                                  {item.pendingActionItemCount} action{item.pendingActionItemCount === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -900,6 +985,27 @@ export function InboxWorkspace({
                               >
                                 {isSummarizing ? "Summarizing..." : "Generate summary"}
                               </button>
+                              <div className="border-b border-black/6 pb-1 mb-1">
+                                <p className="px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                                  Reply stance
+                                </p>
+                                <div className="flex gap-1 px-3 py-1">
+                                  {(["firm", "collaborative", "exploratory"] as const).map((s) => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => setReplyStance(s)}
+                                      className={`px-2 py-1 text-[10px] font-medium transition ${
+                                        replyStance === s
+                                          ? "bg-foreground text-background"
+                                          : "bg-secondary/40 text-foreground hover:bg-secondary/60"
+                                      }`}
+                                    >
+                                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => void draftReply()}
@@ -974,6 +1080,82 @@ export function InboxWorkspace({
                                       >
                                         Review key terms
                                       </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {selectedThread.actionItems.length > 0 ? (
+                              <section className="border border-[#fecdca]/60 bg-[#fef3f2] px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <CircleDot className="h-4 w-4 text-[#b42318]" />
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#b42318]">
+                                    Action items
+                                  </p>
+                                </div>
+                                <div className="mt-3 space-y-3">
+                                  {selectedThread.actionItems.map((item) => (
+                                    <ActionItemRow key={item.id} item={item} />
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {selectedThread.promiseDiscrepancies.length > 0 ? (
+                              <section className="border border-[#fde68a]/60 bg-[#fffbeb] px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-[#b45309]" />
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#b45309]">
+                                    Email vs. contract discrepancies
+                                  </p>
+                                </div>
+                                <div className="mt-3 space-y-3">
+                                  {selectedThread.promiseDiscrepancies.map((d, i) => (
+                                    <div key={`${d.field}-${i}`} className="border-l-2 border-[#f59e0b] pl-3">
+                                      <p className="text-[12px] font-semibold text-foreground">
+                                        {d.field}: email says &ldquo;{d.emailClaim}&rdquo;
+                                      </p>
+                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                        Contract says &ldquo;{d.contractValue}&rdquo;
+                                      </p>
+                                      <p className="mt-1 text-[11px] italic text-muted-foreground">
+                                        &ldquo;{d.sourceText}&rdquo;
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {selectedThread.crossDealConflicts.length > 0 ? (
+                              <section className="border border-[#fecaca]/60 bg-[#fef2f2] px-5 py-4">
+                                <div className="flex items-center gap-2">
+                                  <ShieldAlert className="h-4 w-4 text-[#dc2626]" />
+                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#dc2626]">
+                                    Cross-deal conflicts
+                                  </p>
+                                </div>
+                                <div className="mt-3 space-y-3">
+                                  {selectedThread.crossDealConflicts.map((conflict, i) => (
+                                    <div key={`conflict-${i}`} className="border-l-2 border-[#ef4444] pl-3">
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-[12px] font-semibold text-foreground">
+                                          {conflict.title}
+                                        </p>
+                                        <span className={`px-2 py-0.5 text-[10px] font-medium ${
+                                          conflict.severity === "high"
+                                            ? "bg-[#fecaca] text-[#991b1b]"
+                                            : conflict.severity === "medium"
+                                            ? "bg-[#fef3c7] text-[#92400e]"
+                                            : "bg-[#e0e7ff] text-[#3730a3]"
+                                        }`}>
+                                          {conflict.severity}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                        {conflict.detail}
+                                      </p>
                                     </div>
                                   ))}
                                 </div>

@@ -11,12 +11,15 @@ import type {
   EmailDealCandidateMatchRecord,
   EmailThreadDetail,
   EmailThreadListItem,
+  NegotiationStance,
   PendingExtractionData,
   Viewer
 } from "@/lib/types";
 import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
 import { generateEmailReplyDraft, generateEmailThreadSummary } from "@/lib/email/ai";
-import { detectImportantEmailEvents, buildEmailTermSuggestion, scoreThreadAgainstDeal } from "@/lib/email/smart-inbox";
+import { detectImportantEmailEvents, buildEmailTermSuggestion, detectPromiseDiscrepancies, scoreThreadAgainstDeal } from "@/lib/email/smart-inbox";
+import { extractActionItemsFromMessage } from "@/lib/email/action-items";
+import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
 import { parseOAuthState } from "@/lib/email/oauth-state";
@@ -42,10 +45,13 @@ import {
   listLinkedEmailThreadsForDeal,
   markEmailCandidateMatchForDealThread,
   saveConnectedEmailAccount,
+  saveEmailActionItem,
   saveEmailDealEvent,
   saveEmailDealTermSuggestion,
+  saveEmailRiskFlag,
   saveEmailThreadSummary,
   saveSyncedEmailThread,
+  upsertBrandContact,
   unlinkEmailThreadFromDeal,
   updateConnectedEmailAccount,
   updateEmailCandidateMatchStatus,
@@ -341,6 +347,8 @@ async function processLinkedThreadUpdates(
   viewer: Viewer,
   threadIds: string[]
 ) {
+  const allAggregates = await listDealAggregatesForViewer(viewer);
+
   for (const threadId of threadIds) {
     const thread = await getEmailThreadDetailForUser(viewer.id, threadId);
     if (!thread || thread.links.length === 0) {
@@ -348,12 +356,13 @@ async function processLinkedThreadUpdates(
     }
 
     for (const link of thread.links) {
-      const aggregate = await getRepository().getDealAggregate(viewer.id, link.dealId);
+      const aggregate = allAggregates.find((a) => a.deal.id === link.dealId);
       if (!aggregate) {
         continue;
       }
 
       for (const message of thread.messages) {
+        // 1. Existing: detect important events
         const events = detectImportantEmailEvents(message);
         for (const event of events) {
           await saveEmailDealEvent({
@@ -368,33 +377,103 @@ async function processLinkedThreadUpdates(
           });
         }
 
+        // 2. Existing: extract and apply term suggestions
         const suggestion = buildEmailTermSuggestion(aggregate, thread, message);
-        if (!suggestion) {
-          continue;
+        if (suggestion) {
+          const pendingPatch = await applyEmailTermSuggestionToDeal(
+            viewer,
+            link.dealId,
+            suggestion.patch
+          );
+          if (pendingPatch) {
+            await saveEmailDealTermSuggestion({
+              userId: viewer.id,
+              dealId: link.dealId,
+              threadId: thread.thread.id,
+              messageId: message.id,
+              title: suggestion.title,
+              summary: suggestion.summary,
+              patch: suggestion.patch,
+              evidence: suggestion.evidence
+            });
+          }
         }
 
-        const pendingPatch = await applyEmailTermSuggestionToDeal(
-          viewer,
-          link.dealId,
-          suggestion.patch
-        );
-        if (!pendingPatch) {
-          continue;
+        // 3. NEW: extract action items (Deal Pulse)
+        const actionItems = await extractActionItemsFromMessage(message, aggregate);
+        for (const item of actionItems) {
+          await saveEmailActionItem({
+            userId: viewer.id,
+            dealId: link.dealId,
+            threadId: thread.thread.id,
+            messageId: message.id,
+            action: item.action,
+            dueDate: item.dueDate,
+            urgency: item.urgency,
+            sourceText: item.sourceText
+          });
         }
 
-        await saveEmailDealTermSuggestion({
-          userId: viewer.id,
-          dealId: link.dealId,
-          threadId: thread.thread.id,
-          messageId: message.id,
-          title: suggestion.title,
-          summary: suggestion.summary,
-          patch: suggestion.patch,
-          evidence: suggestion.evidence
-        });
+        // 4. NEW: detect promise discrepancies (Promise Tracker)
+        const discrepancies = detectPromiseDiscrepancies(aggregate, message);
+        for (const discrepancy of discrepancies) {
+          await saveEmailRiskFlag({
+            dealId: link.dealId,
+            category: discrepancy.field === "paymentAmount" ? "payment_terms"
+              : discrepancy.field === "exclusivity" ? "exclusivity"
+              : discrepancy.field === "deliverables" ? "deliverables"
+              : discrepancy.field === "usageDuration" ? "usage_rights"
+              : "other",
+            title: `Email contradicts contract: ${discrepancy.field}`,
+            detail: `Email claims "${discrepancy.emailClaim}" but contract says "${discrepancy.contractValue}".`,
+            severity: discrepancy.severity,
+            suggestedAction: "Review the email thread and compare with your signed contract terms.",
+            evidence: [discrepancy.sourceText],
+            sourceType: "email",
+            sourceMessageId: discrepancy.messageId
+          });
+        }
+
+        // 5. NEW: build brand contact intelligence
+        if (message.direction === "inbound" && message.from?.email) {
+          await upsertBrandContact({
+            userId: viewer.id,
+            dealId: link.dealId,
+            name: message.from.name ?? message.from.email,
+            email: message.from.email,
+            organization: aggregate.deal.brandName,
+            inferredRole: inferContactRole(message),
+            lastSeenAt: message.receivedAt ?? message.sentAt
+          });
+        }
+      }
+
+      // 6. NEW: check cross-deal conflicts after processing all messages
+      const latestMessage = thread.messages[thread.messages.length - 1];
+      if (latestMessage) {
+        checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
       }
     }
   }
+}
+
+function inferContactRole(message: { subject: string; textBody: string | null }): string | null {
+  const text = `${message.subject} ${message.textBody ?? ""}`.toLowerCase();
+
+  if (/\b(contract|agreement|legal|terms|clause|amendment)\b/.test(text)) {
+    return "contracts";
+  }
+  if (/\b(invoice|payment|billing|finance|net\s*\d+|remit)\b/.test(text)) {
+    return "finance";
+  }
+  if (/\b(creative|brief|draft|concept|review|approval|content)\b/.test(text)) {
+    return "creative";
+  }
+  if (/\b(campaign|manager|coordinator|partnership|talent)\b/.test(text)) {
+    return "partnerships";
+  }
+
+  return null;
 }
 
 async function syncGmailAccount(
@@ -672,7 +751,33 @@ export async function listInboxThreadsForViewer(
 }
 
 export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) {
-  return getEmailThreadDetailForUser(viewer.id, threadId);
+  const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
+  if (!detail || detail.links.length === 0) {
+    return detail;
+  }
+
+  // Enrich with promise discrepancies and cross-deal conflicts
+  const allAggregates = await listDealAggregatesForViewer(viewer);
+
+  for (const link of detail.links) {
+    const aggregate = allAggregates.find((a) => a.deal.id === link.dealId);
+    if (!aggregate) {
+      continue;
+    }
+
+    for (const message of detail.messages) {
+      const discrepancies = detectPromiseDiscrepancies(aggregate, message);
+      detail.promiseDiscrepancies.push(...discrepancies);
+    }
+
+    const latestMessage = detail.messages[detail.messages.length - 1];
+    if (latestMessage) {
+      const conflicts = checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
+      detail.crossDealConflicts.push(...conflicts);
+    }
+  }
+
+  return detail;
 }
 
 export async function listLinkedEmailThreadsForViewerDeal(viewer: Viewer, dealId: string) {
@@ -934,7 +1039,8 @@ export async function summarizeEmailThreadForViewer(viewer: Viewer, threadId: st
 export async function draftReplyForViewer(
   viewer: Viewer,
   threadId: string,
-  explicitDealId?: string | null
+  explicitDealId?: string | null,
+  stance?: NegotiationStance | null
 ) {
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
   if (!detail) {
@@ -946,5 +1052,5 @@ export async function draftReplyForViewer(
     getProfileForViewer(viewer)
   ]);
 
-  return generateEmailReplyDraft(detail, deal as DealAggregate | null, profile);
+  return generateEmailReplyDraft(detail, deal as DealAggregate | null, profile, stance ?? null);
 }

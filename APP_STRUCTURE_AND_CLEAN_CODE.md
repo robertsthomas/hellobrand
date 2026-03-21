@@ -33,6 +33,11 @@ Rules:
 - Pages should orchestrate data loading and component composition only.
 - Server actions should validate input, call domain services, then revalidate or redirect.
 - Route files should not contain large chunks of business logic.
+- Route aliases are acceptable when they preserve stable URLs while the real page lives elsewhere.
+  Current examples:
+  - `app/deals/[dealId]/page.tsx` re-exporting from `app/app/deals/[dealId]/page.tsx`
+  - `app/deals/new/page.tsx` re-exporting or redirecting into the intake flow
+  - `app/app/dashboard/page.tsx` re-exporting from `app/app/page.tsx`
 
 ### `components/`
 
@@ -50,6 +55,8 @@ Rules:
 - Components should stay focused on rendering and UI state.
 - Shared behavior should move into helper modules or hooks.
 - Large form editors should be split into smaller subcomponents when they start carrying business rules.
+- `components/ui/` should remain the home for low-level UI primitives.
+- Route-specific composition components are acceptable here if they are still UI-first and do not own domain rules.
 
 ### `lib/`
 
@@ -63,6 +70,10 @@ Responsibilities:
 - Validation helpers
 - Data normalization and mapping
 - Non-UI business rules
+- Assistant runtime, prompt, and snapshot logic
+- Email sync, linking, AI drafting, and inbox intelligence
+- Cached read models that sit between routes and domain services
+- External-service adapters such as Prisma, Supabase, and Inngest
 
 Rules:
 
@@ -70,6 +81,36 @@ Rules:
 - Keep side-effectful code separated from data transforms.
 - Keep repository mapping in dedicated mapper helpers.
 - Keep domain-specific logic out of UI components.
+
+### `prisma/`
+
+Use `prisma/` for schema and migration history only.
+
+Responsibilities:
+
+- Prisma schema definition
+- Forward-only migration files
+
+Rules:
+
+- Do not hide business rules in migration SQL.
+- Application logic should not depend on ad hoc SQL in route handlers.
+- If a manual migration is applied outside Prisma, resolve the migration history explicitly.
+
+## Current Repo-Specific Boundaries
+
+These boundaries reflect the repo as it exists today and should be treated as the active convention.
+
+- `app/server-actions/`: authenticated action entrypoints grouped by surface
+- `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: primary domain commands and orchestration
+- `lib/analysis/`: extraction, fallback parsing, LLM orchestration, and summary generation
+- `lib/email/`: provider-agnostic email domain logic, AI helpers, repository helpers, and smart inbox behavior
+- `lib/assistant/`: prompt assembly, runtime, tool wiring, snapshot generation, and UI block definitions
+- `lib/repository/`: persistence abstraction for Prisma-backed and file-backed modes
+- `lib/cached-data.ts`: route-facing cached loaders for read-heavy pages
+- `lib/browser/` and `lib/stores/`: browser-only queue/state helpers
+- `components/ui/`: primitive UI building blocks
+- `components/figma/`: Figma-specific rendering or integration helpers
 
 ## Recommended Layering
 
@@ -289,8 +330,42 @@ Whenever a shared helper is introduced, add a test that proves:
 - `components/`: rendering and interaction only
 - `lib/analysis/`: extraction, scoring, merging, summary logic
 - `lib/deals.ts` and `lib/intake.ts`: domain orchestration
+- `lib/email/`: inbox linking, email AI, and email-domain coordination
+- `lib/assistant/`: assistant prompt/runtime/tool layers
 - `lib/repository/`: persistence adapters and mapping
+- `lib/cached-data.ts`: cached read-model composition for pages
+- `prisma/`: schema and migrations only
 - `lib/*-metadata.ts`: shared config and lookup data
+
+## Accepted Exceptions
+
+Some current patterns are acceptable even though they are not the end-state ideal.
+
+- Re-export route files that preserve stable URLs while app pages move
+- A thin `app/actions.ts` barrel that stabilizes import paths for server actions
+- A repository selector in `lib/repository/index.ts` that swaps Prisma and file-backed persistence based on environment
+- Cached page loaders in `lib/cached-data.ts` that compose repository reads for the route layer
+
+These should stay thin. If they start absorbing business logic, split them immediately.
+
+## Current Refactor Priorities
+
+The following files are beyond the "easy to understand in one pass" bar and should be treated as refactor targets when touched next:
+
+- `lib/deals.ts`
+- `lib/intake.ts`
+- `lib/email/service.ts`
+- `lib/analysis/llm.ts`
+- `app/app/page.tsx`
+- `components/profile-editor.tsx`
+- `components/terms-editor.tsx`
+
+For these files, the default expectation is:
+
+- extract pure mappers and normalization helpers
+- separate read-model composition from write commands
+- move repeated form section logic into smaller helpers or subcomponents
+- keep route pages focused on composition instead of accumulating dashboard business rules
 
 ## Clean Code Checklist
 

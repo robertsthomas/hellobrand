@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 
 import { getEmailDraftModel, getEmailSummaryModel } from "@/lib/email/config";
-import type { DealAggregate, EmailThreadDetail, ProfileRecord } from "@/lib/types";
+import type { DealAggregate, EmailThreadDetail, NegotiationStance, ProfileRecord } from "@/lib/types";
 
 function providerConfig() {
   if (!process.env.OPENROUTER_API_KEY) {
@@ -98,7 +98,8 @@ function fallbackDraft(thread: EmailThreadDetail, partnership: DealAggregate | n
 export async function generateEmailReplyDraft(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
-  profile: ProfileRecord
+  profile: ProfileRecord,
+  stance?: NegotiationStance | null
 ) {
   const api = client();
   if (!api) {
@@ -109,25 +110,46 @@ export async function generateEmailReplyDraft(
     ? [
         `Brand: ${partnership.deal.brandName}`,
         `Campaign: ${partnership.deal.campaignName}`,
-        `Payment terms: ${partnership.terms?.paymentTerms ?? "Unknown"}`,
-        `Usage rights: ${partnership.terms?.usageRights ?? "Unknown"}`,
+        `Status: ${partnership.deal.status}`,
+        `Payment: ${partnership.terms?.paymentAmount ? `$${partnership.terms.paymentAmount}` : "Unknown"}, terms: ${partnership.terms?.paymentTerms ?? "Unknown"}`,
+        `Usage rights: ${partnership.terms?.usageRights ?? "Unknown"}, duration: ${partnership.terms?.usageDuration ?? "Unknown"}`,
+        `Exclusivity: ${partnership.terms?.exclusivity ?? partnership.terms?.exclusivityApplies ? "Yes" : "No/Unknown"}${partnership.terms?.exclusivityCategory ? ` (${partnership.terms.exclusivityCategory})` : ""}`,
         `Deliverables: ${(partnership.terms?.deliverables ?? []).map((item) => `${item.quantity ?? "TBD"} ${item.title}`).join(", ") || "Unknown"}`,
         `Partnership summary: ${partnership.currentSummary?.body ?? partnership.deal.summary ?? "None"}`
       ].join("\n")
     : "No linked partnership context.";
 
+  const riskContext = partnership && partnership.riskFlags.length > 0
+    ? `\nRisk flags:\n${partnership.riskFlags.map((f) => `- [${f.severity}] ${f.title}: ${f.detail}`).join("\n")}`
+    : "";
+
+  const discrepancyContext = thread.promiseDiscrepancies.length > 0
+    ? `\nEmail vs contract discrepancies:\n${thread.promiseDiscrepancies.map((d) => `- ${d.field}: email says "${d.emailClaim}", contract says "${d.contractValue}"`).join("\n")}`
+    : "";
+
+  const actionContext = thread.actionItems.length > 0
+    ? `\nPending action items from this thread:\n${thread.actionItems.map((a) => `- ${a.action}${a.dueDate ? ` (due: ${a.dueDate})` : ""}`).join("\n")}`
+    : "";
+
+  const stanceInstruction = stance === "firm"
+    ? "\nStance: FIRM — Reference specific contract clauses, politely decline scope creep, hold boundaries on agreed terms. Be professional but clear about what was agreed."
+    : stance === "collaborative"
+    ? "\nStance: COLLABORATIVE — Acknowledge the request, express willingness to discuss, suggest compromises while protecting key terms. Warm but aware."
+    : stance === "exploratory"
+    ? "\nStance: EXPLORATORY — Ask clarifying questions, express interest without commitment, gather more information before responding substantively."
+    : "";
+
   const response = await api.chat.completions.create({
     model: getEmailDraftModel(),
-    temperature: 0.35,
+    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
     messages: [
       {
         role: "system",
-        content:
-          "Write a concise creator-professional email reply. Use the thread and partnership context, do not invent commitments, and keep the tone practical and clear. Return JSON with subject and body."
+        content: `Write a concise creator-professional email reply. Use the thread and partnership context including deal terms, risk flags, and any discrepancies between email claims and contract. Do not invent commitments. Keep the tone practical and clear.${stanceInstruction}\n\nReturn JSON with subject and body.`
       },
       {
         role: "user",
-        content: `Partnership context:\n${partnershipContext}\n\nProfile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}\n\nThread:\n${plainTextThread(thread)}`
+        content: `Partnership context:\n${partnershipContext}${riskContext}${discrepancyContext}${actionContext}\n\nProfile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}\n\nThread:\n${plainTextThread(thread)}`
       }
     ],
     response_format: { type: "json_object" }
