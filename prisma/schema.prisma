@@ -558,6 +558,7 @@ model Profile {
   reminderLeadDays        Int?
   conflictAlertsEnabled   Boolean  @default(true)
   paymentRemindersEnabled Boolean  @default(true)
+  accentColor             String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 

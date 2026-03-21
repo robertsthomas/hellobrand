@@ -7,6 +7,17 @@ import { useRouter } from "next/navigation";
 import { parseProfileMetadata, serializeProfileMetadata } from "@/lib/profile-metadata";
 import type { ProfileRecord } from "@/lib/types";
 
+const ACCENT_PRESETS = [
+  { label: "Forest", hex: "#1a4d3e" },
+  { label: "Ocean", hex: "#1a5276" },
+  { label: "Indigo", hex: "#3730a3" },
+  { label: "Violet", hex: "#6d28d9" },
+  { label: "Berry", hex: "#9d174d" },
+  { label: "Coral", hex: "#c2410c" },
+  { label: "Amber", hex: "#b45309" },
+  { label: "Slate", hex: "#334155" },
+] as const;
+
 function FieldLabel({
   htmlFor,
   children
@@ -86,7 +97,8 @@ export function SettingsEditor({
     defaultCurrency: initialProfile.defaultCurrency ?? "USD",
     reminderLeadDays: String(initialProfile.reminderLeadDays ?? 3),
     conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
-    paymentRemindersEnabled: initialProfile.paymentRemindersEnabled
+    paymentRemindersEnabled: initialProfile.paymentRemindersEnabled,
+    accentColor: initialProfile.accentColor ?? ""
   });
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,7 +129,8 @@ export function SettingsEditor({
               ? Number(form.reminderLeadDays)
               : 3,
           conflictAlertsEnabled: form.conflictAlertsEnabled,
-          paymentRemindersEnabled: form.paymentRemindersEnabled
+          paymentRemindersEnabled: form.paymentRemindersEnabled,
+          accentColor: form.accentColor || null
         })
       });
 
@@ -260,6 +273,115 @@ export function SettingsEditor({
             }
           />
         </div>
+      </section>
+
+      <section className="border-b border-border py-10">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
+            Accent Color
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Choose the primary accent color used across the app. This tints buttons,
+            highlights, and key UI surfaces.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {ACCENT_PRESETS.map((preset) => {
+            const isSelected = form.accentColor.toLowerCase() === preset.hex;
+            return (
+              <button
+                key={preset.hex}
+                type="button"
+                title={preset.label}
+                onClick={() =>
+                  setForm((current) => ({ ...current, accentColor: preset.hex }))
+                }
+                className={`group relative flex h-11 w-11 items-center justify-center border-2 transition-all ${
+                  isSelected
+                    ? "border-foreground scale-110"
+                    : "border-transparent hover:border-border"
+                }`}
+              >
+                <span
+                  className="block h-full w-full"
+                  style={{ backgroundColor: preset.hex }}
+                />
+                {isSelected ? (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      className="text-white drop-shadow-sm"
+                    >
+                      <path
+                        d="M3.5 8.5L6.5 11.5L12.5 4.5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+
+          <div className="flex items-center gap-2 pl-2">
+            <label
+              htmlFor="customAccentColor"
+              className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Custom
+            </label>
+            <input
+              id="customAccentColor"
+              type="color"
+              value={form.accentColor || "#1a4d3e"}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  accentColor: event.currentTarget.value
+                }))
+              }
+              className="h-11 w-11 cursor-pointer border border-border bg-transparent p-0.5"
+            />
+          </div>
+
+          {form.accentColor ? (
+            <button
+              type="button"
+              onClick={() =>
+                setForm((current) => ({ ...current, accentColor: "" }))
+              }
+              className="ml-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Reset to default
+            </button>
+          ) : null}
+        </div>
+
+        {form.accentColor ? (
+          <div className="mt-4 flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">Preview:</span>
+            <span
+              className="inline-flex h-9 items-center justify-center px-4 text-sm font-medium text-white"
+              style={{ backgroundColor: form.accentColor }}
+            >
+              Button
+            </span>
+            <span
+              className="inline-block h-3 w-3 rounded-full"
+              style={{ backgroundColor: form.accentColor }}
+            />
+            <span className="text-xs font-mono text-muted-foreground">
+              {form.accentColor}
+            </span>
+          </div>
+        ) : null}
       </section>
 
       <section className="border-b border-border py-10">

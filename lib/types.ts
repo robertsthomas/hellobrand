@@ -795,6 +795,7 @@ export interface ProfileRecord {
   reminderLeadDays: number | null;
   conflictAlertsEnabled: boolean;
   paymentRemindersEnabled: boolean;
+  accentColor: string | null;
   createdAt: string;
   updatedAt: string;
 }

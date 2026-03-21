@@ -26,6 +26,7 @@ function toProfileRecord(profile: {
   reminderLeadDays: number | null;
   conflictAlertsEnabled: boolean;
   paymentRemindersEnabled: boolean;
+  accentColor?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): ProfileRecord {
@@ -42,6 +43,7 @@ function toProfileRecord(profile: {
     reminderLeadDays: profile.reminderLeadDays,
     conflictAlertsEnabled: profile.conflictAlertsEnabled,
     paymentRemindersEnabled: profile.paymentRemindersEnabled,
+    accentColor: profile.accentColor ?? null,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString()
   };
@@ -126,6 +128,7 @@ export async function updateProfileForViewer(
     reminderLeadDays?: number | null;
     conflictAlertsEnabled?: boolean;
     paymentRemindersEnabled?: boolean;
+    accentColor?: string | null;
   }
 ) {
   const existing = await prisma.profile.findUnique({
@@ -144,7 +147,8 @@ export async function updateProfileForViewer(
     conflictAlertsEnabled:
       patch.conflictAlertsEnabled ?? existing?.conflictAlertsEnabled ?? true,
     paymentRemindersEnabled:
-      patch.paymentRemindersEnabled ?? existing?.paymentRemindersEnabled ?? true
+      patch.paymentRemindersEnabled ?? existing?.paymentRemindersEnabled ?? true,
+    accentColor: patch.accentColor !== undefined ? patch.accentColor : (existing?.accentColor ?? null)
   };
 
   const profile = await prisma.profile.upsert({
@@ -166,7 +170,8 @@ export async function updateProfileForViewer(
     defaultCurrency: existing?.defaultCurrency ?? "USD",
     reminderLeadDays: existing?.reminderLeadDays ?? 3,
     conflictAlertsEnabled: existing?.conflictAlertsEnabled ?? true,
-    paymentRemindersEnabled: existing?.paymentRemindersEnabled ?? true
+    paymentRemindersEnabled: existing?.paymentRemindersEnabled ?? true,
+    accentColor: existing?.accentColor ?? null
   };
 
   const changedEntries = Object.entries(normalizedPatch).filter(
