@@ -31,7 +31,7 @@ interface SearchResultItem {
 }
 
 const KIND_CONFIG: Record<SearchResultKind, { label: string; icon: typeof FileText; color: string }> = {
-  deal: { label: "Deal", icon: StickyNote, color: "bg-ocean/10 text-ocean" },
+  deal: { label: "Partnership", icon: StickyNote, color: "bg-ocean/10 text-ocean" },
   document: { label: "Document", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
   terms: { label: "Terms", icon: StickyNote, color: "bg-emerald-500/10 text-emerald-600" },
   risk: { label: "Risk", icon: Shield, color: "bg-red-500/10 text-red-600" },
@@ -102,7 +102,7 @@ export function SearchResults({
     return counts;
   }, [results]);
 
-  const uniqueDeals = useMemo(() => {
+  const uniquePartnerships = useMemo(() => {
     const map = new Map<string, { id: string; name: string; brand: string }>();
     for (const r of results) {
       if (!map.has(r.dealId)) {
@@ -128,7 +128,7 @@ export function SearchResults({
           type="search"
           value={localQuery}
           onChange={(e) => setLocalQuery(e.target.value)}
-          placeholder="Search deals, documents, terms, risks..."
+          placeholder="Search partnerships, documents, terms, risks..."
           className="h-14 w-full border border-black/10 bg-white pl-12 pr-4 text-lg text-foreground outline-none transition placeholder:text-black/30 focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:focus:border-white/20"
         />
       </form>
@@ -140,7 +140,7 @@ export function SearchResults({
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{results.length}</span> result{results.length === 1 ? "" : "s"}
               {" across "}
-              <span className="font-semibold text-foreground">{uniqueDeals}</span> deal{uniqueDeals === 1 ? "" : "s"}
+              <span className="font-semibold text-foreground">{uniquePartnerships}</span> partnership{uniquePartnerships === 1 ? "" : "s"}
               {" for "}
               <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
             </p>
@@ -213,7 +213,7 @@ export function SearchResults({
           <Search className="mx-auto h-8 w-8 text-black/20 dark:text-white/20" />
           <h3 className="mt-4 text-xl font-semibold text-foreground">No results found</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Try a different search term or broaden your query. Search covers deal names, document text, terms, risks, and summaries.
+            Try a different search term or broaden your query. Search covers partnership names, document text, terms, risks, and summaries.
           </p>
         </div>
       ) : null}
@@ -223,7 +223,7 @@ export function SearchResults({
           <Search className="mx-auto h-8 w-8 text-black/20 dark:text-white/20" />
           <h3 className="mt-4 text-xl font-semibold text-foreground">Search your workspace</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Search across all deals, uploaded documents, extracted terms, risk flags, and AI-generated summaries.
+            Search across all partnerships, uploaded documents, extracted terms, risk flags, and AI-generated summaries.
           </p>
         </div>
       ) : null}

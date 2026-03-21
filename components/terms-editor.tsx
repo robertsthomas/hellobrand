@@ -309,7 +309,7 @@ export function TermsEditor({
       <input type="hidden" name="dealId" value={dealId} />
 
       {/* ───── Partnership ───── */}
-      <Section title="Partnership" description="Core identifying details for the deal and the external team." editing={ed("partnership")} onToggleEdit={() => toggle("partnership")}>
+      <Section title="Partnership" description="Core identifying details for the partnership and the external team." editing={ed("partnership")} onToggleEdit={() => toggle("partnership")}>
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Brand name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.brandName)} />}
@@ -463,7 +463,7 @@ export function TermsEditor({
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
             <EditableStringListField
               title="Restricted categories"
-              description="List the brands or categories this deal blocks you from working with."
+              description="List the brands or categories this partnership blocks you from working with."
               jsonName="restrictedCategoriesJson"
               textName="exclusivityRestrictions"
               initialValues={terms?.restrictedCategories ?? []}
@@ -475,7 +475,7 @@ export function TermsEditor({
             />
             <EditableStringListField
               title="Competitor categories"
-              description="Add the competitor groups this deal should be compared against."
+              description="Add the competitor groups this partnership should be compared against."
               jsonName="competitorCategoriesJson"
               initialValues={terms?.competitorCategories ?? []}
               inputClassName={INPUT_CLASS}

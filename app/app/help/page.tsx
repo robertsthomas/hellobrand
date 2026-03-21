@@ -41,7 +41,7 @@ const quickLinks = [
   {
     icon: Shield,
     label: "Privacy & security",
-    description: "Review how uploaded deal materials are stored and handled.",
+    description: "Review how uploaded partnership materials are stored and handled.",
     accent: "text-[#A56A2A]"
   }
 ];
@@ -57,11 +57,11 @@ const faqs = [
   },
   {
     q: "Does HelloBrand provide legal advice?",
-    a: "No. HelloBrand helps you understand creator deal terms, spot risks, and draft better responses, but it is not a law firm and does not replace legal counsel."
+    a: "No. HelloBrand helps you understand creator partnership terms, spot risks, and draft better responses, but it is not a law firm and does not replace legal counsel."
   },
   {
     q: "How do conflict warnings work?",
-    a: "HelloBrand compares active deals across category, exclusivity language, timing windows, and competitor restrictions. Warnings appear on the dashboard, during intake review, and inside each deal workspace."
+    a: "HelloBrand compares active partnerships across category, exclusivity language, timing windows, and competitor restrictions. Warnings appear on the dashboard, during intake review, and inside each partnership workspace."
   },
   {
     q: "What happens if contract processing fails?",
@@ -73,11 +73,11 @@ const faqs = [
   },
   {
     q: "Can I update a workspace after it has been created?",
-    a: "Yes. You can upload more supporting documents to an existing deal workspace, and the app will use them to improve context, summaries, and warnings without requiring a new workspace."
+    a: "Yes. You can upload more supporting documents to an existing partnership workspace, and the app will use them to improve context, summaries, and warnings without requiring a new workspace."
   },
   {
-    q: "Can I delete a deal or intake?",
-    a: "Yes. Draft intakes can be deleted before confirmation, and confirmed deals can be deleted from the workspace or deal list. Deletion removes uploaded materials and related derived data for that deal."
+    q: "Can I delete a partnership or intake?",
+    a: "Yes. Draft intakes can be deleted before confirmation, and confirmed partnerships can be deleted from the workspace or partnership list. Deletion removes uploaded materials and related derived data for that partnership."
   }
 ];
 
@@ -160,7 +160,7 @@ export default function HelpPage() {
             </h2>
             <p className="text-sm text-muted-foreground">
               Use support if the workspace flow is blocked, a document is not
-              parsing correctly, or you need help recovering a deal.
+              parsing correctly, or you need help recovering a partnership.
             </p>
           </div>
 
@@ -169,7 +169,7 @@ export default function HelpPage() {
               <MessageCircle className="mb-3 h-5 w-5 text-[#1E6A4E]" />
               <h3 className="text-base font-medium text-foreground">Live Chat</h3>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use live support for workspace issues, upload failures, or deal
+                Use live support for workspace issues, upload failures, or partnership
                 review questions.
               </p>
               <Button className="mt-5 w-full sm:w-auto">Start Chat</Button>
@@ -196,7 +196,7 @@ export default function HelpPage() {
                   Creator Resources
                 </h3>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-muted-foreground">
-                  Review guides on deal negotiations, creator risk review,
+                  Review guides on partnership negotiations, creator risk review,
                   contract language, and payment follow-up templates.
                 </p>
               </div>

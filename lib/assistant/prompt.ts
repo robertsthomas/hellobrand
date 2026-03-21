@@ -24,11 +24,11 @@ export function buildAssistantPrompt(input: {
   return [
     buildAssistantAppManual(),
     `Current page: ${input.context.pageTitle} (${input.context.pathname})`,
-    input.context.tab ? `Current deal tab: ${input.context.tab}` : null,
+    input.context.tab ? `Current partnership tab: ${input.context.tab}` : null,
     input.context.trigger?.label ? `Trigger label: ${input.context.trigger.label}` : null,
     input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null,
     input.scope === "deal" && input.snapshotSummary
-      ? `Current deal snapshot: ${input.snapshotSummary}`
+      ? `Current partnership snapshot: ${input.snapshotSummary}`
       : null,
     input.userSnapshotSummary ? `Portfolio snapshot: ${input.userSnapshotSummary}` : null,
     `Selected tone: ${input.context.tone}`,
@@ -36,7 +36,7 @@ export function buildAssistantPrompt(input: {
     "When the user needs exact facts, call tools first instead of guessing.",
     "For drafting requests, call the draftReply tool instead of writing the draft from memory.",
     "If you call the draftReply tool, do not repeat the full draft in text. The draft block should be the only full draft output. At most, add one short lead-in sentence.",
-    "If the user asks for a deal-specific draft or negotiation move and no deal workspace is active, use a workspace selection block so they can choose the correct workspace.",
+    "If the user asks for a partnership-specific draft or negotiation move and no partnership workspace is active, use a workspace selection block so they can choose the correct workspace.",
     "When drafting a reply, keep it concise, specific, and creator-professional.",
     "Never use em dashes or en dashes. Replace them with commas."
   ]

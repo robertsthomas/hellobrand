@@ -53,7 +53,7 @@ async function AnalyticsContent() {
     (sum, aggregate) => sum + (aggregate?.terms?.paymentAmount ?? 0),
     0
   );
-  const activeDealsCount = safeAggregates.filter(
+  const activePartnershipsCount = safeAggregates.filter(
     (aggregate) =>
       aggregate?.deal.status !== "completed" && aggregate?.deal.status !== "paid"
   ).length;
@@ -114,14 +114,14 @@ async function AnalyticsContent() {
     platform: ProfilePlatform;
     handle: string;
     audienceLabel: string | null;
-    dealContext: string | null;
+    partnershipContext: string | null;
   }> =
     metadata.socialHandles.length > 0
       ? metadata.socialHandles
       : [
-          { id: "instagram", platform: "instagram", handle: "", audienceLabel: null, dealContext: null },
-          { id: "tiktok", platform: "tiktok", handle: "", audienceLabel: null, dealContext: null },
-          { id: "youtube", platform: "youtube", handle: "", audienceLabel: null, dealContext: null }
+          { id: "instagram", platform: "instagram", handle: "", audienceLabel: null, partnershipContext: null },
+          { id: "tiktok", platform: "tiktok", handle: "", audienceLabel: null, partnershipContext: null },
+          { id: "youtube", platform: "youtube", handle: "", audienceLabel: null, partnershipContext: null }
         ];
 
   const metrics = [
@@ -131,12 +131,12 @@ async function AnalyticsContent() {
       context: `${safeAggregates.length} total workspaces`
     },
     {
-      label: "Active deals",
-      value: String(activeDealsCount),
+      label: "Active partnerships",
+      value: String(activePartnershipsCount),
       context: "Currently in progress"
     },
     {
-      label: "Average deal size",
+      label: "Average partnership value",
       value: formatCurrency(averageDealSize),
       context: "Across confirmed values"
     },
@@ -159,7 +159,7 @@ async function AnalyticsContent() {
               Analytics
             </h1>
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
-              A lightweight performance view for deal value, payment timing, and
+              A lightweight performance view for partnership value, payment timing, and
               creator channels linked to your profile.
             </p>
           </div>
@@ -178,7 +178,7 @@ async function AnalyticsContent() {
                     Engagement and growth metrics
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Simplified business metrics derived from your active deal flow.
+                    Simplified business metrics derived from your active partnership flow.
                   </p>
                 </div>
                 <div className="text-sm text-muted-foreground">Timeline view</div>
@@ -202,9 +202,9 @@ async function AnalyticsContent() {
                               ? 8
                               : metric.label === "Tracked revenue"
                                 ? 72
-                                : metric.label === "Active deals"
+                                : metric.label === "Active partnerships"
                                   ? 52
-                                  : metric.label === "Average deal size"
+                                  : metric.label === "Average partnership value"
                                     ? 46
                                     : 34,
                             8

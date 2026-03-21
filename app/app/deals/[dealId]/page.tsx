@@ -138,7 +138,7 @@ async function DealDetailContent({
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            All Deals
+            All Partnerships
           </Link>
 
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/8 pb-8 dark:border-white/10">
@@ -235,8 +235,8 @@ async function DealDetailContent({
             {(aggregate.conflictResults?.length ?? 0) > 0 ? (
               <ConflictWarnings
                 conflicts={aggregate.conflictResults}
-                title="Cross-deal conflict warnings"
-                description="These warnings compare this deal against your other active deals."
+                title="Cross-partnership conflict warnings"
+                description="These warnings compare this partnership against your other active partnerships."
               />
             ) : null}
             {(terms?.disclosureObligations?.length ?? 0) > 0 ? (
@@ -379,7 +379,7 @@ async function DealDetailContent({
             triggerLabel={`Delete ${deal.campaignName}`}
           >
             <Trash2 className="h-4 w-4" />
-            Delete this deal
+            Delete this partnership
           </DeleteDealDialog>
         </div>
       </div>

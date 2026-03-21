@@ -8,7 +8,7 @@ export default async function WorkspaceLayout({
 }: {
   children: ReactNode;
 }) {
-  const viewer = await requireViewer();
+  await requireViewer();
 
-  return <AppFrame viewer={viewer}>{children}</AppFrame>;
+  return <AppFrame>{children}</AppFrame>;
 }

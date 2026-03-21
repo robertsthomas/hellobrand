@@ -57,7 +57,7 @@ export function buildAssistantTools(input: {
 
   return {
     getDealSnapshot: {
-      description: "Look up the current deal snapshot or another specific deal by id.",
+      description: "Look up the current partnership snapshot or another specific partnership by id.",
       inputSchema: z.object({
         dealId: z.string().optional()
       }),
@@ -65,15 +65,15 @@ export function buildAssistantTools(input: {
         const targetDealId = dealId ?? input.threadDealId;
 
         if (!targetDealId) {
-          return { error: "No deal is currently selected." };
+          return { error: "No partnership is currently selected." };
         }
 
         const snapshot = await ensureAssistantSnapshot(input.viewer, "deal", targetDealId);
-        return snapshot?.payload ?? { error: "Deal snapshot not found." };
+        return snapshot?.payload ?? { error: "Partnership snapshot not found." };
       }
     },
     searchDeals: {
-      description: "Search the viewer's deal portfolio by brand or campaign name.",
+      description: "Search the viewer's partnership portfolio by brand or campaign name.",
       inputSchema: z.object({
         query: z.string().min(1)
       }),
@@ -128,7 +128,7 @@ export function buildAssistantTools(input: {
         })
     },
     getDealEvidence: {
-      description: "Retrieve evidence snippets and risk details for a deal field or risk category.",
+      description: "Retrieve evidence snippets and risk details for a partnership field or risk category.",
       inputSchema: z.object({
         dealId: z.string().optional(),
         field: z.string().min(1)
@@ -148,7 +148,7 @@ export function buildAssistantTools(input: {
 
         const aggregate = await getDealForViewer(input.viewer, targetDealId);
         if (!aggregate) {
-          return { error: "Deal not found." };
+          return { error: "Partnership not found." };
         }
 
         return {
@@ -198,7 +198,7 @@ export function buildAssistantTools(input: {
       }
     },
     draftReply: {
-      description: "Draft a creator-professional reply grounded in the current deal.",
+      description: "Draft a creator-professional reply grounded in the current partnership.",
       inputSchema: z.object({
         dealId: z.string().optional(),
         intent: z.string().optional(),
@@ -224,13 +224,13 @@ export function buildAssistantTools(input: {
             prompt: activeUserPrompt ?? focus,
             tab: "emails",
             title: "Which workspace should I draft for?",
-            description: "This draft needs a specific workspace. Pick one and I’ll continue in that deal’s email context."
+            description: "This draft needs a specific workspace. Pick one and I’ll continue in that partnership’s email context."
           });
         }
 
         const aggregate = await getDealForViewer(input.viewer, targetDealId);
         if (!aggregate) {
-          return { error: "Deal not found." };
+          return { error: "Partnership not found." };
         }
 
         const profile = process.env.DATABASE_URL

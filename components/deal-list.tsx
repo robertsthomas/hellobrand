@@ -47,14 +47,14 @@ export function DealList({
           No workspaces yet
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-muted-foreground">
-          Start a new deal workspace by uploading the first contract or brand
+          Start a new partnership workspace by uploading the first contract or brand
           documents.
         </p>
         <Link
           href="/app/intake/new"
           className={cn(buttonVariants(), "mt-6 px-5")}
-          aria-label="Upload documents for a new deal workspace"
-          title="Start a new deal workspace"
+          aria-label="Upload documents for a new partnership workspace"
+          title="Start a new partnership workspace"
         >
           New workspace
         </Link>

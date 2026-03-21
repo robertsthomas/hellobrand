@@ -6,7 +6,7 @@ const tiers = [
   {
     name: "Starter",
     price: "$12",
-    caption: "For creators doing a few deals each month",
+    caption: "For creators managing a few partnerships each month",
     features: ["5 contract reviews", "Risk flags", "Email drafts"]
   },
   {
@@ -36,8 +36,8 @@ export default function PricingPage() {
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-5xl font-semibold text-ink">Pricing for creators</h1>
             <p className="mt-5 text-lg text-black/60 dark:text-white/65">
-              Start simple, understand your deals faster, and upgrade when your
-              deal flow gets busier.
+              Start simple, understand your partnerships faster, and upgrade when your
+              partnership flow gets busier.
             </p>
           </div>
           <div className="mt-12 grid gap-6 lg:grid-cols-3">

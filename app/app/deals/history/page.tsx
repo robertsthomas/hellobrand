@@ -90,10 +90,10 @@ async function DealHistoryContent() {
     };
   });
 
-  const totalDeals = rows.length;
-  const activeDeals = rows.filter((row) => row.stageGroup === "active").length;
+  const totalPartnerships = rows.length;
+  const activePartnerships = rows.filter((row) => row.stageGroup === "active").length;
   const totalEarned = rows.reduce((sum, row) => sum + (row.amount ?? 0), 0);
-  const averageDealSize = totalDeals === 0 ? 0 : totalEarned / totalDeals;
+  const averageDealSize = totalPartnerships === 0 ? 0 : totalEarned / totalPartnerships;
 
   return (
     <div className="px-6 py-8 lg:px-10 lg:py-10">
@@ -101,8 +101,8 @@ async function DealHistoryContent() {
         <DealHistoryTable
           rows={rows}
           metrics={{
-            totalDeals,
-            activeDeals,
+            totalPartnerships,
+            activePartnerships,
             totalEarned,
             averageDealSize
           }}

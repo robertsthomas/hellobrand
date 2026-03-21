@@ -561,7 +561,7 @@ export async function extractSectionWithLlm(
 ): Promise<ExtractionPipelineResult> {
   const payload = await requestJson(
     "extract_section",
-    "You extract creator deal facts from one document section at a time. Return only explicit facts from the section. Never guess missing values. Use null for anything not present. Keep output compact and factual.",
+    "You extract creator partnership facts from one document section at a time. Return only explicit facts from the section. Never guess missing values. Use null for anything not present. Keep output compact and factual.",
     `Extract facts from this ${documentKind} section.\n\nSection title: ${section.title}\nSection text:\n${section.content}\n\nFallback extraction for this section:\n${JSON.stringify(
       fallback.data,
       null,
@@ -599,7 +599,7 @@ export async function analyzeRisksWithLlm(
 ) {
   const payload = await requestJson(
     "analyze_risks",
-    "You analyze creator deal risk after factual extraction is complete. Focus on creator-specific issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination. Do not restate every contract term.",
+    "You analyze creator partnership risk after factual extraction is complete. Focus on creator-specific issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination. Do not restate every contract term.",
     `Document kind: ${documentKind}\n\nNormalized document text:\n${text}\n\nStructured extraction:\n${JSON.stringify(
       extraction.data,
       null,
@@ -625,12 +625,12 @@ export async function generateSummaryWithLlm(
   const evidenceCount = Array.isArray(extraction.evidence) ? extraction.evidence.length : 0;
   const payload = await requestJson(
     "generate_summary",
-    "You write concise, plain-English creator deal summaries. You are not a law firm. Be clear, direct, and useful.",
-    `Using the extracted fields and risk flags below, write a creator-facing summary with these sections: "What this deal is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nExtracted fields:\n${JSON.stringify(
+    "You write concise, plain-English creator partnership summaries. You are not a law firm. Be clear, direct, and useful.",
+    `Using the extracted fields and risk flags below, write a creator-facing summary with these sections: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nExtracted fields:\n${JSON.stringify(
       extraction.data,
       null,
       2
-    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this deal is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
+    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this partnership is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
     {
       requestType: "generate_summary",
       riskCount: risks.length,
@@ -686,7 +686,7 @@ export async function extractBriefWithLlm(
   kind: DocumentKind,
   fallback: BriefData
 ): Promise<BriefData> {
-  const systemPrompt = `You are a creator-deal analyst. Extract campaign brief fields from the document and return a JSON object with these fields:
+  const systemPrompt = `You are a creator-partnership analyst. Extract campaign brief fields from the document and return a JSON object with these fields:
 campaignOverview (string|null), messagingPoints (string[]), talkingPoints (string[]), creativeConceptOverview (string|null), brandGuidelines (string|null), approvalRequirements (string|null), targetAudience (string|null), toneAndStyle (string|null), doNotMention (string[]).
 Only include information explicitly stated. Return null or empty arrays for fields not found.`;
 
@@ -801,15 +801,15 @@ function buildBriefContext(aggregate: DealAggregate) {
 }
 
 export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<GeneratedBrief> {
-  const systemPrompt = `You are a creator campaign brief writer. Synthesize all deal context into a polished, actionable campaign brief with these specific sections (use these exact IDs):
+  const systemPrompt = `You are a creator campaign brief writer. Synthesize all partnership context into a polished, actionable campaign brief with these specific sections (use these exact IDs):
 
 ${BRIEF_SECTION_IDS.map((id) => `- "${id}"`).join("\n")}
 
 For each section, provide an id, title, content (paragraph text), and optional items (bullet list).
-Pre-fill from existing briefData where available and enhance with deal context.
+Pre-fill from existing briefData where available and enhance with partnership context.
 Return JSON: { "sections": [{ "id": "...", "title": "...", "content": "...", "items": ["..."] }] }`;
 
-  const userPrompt = `Generate a professional campaign brief from this deal context:\n\n${buildBriefContext(aggregate)}`;
+  const userPrompt = `Generate a professional campaign brief from this partnership context:\n\n${buildBriefContext(aggregate)}`;
 
   const payload = await requestJson("generate_brief", systemPrompt, userPrompt, {
     requestType: "generate_brief",

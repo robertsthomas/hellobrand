@@ -24,7 +24,7 @@ export type AppNavItem = {
 
 export const appNavItems: AppNavItem[] = [
   { href: "/app", label: "Dashboard", icon: Home },
-  { href: "/app/deals/history", label: "All deals", icon: Archive },
+  { href: "/app/deals/history", label: "All partnerships", icon: Archive },
   { href: "/app/inbox", label: "Inbox", icon: Inbox },
   { href: "/app/payments", label: "Payments", icon: Receipt },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
@@ -43,11 +43,11 @@ export function getAppRouteMeta(pathname: string): AppRouteMeta {
   }
 
   if (pathname.startsWith("/app/deals/history")) {
-    return { section: "Deals", title: "All deals" };
+    return { section: "Partnerships", title: "All partnerships" };
   }
 
   if (pathname.startsWith("/app/deals/")) {
-    return { section: "Deals", title: "Deal workspace" };
+    return { section: "Partnerships", title: "Partnership workspace" };
   }
 
   if (pathname.startsWith("/app/inbox")) {

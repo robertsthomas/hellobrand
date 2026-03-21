@@ -132,7 +132,7 @@ export function PendingChangesPanel({
             {diff.totalChangedFields === 1 ? "" : "s"} detected
           </div>
           <p className="mt-1 text-sm text-black/60 dark:text-white/65">
-            A new document introduced changes to your deal terms. Review each
+            A new document introduced changes to your partnership terms. Review each
             field below and choose which updates to accept.
             {diff.manuallyEditedConflicts > 0
               ? ` ${diff.manuallyEditedConflicts} field${diff.manuallyEditedConflicts === 1 ? "" : "s"} you previously edited manually ${diff.manuallyEditedConflicts === 1 ? "is" : "are"} unchecked by default.`

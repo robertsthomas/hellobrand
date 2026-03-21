@@ -5,7 +5,7 @@ export interface DealSummarySection {
 }
 
 const CANONICAL_SECTIONS = [
-  "What this deal is",
+  "What this partnership is",
   "What you deliver",
   "What you get paid",
   "Rights and restrictions",
@@ -85,7 +85,7 @@ export function parseDealSummarySections(body: string | null | undefined) {
 
   const prepared = prepareForSectionParsing(normalized);
   const headingRegex =
-    /#{1,6}\s*(What this deal is|What you deliver|What you get paid|Rights and restrictions|Watchouts)\b/gi;
+    /#{1,6}\s*(What this partnership is|What you deliver|What you get paid|Rights and restrictions|Watchouts)\b/gi;
   const matches = [...prepared.matchAll(headingRegex)];
 
   if (matches.length === 0) {

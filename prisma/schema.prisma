@@ -19,6 +19,9 @@ model User {
   intakeBatches      IntakeBatch[]
   deals              Deal[]
   emailAccounts      ConnectedEmailAccount[]
+  emailCandidateMatches EmailDealCandidateMatch[]
+  emailDealEvents    EmailDealEvent[]
+  emailTermSuggestions EmailDealTermSuggestion[]
   assistantThreads   AssistantThread[]
   assistantSnapshots AssistantContextSnapshot[]
 }
@@ -51,6 +54,9 @@ model Deal {
   jobs               Job[]
   summaries          Summary[]
   emailLinks         DealEmailLink[]
+  emailCandidateMatches EmailDealCandidateMatch[]
+  emailDealEvents    EmailDealEvent[]
+  emailTermSuggestions EmailDealTermSuggestion[]
 }
 
 model Document {
@@ -314,6 +320,9 @@ model EmailThread {
   account   ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   messages  EmailMessage[]
   dealLinks DealEmailLink[]
+  candidateMatches EmailDealCandidateMatch[]
+  dealEvents EmailDealEvent[]
+  termSuggestions EmailDealTermSuggestion[]
 
   @@unique([accountId, providerThreadId])
   @@index([accountId, lastMessageAt])
@@ -341,6 +350,8 @@ model EmailMessage {
 
   thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
   attachments EmailAttachment[]
+  dealEvents EmailDealEvent[]
+  termSuggestions EmailDealTermSuggestion[]
 
   @@unique([threadId, providerMessageId])
   @@index([threadId, receivedAt])
@@ -393,6 +404,75 @@ model DealEmailLink {
 
   @@unique([dealId, threadId])
   @@index([threadId])
+}
+
+model EmailDealCandidateMatch {
+  id           String   @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  status       String
+  confidence   Float
+  reasonsJson  Json
+  evidenceJson Json
+  reviewedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal   Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, threadId])
+  @@index([userId, status, updatedAt])
+  @@index([threadId])
+}
+
+model EmailDealEvent {
+  id          String   @id @default(uuid())
+  userId      String
+  dealId      String
+  threadId    String
+  messageId   String
+  category    String
+  title       String
+  body        String
+  metadataJson Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread  EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, messageId, category])
+  @@index([userId, dealId, createdAt])
+  @@index([threadId, createdAt])
+}
+
+model EmailDealTermSuggestion {
+  id          String   @id @default(uuid())
+  userId      String
+  dealId      String
+  threadId    String
+  messageId   String
+  status      String
+  title       String
+  summary     String
+  patchJson   Json
+  evidenceJson Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread  EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, messageId])
+  @@index([userId, dealId, status, createdAt])
+  @@index([threadId, status, createdAt])
 }
 
 model Job {

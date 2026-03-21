@@ -4,7 +4,7 @@ import { Check, FileText, Sparkles, Upload } from "lucide-react";
 const steps = [
   {
     number: 1,
-    title: "Upload your first deal docs",
+    title: "Upload your first partnership docs",
     body: "Drop in a contract, brief, deck, or pasted email context so HelloBrand can build the workspace.",
     icon: Upload,
     tint: "bg-ocean/10 text-ocean"

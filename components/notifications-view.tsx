@@ -161,7 +161,7 @@ export function NotificationsView({
             Notifications
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Stay updated on your deals and contracts
+            Stay updated on your partnerships and contracts
           </p>
         </div>
         <Button variant="outline" size="icon" aria-label="Notification settings">

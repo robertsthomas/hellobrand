@@ -29,7 +29,7 @@ export function DealContextPanel({ terms }: DealContextPanelProps) {
   return (
     <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
-        Deal Context
+        Partnership context
       </p>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">

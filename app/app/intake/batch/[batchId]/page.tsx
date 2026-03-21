@@ -63,11 +63,11 @@ async function BatchReviewContent({
               Bulk intake
             </p>
             <h1 className="text-4xl font-semibold text-ink">
-              Review detected deals
+              Review detected partnerships
             </h1>
             <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
-              We detected multiple deals in your uploaded documents. Review the
-              groupings below, reassign documents if needed, then create each deal.
+              We detected multiple partnerships in your uploaded documents. Review the
+              groupings below, reassign documents if needed, then create each partnership.
             </p>
           </div>
         </section>

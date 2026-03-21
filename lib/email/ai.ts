@@ -69,7 +69,7 @@ export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
       {
         role: "system",
         content:
-          "Summarize the email thread for a creator managing brand deals. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps."
+          "Summarize the email thread for a creator managing brand partnerships. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps."
       },
       {
         role: "user",
@@ -81,10 +81,10 @@ export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
   return response.choices[0]?.message?.content?.trim() || fallbackSummary(thread);
 }
 
-function fallbackDraft(thread: EmailThreadDetail, deal: DealAggregate | null, profile: ProfileRecord) {
+function fallbackDraft(thread: EmailThreadDetail, partnership: DealAggregate | null, profile: ProfileRecord) {
   const signoff = profile.preferredSignature?.trim() || profile.displayName?.trim() || "Creator";
-  const intro = deal
-    ? `Thanks for the note on ${deal.deal.campaignName}.`
+  const intro = partnership
+    ? `Thanks for the note on ${partnership.deal.campaignName}.`
     : "Thanks for the note.";
 
   return {
@@ -97,24 +97,24 @@ function fallbackDraft(thread: EmailThreadDetail, deal: DealAggregate | null, pr
 
 export async function generateEmailReplyDraft(
   thread: EmailThreadDetail,
-  deal: DealAggregate | null,
+  partnership: DealAggregate | null,
   profile: ProfileRecord
 ) {
   const api = client();
   if (!api) {
-    return fallbackDraft(thread, deal, profile);
+    return fallbackDraft(thread, partnership, profile);
   }
 
-  const dealContext = deal
+  const partnershipContext = partnership
     ? [
-        `Brand: ${deal.deal.brandName}`,
-        `Campaign: ${deal.deal.campaignName}`,
-        `Payment terms: ${deal.terms?.paymentTerms ?? "Unknown"}`,
-        `Usage rights: ${deal.terms?.usageRights ?? "Unknown"}`,
-        `Deliverables: ${(deal.terms?.deliverables ?? []).map((item) => `${item.quantity ?? "TBD"} ${item.title}`).join(", ") || "Unknown"}`,
-        `Deal summary: ${deal.currentSummary?.body ?? deal.deal.summary ?? "None"}`
+        `Brand: ${partnership.deal.brandName}`,
+        `Campaign: ${partnership.deal.campaignName}`,
+        `Payment terms: ${partnership.terms?.paymentTerms ?? "Unknown"}`,
+        `Usage rights: ${partnership.terms?.usageRights ?? "Unknown"}`,
+        `Deliverables: ${(partnership.terms?.deliverables ?? []).map((item) => `${item.quantity ?? "TBD"} ${item.title}`).join(", ") || "Unknown"}`,
+        `Partnership summary: ${partnership.currentSummary?.body ?? partnership.deal.summary ?? "None"}`
       ].join("\n")
-    : "No linked deal context.";
+    : "No linked partnership context.";
 
   const response = await api.chat.completions.create({
     model: getEmailDraftModel(),
@@ -123,11 +123,11 @@ export async function generateEmailReplyDraft(
       {
         role: "system",
         content:
-          "Write a concise creator-professional email reply. Use the thread and deal context, do not invent commitments, and keep the tone practical and clear. Return JSON with subject and body."
+          "Write a concise creator-professional email reply. Use the thread and partnership context, do not invent commitments, and keep the tone practical and clear. Return JSON with subject and body."
       },
       {
         role: "user",
-        content: `Deal context:\n${dealContext}\n\nProfile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}\n\nThread:\n${plainTextThread(thread)}`
+        content: `Partnership context:\n${partnershipContext}\n\nProfile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}\n\nThread:\n${plainTextThread(thread)}`
       }
     ],
     response_format: { type: "json_object" }
@@ -149,5 +149,5 @@ export async function generateEmailReplyDraft(
     // fall through to fallback
   }
 
-  return fallbackDraft(thread, deal, profile);
+  return fallbackDraft(thread, partnership, profile);
 }

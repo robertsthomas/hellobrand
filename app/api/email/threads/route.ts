@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
       provider: searchParams.get("provider"),
       accountId: searchParams.get("accountId"),
       linkedDealId: searchParams.get("dealId"),
+      linkedOnly: searchParams.get("linkedOnly") === "1",
       limit: Number(searchParams.get("limit") ?? 100)
     });
 

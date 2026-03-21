@@ -99,7 +99,7 @@ function DealHistoryRowActions({
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogContent className="max-w-md rounded-md border-black/10 bg-background p-6 dark:border-white/10">
           <AlertDialogHeader className="gap-3">
-            <AlertDialogTitle>Delete this deal?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this partnership?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
               This deletes <span className="font-medium text-foreground">{dealName}</span>,
               all uploaded documents, extracted data, summaries, and related workspace
@@ -187,8 +187,8 @@ export function DealHistoryTable({
 }: {
   rows: DealHistoryRow[];
   metrics: {
-    totalDeals: number;
-    activeDeals: number;
+    totalPartnerships: number;
+    activePartnerships: number;
     totalEarned: number;
     averageDealSize: number;
   };
@@ -238,7 +238,7 @@ export function DealHistoryTable({
       <section className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <h1 className="text-3xl sm:text-[38px] lg:text-[46px] font-semibold tracking-[-0.06em] text-foreground">
-            All Deals
+            All Partnerships
           </h1>
           <p className="text-lg text-muted-foreground">
             View and manage all your brand partnerships
@@ -255,12 +255,12 @@ export function DealHistoryTable({
 
       <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
-          <p className="text-sm text-muted-foreground">Total Deals</p>
-          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.totalDeals}</p>
+          <p className="text-sm text-muted-foreground">Total Partnerships</p>
+          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.totalPartnerships}</p>
         </div>
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Active</p>
-          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.activeDeals}</p>
+          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.activePartnerships}</p>
         </div>
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Total Earned</p>
@@ -269,7 +269,7 @@ export function DealHistoryTable({
           </p>
         </div>
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
-          <p className="text-sm text-muted-foreground">Avg Deal Size</p>
+          <p className="text-sm text-muted-foreground">Avg Partnership Size</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">
             {formatCurrency(metrics.averageDealSize)}
           </p>
@@ -286,7 +286,7 @@ export function DealHistoryTable({
                 setQuery(event.currentTarget.value);
                 setPage(1);
               }}
-              placeholder="Search deals by brand or campaign..."
+              placeholder="Search partnerships by brand or campaign..."
               className="h-12 w-full border border-black/10 bg-white pl-11 pr-4 text-[15px] text-foreground outline-none placeholder:text-[#7d8898] dark:border-white/10 dark:bg-[#161a1f]"
             />
           </div>
@@ -311,7 +311,7 @@ export function DealHistoryTable({
                     setPage(1);
                   }}
                 >
-                  Only deals with risks
+                  Only partnerships with risks
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                   checked={hasDeliverablesOnly}
@@ -320,7 +320,7 @@ export function DealHistoryTable({
                     setPage(1);
                   }}
                 >
-                  Only deals with deliverables
+                  Only partnerships with deliverables
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -339,7 +339,7 @@ export function DealHistoryTable({
 
         <div className="flex flex-wrap gap-2 border-b border-black/8 pb-3 dark:border-white/10">
           {[
-            { key: "all", label: "All Deals" },
+            { key: "all", label: "All Partnerships" },
             { key: "active", label: "Active" },
             { key: "under_review", label: "Under Review" },
             { key: "completed", label: "Completed" },
@@ -389,7 +389,7 @@ export function DealHistoryTable({
               {pagedRows.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell colSpan={8} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    No deals match the current filters.
+                    No partnerships match the current filters.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -400,12 +400,12 @@ export function DealHistoryTable({
                     onClick={() => router.push(`/app/deals/${row.id}`)}
                   >
                     <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
-                      <ValueTooltip content="Brand associated with this deal.">
+                      <ValueTooltip content="Brand associated with this partnership.">
                         <span>{row.brandName}</span>
                       </ValueTooltip>
                     </TableCell>
                     <TableCell className="px-6 py-5 text-sm text-muted-foreground">
-                      <ValueTooltip content="Campaign or workspace title for this deal.">
+                      <ValueTooltip content="Campaign or workspace title for this partnership.">
                         <span>{row.campaignName}</span>
                       </ValueTooltip>
                     </TableCell>
@@ -415,7 +415,7 @@ export function DealHistoryTable({
                       </ValueTooltip>
                     </TableCell>
                     <TableCell className="px-6 py-5">
-                      <ValueTooltip content="Current stage of the deal workflow.">
+                      <ValueTooltip content="Current stage of the partnership workflow.">
                         <div className="flex items-center gap-2">
                           <span className={cn("h-2 w-2 rounded-full", stageDotClass(row.stageGroup))} />
                           <span className="text-sm text-foreground">{row.stageLabel}</span>
@@ -423,7 +423,7 @@ export function DealHistoryTable({
                       </ValueTooltip>
                     </TableCell>
                     <TableCell className="px-6 py-5 text-sm text-muted-foreground">
-                      <ValueTooltip content="Most relevant tracked date for this deal.">
+                      <ValueTooltip content="Most relevant tracked date for this partnership.">
                         <span>{formatDate(row.date)}</span>
                       </ValueTooltip>
                     </TableCell>
@@ -474,11 +474,11 @@ export function DealHistoryTable({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
             {filteredRows.length === 0
-              ? "Showing 0 deals"
+              ? "Showing 0 partnerships"
               : `Showing ${(safePage - 1) * pageSize + 1}-${Math.min(
                   safePage * pageSize,
                   filteredRows.length
-                )} of ${filteredRows.length} deals`}
+                )} of ${filteredRows.length} partnerships`}
           </p>
 
           <div className="flex items-center gap-1">

@@ -106,7 +106,7 @@ export function DealEmailPanel({
                 Emails
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-                Connect Gmail or Outlook in Settings to sync inbox threads into this deal workspace.
+                Connect Gmail or Outlook in Settings to sync inbox threads into this partnership workspace.
               </p>
             </div>
           </div>
@@ -132,7 +132,7 @@ export function DealEmailPanel({
               Linked Threads
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Linked email context appears here and in the shared inbox so you can track negotiations alongside deal terms.
+              Linked email context appears here and in the shared inbox so you can track negotiations alongside partnership terms.
             </p>
           </div>
           <a
@@ -146,7 +146,7 @@ export function DealEmailPanel({
         <div className="mt-5 space-y-3">
           {linkedThreads.length === 0 ? (
             <div className="border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
-              No email threads are linked to this deal yet.
+              No email threads are linked to this partnership yet.
             </div>
           ) : (
             linkedThreads.map((item) => (
@@ -193,14 +193,14 @@ export function DealEmailPanel({
             Link More Threads
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Search recent synced inbox threads and attach relevant conversations to this deal.
+            Search recent synced inbox threads and attach relevant conversations to this partnership.
           </p>
         </div>
 
         <input
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
-          placeholder="Search by sender, subject, or deal context"
+          placeholder="Search by sender, subject, or partnership context"
           className="w-full border border-border bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary"
         />
 
@@ -238,7 +238,7 @@ export function DealEmailPanel({
                         ? "Updating..."
                         : currentlyLinked
                           ? "Unlink"
-                          : "Link to deal"}
+                          : "Link to partnership"}
                     </button>
                   </div>
 

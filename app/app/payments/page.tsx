@@ -69,7 +69,7 @@ async function PaymentsContent() {
             </h1>
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
               Track payout status, update due dates, and keep invoice notes in
-              one cleaner finance view for each workspace.
+              one cleaner finance view for each partnership workspace.
             </p>
           </div>
 
@@ -150,7 +150,7 @@ async function PaymentsContent() {
                       href={`/app/deals/${deal.id}`}
                       className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
                     >
-                      Open workspace
+                      Open partnership workspace
                     </Link>
                   </div>
 
@@ -161,7 +161,7 @@ async function PaymentsContent() {
                           Payment preview
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Current invoice timing and payout state for this workspace.
+                          Current invoice timing and payout state for this partnership workspace.
                         </p>
                       </div>
                     </div>

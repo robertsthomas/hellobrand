@@ -28,7 +28,7 @@ export function DeliverablesList({
             Deliverables
           </h2>
           <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-            Creator obligations extracted from the deal documents. Edit them in
+            Creator obligations extracted from the partnership documents. Edit them in
             Key Terms if anything looks off.
           </p>
         </div>

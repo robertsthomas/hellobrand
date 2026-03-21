@@ -12,7 +12,13 @@ export const emailInitialSyncFunction = inngest.createFunction(
     }
 
     await step.run("sync-email-account-initial", async () =>
-      syncEmailAccount(accountId, { mode: "initial" })
+      syncEmailAccount(accountId, {
+        mode: "initial",
+        recentLimit:
+          typeof event.data.recentLimit === "number"
+            ? event.data.recentLimit
+            : undefined
+      })
     );
 
     return { ok: true, accountId };

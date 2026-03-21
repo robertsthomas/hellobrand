@@ -221,9 +221,9 @@ export function DashboardDealsTable({
                   dealName={row.original.campaignName}
                   redirectTo="/app"
                   triggerMode="menu-item"
-                  menuLabel="Delete"
+                  menuLabel="Delete partnership"
                 >
-                  Delete workspace
+                  Delete partnership
                 </DeleteDealDialog>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -269,10 +269,10 @@ export function DashboardDealsTable({
     <section className="space-y-0">
       <div className="border-b border-black/8 pb-8 dark:border-white/10">
         <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
-          Deals
+          Partnerships
         </p>
         <h2 className="mt-4 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
-          All workspaces
+          All partnerships
         </h2>
       </div>
 
@@ -377,7 +377,7 @@ export function DashboardDealsTable({
       </Table>
 
       <div className="py-5 text-sm text-muted-foreground">
-        Showing {rowCount} of {deals.length} workspaces
+        Showing {rowCount} of {deals.length} partnerships
       </div>
     </section>
   );

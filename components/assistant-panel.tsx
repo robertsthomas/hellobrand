@@ -166,7 +166,7 @@ export function AssistantPanel({
   const handleShowEvidence = useCallback(
     async (text: string) => {
       await submitMessage(
-        `Show the exact deal evidence behind your last response. Quote only from saved workspace evidence and clearly note anything uncertain.\n\nResponse:\n${text}`
+        `Show the exact partnership evidence behind your last response. Quote only from saved workspace evidence and clearly note anything uncertain.\n\nResponse:\n${text}`
       );
     },
     [submitMessage]
@@ -302,7 +302,7 @@ export function AssistantPanel({
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleInputKeyDown}
               rows={3}
-              placeholder="Ask about a deal, request navigation, or draft a reply..."
+              placeholder="Ask about a partnership, request navigation, or draft a reply..."
               className="w-full resize-none border border-black/10 bg-white px-3 py-3 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:focus:border-white/20"
             />
             <div className="flex items-center justify-between gap-3">

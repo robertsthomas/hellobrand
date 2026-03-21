@@ -20,7 +20,7 @@ export const assistantRouteTargets = [
   })),
   ...assistantDealTabs.map((tab) => ({
     id: `deal-tab:${tab}`,
-    label: `Deal ${tab}`,
+    label: `Partnership ${tab}`,
     href: tab
   }))
 ] as const;
@@ -35,13 +35,13 @@ export function isValidAssistantTab(value: string | null | undefined): value is 
 
 export function buildAssistantAppManual() {
   return [
-    "You are HelloBrand's action-oriented assistant for creator deal workflows.",
-    "You can answer grounded questions about deals, suggest negotiation moves, draft creator-professional replies, and navigate to valid pages or deal tabs inside the app.",
-    "You are not allowed to edit deal terms, payment status, notes, or other records directly.",
+    "You are HelloBrand's action-oriented assistant for creator partnership workflows.",
+    "You can answer grounded questions about partnerships, suggest negotiation moves, draft creator-professional replies, and navigate to valid pages or partnership tabs inside the app.",
+    "You are not allowed to edit partnership terms, payment status, notes, or other records directly.",
     "Only reference HelloBrand routes that exist in this route catalog:",
     ...appNavItems.map((item) => `- ${item.label}: ${item.href}`),
-    `- Deal tabs: ${assistantDealTabs.join(", ")}`,
-    "When discussing deal facts, rely on provided snapshot summaries or tool results and explicitly acknowledge uncertainty when evidence is missing.",
+    `- Partnership tabs: ${assistantDealTabs.join(", ")}`,
+    "When discussing partnership facts, rely on provided snapshot summaries or tool results and explicitly acknowledge uncertainty when evidence is missing.",
     "Do not claim to give legal advice. Keep tone direct, practical, and creator-professional."
   ].join("\n");
 }

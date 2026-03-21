@@ -274,7 +274,7 @@ async function IntakeReviewContent({
               Intake review
             </h1>
             <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
-              Your extracted deal details are ready to review before the workspace goes live.
+              Your extracted partnership details are ready to review before the workspace goes live.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -330,7 +330,7 @@ async function IntakeReviewContent({
 
         <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold text-ink">Confirm this deal</h2>
+                <h2 className="text-2xl font-semibold text-ink">Confirm this partnership</h2>
                 <p className="text-sm text-black/60 dark:text-white/65">
                   The intake always stays in the same order. Missing details can stay
                   empty until you fill them in manually.
@@ -353,7 +353,7 @@ async function IntakeReviewContent({
                 <input type="hidden" name="sessionId" value={session.id} />
                 <SectionCard
                   title="Partnership"
-                  description="Confirm who the deal is for and whether an agency is involved."
+                  description="Confirm who the partnership is for and whether an agency is involved."
                 >
                   <div className="grid gap-5">
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
@@ -390,7 +390,7 @@ async function IntakeReviewContent({
                         hasValue: Boolean(normalized?.agencyName),
                         pendingLabel:
                           "Checking whether an agency or management company appears...",
-                        emptyLabel: "Optional. Leave blank if this is a direct brand deal."
+                        emptyLabel: "Optional. Leave blank if this is a direct brand partnership."
                       })}
                     </label>
                   </div>
@@ -414,7 +414,7 @@ async function IntakeReviewContent({
                       </select>
                       <span className="text-xs font-normal text-black/50 dark:text-white/50">
                         Use the agency when a management company or intermediary is driving
-                        the deal.
+                        the partnership.
                       </span>
                     </label>
 
@@ -495,7 +495,7 @@ async function IntakeReviewContent({
 
                 <SectionCard
                   title="Contract snapshot"
-                  description="This should feel like a clean, reusable summary of the deal before the workspace opens."
+                  description="This should feel like a clean, reusable summary of the partnership before the workspace opens."
                 >
                   <div className="grid gap-5">
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
@@ -504,7 +504,7 @@ async function IntakeReviewContent({
                         className={inputClassName}
                         name="contractTitle"
                         defaultValue={normalized?.contractTitle ?? ""}
-                        placeholder="Deal or contract title"
+                        placeholder="Partnership or contract title"
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                         required
@@ -513,7 +513,7 @@ async function IntakeReviewContent({
                         analysisRunning,
                         hasValue: Boolean(normalized?.contractTitle),
                         pendingLabel: "Generating a clean title from the source files...",
-                        emptyLabel: "Use a creator-friendly title for the deal."
+                        emptyLabel: "Use a creator-friendly title for the partnership."
                       })}
                     </label>
 
@@ -610,7 +610,7 @@ async function IntakeReviewContent({
                         aria-disabled={analysisRunning}
                       />
                       <span className="text-xs font-normal text-black/50 dark:text-white/50">
-                        This stays editable and will carry into the deal workspace after
+                        This stays editable and will carry into the partnership workspace after
                         confirmation.
                       </span>
                     </label>
@@ -664,7 +664,7 @@ async function IntakeReviewContent({
                       className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={!showConfirmation}
                     >
-                      Generate deal workspace
+                      Generate partnership workspace
                     </SubmitButton>
                   </div>
                 </div>

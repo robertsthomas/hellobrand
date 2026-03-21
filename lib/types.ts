@@ -61,6 +61,16 @@ export type EmailAccountStatus =
   | "disconnected";
 export type EmailDirection = "inbound" | "outbound";
 export type EmailLinkSource = "manual" | "ai_suggested" | "rule_based";
+export type EmailCandidateStatus = "suggested" | "confirmed" | "rejected";
+export type EmailDealEventCategory =
+  | "payment"
+  | "timeline"
+  | "deliverable"
+  | "approval"
+  | "rights"
+  | "attachment"
+  | "ask";
+export type EmailTermSuggestionStatus = "pending" | "applied" | "dismissed";
 
 export interface EmailParticipant {
   name: string | null;
@@ -432,6 +442,49 @@ export interface DealEmailLinkRecord {
   createdAt: string;
 }
 
+export interface EmailDealCandidateMatchRecord {
+  id: string;
+  userId: string;
+  dealId: string;
+  threadId: string;
+  status: EmailCandidateStatus;
+  confidence: number;
+  reasons: string[];
+  evidence: Record<string, unknown>;
+  reviewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailDealEventRecord {
+  id: string;
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  category: EmailDealEventCategory;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailDealTermSuggestionRecord {
+  id: string;
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  status: EmailTermSuggestionStatus;
+  title: string;
+  summary: string;
+  patch: Record<string, unknown>;
+  evidence: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface EmailThreadLinkView {
   id: string;
   dealId: string;
@@ -448,6 +501,8 @@ export interface EmailThreadListItem {
   thread: EmailThreadRecord;
   account: ConnectedEmailAccountRecord;
   links: EmailThreadLinkView[];
+  importantEventCount: number;
+  pendingTermSuggestionCount: number;
 }
 
 export interface EmailThreadDetail {
@@ -455,6 +510,21 @@ export interface EmailThreadDetail {
   account: ConnectedEmailAccountRecord;
   messages: EmailMessageRecord[];
   links: EmailThreadLinkView[];
+  importantEvents: EmailDealEventRecord[];
+  termSuggestions: EmailDealTermSuggestionRecord[];
+}
+
+export interface EmailDealCandidateMatchView {
+  candidate: EmailDealCandidateMatchRecord;
+  deal: DealRecord;
+  thread: EmailThreadRecord;
+  account: ConnectedEmailAccountRecord;
+  links: EmailThreadLinkView[];
+}
+
+export interface EmailDealCandidateMatchGroup {
+  deal: DealRecord;
+  matches: EmailDealCandidateMatchView[];
 }
 
 export interface JobRecord {
@@ -757,6 +827,9 @@ export interface AppStore {
   emailMessages: EmailMessageRecord[];
   emailSyncStates: EmailSyncStateRecord[];
   dealEmailLinks: DealEmailLinkRecord[];
+  emailCandidateMatches: EmailDealCandidateMatchRecord[];
+  emailDealEvents: EmailDealEventRecord[];
+  emailDealTermSuggestions: EmailDealTermSuggestionRecord[];
   assistantThreads: AssistantThreadRecord[];
   assistantMessages: AssistantMessageRecord[];
   assistantContextSnapshots: AssistantContextSnapshotRecord[];

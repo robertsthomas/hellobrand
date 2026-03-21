@@ -5,6 +5,9 @@ import type { EmailParticipant } from "@/lib/types";
 const GOOGLE_AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
+const GMAIL_RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
+const GMAIL_REQUEST_RETRY_LIMIT = 5;
+const GMAIL_THREAD_FETCH_CONCURRENCY = 4;
 
 type GmailPayloadPart = {
   mimeType?: string;
@@ -12,6 +15,67 @@ type GmailPayloadPart = {
   body?: { data?: string; attachmentId?: string; size?: number };
   parts?: GmailPayloadPart[];
 };
+
+class GmailApiError extends Error {
+  status: number;
+  retryAfterMs: number | null;
+  isRetryable: boolean;
+
+  constructor(status: number, message: string, retryAfterMs: number | null) {
+    super(`Gmail request failed (${status}): ${message}`);
+    this.name = "GmailApiError";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+    this.isRetryable = GMAIL_RETRYABLE_STATUS_CODES.has(status);
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseRetryAfterMs(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return null;
+  }
+
+  return Math.max(0, timestamp - Date.now());
+}
+
+async function mapWithConcurrency<TInput, TOutput>(
+  values: TInput[],
+  concurrency: number,
+  worker: (value: TInput, index: number) => Promise<TOutput>
+) {
+  const results = new Array<TOutput>(values.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < values.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await worker(values[currentIndex], currentIndex);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () =>
+      runWorker()
+    )
+  );
+
+  return results;
+}
 
 function parseAddressHeader(value: string | null | undefined): EmailParticipant | null {
   if (!value) {
@@ -141,21 +205,38 @@ async function gmailRequest<T>(
   accessToken: string,
   init?: RequestInit
 ): Promise<T> {
-  const response = await fetch(`${GMAIL_API_BASE}${path}`, {
-    ...init,
-    headers: {
-      authorization: `Bearer ${accessToken}`,
-      "content-type": "application/json",
-      ...(init?.headers ?? {})
-    }
-  });
+  for (let attempt = 0; attempt < GMAIL_REQUEST_RETRY_LIMIT; attempt += 1) {
+    const response = await fetch(`${GMAIL_API_BASE}${path}`, {
+      ...init,
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+        ...(init?.headers ?? {})
+      }
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      return (await response.json()) as T;
+    }
+
     const message = await response.text();
-    throw new Error(`Gmail request failed (${response.status}): ${message}`);
+    const error = new GmailApiError(
+      response.status,
+      message,
+      parseRetryAfterMs(response.headers.get("retry-after"))
+    );
+
+    if (!error.isRetryable || attempt === GMAIL_REQUEST_RETRY_LIMIT - 1) {
+      throw error;
+    }
+
+    const backoffMs =
+      error.retryAfterMs ??
+      Math.min(1000 * 2 ** attempt, 8000) + Math.floor(Math.random() * 250);
+    await sleep(backoffMs);
   }
 
-  return (await response.json()) as T;
+  throw new Error("Gmail request retry loop exhausted.");
 }
 
 export function buildGoogleAuthUrl(state: string) {
@@ -338,8 +419,10 @@ export async function fetchGmailThreadsByIds(
   emailAddress: string,
   threadIds: string[]
 ) {
-  const threads = await Promise.all(
-    threadIds.map((threadId) =>
+  const threads = await mapWithConcurrency(
+    threadIds,
+    GMAIL_THREAD_FETCH_CONCURRENCY,
+    (threadId) =>
       gmailRequest<{
         id: string;
         snippet?: string;
@@ -352,7 +435,6 @@ export async function fetchGmailThreadsByIds(
           };
         }>;
       }>(`/threads/${threadId}?format=full`, accessToken)
-    )
   );
 
   return threads.map((thread) => mapGmailThread(thread, emailAddress));

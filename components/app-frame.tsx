@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,14 +22,11 @@ import {
   primaryAppNavItems,
   secondaryAppNavItems
 } from "@/lib/app-shell";
-import type { Viewer } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function AppFrame({
-  viewer,
   children
 }: {
-  viewer: Viewer;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -37,12 +35,9 @@ export function AppFrame({
   const mainRef = useRef<HTMLElement | null>(null);
 
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
-  const handle =
-    viewer.displayName.startsWith("@")
-      ? viewer.displayName
-      : `@${viewer.displayName.toLowerCase().replace(/\s+/g, "")}`;
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isInboxRoute = pathname === "/app/inbox";
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -134,8 +129,8 @@ export function AppFrame({
                 type="search"
                 value={sidebarQuery}
                 onChange={(event) => setSidebarQuery(event.target.value)}
-                placeholder="Search deals"
-                aria-label="Search deals"
+                placeholder="Search partnerships"
+                aria-label="Search partnerships"
                 className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
               />
             </form>
@@ -159,19 +154,7 @@ export function AppFrame({
           </div>
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
-            <div className="space-y-4">
-              <Link href="/app/profile" className="flex items-center gap-3 transition-colors hover:opacity-80">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
-                  {viewer.displayName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "HB"}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-foreground">
-                    {viewer.displayName}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">{handle}</p>
-                </div>
-              </Link>
-
+            <div className="space-y-3">
               <Link
                 href="/app/intake/new"
                 className={cn(
@@ -181,6 +164,14 @@ export function AppFrame({
               >
                 <span>New workspace</span>
               </Link>
+              <SignOutButton redirectUrl="/">
+                <button
+                  type="button"
+                  className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+                >
+                  Log out
+                </button>
+              </SignOutButton>
             </div>
           </div>
         </aside>
@@ -222,8 +213,8 @@ export function AppFrame({
                     type="search"
                     value={sidebarQuery}
                     onChange={(event) => setSidebarQuery(event.target.value)}
-                    placeholder="Search deals"
-                    aria-label="Search deals"
+                    placeholder="Search partnerships"
+                    aria-label="Search partnerships"
                     className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
                   />
                 </form>
@@ -293,18 +284,7 @@ export function AppFrame({
               </div>
 
               <div className="border-t border-border px-5 py-5 dark:border-white/8">
-                <div className="space-y-4">
-                  <Link href="/app/profile" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3 transition-colors hover:opacity-80">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary text-xs font-bold text-primary-foreground">
-                      {viewer.displayName.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "HB"}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold text-foreground">
-                        {viewer.displayName}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">{handle}</p>
-                    </div>
-                  </Link>
+                <div className="space-y-3">
                   <Link
                     href="/app/intake/new"
                     onClick={() => setMobileMenuOpen(false)}
@@ -312,6 +292,15 @@ export function AppFrame({
                   >
                     <span>New workspace</span>
                   </Link>
+                  <SignOutButton redirectUrl="/">
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+                    >
+                      Log out
+                    </button>
+                  </SignOutButton>
                 </div>
               </div>
             </SheetContent>
@@ -341,7 +330,10 @@ export function AppFrame({
 
           <main
             ref={mainRef}
-            className="workspace-dot-grid flex-1 overflow-hidden bg-white dark:bg-[#111318]"
+            className={cn(
+              "workspace-dot-grid flex-1 bg-white dark:bg-[#111318]",
+              isInboxRoute ? "overflow-hidden" : "overflow-auto"
+            )}
           >
             <div className="flex h-full min-h-0 flex-col">{children}</div>
           </main>

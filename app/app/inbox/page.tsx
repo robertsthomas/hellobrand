@@ -3,7 +3,11 @@ import { Suspense } from "react";
 import { InboxWorkspace } from "@/components/inbox-workspace";
 import { requireViewer } from "@/lib/auth";
 import { listDealsForViewer } from "@/lib/deals";
-import { getEmailThreadForViewer, listInboxThreadsForViewer } from "@/lib/email/service";
+import {
+  getEmailThreadForViewer,
+  listEmailAccountsForViewer,
+  listInboxThreadsForViewer
+} from "@/lib/email/service";
 
 export default function InboxPage({
   searchParams
@@ -36,15 +40,17 @@ async function InboxContent({
 }) {
   const viewer = await requireViewer();
   const resolved = searchParams ? await searchParams : {};
-  const [threads, deals] = await Promise.all([
+  const [threads, deals, emailAccounts] = await Promise.all([
     listInboxThreadsForViewer(viewer, {
       query: resolved.q ?? null,
       provider: resolved.provider ?? null,
       accountId: resolved.accountId ?? null,
       linkedDealId: resolved.dealId ?? null,
+      linkedOnly: true,
       limit: 100
     }),
-    listDealsForViewer(viewer)
+    listDealsForViewer(viewer),
+    listEmailAccountsForViewer(viewer)
   ]);
 
   const selectedThreadId = resolved.thread ?? threads[0]?.thread.id ?? null;
@@ -57,6 +63,7 @@ async function InboxContent({
       threads={threads}
       selectedThread={selectedThread}
       deals={deals}
+      hasConnectedAccounts={emailAccounts.length > 0}
       selectedFilters={{
         q: resolved.q ?? "",
         provider: resolved.provider ?? "",

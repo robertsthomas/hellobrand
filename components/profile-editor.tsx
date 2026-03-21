@@ -418,7 +418,7 @@ export function ProfileEditor({
             </p>
             <p className="text-sm text-muted-foreground">
               {isConfigured
-                ? "Your profile defaults are ready to backfill new deals."
+                ? "Your profile defaults are ready to backfill new partnerships."
                 : "Set up your creator details so HelloBrand can draft cleaner defaults."}
             </p>
           </div>
@@ -509,7 +509,7 @@ export function ProfileEditor({
       <section className="border-b border-border py-10">
         <SectionHeader
           title="Social Media Channels"
-          description="Keep your core channels here so intake and deal setup can reference the right public handles."
+          description="Keep your core channels here so intake and partnership setup can reference the right public handles."
         />
 
         <div className="space-y-0">
@@ -556,8 +556,8 @@ export function ProfileEditor({
 
       <section className="border-b border-border py-10">
         <SectionHeader
-          title="Deal-Specific Handles"
-          description="Use this for alternate handles or platform-specific identities you only use for certain brands, campaigns, or deal types."
+          title="Partnership-Specific Handles"
+          description="Use this for alternate handles or platform-specific identities you only use for certain brands, campaigns, or partnership types."
         />
 
         <div className="space-y-4">
@@ -571,7 +571,7 @@ export function ProfileEditor({
                 <FlatInput
                   id={`${entry.id}-context`}
                   value={entry.dealContext ?? ""}
-                  placeholder="Beauty brand deals, paid TikTok campaigns, parenthood content"
+                  placeholder="Beauty brand partnerships, paid TikTok campaigns, parenthood content"
                   onChange={(event) =>
                     updateDealHandle(
                       entry.id,
@@ -626,7 +626,7 @@ export function ProfileEditor({
                 <button
                   type="button"
                   className="flex h-12 w-12 items-center justify-center border border-border bg-white text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  aria-label="Remove deal-specific handle"
+                  aria-label="Remove partnership-specific handle"
                   onClick={() =>
                     setForm((current) => ({
                       ...current,
@@ -654,7 +654,7 @@ export function ProfileEditor({
             }
           >
             <Plus className="h-4 w-4" />
-            Add deal-specific handle
+            Add partnership-specific handle
           </button>
         </div>
       </section>

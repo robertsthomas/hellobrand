@@ -166,7 +166,7 @@ export function SettingsEditor({
             Workflow Defaults
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            These defaults influence new deal setup, reminder timing, and generated
+            These defaults influence new partnership setup, reminder timing, and generated
             drafts.
           </p>
         </div>
@@ -231,7 +231,7 @@ export function SettingsEditor({
             Notifications
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Control the alerts HelloBrand surfaces as your deals move through review,
+            Control the alerts HelloBrand surfaces as your partnerships move through review,
             deliverables, and payment follow-up.
           </p>
         </div>
@@ -250,7 +250,7 @@ export function SettingsEditor({
           />
           <FlatToggleRow
             title="Conflict alerts"
-            description="Flag overlapping dates, exclusivity collisions, and future category conflicts as the deal graph gets richer."
+            description="Flag overlapping dates, exclusivity collisions, and future category conflicts as the partnership graph gets richer."
             checked={form.conflictAlertsEnabled}
             onChange={(checked) =>
               setForm((current) => ({

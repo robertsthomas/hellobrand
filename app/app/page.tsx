@@ -161,7 +161,7 @@ async function DashboardContent() {
       return left.dueDate.localeCompare(right.dueDate);
     });
 
-  const activeDeals = dealRows.filter((deal) => deal.status !== "completed").length;
+  const activePartnerships = dealRows.filter((deal) => deal.status !== "completed").length;
   const totalRevenue = dealRows.reduce((sum, deal) => sum + (deal.paymentAmount ?? 0), 0);
   const pendingPaymentsAmount = dealRows
     .filter((deal) =>
@@ -172,7 +172,7 @@ async function DashboardContent() {
     deal.riskFlags.some((flag) => flag.severity === "high")
   ).length;
   const overdueInvoices = dealRows.filter((deal) => deal.paymentStatus === "late").length;
-  const completedDeals = dealRows.filter(
+  const completedPartnerships = dealRows.filter(
     (deal) => deal.status === "completed" || deal.status === "paid"
   ).length;
   const dueSoonDeliverables = allDeliverables.filter((item) => {
@@ -220,9 +220,9 @@ async function DashboardContent() {
 
   const metrics = [
     {
-      label: "Active deals",
-      value: String(activeDeals),
-      note: `${completedDeals} completed`,
+      label: "Active partnerships",
+      value: String(activePartnerships),
+      note: `${completedPartnerships} completed`,
       icon: FileText,
       help: "Confirmed workspaces that are still in progress or under review."
     },
@@ -241,17 +241,17 @@ async function DashboardContent() {
           ? `${overdueInvoices} overdue invoice${overdueInvoices === 1 ? "" : "s"}`
           : "Nothing overdue",
       icon: Receipt,
-      help: "Payments still waiting to be received, including invoiced and overdue brand deals."
+      help: "Payments still waiting to be received, including invoiced and overdue brand partnerships."
     },
     {
       label: "Risk alerts",
       value: String(riskAlertCount),
       note:
         dashboardConflictCounts.total > 0
-          ? `${dashboardConflictCounts.total} cross-deal warning${dashboardConflictCounts.total === 1 ? "" : "s"}`
+          ? `${dashboardConflictCounts.total} cross-partnership warning${dashboardConflictCounts.total === 1 ? "" : "s"}`
           : "No active overlaps",
       icon: AlertTriangle,
-      help: "Workspaces with high-severity contract risks or cross-deal conflicts that need attention."
+      help: "Workspaces with high-severity contract risks or cross-partnership conflicts that need attention."
     }
   ];
 
@@ -387,7 +387,7 @@ async function DashboardContent() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="deals">Deals</TabsTrigger>
+              <TabsTrigger value="deals">Partnerships</TabsTrigger>
               <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
             </TabsList>
@@ -403,7 +403,7 @@ async function DashboardContent() {
               <ConflictWarnings
                 conflicts={dashboardConflicts}
                 compact
-                title="Cross-deal conflicts"
+                title="Cross-partnership conflicts"
                 description="HelloBrand found overlapping category, exclusivity, or timing signals across active workspaces."
               />
             ) : null}
@@ -417,7 +417,7 @@ async function DashboardContent() {
                         Recent workspaces
                       </p>
                       <h2 className="mt-2 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
-                        Active deal flow
+                        Active partnership flow
                       </h2>
                     </div>
                     <Link
@@ -430,7 +430,7 @@ async function DashboardContent() {
 
                   <div className="border-t border-black/8 dark:border-white/10">
                     <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] border-b border-black/8 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:border-white/10 dark:text-[#8f98a6]">
-                      <span>Deal</span>
+                      <span>Partnership</span>
                       <span>Stage</span>
                       <span>Payment</span>
                       <span>Next due</span>
@@ -580,7 +580,7 @@ async function DashboardContent() {
                 {dealRows.some((deal) => (deal.disclosureObligations?.length ?? 0) > 0) ? (
                   <DisclosureObligations
                     obligations={dealRows.flatMap((deal) => deal.disclosureObligations ?? []).slice(0, 4)}
-                    title="Disclosure reminders across active deals"
+                    title="Disclosure reminders across active partnerships"
                   />
                 ) : null}
               </div>
@@ -769,7 +769,7 @@ async function DashboardContent() {
                     Revenue overview
                   </p>
                   <h2 className="mt-2 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
-                    Workspace performance
+                    Partnership performance
                   </h2>
                 </div>
 
@@ -781,7 +781,7 @@ async function DashboardContent() {
                       detail: "Across all confirmed workspaces"
                     },
                     {
-                      label: "Average deal size",
+                      label: "Average partnership value",
                       value: formatCurrency(
                         dealRows.length > 0 ? Math.round(totalRevenue / dealRows.length) : 0
                       ),
@@ -824,7 +824,7 @@ async function DashboardContent() {
 
                 <div className="divide-y divide-black/8 border-t border-black/8 dark:divide-white/10 dark:border-white/10">
                   <div className="px-1 py-4">
-                    <p className="font-semibold text-foreground">Cross-deal overlaps</p>
+                    <p className="font-semibold text-foreground">Cross-partnership overlaps</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {dashboardConflictCounts.total > 0
                         ? `${dashboardConflictCounts.total} overlap warning${dashboardConflictCounts.total === 1 ? "" : "s"} across active workspaces.`

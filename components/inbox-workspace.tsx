@@ -7,13 +7,17 @@ import {
   FileImage,
   FileText,
   FileVideo,
+  Info,
   MoreHorizontal,
   Paperclip,
-  X
+  X,
+  XCircle
 } from "lucide-react";
 
+import { AppTooltip } from "@/components/app-tooltip";
 import type {
   DealRecord,
+  EmailDealCandidateMatchGroup,
   EmailAttachmentRecord,
   EmailMessageRecord,
   EmailParticipant,
@@ -232,11 +236,13 @@ export function InboxWorkspace({
   threads,
   selectedThread: initialSelectedThread,
   deals,
+  hasConnectedAccounts,
   selectedFilters
 }: {
   threads: EmailThreadListItem[];
   selectedThread: EmailThreadDetail | null;
   deals: DealRecord[];
+  hasConnectedAccounts: boolean;
   selectedFilters: {
     q: string;
     provider: string;
@@ -248,6 +254,7 @@ export function InboxWorkspace({
   const actionMenuRef = useRef<HTMLDivElement | null>(null);
   const threadCacheRef = useRef<Record<string, EmailThreadDetail>>({});
   const threadRequestRef = useRef<AbortController | null>(null);
+  const discoveryRequestRef = useRef<AbortController | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
   const [selectedDealId, setSelectedDealId] = useState<string>("");
@@ -261,6 +268,11 @@ export function InboxWorkspace({
   const [isLinking, setIsLinking] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false);
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [isReviewingCandidates, setIsReviewingCandidates] = useState(false);
+  const [candidateGroups, setCandidateGroups] = useState<EmailDealCandidateMatchGroup[]>([]);
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -294,6 +306,13 @@ export function InboxWorkspace({
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      threadRequestRef.current?.abort();
+      discoveryRequestRef.current?.abort();
+    };
+  }, []);
+
   const selectedThreadId = selectedThread?.thread.id ?? "";
   const linkedDealIds = useMemo(
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
@@ -302,6 +321,13 @@ export function InboxWorkspace({
   const selectedMessages = selectedThread?.messages ?? [];
   const latestMessage = selectedMessages[selectedMessages.length - 1] ?? null;
   const earlierMessages = latestMessage ? selectedMessages.slice(0, -1) : [];
+  const hasLinkedThreads = threads.length > 0;
+  const selectedThreadDeals = useMemo(() => {
+    const byId = new Map(deals.map((deal) => [deal.id, deal]));
+    return selectedThread?.links
+      .map((link) => byId.get(link.dealId))
+      .filter((entry): entry is DealRecord => Boolean(entry)) ?? [];
+  }, [deals, selectedThread]);
 
   function buildInboxUrl(
     next: Partial<typeof selectedFilters> & { thread?: string } = {}
@@ -482,6 +508,142 @@ export function InboxWorkspace({
     }
   }
 
+  function toggleCandidate(candidateId: string) {
+    setSelectedCandidateIds((current) =>
+      current.includes(candidateId)
+        ? current.filter((id) => id !== candidateId)
+        : [...current, candidateId]
+    );
+  }
+
+  async function discoverCandidates() {
+    discoveryRequestRef.current?.abort();
+    const controller = new AbortController();
+    discoveryRequestRef.current = controller;
+    setIsDiscovering(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/email/candidates/discover", {
+        method: "POST",
+        signal: controller.signal
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not scan inbox for deal threads.");
+      }
+
+      const groups = (payload.candidates ?? []) as EmailDealCandidateMatchGroup[];
+      setCandidateGroups(groups);
+      setSelectedCandidateIds(
+        groups.flatMap((group) => group.matches.map((match) => match.candidate.id))
+      );
+      setIsCandidateModalOpen(true);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not scan inbox for deal threads."
+      );
+    } finally {
+      if (discoveryRequestRef.current === controller) {
+        discoveryRequestRef.current = null;
+      }
+      setIsDiscovering(false);
+    }
+  }
+
+  function cancelDiscovery() {
+    discoveryRequestRef.current?.abort();
+    discoveryRequestRef.current = null;
+    setIsDiscovering(false);
+  }
+
+  async function reviewCandidates(action: "confirm" | "reject_all") {
+    const visibleIds = candidateGroups.flatMap((group) =>
+      group.matches.map((match) => match.candidate.id)
+    );
+    const confirmIds = action === "confirm" ? selectedCandidateIds : [];
+    const rejectIds =
+      action === "confirm"
+        ? []
+        : visibleIds;
+
+    if (confirmIds.length === 0 && rejectIds.length === 0) {
+      return;
+    }
+
+    setIsReviewingCandidates(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/email/candidates/review", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          confirmIds,
+          rejectIds
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not review email candidates.");
+      }
+
+      setIsCandidateModalOpen(false);
+      setCandidateGroups([]);
+      setSelectedCandidateIds([]);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not review email candidates."
+      );
+    } finally {
+      setIsReviewingCandidates(false);
+    }
+  }
+
+  async function dismissCandidate(candidateId: string) {
+    setIsReviewingCandidates(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/email/candidates/review", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          rejectIds: [candidateId]
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not dismiss email candidate.");
+      }
+
+      setCandidateGroups((current) =>
+        current
+          .map((group) => ({
+            ...group,
+            matches: group.matches.filter((match) => match.candidate.id !== candidateId)
+          }))
+          .filter((group) => group.matches.length > 0)
+      );
+      setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not dismiss email candidate."
+      );
+    } finally {
+      setIsReviewingCandidates(false);
+    }
+  }
+
   return (
     <>
       <div className="flex h-full min-h-0 flex-col overflow-hidden px-5 py-4 lg:px-8 lg:py-5">
@@ -493,50 +655,29 @@ export function InboxWorkspace({
                   Inbox
                 </h1>
                 <p className="mt-1 max-w-3xl text-[13px] leading-6 text-muted-foreground">
-                  Browse synced inbox threads, link them to deals, and generate grounded
-                  summaries and reply drafts.
+                  Browse linked deal threads, review workspace-relevant updates, and keep email context tied to active deals.
                 </p>
               </div>
 
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  applyFilters({ thread: "" });
-                }}
-                className="grid w-full gap-3 lg:grid-cols-[minmax(0,1.5fr)_170px_240px_auto]"
-              >
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.currentTarget.value)}
-                  placeholder="Search sender, subject, brand, or deal"
-                  className="h-12 min-w-0 border border-border bg-white px-4 text-[13px] text-foreground outline-none transition focus:border-primary"
-                />
-                <InboxSelect
-                  value={selectedFilters.provider}
-                  onChange={(value) => applyFilters({ provider: value, thread: "" })}
-                >
-                  <option value="">All providers</option>
-                  <option value="gmail">Gmail</option>
-                  <option value="outlook">Outlook</option>
-                </InboxSelect>
-                <InboxSelect
-                  value={selectedFilters.dealId}
-                  onChange={(value) => applyFilters({ dealId: value, thread: "" })}
-                >
-                  <option value="">All deals</option>
-                  {deals.map((deal) => (
-                    <option key={deal.id} value={deal.id}>
-                      {deal.campaignName}
-                    </option>
-                  ))}
-                </InboxSelect>
-                <button
-                  type="submit"
-                  className="h-12 border border-black/10 px-5 text-[13px] font-semibold text-foreground transition hover:border-black/20"
-                >
-                  Search
-                </button>
-              </form>
+              <div className="flex items-center gap-3">
+                {hasConnectedAccounts && hasLinkedThreads ? (
+                  <AppTooltip
+                    content="We search recent synced mail first, then keep expanding in the background."
+                    sideOffset={8}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void discoverCandidates()}
+                      disabled={isDiscovering}
+                      aria-label="Find emails"
+                      className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-5 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
+                      <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                    </button>
+                  </AppTooltip>
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -546,24 +687,101 @@ export function InboxWorkspace({
             </div>
           ) : null}
 
-          <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[400px_minmax(0,1fr)]">
-            <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
-              <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-[17px] font-semibold text-foreground">Threads</h2>
-                  <span className="bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                    {threads.length}
-                  </span>
+          {!hasLinkedThreads ? (
+            <section className="flex min-h-0 flex-1 items-center justify-center border border-black/8 bg-white px-8 py-12 text-center dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="max-w-xl">
+                <p className="text-[12px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Smart inbox
+                </p>
+                <h2 className="mt-3 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
+                  Build your deal inbox
+                </h2>
+                <p className="mt-4 text-[14px] leading-7 text-muted-foreground">
+                  Search connected inboxes, review likely matches, and keep this inbox focused on linked deal conversations.
+                </p>
+
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                  {hasConnectedAccounts ? (
+                    <AppTooltip
+                      content="We search recent synced mail first, then keep expanding in the background."
+                      sideOffset={8}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void discoverCandidates()}
+                        disabled={isDiscovering}
+                        aria-label="Find emails"
+                        className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
+                        <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                      </button>
+                    </AppTooltip>
+                  ) : (
+                    <a
+                      href="/app/settings"
+                      className="inline-flex h-12 items-center border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20"
+                    >
+                      Connect email accounts
+                    </a>
+                  )}
                 </div>
               </div>
-
-              <div className="min-h-0 flex-1 overflow-y-auto bg-[#fcfcfa] dark:bg-transparent">
-                {threads.length === 0 ? (
-                  <div className="px-5 py-6 text-[13px] text-muted-foreground">
-                    No synced threads match the current filters.
+            </section>
+          ) : (
+            <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[400px_minmax(0,1fr)]">
+              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-[17px] font-semibold text-foreground">Linked Threads</h2>
+                    <span className="bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                      {threads.length}
+                    </span>
                   </div>
-                ) : (
-                  threads.map((item) => {
+
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      applyFilters({ thread: "" });
+                    }}
+                    className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_170px_210px_auto]"
+                  >
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.currentTarget.value)}
+                      placeholder="Search linked threads"
+                      className="h-12 min-w-0 border border-border bg-white px-4 text-[13px] text-foreground outline-none transition focus:border-primary"
+                    />
+                    <InboxSelect
+                      value={selectedFilters.provider}
+                      onChange={(value) => applyFilters({ provider: value, thread: "" })}
+                    >
+                      <option value="">All providers</option>
+                      <option value="gmail">Gmail</option>
+                      <option value="outlook">Outlook</option>
+                    </InboxSelect>
+                    <InboxSelect
+                      value={selectedFilters.dealId}
+                      onChange={(value) => applyFilters({ dealId: value, thread: "" })}
+                    >
+                      <option value="">All partnerships</option>
+                      {deals.map((deal) => (
+                        <option key={deal.id} value={deal.id}>
+                          {deal.campaignName}
+                        </option>
+                      ))}
+                    </InboxSelect>
+                    <button
+                      type="submit"
+                      className="h-12 border border-black/10 px-5 text-[13px] font-semibold text-foreground transition hover:border-black/20"
+                    >
+                      Search
+                    </button>
+                  </form>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto bg-[#fcfcfa] dark:bg-transparent">
+                  {threads.map((item) => {
                     const active = item.thread.id === activeThreadId;
 
                     return (
@@ -584,10 +802,10 @@ export function InboxWorkspace({
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="truncate text-[14px] font-semibold leading-5 text-foreground">
+                                <p className="truncate text-[13px] font-semibold leading-5 text-foreground">
                                   {participantLabel(item.thread.participants[0])}
                                 </p>
-                                <p className="truncate text-[13px] text-foreground/90">
+                                <p className="truncate text-[12px] text-foreground/90">
                                   {item.thread.subject}
                                 </p>
                               </div>
@@ -596,7 +814,7 @@ export function InboxWorkspace({
                               </p>
                             </div>
 
-                            <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-muted-foreground">
+                            <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
                               {item.thread.snippet || "No preview available."}
                             </p>
 
@@ -612,9 +830,14 @@ export function InboxWorkspace({
                                   {link.campaignName}
                                 </span>
                               ))}
-                              {item.thread.aiSummary ? (
-                                <span className="bg-emerald-50 px-2.5 py-1 text-[10px] font-medium text-emerald-700">
-                                  AI summary
+                              {item.importantEventCount > 0 ? (
+                                <span className="bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
+                                  {item.importantEventCount} updates
+                                </span>
+                              ) : null}
+                              {item.pendingTermSuggestionCount > 0 ? (
+                                <span className="bg-[#f8f3e9] px-2.5 py-1 text-[10px] font-medium text-[#8a5c12]">
+                                  Terms suggested
                                 </span>
                               ) : null}
                             </div>
@@ -622,184 +845,386 @@ export function InboxWorkspace({
                         </div>
                       </button>
                     );
-                  })
-                )}
-              </div>
-            </section>
-
-            <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
-              {!selectedThread ? (
-                <div className="px-6 py-10 text-[13px] text-muted-foreground">
-                  Select a thread to see the full conversation.
+                  })}
                 </div>
-              ) : (
-                <>
-                  <div className="shrink-0 border-b border-black/8 px-6 py-5 dark:border-white/10 dark:bg-white/[0.02]">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="bg-white px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-sm dark:bg-white/10">
-                            {providerLabel(selectedThread.account.provider)}
-                          </span>
-                          <span className="bg-white px-3 py-1 text-[10px] font-medium text-muted-foreground shadow-sm dark:bg-white/10">
-                            {selectedThread.account.emailAddress}
-                          </span>
-                          {selectedThread.thread.aiSummary ? (
-                            <span className="bg-emerald-50 px-3 py-1 text-[10px] font-medium text-emerald-700">
-                              Summary ready
-                            </span>
-                          ) : null}
-                        </div>
-                        <h2 className="mt-3 max-w-4xl text-[23px] font-semibold tracking-[-0.04em] text-foreground">
-                          {selectedThread.thread.subject}
-                        </h2>
-                      </div>
+              </section>
 
-                      <div className="relative shrink-0" ref={actionMenuRef}>
-                        <button
-                          type="button"
-                          onClick={() => setIsActionMenuOpen((current) => !current)}
-                          className="inline-flex h-9 w-9 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
-                          aria-label="Thread actions"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-
-                        {isActionMenuOpen ? (
-                          <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 border border-black/8 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#161a20]">
-                            <button
-                              type="button"
-                              onClick={() => void summarizeThread()}
-                              disabled={isSummarizing}
-                              className="block w-full px-3 py-2 text-left text-[13px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isSummarizing ? "Summarizing..." : "Generate summary"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void draftReply()}
-                              disabled={isDrafting}
-                              className="block w-full px-3 py-2 text-left text-[13px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {isDrafting ? "Drafting..." : "Draft reply"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsActionMenuOpen(false);
-                                setIsLinkModalOpen(true);
-                              }}
-                              className="block w-full px-3 py-2 text-left text-[13px] text-foreground transition hover:bg-secondary/40"
-                            >
-                              Link deal
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+                {!selectedThread ? (
+                  <div className="px-6 py-10 text-[13px] text-muted-foreground">
+                    Select a thread to see the full conversation.
                   </div>
+                ) : (
+                  <>
+                    <div className="shrink-0 border-b border-black/8 px-6 py-5 dark:border-white/10">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="bg-white px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-sm">
+                              {providerLabel(selectedThread.account.provider)}
+                            </span>
+                            <span className="bg-white px-3 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                              {selectedThread.account.emailAddress}
+                            </span>
+                            {selectedThreadDeals.map((deal) => (
+                              <span
+                                key={deal.id}
+                                className="bg-[#f4efe4] px-3 py-1 text-[10px] font-medium text-[#8a5c12]"
+                              >
+                                {deal.campaignName}
+                              </span>
+                            ))}
+                          </div>
+                          <h2 className="mt-3 max-w-4xl text-[22px] font-semibold tracking-[-0.04em] text-foreground">
+                            {selectedThread.thread.subject}
+                          </h2>
+                        </div>
 
-                  <div className="min-h-0 flex-1 overflow-hidden p-5">
-                    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-[#161a20]">
-                      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                        <div className="space-y-5">
-                          {isThreadLoading ? (
-                            <div className="border border-black/8 px-5 py-4 text-[13px] text-muted-foreground dark:border-white/10">
-                              Loading thread...
+                        <div className="relative shrink-0" ref={actionMenuRef}>
+                          <button
+                            type="button"
+                            onClick={() => setIsActionMenuOpen((current) => !current)}
+                            className="inline-flex h-8 w-8 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
+                            aria-label="Thread actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+
+                          {isActionMenuOpen ? (
+                            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 border border-black/8 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#161a20]">
+                              <button
+                                type="button"
+                                onClick={() => void summarizeThread()}
+                                disabled={isSummarizing}
+                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isSummarizing ? "Summarizing..." : "Generate summary"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void draftReply()}
+                                disabled={isDrafting}
+                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {isDrafting ? "Drafting..." : "Draft reply"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsActionMenuOpen(false);
+                                  setIsLinkModalOpen(true);
+                                }}
+                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40"
+                              >
+                                Link deal
+                              </button>
                             </div>
                           ) : null}
-
-                          {summary ? (
-                            <section className="border border-emerald-200 bg-emerald-50 px-5 py-4">
-                              <p className="text-[11px] uppercase tracking-[0.14em] text-emerald-700">
-                                AI summary
-                              </p>
-                              <p className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-emerald-900">
-                                {summary}
-                              </p>
-                            </section>
-                          ) : null}
-
-                          {draft ? (
-                            <section className="border border-black/8 px-5 py-4 dark:border-white/10">
-                              <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                                Draft reply
-                              </p>
-                              <p className="mt-3 text-[13px] font-semibold text-foreground">
-                                {draft.subject}
-                              </p>
-                              <pre className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-foreground">
-                                {draft.body}
-                              </pre>
-                            </section>
-                          ) : null}
-
-                          {earlierMessages.length > 0 ? (
-                            <section className="space-y-3">
-                              {earlierMessages.map((message) => (
-                                <MessageStrip
-                                  key={message.id}
-                                  message={message}
-                                  isOutbound={message.direction === "outbound"}
-                                />
-                              ))}
-                            </section>
-                          ) : null}
-
-                          {latestMessage ? (
-                            <section className="bg-white dark:bg-[#161a20]">
-                              <div className="border-b border-black/8 px-6 py-3 dark:border-white/10">
-                                <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-start gap-4">
-                                  <div
-                                    className={`flex h-12 w-12 shrink-0 items-center justify-center text-sm font-semibold ${
-                                      latestMessage.direction === "outbound"
-                                        ? "bg-foreground text-background"
-                                        : "bg-secondary/60 text-foreground"
-                                    }`}
-                                  >
-                                    {latestMessage.direction === "outbound"
-                                      ? "You"
-                                      : initialsFromParticipant(latestMessage.from)}
-                                  </div>
-
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-[15px] font-semibold text-foreground">
-                                      {latestMessage.direction === "outbound"
-                                        ? "You"
-                                        : participantLabel(latestMessage.from)}
-                                    </p>
-                                    <p className="mt-0.5 text-[12px] text-muted-foreground">
-                                      {latestMessage.direction === "outbound"
-                                        ? `To: ${latestMessage.to.map(participantLabel).join(", ")}`
-                                        : latestMessage.from?.email || ""}
-                                    </p>
-                                  </div>
-                                </div>
-                                </div>
-                              </div>
-
-                              <div className="px-8 py-7">
-                                <div
-                                  className="whitespace-pre-wrap text-[14px] leading-8 text-foreground"
-                                >
-                                  {latestMessage.textBody || "No text body available."}
-                                </div>
-
-                                <AttachmentShelf attachments={latestMessage.attachments} />
-                              </div>
-                            </section>
-                          ) : null}
                         </div>
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </section>
-          </div>
+
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+                        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                          <div className="space-y-5">
+                            {isThreadLoading ? (
+                              <div className="border border-black/8 px-5 py-4 text-[12px] text-muted-foreground">
+                                Loading thread...
+                              </div>
+                            ) : null}
+
+                            {selectedThread.importantEvents.length > 0 ? (
+                              <section className="border border-black/8 px-5 py-4">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  Important updates
+                                </p>
+                                <div className="mt-3 space-y-3">
+                                  {selectedThread.importantEvents.map((event) => (
+                                    <div key={event.id} className="border-l-2 border-black/10 pl-3">
+                                      <p className="text-[12px] font-semibold text-foreground">
+                                        {event.title}
+                                      </p>
+                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                        {event.body}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {selectedThread.termSuggestions.length > 0 ? (
+                              <section className="border border-black/8 px-5 py-4">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  Suggested workspace term updates
+                                </p>
+                                <div className="mt-3 space-y-3">
+                                  {selectedThread.termSuggestions.map((suggestion) => (
+                                    <div key={suggestion.id} className="border-l-2 border-black/10 pl-3">
+                                      <p className="text-[12px] font-semibold text-foreground">
+                                        {suggestion.title}
+                                      </p>
+                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                        {suggestion.summary}
+                                      </p>
+                                      <a
+                                        href={`/app/deals/${suggestion.dealId}?tab=terms`}
+                                        className="mt-2 inline-flex text-[12px] font-medium text-foreground underline-offset-4 hover:underline"
+                                      >
+                                        Review key terms
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              </section>
+                            ) : null}
+
+                            {summary ? (
+                              <section className="border border-black/8 px-5 py-4">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  AI summary
+                                </p>
+                                <p className="mt-3 whitespace-pre-wrap text-[12px] leading-6 text-foreground">
+                                  {summary}
+                                </p>
+                              </section>
+                            ) : null}
+
+                            {draft ? (
+                              <section className="border border-black/8 px-5 py-4">
+                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                                  Draft reply
+                                </p>
+                                <p className="mt-3 text-[12px] font-semibold text-foreground">
+                                  {draft.subject}
+                                </p>
+                                <pre className="mt-3 whitespace-pre-wrap text-[12px] leading-6 text-foreground">
+                                  {draft.body}
+                                </pre>
+                              </section>
+                            ) : null}
+
+                            {earlierMessages.length > 0 ? (
+                              <section className="space-y-3">
+                                {earlierMessages.map((message) => (
+                                  <MessageStrip
+                                    key={message.id}
+                                    message={message}
+                                    isOutbound={message.direction === "outbound"}
+                                  />
+                                ))}
+                              </section>
+                            ) : null}
+
+                            {latestMessage ? (
+                              <section className="bg-white">
+                                <div className="border-b border-black/8 px-6 py-3">
+                                  <div className="flex items-start gap-4">
+                                    <div
+                                      className={`flex h-12 w-12 shrink-0 items-center justify-center text-sm font-semibold ${
+                                        latestMessage.direction === "outbound"
+                                          ? "bg-foreground text-background"
+                                          : "bg-secondary/60 text-foreground"
+                                      }`}
+                                    >
+                                      {latestMessage.direction === "outbound"
+                                        ? "You"
+                                        : initialsFromParticipant(latestMessage.from)}
+                                    </div>
+
+                                    <div className="min-w-0 flex-1 border-b border-black/8 pb-3">
+                                      <p className="text-[14px] font-semibold text-foreground">
+                                        {latestMessage.direction === "outbound"
+                                          ? "You"
+                                          : participantLabel(latestMessage.from)}
+                                      </p>
+                                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                        {latestMessage.direction === "outbound"
+                                          ? `To: ${latestMessage.to.map(participantLabel).join(", ")}`
+                                          : latestMessage.from?.email || ""}
+                                      </p>
+                                    </div>
+
+                                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                                      {formatDate(latestMessage.receivedAt || latestMessage.sentAt)}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="px-8 py-7">
+                                  <div className="whitespace-pre-wrap text-[13px] leading-8 text-foreground">
+                                    {latestMessage.textBody || "No text body available."}
+                                  </div>
+
+                                  <AttachmentShelf attachments={latestMessage.attachments} />
+                                </div>
+                              </section>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          )}
         </div>
       </div>
+
+      {isCandidateModalOpen ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden border border-black/8 bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-black/8 px-6 py-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
+                  Find emails
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-foreground">
+                  Review likely deal matches
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  We scanned recent synced mail across connected providers and grouped the strongest matches by deal. Confirm the threads you want in the smart inbox.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCandidateModalOpen(false)}
+                className="inline-flex h-9 w-9 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
+                aria-label="Close candidate modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              {candidateGroups.length === 0 ? (
+                <div className="border border-dashed border-border px-5 py-6 text-center text-[13px] text-muted-foreground">
+                  No likely deal-related threads were found yet. We’ll keep expanding the search in the background as more mail is synced.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {candidateGroups.map((group) => (
+                    <section key={group.deal.id} className="border border-black/8">
+                      <div className="border-b border-black/8 px-5 py-4">
+                        <p className="text-[15px] font-semibold text-foreground">
+                          {group.deal.campaignName}
+                        </p>
+                        <p className="mt-1 text-[12px] text-muted-foreground">
+                          {group.deal.brandName}
+                        </p>
+                      </div>
+
+                      <div className="divide-y divide-black/6">
+                        {group.matches.map((match) => {
+                          const isSelected = selectedCandidateIds.includes(match.candidate.id);
+
+                          return (
+                            <div key={match.candidate.id} className="px-5 py-4">
+                              <div className="flex items-start gap-4">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleCandidate(match.candidate.id)}
+                                  className="mt-1 h-4 w-4 border border-border"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-[13px] font-semibold text-foreground">
+                                        {match.thread.subject}
+                                      </p>
+                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                        {providerLabel(match.account.provider)} · {match.account.emailAddress}
+                                      </p>
+                                    </div>
+                                    <span className="bg-[#f4efe4] px-2.5 py-1 text-[10px] font-medium text-[#8a5c12]">
+                                      {Math.round(match.candidate.confidence * 100)}% match
+                                    </span>
+                                  </div>
+
+                                  <p className="mt-3 text-[12px] leading-6 text-muted-foreground">
+                                    {match.thread.snippet || "No preview available."}
+                                  </p>
+
+                                  <ul className="mt-3 space-y-1">
+                                    {match.candidate.reasons.map((reason) => (
+                                      <li key={reason} className="text-[12px] text-muted-foreground">
+                                        {reason}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => void dismissCandidate(match.candidate.id)}
+                                  disabled={isReviewingCandidates}
+                                  className="text-[12px] font-medium text-muted-foreground underline-offset-4 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Dismiss
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-black/8 px-6 py-4">
+              <p className="text-[12px] text-muted-foreground">
+                Recent threads were scanned immediately. Older synced history will keep expanding in the background.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void reviewCandidates("reject_all")}
+                  disabled={candidateGroups.length === 0 || isReviewingCandidates}
+                  className="h-11 border border-black/10 px-4 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Dismiss all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void reviewCandidates("confirm")}
+                  disabled={selectedCandidateIds.length === 0 || isReviewingCandidates}
+                  className="h-11 border border-black/10 px-4 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isReviewingCandidates ? "Linking..." : "Link selected threads"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isDiscovering ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm border border-black/8 bg-white px-6 py-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-foreground" />
+                <p className="text-[14px] font-medium text-foreground">
+                  Fetching recent emails...
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cancelDiscovery}
+                className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                aria-label="Cancel email discovery"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {selectedThread && isLinkModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
@@ -817,14 +1242,14 @@ export function InboxWorkspace({
                 type="button"
                 onClick={() => setIsLinkModalOpen(false)}
                 className="inline-flex h-9 w-9 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
-                aria-label="Close link deal modal"
+                aria-label="Close link partnership modal"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Select a deal to link or unlink this thread from your workspace context.
+              Select a partnership to link or unlink this thread from your workspace context.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -832,7 +1257,7 @@ export function InboxWorkspace({
                 value={selectedDealId}
                 onChange={setSelectedDealId}
               >
-                <option value="">Select a deal</option>
+                <option value="">Select a partnership</option>
                 {deals.map((deal) => (
                   <option key={deal.id} value={deal.id}>
                     {deal.campaignName}
@@ -857,8 +1282,8 @@ export function InboxWorkspace({
                   {isLinking
                     ? "Updating..."
                     : linkedDealIds.has(selectedDealId)
-                      ? "Unlink from deal"
-                      : "Link to deal"}
+                      ? "Unlink from partnership"
+                      : "Link to partnership"}
                 </button>
               </div>
             </div>

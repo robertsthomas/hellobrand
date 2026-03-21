@@ -8,20 +8,20 @@ import {
 import { assistantMessageText, assistantRecordToUIMessage } from "@/lib/assistant/messages";
 
 describe("assistant app manual helpers", () => {
-  test("builds valid deal tab hrefs", () => {
+  test("builds valid partnership tab hrefs", () => {
     expect(buildAssistantHref("deal-tab:risks", { dealId: "deal-123" })).toBe(
       "/app/deals/deal-123?tab=risks"
     );
   });
 
-  test("rejects invalid deal tabs", () => {
+  test("rejects invalid partnership tabs", () => {
     expect(buildAssistantHref("deal-tab:not-real", { dealId: "deal-123" })).toBeNull();
     expect(isValidAssistantTab("not-real")).toBe(false);
   });
 
   test("maps route titles from the app shell", () => {
     expect(assistantPageTitle("/app/payments")).toBe("Payments");
-    expect(assistantPageTitle("/app/deals/demo-deal")).toBe("Deal workspace");
+    expect(assistantPageTitle("/app/deals/demo-deal")).toBe("Partnership workspace");
   });
 });
 

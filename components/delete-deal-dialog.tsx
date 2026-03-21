@@ -23,7 +23,7 @@ export function DeleteDealDialog({
   className,
   children,
   menuLabel = "Delete",
-  triggerLabel = "Delete deal",
+  triggerLabel = "Delete partnership",
   triggerMode = "button",
 }: {
   dealId: string;
@@ -72,7 +72,7 @@ export function DeleteDealDialog({
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent className="max-w-md rounded-md border-black/10 bg-background p-6 dark:border-white/10">
           <AlertDialogHeader className="gap-3">
-            <AlertDialogTitle>Delete this deal?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this partnership?</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
               This deletes <span className="font-medium text-foreground">{dealName}</span>,
               all uploaded documents, extracted data, summaries, and related workspace

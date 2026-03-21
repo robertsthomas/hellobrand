@@ -1,17 +1,17 @@
 # HelloBrand
 
-HelloBrand is a creator-first deal workspace for influencers and solo creators. The Phase 1 build uses Clerk auth, Prisma, Supabase-backed storage, and an intake-first workflow: sign in, start intake, upload or paste creator documents, confirm extracted metadata, and then manage the live deal workspace.
+HelloBrand is a creator-first partnership workspace for influencers and solo creators. The Phase 1 build uses Clerk auth, Prisma, Supabase-backed storage, and an intake-first workflow: sign in, start intake, upload or paste creator documents, confirm extracted metadata, and then manage the live partnership workspace.
 
 ## What is implemented
 
 - Next.js App Router structure with public marketing pages and Clerk-protected `/app` routes
-- Guided intake flow with resumable intake sessions and confirmation before deal creation
-- Multi-document deal workspaces for contracts, briefs, decks, invoices, and pasted text
-- Payments overview with one primary payout record per deal
-- Editable creator profile defaults for deal and draft context
+- Guided intake flow with resumable intake sessions and confirmation before partnership creation
+- Multi-document partnership workspaces for contracts, briefs, decks, invoices, and pasted text
+- Payments overview with one primary payout record per partnership
+- Editable creator profile defaults for partnership and draft context
 - Staged extraction pipeline with normalization, classification, sectioning, structured extraction, risk analysis, and summary persistence
-- Editable deal terms, evidence-backed watchouts, creator workflow statuses, and negotiation-ready email drafts
-- API routes for intake, deals, reports, documents, drafts, payments, profile, contract alias upload, and document reprocessing
+- Editable partnership terms, evidence-backed watchouts, creator workflow statuses, and negotiation-ready email drafts
+- API routes for intake, partnerships, reports, documents, drafts, payments, profile, contract alias upload, and document reprocessing
 - Prisma schema for the planned Postgres production model
 
 ## Roadmap

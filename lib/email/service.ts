@@ -1,32 +1,55 @@
 import { inngest } from "@/lib/inngest/client";
+import { getViewerById } from "@/lib/auth";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { startServerDebug } from "@/lib/server-debug";
-import type { ConnectedEmailAccountRecord, DealAggregate, EmailThreadDetail, EmailThreadListItem, Viewer } from "@/lib/types";
+import type {
+  ConnectedEmailAccountRecord,
+  DealTermsRecord,
+  DealAggregate,
+  EmailDealCandidateMatchGroup,
+  EmailDealCandidateMatchRecord,
+  EmailThreadDetail,
+  EmailThreadListItem,
+  PendingExtractionData,
+  Viewer
+} from "@/lib/types";
 import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
 import { generateEmailReplyDraft, generateEmailThreadSummary } from "@/lib/email/ai";
+import { detectImportantEmailEvents, buildEmailTermSuggestion, scoreThreadAgainstDeal } from "@/lib/email/smart-inbox";
 import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { hasProviderConfig } from "@/lib/email/config";
+import { listDealAggregatesForViewer, mergeTerms } from "@/lib/deals";
+import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
 import {
   disconnectConnectedEmailAccount,
   findConnectedEmailAccountByProviderAddress,
   findConnectedEmailAccountBySubscriptionId,
+  acquireConnectedEmailAccountSyncLease,
   getConnectedEmailAccount,
+  getEmailCandidateMatchForUser,
+  getEmailCandidateMatchForDealThread,
   getConnectedEmailAccountForUser,
   getEmailSyncState,
   getEmailThreadDetailForUser,
   linkEmailThreadToDeal,
+  listEmailCandidateMatchesForUser,
   listAccountsNeedingRenewal,
   listConnectedEmailAccounts,
   listEmailThreadsForUser,
   listLinkedEmailThreadsForDeal,
+  markEmailCandidateMatchForDealThread,
   saveConnectedEmailAccount,
+  saveEmailDealEvent,
+  saveEmailDealTermSuggestion,
   saveEmailThreadSummary,
   saveSyncedEmailThread,
   unlinkEmailThreadFromDeal,
   updateConnectedEmailAccount,
+  updateEmailCandidateMatchStatus,
+  upsertEmailCandidateMatch,
   upsertEmailSyncState
 } from "@/lib/email/repository";
 
@@ -53,6 +76,85 @@ function tokenExpiresAt(expiresIn: number | undefined) {
   return new Date(Date.now() + expiresIn * 1000).toISOString();
 }
 
+function groupCandidateMatches(
+  matches: Awaited<ReturnType<typeof listEmailCandidateMatchesForUser>>
+) {
+  const grouped = new Map<string, EmailDealCandidateMatchGroup>();
+
+  for (const match of matches) {
+    const existing = grouped.get(match.deal.id);
+    if (existing) {
+      existing.matches.push(match);
+      continue;
+    }
+
+    grouped.set(match.deal.id, {
+      deal: match.deal,
+      matches: [match]
+    });
+  }
+
+  return [...grouped.values()].sort((left, right) => {
+    const leftScore = left.matches[0]?.candidate.confidence ?? 0;
+    const rightScore = right.matches[0]?.candidate.confidence ?? 0;
+    return rightScore - leftScore;
+  });
+}
+
+function emptyTermsPatch(
+  aggregate: DealAggregate
+): Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"> {
+  return {
+    brandName: aggregate.terms?.brandName ?? aggregate.deal.brandName,
+    agencyName: aggregate.terms?.agencyName ?? null,
+    creatorName: aggregate.terms?.creatorName ?? null,
+    campaignName: aggregate.terms?.campaignName ?? aggregate.deal.campaignName,
+    paymentAmount: aggregate.terms?.paymentAmount ?? null,
+    currency: aggregate.terms?.currency ?? null,
+    paymentTerms: aggregate.terms?.paymentTerms ?? null,
+    paymentStructure: aggregate.terms?.paymentStructure ?? null,
+    netTermsDays: aggregate.terms?.netTermsDays ?? null,
+    paymentTrigger: aggregate.terms?.paymentTrigger ?? null,
+    deliverables: aggregate.terms?.deliverables ?? [],
+    usageRights: aggregate.terms?.usageRights ?? null,
+    usageRightsOrganicAllowed: aggregate.terms?.usageRightsOrganicAllowed ?? null,
+    usageRightsPaidAllowed: aggregate.terms?.usageRightsPaidAllowed ?? null,
+    whitelistingAllowed: aggregate.terms?.whitelistingAllowed ?? null,
+    usageDuration: aggregate.terms?.usageDuration ?? null,
+    usageTerritory: aggregate.terms?.usageTerritory ?? null,
+    usageChannels: aggregate.terms?.usageChannels ?? [],
+    exclusivity: aggregate.terms?.exclusivity ?? null,
+    exclusivityApplies: aggregate.terms?.exclusivityApplies ?? null,
+    exclusivityCategory: aggregate.terms?.exclusivityCategory ?? null,
+    exclusivityDuration: aggregate.terms?.exclusivityDuration ?? null,
+    exclusivityRestrictions: aggregate.terms?.exclusivityRestrictions ?? null,
+    brandCategory: aggregate.terms?.brandCategory ?? null,
+    competitorCategories: aggregate.terms?.competitorCategories ?? [],
+    restrictedCategories: aggregate.terms?.restrictedCategories ?? [],
+    campaignDateWindow: aggregate.terms?.campaignDateWindow ?? null,
+    disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
+    revisions: aggregate.terms?.revisions ?? null,
+    revisionRounds: aggregate.terms?.revisionRounds ?? null,
+    termination: aggregate.terms?.termination ?? null,
+    terminationAllowed: aggregate.terms?.terminationAllowed ?? null,
+    terminationNotice: aggregate.terms?.terminationNotice ?? null,
+    terminationConditions: aggregate.terms?.terminationConditions ?? null,
+    governingLaw: aggregate.terms?.governingLaw ?? null,
+    notes: aggregate.terms?.notes ?? null,
+    manuallyEditedFields: aggregate.terms?.manuallyEditedFields ?? [],
+    briefData: aggregate.terms?.briefData ?? null
+  };
+}
+
+async function queueSmartInboxExpansion(accountIds: string[], recentLimit = 100) {
+  for (const accountId of accountIds) {
+    await enqueueEmailEvent("email/account.initial_sync.requested", {
+      accountId,
+      recentLimit
+    });
+  }
+}
+
 async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
   if (hasInngestEventKey()) {
     try {
@@ -64,7 +166,11 @@ async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
   }
 
   if (name === "email/account.initial_sync.requested") {
-    await syncEmailAccount(String(data.accountId), { mode: "initial" });
+    await syncEmailAccount(String(data.accountId), {
+      mode: "initial",
+      recentLimit:
+        typeof data.recentLimit === "number" ? data.recentLimit : undefined
+    });
   } else if (name === "email/account.incremental_sync.requested") {
     await syncEmailAccount(String(data.accountId), {
       mode: "incremental",
@@ -126,10 +232,176 @@ async function ensureActiveTokens(account: ConnectedEmailAccountRecord) {
   };
 }
 
+async function refreshEmailDealSuggestionsForViewer(
+  viewer: Viewer,
+  options?: {
+    threadIds?: string[];
+    limit?: number;
+  }
+) {
+  const [threads, aggregates] = await Promise.all([
+    listEmailThreadsForUser(viewer.id, {
+      limit: options?.limit ?? 250
+    }),
+    listDealAggregatesForViewer(viewer)
+  ]);
+
+  const threadIds = new Set(options?.threadIds ?? []);
+  const scopedThreads =
+    threadIds.size > 0 ? threads.filter((thread) => threadIds.has(thread.thread.id)) : threads;
+
+  for (const thread of scopedThreads) {
+    for (const aggregate of aggregates) {
+      if (thread.links.some((link) => link.dealId === aggregate.deal.id)) {
+        continue;
+      }
+
+      const match = scoreThreadAgainstDeal(thread, aggregate);
+      if (!match) {
+        continue;
+      }
+
+      const existing = await getEmailCandidateMatchForDealThread(
+        viewer.id,
+        aggregate.deal.id,
+        thread.thread.id
+      );
+      if (existing?.status === "rejected") {
+        continue;
+      }
+
+      await upsertEmailCandidateMatch({
+        userId: viewer.id,
+        dealId: aggregate.deal.id,
+        threadId: thread.thread.id,
+        status: "suggested",
+        confidence: match.confidence,
+        reasons: match.reasons,
+        evidence: match.evidence
+      });
+    }
+  }
+}
+
+async function applyEmailTermSuggestionToDeal(
+  viewer: Viewer,
+  dealId: string,
+  patch: Partial<PendingExtractionData>
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate) {
+    return null;
+  }
+
+  const currentTermsBase = aggregate.terms ?? emptyTermsPatch(aggregate);
+  const currentTermsRecord: DealTermsRecord = aggregate.terms ?? {
+    id: `email-${dealId}`,
+    dealId,
+    ...currentTermsBase,
+    pendingExtraction: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  const existingPending = (aggregate.terms?.pendingExtraction as PendingExtractionData | null) ??
+    currentTermsBase;
+  const mergedPending = coalesceExtractions(
+    existingPending,
+    patch,
+    (base, next) => {
+      const merged = mergeTerms(
+        {
+          ...base,
+          pendingExtraction: null
+        },
+        {
+          ...next,
+          pendingExtraction: null
+        },
+        {
+          manuallyEditedFields: currentTermsBase.manuallyEditedFields ?? []
+        }
+      );
+      const { pendingExtraction: _pendingExtraction, ...rest } = merged;
+      return rest as PendingExtractionData;
+    }
+  );
+
+  if (!hasMeaningfulChanges(currentTermsRecord, mergedPending)) {
+    return null;
+  }
+
+  await getRepository().upsertTerms(dealId, {
+    ...currentTermsBase,
+    pendingExtraction: mergedPending
+  });
+  return mergedPending;
+}
+
+async function processLinkedThreadUpdates(
+  viewer: Viewer,
+  threadIds: string[]
+) {
+  for (const threadId of threadIds) {
+    const thread = await getEmailThreadDetailForUser(viewer.id, threadId);
+    if (!thread || thread.links.length === 0) {
+      continue;
+    }
+
+    for (const link of thread.links) {
+      const aggregate = await getRepository().getDealAggregate(viewer.id, link.dealId);
+      if (!aggregate) {
+        continue;
+      }
+
+      for (const message of thread.messages) {
+        const events = detectImportantEmailEvents(message);
+        for (const event of events) {
+          await saveEmailDealEvent({
+            userId: viewer.id,
+            dealId: link.dealId,
+            threadId: thread.thread.id,
+            messageId: message.id,
+            category: event.category,
+            title: event.title,
+            body: event.body,
+            metadata: event.metadata
+          });
+        }
+
+        const suggestion = buildEmailTermSuggestion(aggregate, thread, message);
+        if (!suggestion) {
+          continue;
+        }
+
+        const pendingPatch = await applyEmailTermSuggestionToDeal(
+          viewer,
+          link.dealId,
+          suggestion.patch
+        );
+        if (!pendingPatch) {
+          continue;
+        }
+
+        await saveEmailDealTermSuggestion({
+          userId: viewer.id,
+          dealId: link.dealId,
+          threadId: thread.thread.id,
+          messageId: message.id,
+          title: suggestion.title,
+          summary: suggestion.summary,
+          patch: suggestion.patch,
+          evidence: suggestion.evidence
+        });
+      }
+    }
+  }
+}
+
 async function syncGmailAccount(
   account: ConnectedEmailAccountRecord,
   mode: "initial" | "incremental",
-  gmailHistoryId?: string | null
+  gmailHistoryId?: string | null,
+  recentLimit = 20
 ) {
   const debug = startServerDebug("email_gmail_sync", {
     accountId: account.id,
@@ -150,10 +422,11 @@ async function syncGmailAccount(
     let lastHistoryId = syncState?.lastHistoryId ?? profile.historyId;
 
     if (mode === "initial" || !syncState?.lastHistoryId) {
-      const threads = await listRecentGmailThreads(accessToken, account.emailAddress, 20);
+      const threads = await listRecentGmailThreads(accessToken, account.emailAddress, recentLimit);
 
       for (const thread of threads) {
-        await saveSyncedEmailThread(account.id, "gmail", thread);
+        const saved = await saveSyncedEmailThread(account.id, "gmail", thread);
+        threadIds.push(saved.id);
       }
     } else {
       const history = await listGmailHistoryThreadIds(
@@ -165,8 +438,10 @@ async function syncGmailAccount(
 
       if (threadIds.length > 0) {
         const threads = await fetchGmailThreadsByIds(accessToken, account.emailAddress, threadIds);
+        threadIds = [];
         for (const thread of threads) {
-          await saveSyncedEmailThread(account.id, "gmail", thread);
+          const saved = await saveSyncedEmailThread(account.id, "gmail", thread);
+          threadIds.push(saved.id);
         }
       }
     }
@@ -188,6 +463,14 @@ async function syncGmailAccount(
       lastErrorCode: null,
       lastErrorMessage: null
     });
+
+    const viewer = await getViewerById(account.userId);
+    if (viewer && threadIds.length > 0) {
+      await refreshEmailDealSuggestionsForViewer(viewer, {
+        threadIds
+      });
+      await processLinkedThreadUpdates(viewer, threadIds);
+    }
 
     debug.complete({
       threadCount: threadIds.length
@@ -211,7 +494,8 @@ async function syncGmailAccount(
 async function syncOutlookAccount(
   account: ConnectedEmailAccountRecord,
   mode: "initial" | "incremental",
-  outlookMessageIds?: string[]
+  outlookMessageIds?: string[],
+  recentLimit = 20
 ) {
   const debug = startServerDebug("email_outlook_sync", {
     accountId: account.id,
@@ -228,7 +512,7 @@ async function syncOutlookAccount(
 
     let threads;
     if (mode === "initial" || !outlookMessageIds || outlookMessageIds.length === 0) {
-      threads = await listRecentOutlookThreads(accessToken, account.emailAddress, 20);
+      threads = await listRecentOutlookThreads(accessToken, account.emailAddress, recentLimit);
     } else {
       const messagePayloads = await Promise.all(
         outlookMessageIds.map((messageId) => fetchOutlookMessage(accessToken, messageId))
@@ -241,8 +525,10 @@ async function syncOutlookAccount(
       );
     }
 
+    const savedThreadIds: string[] = [];
     for (const thread of threads) {
-      await saveSyncedEmailThread(account.id, "outlook", thread);
+      const saved = await saveSyncedEmailThread(account.id, "outlook", thread);
+      savedThreadIds.push(saved.id);
     }
 
     const subscription = await createOutlookSubscription(accessToken);
@@ -261,6 +547,14 @@ async function syncOutlookAccount(
       lastErrorCode: null,
       lastErrorMessage: null
     });
+
+    const viewer = await getViewerById(account.userId);
+    if (viewer && savedThreadIds.length > 0) {
+      await refreshEmailDealSuggestionsForViewer(viewer, {
+        threadIds: savedThreadIds
+      });
+      await processLinkedThreadUpdates(viewer, savedThreadIds);
+    }
 
     debug.complete({
       threadCount: threads.length
@@ -287,6 +581,7 @@ export async function syncEmailAccount(
     mode?: "initial" | "incremental";
     gmailHistoryId?: string | null;
     outlookMessageIds?: string[];
+    recentLimit?: number;
   }
 ) {
   const account = await getConnectedEmailAccount(accountId);
@@ -294,15 +589,29 @@ export async function syncEmailAccount(
     return null;
   }
 
-  await updateConnectedEmailAccount(account.id, {
-    status: "syncing"
-  });
+  const acquired = await acquireConnectedEmailAccountSyncLease(
+    account.id,
+    new Date(Date.now() - 15 * 60 * 1000).toISOString()
+  );
+  if (!acquired) {
+    return getConnectedEmailAccount(account.id);
+  }
 
   const mode = options?.mode ?? "initial";
   if (account.provider === "gmail") {
-    await syncGmailAccount(account, mode, options?.gmailHistoryId ?? null);
+    await syncGmailAccount(
+      account,
+      mode,
+      options?.gmailHistoryId ?? null,
+      options?.recentLimit ?? 20
+    );
   } else {
-    await syncOutlookAccount(account, mode, options?.outlookMessageIds ?? []);
+    await syncOutlookAccount(
+      account,
+      mode,
+      options?.outlookMessageIds ?? [],
+      options?.recentLimit ?? 20
+    );
   }
 
   return getConnectedEmailAccount(account.id);
@@ -355,6 +664,7 @@ export async function listInboxThreadsForViewer(
     provider?: string | null;
     accountId?: string | null;
     linkedDealId?: string | null;
+    linkedOnly?: boolean;
     limit?: number;
   }
 ) {
@@ -370,11 +680,79 @@ export async function listLinkedEmailThreadsForViewerDeal(viewer: Viewer, dealId
 }
 
 export async function linkThreadToDealForViewer(viewer: Viewer, threadId: string, dealId: string) {
-  return linkEmailThreadToDeal(viewer.id, threadId, dealId);
+  const link = await linkEmailThreadToDeal(viewer.id, threadId, dealId, "manual");
+  if (link) {
+    await markEmailCandidateMatchForDealThread(viewer.id, dealId, threadId, "confirmed");
+    await processLinkedThreadUpdates(viewer, [threadId]);
+  }
+  return link;
 }
 
 export async function unlinkThreadFromDealForViewer(viewer: Viewer, threadId: string, dealId: string) {
-  return unlinkEmailThreadFromDeal(viewer.id, threadId, dealId);
+  const unlinked = await unlinkEmailThreadFromDeal(viewer.id, threadId, dealId);
+  if (unlinked) {
+    await markEmailCandidateMatchForDealThread(viewer.id, dealId, threadId, "rejected");
+  }
+  return unlinked;
+}
+
+export async function listDealEmailCandidatesForViewer(viewer: Viewer) {
+  const matches = await listEmailCandidateMatchesForUser(viewer.id, "suggested");
+  return groupCandidateMatches(matches);
+}
+
+export async function discoverDealEmailCandidatesForViewer(viewer: Viewer) {
+  await refreshEmailDealSuggestionsForViewer(viewer, { limit: 250 });
+  const accounts = await listConnectedEmailAccounts(viewer.id);
+  await queueSmartInboxExpansion(accounts.map((account) => account.id), 100);
+  return listDealEmailCandidatesForViewer(viewer);
+}
+
+export async function reviewDealEmailCandidatesForViewer(
+  viewer: Viewer,
+  input: {
+    confirmIds?: string[];
+    rejectIds?: string[];
+  }
+) {
+  const confirmed: EmailDealCandidateMatchRecord[] = [];
+  const rejected: EmailDealCandidateMatchRecord[] = [];
+
+  for (const candidateId of input.confirmIds ?? []) {
+    const candidate = await getEmailCandidateMatchForUser(viewer.id, candidateId);
+    if (!candidate) {
+      continue;
+    }
+
+    const link = await linkEmailThreadToDeal(
+      viewer.id,
+      candidate.threadId,
+      candidate.dealId,
+      "ai_suggested",
+      candidate.confidence
+    );
+    if (!link) {
+      continue;
+    }
+
+    const saved = await updateEmailCandidateMatchStatus(viewer.id, candidateId, "confirmed");
+    if (saved) {
+      confirmed.push(saved);
+      await processLinkedThreadUpdates(viewer, [saved.threadId]);
+    }
+  }
+
+  for (const candidateId of input.rejectIds ?? []) {
+    const saved = await updateEmailCandidateMatchStatus(viewer.id, candidateId, "rejected");
+    if (saved) {
+      rejected.push(saved);
+    }
+  }
+
+  return {
+    confirmed,
+    rejected
+  };
 }
 
 export async function disconnectEmailAccountForViewer(viewer: Viewer, accountId: string) {

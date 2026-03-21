@@ -168,7 +168,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
               Generate Campaign Brief
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Synthesize all deal context into a polished, section-structured brief.
+              Synthesize all partnership context into a polished, section-structured brief.
             </p>
           </div>
           <button

@@ -90,7 +90,7 @@ export function EmailConnectionsPanel({
           Email Connections
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Connect Gmail or Outlook to sync inbox threads, attach them to deals, and
+          Connect Gmail or Outlook to sync inbox threads, attach them to partnerships, and
           draft replies from your workspace context.
         </p>
       </div>

@@ -81,7 +81,7 @@ export function CreatorProfileSetupDialog({
             </DialogTitle>
             <DialogDescription className="text-sm leading-6 text-black/60 dark:text-white/65">
               Save your name and handle so HelloBrand can prefill creator defaults in
-              intake and deal workspaces.
+              intake and partnership workspaces.
             </DialogDescription>
           </DialogHeader>
 

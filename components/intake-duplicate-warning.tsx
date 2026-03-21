@@ -102,7 +102,7 @@ export function IntakeDuplicateWarning({
     async (targetDealId: string) => {
       setIsActing(true);
       try {
-        // Move documents from current deal to the existing deal
+        // Move documents from current partnership to the existing partnership
         const response = await fetch(`/api/intake/${sessionId}/merge`, {
           method: "POST",
           headers: { "content-type": "application/json" },

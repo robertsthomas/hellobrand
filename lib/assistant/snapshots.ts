@@ -41,7 +41,7 @@ function dealSnapshotSummary(aggregate: DealAggregate, comparisonSet: DealAggreg
       aggregate.riskFlags.length > 0
         ? `${aggregate.riskFlags.length} risk flag(s)`
         : "No active risk flags",
-      conflicts.length > 0 ? `${conflicts.length} cross-deal conflict warning(s)` : "No cross-deal conflicts"
+      conflicts.length > 0 ? `${conflicts.length} cross-partnership conflict warning(s)` : "No cross-partnership conflicts"
     ].join(" | "),
     payload: {
       deal: {
@@ -96,8 +96,8 @@ function userSnapshotSummary(aggregates: DealAggregate[]) {
   return {
     summary: [
       `${portfolio.length} active workspace(s)`,
-      `${portfolio.reduce((count, deal) => count + deal.riskCount, 0)} total risk flag(s)`,
-      `${portfolio.filter((deal) => deal.paymentStatus === "late").length} late payment workspace(s)`
+      `${portfolio.reduce((count, partnership) => count + partnership.riskCount, 0)} total risk flag(s)`,
+      `${portfolio.filter((deal) => deal.paymentStatus === "late").length} late payment partnership workspace(s)`
     ].join(" | "),
     payload: {
       portfolio,
