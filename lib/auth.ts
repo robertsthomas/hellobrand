@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
@@ -48,13 +48,24 @@ async function upsertViewerFromSession() {
   const claims = (session.sessionClaims as Record<string, unknown> | undefined) ?? null;
   const defaults = deriveViewerDefaults(session.userId, claims);
 
-  // Prefer the real Clerk email, even if db has the @clerk.local fallback
-  const realEmail = firstString(
+  // Prefer the real Clerk email, even if db has the @clerk.local fallback.
+  // Try claims first, then fall back to the Clerk API for the primary email.
+  let realEmail = firstString(
     claims?.email,
     claims?.primaryEmailAddress,
     claims?.primary_email_address,
     claims?.["email_address"]
   );
+
+  if (!realEmail) {
+    try {
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(session.userId);
+      realEmail = clerkUser.primaryEmailAddress?.emailAddress ?? null;
+    } catch {
+      // If the Clerk API call fails, we'll use the fallback
+    }
+  }
 
   // Read display name from Clerk public metadata if synced from profile
   const publicMeta = (claims?.publicMetadata ?? claims?.public_metadata) as Record<string, unknown> | undefined;
@@ -69,15 +80,19 @@ async function upsertViewerFromSession() {
     } satisfies Viewer;
   }
 
+  const effectiveEmail = realEmail ?? defaults.email;
+
   const user = await prisma.user.upsert({
     where: { id: session.userId },
     update: {
-      email: defaults.email,
+      // Only overwrite the DB email when we have a real one from Clerk,
+      // so we never regress a good address back to the @clerk.local fallback
+      ...(realEmail ? { email: realEmail } : {}),
       displayName: metaDisplayName ?? defaults.displayName
     },
     create: {
       id: session.userId,
-      email: defaults.email,
+      email: effectiveEmail,
       displayName: metaDisplayName ?? defaults.displayName
     }
   });

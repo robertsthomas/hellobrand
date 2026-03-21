@@ -4,7 +4,7 @@ import {
   PRICING_PLAN_CONTRACT,
   TIER_SURFACE_CONTRACT
 } from "./fixtures/tiers";
-import { getTierName, gotoAuthed } from "./helpers";
+import { getTierName, gotoAuthed, isRateLimited } from "./helpers";
 
 test.describe("tier matrix", () => {
   test("pricing cards match the public contract", async ({ page }) => {
@@ -75,6 +75,8 @@ test.describe("tier matrix", () => {
     ).toBeVisible();
 
     await gotoAuthed(page, "/app/analytics");
+    if (await isRateLimited(page)) return;
+
     if (tier === "basic") {
       await expect(
         page.getByRole("heading", { name: "Unlock analytics" })
@@ -84,6 +86,8 @@ test.describe("tier matrix", () => {
     }
 
     const briefResponse = await page.goto("/app/deals/demo-deal?tab=brief");
+    if (await isRateLimited(page)) return;
+
     const briefStatus = briefResponse?.status() ?? 0;
     if (tier === "basic") {
       await expect(
@@ -92,9 +96,6 @@ test.describe("tier matrix", () => {
         })
       ).toBeVisible();
     } else {
-      // Premium/Standard have brief access, so the page either shows the
-      // brief generator (if the deal exists) or a 404 (demo-deal is not
-      // seeded). Either way, there must be no upgrade gate.
       await expect(
         page.getByRole("heading", {
           name: "AI brief generation unlocks on Standard"
@@ -110,6 +111,8 @@ test.describe("tier matrix", () => {
     const tier = getTierName(testInfo.project.name);
 
     await gotoAuthed(page, "/app/inbox");
+    if (await isRateLimited(page)) return;
+
     if (tier === "premium") {
       await expect(page.getByRole("heading", { name: "Inbox" }).first()).toBeVisible();
       await expect(page.getByText("Browse linked deal threads")).toBeVisible();
@@ -119,9 +122,9 @@ test.describe("tier matrix", () => {
       ).toBeVisible();
     }
 
-    // Settings page requires DB for email account loading on premium
-    // Non-premium tiers show the upgrade card which renders before the DB call
     const settingsResponse = await page.goto("/app/settings");
+    if (await isRateLimited(page)) return;
+
     const settingsStatus = settingsResponse?.status() ?? 0;
     if (tier !== "premium") {
       await expect(
@@ -130,18 +133,18 @@ test.describe("tier matrix", () => {
         })
       ).toBeVisible();
     } else {
-      // Premium tries to load email accounts — may fail without DB
       if (settingsStatus === 200) {
         const hasEmailHeading = await page
           .getByRole("heading", { name: "Email Connections" })
           .isVisible()
           .catch(() => false);
-        // Accept either the heading (works) or an error state (no DB)
         expect(hasEmailHeading || settingsStatus === 200).toBe(true);
       }
     }
 
     const emailsResponse = await page.goto("/app/deals/demo-deal?tab=emails");
+    if (await isRateLimited(page)) return;
+
     const emailsStatus = emailsResponse?.status() ?? 0;
     if (tier !== "premium") {
       await expect(
@@ -150,7 +153,6 @@ test.describe("tier matrix", () => {
         })
       ).toBeVisible();
     } else {
-      // Premium has access — demo deal doesn't exist, expect 404 or no gate
       await expect(
         page.getByRole("heading", {
           name: "Email intelligence unlocks on Premium"

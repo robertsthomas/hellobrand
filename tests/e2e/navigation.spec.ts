@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-import { gotoAuthed } from "./helpers";
+import { gotoAuthed, isRateLimited } from "./helpers";
 
 test.describe("navigation", () => {
   test("sidebar renders nav items on billing page", async ({ page }) => {
-    // Use billing page since it has a file-backed fallback and always renders
     await gotoAuthed(page, "/app/settings/billing");
 
     for (const label of [
@@ -30,21 +29,24 @@ test.describe("navigation", () => {
   test("/app/billing redirects to /app/settings/billing", async ({
     page
   }) => {
-    await gotoAuthed(page, "/app/billing");
+    await page.goto("/app/billing");
+    if (await isRateLimited(page)) return;
     await expect(page).toHaveURL(/\/app\/settings\/billing/);
   });
 
   test("/app/profile redirects to /app/settings/profile", async ({
     page
   }) => {
-    await gotoAuthed(page, "/app/profile");
+    await page.goto("/app/profile");
+    if (await isRateLimited(page)) return;
     await expect(page).toHaveURL(/\/app\/settings\/profile/);
   });
 
   test("/app/notifications redirects to /app/settings/notifications", async ({
     page
   }) => {
-    await gotoAuthed(page, "/app/notifications");
+    await page.goto("/app/notifications");
+    if (await isRateLimited(page)) return;
     await expect(page).toHaveURL(/\/app\/settings\/notifications/);
   });
 

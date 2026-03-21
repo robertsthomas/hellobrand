@@ -21,6 +21,16 @@ import {
   parseNullableString
 } from "@/app/action-helpers";
 
+function isNextRedirectError(error: unknown): error is { digest: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    typeof error.digest === "string" &&
+    error.digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export async function savePaymentAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
@@ -83,6 +93,10 @@ export async function startCheckoutAction(formData: FormData) {
     });
     redirect(result.url);
   } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
     const message =
       error instanceof Error ? error.message : "Could not start billing checkout.";
     redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
@@ -96,6 +110,10 @@ export async function openBillingPortalAction() {
     const result = await createBillingPortalSessionForViewer(viewer);
     redirect(result.url);
   } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
     const message =
       error instanceof Error ? error.message : "Could not open Stripe billing portal.";
     redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
@@ -121,6 +139,10 @@ export async function cancelSubscriptionAction() {
 
     redirect(`/app/settings/billing?billing_notice=${encodeURIComponent(message)}`);
   } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
     const message =
       error instanceof Error ? error.message : "Could not cancel the subscription.";
     redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);

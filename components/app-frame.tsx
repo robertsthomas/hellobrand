@@ -43,6 +43,11 @@ export function AppFrame({
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  // Mark this device as having an account so the marketing nav shows "Go to app"
+  useEffect(() => {
+    document.cookie = "hb_has_account=1; path=/; max-age=31536000; SameSite=Lax";
+  }, []);
+
   useEffect(() => {
     const container = mainRef.current;
 
@@ -164,7 +169,7 @@ export function AppFrame({
               >
                 <span>New workspace</span>
               </Link>
-              <SignOutButton redirectUrl="/">
+              <SignOutButton redirectUrl="/login">
                 <button
                   type="button"
                   className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
@@ -292,7 +297,7 @@ export function AppFrame({
                   >
                     <span>New workspace</span>
                   </Link>
-                  <SignOutButton redirectUrl="/">
+                  <SignOutButton redirectUrl="/login">
                     <button
                       type="button"
                       onClick={() => setMobileMenuOpen(false)}

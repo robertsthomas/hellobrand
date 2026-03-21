@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Hand, LockKeyhole, Mail } from "lucide-react";
 import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 
@@ -65,6 +65,7 @@ export function CustomAuthScreen() {
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
+  const verificationFormRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     setMode(queryMode);
@@ -405,7 +406,7 @@ export function CustomAuthScreen() {
                 </Button>
               </form>
             ) : (
-              <form className="mt-8 grid gap-5" onSubmit={handleVerification}>
+              <form className="mt-8 grid gap-5" ref={verificationFormRef} onSubmit={handleVerification}>
                 <div className="grid gap-2">
                   <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
                     Verification code
@@ -416,10 +417,18 @@ export function CustomAuthScreen() {
                       id="verification-code"
                       inputMode="numeric"
                       autoComplete="one-time-code"
+                      maxLength={6}
                       value={verificationCode}
-                      onChange={(event) => setVerificationCode(event.currentTarget.value)}
+                      onChange={(event) => {
+                        const value = event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                        setVerificationCode(value);
+                        if (value.length === 6) {
+                          // Auto-submit after a tick so React state is committed
+                          setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
+                        }
+                      }}
                       className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
-                      placeholder="Enter the code"
+                      placeholder="Enter the 6-digit code"
                       required
                     />
                   </div>

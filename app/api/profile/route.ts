@@ -1,3 +1,4 @@
+import { revalidatePath, updateTag } from "next/cache";
 import { NextRequest } from "next/server";
 import { ZodError } from "zod";
 
@@ -27,6 +28,10 @@ export async function PATCH(request: NextRequest) {
     const input = profileInputSchema.parse(await request.json());
     const profile = await updateProfileForViewer(viewer, input);
     const recentChanges = await listProfileAuditForViewer(viewer);
+
+    updateTag(`user-${viewer.id}-profile`);
+    revalidatePath("/app", "layout");
+
     return ok({ profile, recentChanges, message: "Profile saved." });
   } catch (error) {
     const message = error instanceof ZodError
