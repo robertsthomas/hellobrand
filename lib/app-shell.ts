@@ -5,7 +5,8 @@ import {
   Home,
   Inbox,
   Receipt,
-  Settings
+  Settings,
+  UserRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -27,6 +28,7 @@ export const appNavItems: AppNavItem[] = [
   { href: "/app/payments", label: "Payments", icon: Receipt },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/app/help", label: "Help", icon: CircleHelp },
+  { href: "/app/settings/profile", label: "Profile", icon: UserRound },
   { href: "/app/settings", label: "Settings", icon: Settings }
 ];
 

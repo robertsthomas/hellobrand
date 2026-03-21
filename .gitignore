@@ -12,6 +12,9 @@ coverage
 .runtime
 *.log
 supabase/.temp
+playwright-report
+test-results
+tests/e2e/.auth
 
 # Local environment files
 .env
@@ -24,3 +27,6 @@ supabase/.temp
 # OS files
 .DS_Store
 .vercel
+
+# clerk configuration (can include secrets)
+/.clerk/

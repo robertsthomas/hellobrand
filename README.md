@@ -60,13 +60,14 @@ doppler secrets upload .env --project hellobrand --config dev
    - `STRIPE_PRICE_PREMIUM_MONTHLY`
    - optional yearly price IDs if annual billing is enabled later
 9. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=basic|standard|premium` in a non-production environment to override the effective tier.
-10. Install dependencies:
+10. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
+11. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-11. Apply Prisma migrations and start the app:
+12. Apply Prisma migrations and start the app:
 
 ```bash
 pnpm exec prisma migrate deploy
@@ -95,6 +96,7 @@ pnpm run start:prd
 - The app enqueues document processing. With Inngest credentials it uses the worker route under `/api/inngest`; without them it falls back to local fire-and-forget execution.
 - The extraction pipeline is section-based: extract text -> classify -> split sections -> section extraction -> merge -> risk analysis -> summary.
 - Billing entitlements resolve from Prisma/Postgres. Stripe drives checkout, subscriptions, invoices, and the customer portal.
+- When `DATABASE_URL` is unset, the app falls back to the local file-backed seed store. The Playwright tier matrix uses this mode together with `HELLOBRAND_DEV_PLAN` and the non-production E2E auth cookie.
 
 ## API surface
 
@@ -128,6 +130,41 @@ pnpm test
 ```
 
 The included tests cover fallback extraction, document parsing behavior, email draft generation, and unreadable document handling.
+
+## Playwright E2E
+
+The repo includes a local-first Playwright matrix for `basic`, `standard`, and `premium` entitlement coverage. It uses three local Next.js servers, file-backed seed data, and a non-production test-auth cookie instead of the Clerk sign-in UI.
+
+Install browser binaries, then run:
+
+```bash
+pnpm exec playwright install chromium
+pnpm run test:e2e
+```
+
+Helpful variants:
+
+```bash
+pnpm run test:e2e:ui
+pnpm run test:e2e:headed
+```
+
+The v1 suite covers:
+
+- `/pricing`
+- `/app/settings/billing`
+- `/app/analytics`
+- `/app/inbox`
+- `/app/settings`
+- `/app/deals/demo-deal?tab=brief`
+- `/app/deals/demo-deal?tab=emails`
+
+Each Playwright app server runs with:
+
+- `HELLOBRAND_DEV_PLAN=<basic|standard|premium>`
+- `HELLOBRAND_E2E_ENABLED=1`
+- `HELLOBRAND_E2E_AUTH_SECRET=<local secret>`
+- `DATABASE_URL=`
 
 ## Stripe billing verification
 

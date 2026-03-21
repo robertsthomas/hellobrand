@@ -3,6 +3,7 @@ import { BillingSubscriptionStatus, PlanTier } from "@prisma/client";
 import { getDevPlanOverride } from "@/lib/billing/config";
 import { isActiveBillingSubscriptionStatus } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
+import { getRepository } from "@/lib/repository";
 import type { Viewer } from "@/lib/types";
 
 export const FEATURE_KEYS = [
@@ -112,6 +113,24 @@ function usageFeatureKey(key: UsageLimitKey) {
   return key;
 }
 
+async function getActiveWorkspaceCount(viewer: Viewer) {
+  if (!process.env.DATABASE_URL) {
+    const deals = await getRepository().listDeals(viewer.id);
+    return deals.filter(
+      (deal) => deal.status !== "completed" && deal.status !== "paid"
+    ).length;
+  }
+
+  return prisma.deal.count({
+    where: {
+      userId: viewer.id,
+      status: {
+        notIn: ["completed", "paid"]
+      }
+    }
+  });
+}
+
 async function ensureBillingAccountForUsage(viewer: Viewer) {
   return prisma.billingAccount.upsert({
     where: { userId: viewer.id },
@@ -159,6 +178,41 @@ function usageErrorMessage(key: UsageLimitKey, limit: number, effectiveTier: Pla
 
 export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntitlements> {
   const overrideTier = getDevPlanOverride();
+  const workspaceCount = await getActiveWorkspaceCount(viewer);
+
+  if (!process.env.DATABASE_URL) {
+    const effectiveTier = overrideTier ?? PlanTier.basic;
+    const usage = Object.fromEntries(
+      USAGE_LIMIT_KEYS.map((key) => {
+        const current = key === "active_workspaces" ? workspaceCount : 0;
+        const limit = USAGE_LIMIT_MATRIX[effectiveTier][key];
+        const blocked = limit !== null && current >= limit;
+        return [
+          key,
+          {
+            key,
+            current,
+            limit,
+            remaining: limit === null ? null : Math.max(limit - current, 0),
+            blocked
+          }
+        ];
+      })
+    ) as Record<UsageLimitKey, UsageEntitlement>;
+
+    return {
+      effectiveTier,
+      source: overrideTier ? "override" : "fallback",
+      overrideTier,
+      currentPlanTier: overrideTier,
+      currentTrialPlanTier: null,
+      currentSubscriptionStatus: null,
+      hasActiveSubscription: false,
+      features: FEATURE_MATRIX[effectiveTier],
+      usage
+    };
+  }
+
   const [billingAccount, activeWorkspaceCount] = await Promise.all([
     prisma.billingAccount.findUnique({
       where: { userId: viewer.id },
@@ -169,14 +223,7 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
         id: true
       }
     }),
-    prisma.deal.count({
-      where: {
-        userId: viewer.id,
-        status: {
-          notIn: ["completed", "paid"]
-        }
-      }
-    })
+    Promise.resolve(workspaceCount)
   ]);
 
   const effectiveTier =

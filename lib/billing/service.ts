@@ -260,6 +260,47 @@ async function ensureStripeCustomer(
   return customer.id;
 }
 
+function buildFileBackedBillingOverview(): BillingOverview {
+  const stripeConfigured = isStripeConfigured();
+  const planCatalog = buildPlanAvailability();
+  const overridePlanTier = getDevPlanOverride();
+  const overrideInterval = getDevBillingIntervalOverride();
+  const overrideStatus = getDevBillingStatusOverride();
+  const overrideTrialDaysLeft = getDevTrialDaysLeftOverride();
+  const effectivePlanTier = overridePlanTier ?? null;
+  const effectiveTrialPlanTier =
+    overrideStatus === BillingSubscriptionStatus.trialing
+      ? overridePlanTier ?? null
+      : null;
+  const effectiveTrialEndsAt =
+    overrideStatus === BillingSubscriptionStatus.trialing
+      ? new Date(
+          Date.now() + (overrideTrialDaysLeft ?? 14) * 24 * 60 * 60 * 1000
+        ).toISOString()
+      : null;
+  const recommendedUpgrade = recommendedUpgradeForCurrentPlan(
+    overridePlanTier ?? PlanTier.basic
+  );
+
+  return {
+    stripeConfigured,
+    billingReady: true,
+    billingErrorMessage: null,
+    currentPlanTier: effectivePlanTier,
+    currentPlanInterval: overrideInterval ?? null,
+    currentSubscriptionStatus: overrideStatus ?? null,
+    currentTrialPlanTier: effectiveTrialPlanTier,
+    currentTrialEndsAt: effectiveTrialEndsAt,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    planCatalog,
+    hasActiveSubscription: isActiveBillingSubscriptionStatus(overrideStatus),
+    recommendedUpgradeTier: recommendedUpgrade.tier,
+    recommendedUpgradeLabel: recommendedUpgrade.label
+  };
+}
+
 function assertPlanSelection(
   billingAccount: BillingAccountWithHistory | null,
   requestedPlanTier: PlanTier
@@ -287,6 +328,10 @@ function assertPlanSelection(
 export async function getBillingOverviewForViewer(
   viewer: Viewer
 ): Promise<BillingOverview> {
+  if (!process.env.DATABASE_URL) {
+    return buildFileBackedBillingOverview();
+  }
+
   const stripeConfigured = isStripeConfigured();
   const planCatalog = buildPlanAvailability();
 

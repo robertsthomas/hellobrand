@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
 
@@ -59,6 +60,15 @@ async function upsertViewerFromSession() {
   const publicMeta = (claims?.publicMetadata ?? claims?.public_metadata) as Record<string, unknown> | undefined;
   const metaDisplayName = firstString(publicMeta?.displayName);
 
+  if (!process.env.DATABASE_URL) {
+    return {
+      id: session.userId,
+      email: realEmail ?? defaults.email,
+      displayName: metaDisplayName ?? defaults.displayName,
+      mode: "clerk"
+    } satisfies Viewer;
+  }
+
   const user = await prisma.user.upsert({
     where: { id: session.userId },
     update: {
@@ -81,6 +91,11 @@ async function upsertViewerFromSession() {
 }
 
 export async function getCurrentViewer(): Promise<Viewer | null> {
+  const e2eViewer = await resolveE2EViewerFromCookies();
+  if (e2eViewer) {
+    return e2eViewer;
+  }
+
   return upsertViewerFromSession();
 }
 
@@ -103,6 +118,19 @@ export async function requireApiViewer() {
 }
 
 export async function getViewerById(viewerId: string): Promise<Viewer> {
+  if (!process.env.DATABASE_URL) {
+    if (viewerId === DEFAULT_E2E_VIEWER.id) {
+      return DEFAULT_E2E_VIEWER;
+    }
+
+    return {
+      id: viewerId,
+      email: `${viewerId}@hellobrand.local`,
+      displayName: "Creator",
+      mode: "demo"
+    };
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: viewerId }
   });

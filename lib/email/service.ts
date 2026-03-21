@@ -745,6 +745,10 @@ export async function renewExpiringEmailSubscriptions() {
 
 export async function listEmailAccountsForViewer(viewer: Viewer) {
   await assertEmailConnectionsAccess(viewer);
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+
   return listConnectedEmailAccounts(viewer.id);
 }
 
@@ -760,11 +764,19 @@ export async function listInboxThreadsForViewer(
   }
 ) {
   await assertPremiumInboxAccess(viewer);
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+
   return listEmailThreadsForUser(viewer.id, filters);
 }
 
 export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) {
   await assertPremiumInboxAccess(viewer);
+  if (!process.env.DATABASE_URL) {
+    return null;
+  }
+
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
   if (!detail || detail.links.length === 0) {
     return detail;
@@ -795,6 +807,10 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
 }
 
 export async function listLinkedEmailThreadsForViewerDeal(viewer: Viewer, dealId: string) {
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+
   return listLinkedEmailThreadsForDeal(viewer.id, dealId);
 }
 

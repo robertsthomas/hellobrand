@@ -5,6 +5,7 @@ import {
   SignUpButton,
   UserButton
 } from "@clerk/nextjs";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 
@@ -22,6 +23,31 @@ export const metadata: Metadata = {
   description: "Plain-English contract review for creators."
 };
 
+async function AppProviders({ children }: { children: ReactNode }) {
+  await cookies();
+
+  return (
+    <ClerkProvider
+      appearance={{
+        layout: {
+          showOptionalFields: false
+        }
+      }}
+    >
+      <header className="sr-only">
+        <Show when="signed-out">
+          <SignInButton />
+          <SignUpButton />
+        </Show>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
+      </header>
+      <ThemeProvider>{children}</ThemeProvider>
+    </ClerkProvider>
+  );
+}
+
 export default function RootLayout({
   children
 }: Readonly<{
@@ -31,24 +57,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.variable}>
         <Suspense>
-          <ClerkProvider
-            appearance={{
-              layout: {
-                showOptionalFields: false
-              }
-            }}
-          >
-            <header className="sr-only">
-              <Show when="signed-out">
-                <SignInButton />
-                <SignUpButton />
-              </Show>
-              <Show when="signed-in">
-                <UserButton />
-              </Show>
-            </header>
-            <ThemeProvider>{children}</ThemeProvider>
-          </ClerkProvider>
+          <AppProviders>{children}</AppProviders>
         </Suspense>
       </body>
     </html>

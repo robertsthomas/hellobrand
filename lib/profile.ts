@@ -4,6 +4,28 @@ import { prisma } from "@/lib/prisma";
 import { parseProfileMetadata, type ProfileMetadata } from "@/lib/profile-metadata";
 import type { ProfileAuditRecord, ProfileRecord, Viewer } from "@/lib/types";
 
+function buildFileBackedProfile(viewer: Viewer): ProfileRecord {
+  const now = new Date().toISOString();
+
+  return {
+    id: `profile-${viewer.id}`,
+    userId: viewer.id,
+    displayName: viewer.displayName,
+    creatorLegalName: null,
+    businessName: null,
+    contactEmail: viewer.email,
+    preferredSignature: viewer.displayName,
+    payoutDetails: null,
+    defaultCurrency: "USD",
+    reminderLeadDays: 3,
+    conflictAlertsEnabled: true,
+    paymentRemindersEnabled: true,
+    accentColor: null,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 function getProfileAuditDelegate() {
   return (prisma as typeof prisma & {
     profileAuditEvent?: {
@@ -87,6 +109,10 @@ function toProfileAuditRecord(event: {
 }
 
 export async function getProfileForViewer(viewer: Viewer) {
+  if (!process.env.DATABASE_URL) {
+    return buildFileBackedProfile(viewer);
+  }
+
   const existing = await prisma.profile.findUnique({
     where: { userId: viewer.id }
   });
@@ -217,6 +243,10 @@ export async function updateProfileForViewer(
 }
 
 export async function listProfileAuditForViewer(viewer: Viewer, limit = 8) {
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+
   const profileAuditEvent = getProfileAuditDelegate();
   if (!profileAuditEvent) {
     return [];
