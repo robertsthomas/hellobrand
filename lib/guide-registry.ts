@@ -18,13 +18,22 @@ export interface GuideContext {
 
 export const GUIDE_STEPS: GuideStep[] = [
   {
-    id: "create_workspace",
-    title: "Create your first workspace",
-    body: "Upload a contract, brief, or email thread to build a partnership workspace with extracted terms and AI analysis.",
-    anchorSelector: '[data-guide="sidebar-new-workspace"]',
+    id: "add_first_documents",
+    title: "Add your first documents",
+    body: "Upload a contract, brief, or email thread. HelloBrand will extract terms, flag risks, and build your workspace.",
+    anchorSelector: '[data-guide="add-documents"]',
     routeMatch: "/app",
-    side: "right",
+    side: "bottom",
     autoCompleteCondition: (ctx) => ctx.hasActiveWorkspace
+  },
+  {
+    id: "create_another_workspace",
+    title: "Create another workspace",
+    body: "Each partnership gets its own workspace. Use this button to start a new one anytime.",
+    anchorSelector: '[data-guide="sidebar-new-workspace"]',
+    routeMatch: /^\/app(\/dashboard)?$/,
+    side: "right",
+    eligibility: (ctx) => ctx.hasActiveWorkspace
   },
   {
     id: "workspace_tabs_intro",
@@ -63,7 +72,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Your inbox at a glance",
     body: "The Inbox aggregates email threads linked to your partnerships. Deal matches appear here automatically.",
     anchorSelector: '[data-guide="sidebar-inbox"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
   },
   {
@@ -71,7 +80,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Track your payments",
     body: "See all invoices, due dates, and payment statuses across partnerships in one place.",
     anchorSelector: '[data-guide="sidebar-payments"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
   },
   {
@@ -79,7 +88,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Analytics overview",
     body: "View earnings trends, deal velocity, and portfolio insights to understand your creator business.",
     anchorSelector: '[data-guide="sidebar-analytics"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
   },
   {
@@ -87,7 +96,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Customize your settings",
     body: "Update your profile, notification preferences, billing, and accent color from Settings.",
     anchorSelector: '[data-guide="sidebar-settings"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
   }
 ];

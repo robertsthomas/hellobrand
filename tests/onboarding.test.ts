@@ -30,39 +30,54 @@ describe("guide registry", () => {
     }
   });
 
-  test("returns first matching step for /app route", () => {
+  test("returns add_first_documents as first step for new user on /app", () => {
     const ctx = makeContext({ pathname: "/app" });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
     expect(step).not.toBeNull();
-    expect(step!.id).toBe("create_workspace");
+    expect(step!.id).toBe("add_first_documents");
   });
 
-  test("auto-completes create_workspace when user has active workspace", () => {
+  test("auto-completes add_first_documents when user has active workspace", () => {
     const ctx = makeContext({
       pathname: "/app",
       hasActiveWorkspace: true
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    // create_workspace should be skipped
-    expect(step?.id).not.toBe("create_workspace");
+    expect(step?.id).not.toBe("add_first_documents");
+  });
+
+  test("shows create_another_workspace only after first workspace exists", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasActiveWorkspace: false
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).not.toBe("create_another_workspace");
+
+    const ctxWithWorkspace = makeContext({
+      pathname: "/app",
+      hasActiveWorkspace: true
+    });
+    const step2 = getActiveGuideStep(GUIDE_STEPS, ctxWithWorkspace);
+    expect(step2?.id).toBe("create_another_workspace");
   });
 
   test("skips dismissed steps", () => {
     const ctx = makeContext({
       pathname: "/app",
-      dismissedStepIds: new Set(["create_workspace"])
+      dismissedStepIds: new Set(["add_first_documents"])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).not.toBe("create_workspace");
+    expect(step?.id).not.toBe("add_first_documents");
   });
 
   test("skips completed steps", () => {
     const ctx = makeContext({
       pathname: "/app",
-      completedStepIds: new Set(["create_workspace"])
+      completedStepIds: new Set(["add_first_documents"])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).not.toBe("create_workspace");
+    expect(step?.id).not.toBe("add_first_documents");
   });
 
   test("returns deal workspace step for deal routes", () => {
@@ -84,13 +99,14 @@ describe("guide registry", () => {
     expect(step).toBeNull();
   });
 
-  test("sidebar steps match /app route", () => {
+  test("sidebar steps show after workspace steps are dismissed", () => {
     const sidebarSteps = GUIDE_STEPS.filter((s) =>
       s.id.startsWith("sidebar_")
     );
     const ctx = makeContext({
       pathname: "/app",
-      dismissedStepIds: new Set(["create_workspace"])
+      hasActiveWorkspace: true,
+      dismissedStepIds: new Set(["add_first_documents", "create_another_workspace"])
     });
 
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);

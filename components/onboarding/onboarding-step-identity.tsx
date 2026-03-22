@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -23,73 +22,6 @@ function stripAt(value: string) {
   return trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
 }
 
-function hexToRgbTriplet(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r} ${g} ${b}`;
-}
-
-function lightenForDark(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const mix = 0.45;
-  const lr = Math.round(r + (255 - r) * mix);
-  const lg = Math.round(g + (255 - g) * mix);
-  const lb = Math.round(b + (255 - b) * mix);
-  return `${lr} ${lg} ${lb}`;
-}
-
-function lightenHex(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  const mix = 0.45;
-  const lr = Math.round(r + (255 - r) * mix);
-  const lg = Math.round(g + (255 - g) * mix);
-  const lb = Math.round(b + (255 - b) * mix);
-  return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
-}
-
-/** Apply accent color to CSS variables immediately. */
-function useAccentPreview(accentColor: string) {
-  useEffect(() => {
-    if (!accentColor) {
-      document.querySelector("style[data-onboarding-accent]")?.remove();
-      return;
-    }
-
-    const lightRgb = hexToRgbTriplet(accentColor);
-    const darkRgb = lightenForDark(accentColor);
-    const darkHex = lightenHex(accentColor);
-
-    const style = document.createElement("style");
-    style.setAttribute("data-onboarding-accent", "true");
-    style.textContent = `
-      :root {
-        --primary-rgb: ${lightRgb};
-        --ocean-rgb: ${lightRgb};
-        --ring-rgb: ${lightRgb};
-        --primary: ${accentColor};
-      }
-      html.dark {
-        --primary-rgb: ${darkRgb};
-        --ocean-rgb: ${darkRgb};
-        --ring-rgb: ${darkRgb};
-        --primary: ${darkHex};
-      }
-    `;
-
-    document.querySelector("style[data-onboarding-accent]")?.remove();
-    document.head.appendChild(style);
-
-    return () => {
-      style.remove();
-    };
-  }, [accentColor]);
-}
-
 export function OnboardingStepIdentity({
   displayName,
   setDisplayName,
@@ -109,8 +41,6 @@ export function OnboardingStepIdentity({
   setAccentColor: (value: string) => void;
   onContinue: () => void;
 }) {
-  useAccentPreview(accentColor);
-
   const canContinue = displayName.trim().length > 0 && stripAt(primaryHandle).length > 0;
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -177,7 +107,7 @@ export function OnboardingStepIdentity({
           <span className="text-sm font-medium text-black/70 dark:text-white/75">
             Accent color
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {ACCENT_PRESETS.map((preset) => {
               const isSelected = accentColor === preset.hex;
               return (
@@ -238,7 +168,7 @@ export function OnboardingStepIdentity({
           disabled={!canContinue}
           className={cn(
             buttonVariants({ size: "lg" }),
-            "h-12 w-full bg-ink text-white hover:bg-ink/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+            "h-12 w-full bg-primary text-primary-foreground hover:bg-primary/90",
             !canContinue ? "cursor-not-allowed opacity-40" : ""
           )}
         >

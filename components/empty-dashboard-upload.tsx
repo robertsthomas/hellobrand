@@ -550,6 +550,7 @@ export function EmptyDashboardUpload({
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => inputRef.current?.click()}
+                    data-guide="add-documents"
                     className={cn(
                       buttonVariants({
                         size: "sm",

@@ -44,7 +44,7 @@ export function OnboardingStepProfile({
           <span className="text-sm font-medium text-black/70 dark:text-white/75">
             Content niche
           </span>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {PROFILE_CATEGORY_OPTIONS.map((category) => (
               <button
                 key={category}
@@ -99,7 +99,7 @@ export function OnboardingStepProfile({
           disabled={!canComplete || isPending}
           className={cn(
             buttonVariants({ size: "lg" }),
-            "h-12 flex-1 bg-ink text-white hover:bg-ink/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+            "h-12 flex-1 bg-primary text-primary-foreground hover:bg-primary/90",
             !canComplete || isPending ? "cursor-not-allowed opacity-40" : ""
           )}
         >

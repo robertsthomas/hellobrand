@@ -156,32 +156,40 @@ function getTooltipPosition(
   const vw = window.innerWidth;
   const vh = window.innerHeight;
 
+  // Measure available space on each side of the anchor
+  const space: Record<Side, number> = {
+    top: rect.top,
+    bottom: vh - rect.bottom,
+    left: rect.left,
+    right: vw - rect.right
+  };
+
+  // Check if the preferred side fits
+  const fitsH = (s: Side) =>
+    s === "left" || s === "right"
+      ? space[s] >= TOOLTIP_WIDTH + gap + PADDING
+      : space[s] >= TOOLTIP_HEIGHT_ESTIMATE + gap + PADDING;
+
+  // Pick side: preferred if it fits, otherwise the side with the most space
+  let side = preferredSide;
+  if (!fitsH(side)) {
+    // Try all four sides, pick the one with the most room
+    const ranked = (Object.keys(space) as Side[]).sort(
+      (a, b) => space[b] - space[a]
+    );
+    side = ranked.find(fitsH) ?? ranked[0];
+  }
+
   let top: number;
   let left: number;
 
-  // Try preferred side, flip if it would go off-screen
-  let side = preferredSide;
-
-  if (side === "right" && rect.right + gap + TOOLTIP_WIDTH > vw - PADDING) {
-    side = "left";
-  }
-  if (side === "left" && rect.left - gap - TOOLTIP_WIDTH < PADDING) {
-    side = "right";
-  }
-  if (side === "bottom" && rect.bottom + gap + TOOLTIP_HEIGHT_ESTIMATE > vh - PADDING) {
-    side = "top";
-  }
-  if (side === "top" && rect.top - gap - TOOLTIP_HEIGHT_ESTIMATE < PADDING) {
-    side = "bottom";
-  }
-
   switch (side) {
     case "right":
-      top = rect.top + rect.height / 2 - 60;
+      top = rect.top + rect.height / 2 - TOOLTIP_HEIGHT_ESTIMATE / 2;
       left = rect.right + gap;
       break;
     case "left":
-      top = rect.top + rect.height / 2 - 60;
+      top = rect.top + rect.height / 2 - TOOLTIP_HEIGHT_ESTIMATE / 2;
       left = rect.left - TOOLTIP_WIDTH - gap;
       break;
     case "bottom":

@@ -205,7 +205,7 @@ export function OnboardingStepPlatforms({
           disabled={!canContinue}
           className={cn(
             buttonVariants({ size: "lg" }),
-            "h-12 flex-1 bg-ink text-white hover:bg-ink/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+            "h-12 flex-1 bg-primary text-primary-foreground hover:bg-primary/90",
             !canContinue ? "cursor-not-allowed opacity-40" : ""
           )}
         >

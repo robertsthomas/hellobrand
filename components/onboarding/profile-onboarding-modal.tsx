@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Hand, X } from "lucide-react";
@@ -24,6 +24,69 @@ import { OnboardingStepSuccess } from "@/components/onboarding/onboarding-step-s
 
 const TOTAL_STEPS = 3;
 
+function hexToRgbTriplet(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r} ${g} ${b}`;
+}
+
+function lightenForDark(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const mix = 0.45;
+  return `${Math.round(r + (255 - r) * mix)} ${Math.round(g + (255 - g) * mix)} ${Math.round(b + (255 - b) * mix)}`;
+}
+
+function lightenHex(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const mix = 0.45;
+  const lr = Math.round(r + (255 - r) * mix);
+  const lg = Math.round(g + (255 - g) * mix);
+  const lb = Math.round(b + (255 - b) * mix);
+  return `#${lr.toString(16).padStart(2, "0")}${lg.toString(16).padStart(2, "0")}${lb.toString(16).padStart(2, "0")}`;
+}
+
+function useAccentPreview(accentColor: string) {
+  useEffect(() => {
+    if (!accentColor) {
+      document.querySelector("style[data-onboarding-accent]")?.remove();
+      return;
+    }
+
+    const lightRgb = hexToRgbTriplet(accentColor);
+    const darkRgb = lightenForDark(accentColor);
+    const darkHex = lightenHex(accentColor);
+
+    const style = document.createElement("style");
+    style.setAttribute("data-onboarding-accent", "true");
+    style.textContent = `
+      :root {
+        --primary-rgb: ${lightRgb};
+        --ocean-rgb: ${lightRgb};
+        --ring-rgb: ${lightRgb};
+        --primary: ${accentColor};
+      }
+      html.dark {
+        --primary-rgb: ${darkRgb};
+        --ocean-rgb: ${darkRgb};
+        --ring-rgb: ${darkRgb};
+        --primary: ${darkHex};
+      }
+    `;
+
+    document.querySelector("style[data-onboarding-accent]")?.remove();
+    document.head.appendChild(style);
+
+    return () => {
+      style.remove();
+    };
+  }, [accentColor]);
+}
+
 export function ProfileOnboardingModal({
   viewer
 }: {
@@ -46,6 +109,8 @@ export function ProfileOnboardingModal({
   const [bio, setBio] = useState("");
   const [accentColor, setAccentColor] = useState("");
   const [showExitDialog, setShowExitDialog] = useState(false);
+
+  useAccentPreview(accentColor);
 
   const handleComplete = () => {
     startTransition(async () => {
@@ -89,7 +154,7 @@ export function ProfileOnboardingModal({
   return (
     <div className="flex min-h-screen flex-col bg-white dark:bg-[#0f1115]">
       {/* Thin top bar with logo */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-black/5 px-8 dark:border-white/8">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/5 px-4 sm:h-16 sm:px-8 dark:border-white/8">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground">
             <Hand className="h-4 w-4 rotate-[18deg]" strokeWidth={2.15} />
@@ -111,8 +176,8 @@ export function ProfileOnboardingModal({
       </header>
 
       {/* Centered content area */}
-      <main className={`flex flex-1 items-start justify-center overflow-auto px-6 pb-24 ${
-        step === "success" ? "pt-16 sm:pt-28" : "pt-12 sm:pt-20"
+      <main className={`flex flex-1 items-start justify-center overflow-auto px-4 pb-12 sm:px-6 sm:pb-24 ${
+        step === "success" ? "pt-10 sm:pt-28" : "pt-8 sm:pt-20"
       }`}>
         <div className="w-full max-w-lg">
           {/* Progress bar - only on form steps */}

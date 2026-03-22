@@ -14,56 +14,69 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 
+/**
+ * Generate a symmetric starburst path centered at (cx, cy).
+ * Points alternate between outer and inner radii every (360/points/2) degrees.
+ */
+function starburstPath(cx: number, cy: number, outerR: number, innerR: number, points: number): string {
+  const steps = points * 2;
+  const angleStep = (Math.PI * 2) / steps;
+  // Start from top (-90°)
+  const offset = -Math.PI / 2;
+  const coords: string[] = [];
+  for (let i = 0; i < steps; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = offset + i * angleStep;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    coords.push(`${Math.round(x * 10) / 10} ${Math.round(y * 10) / 10}`);
+  }
+  return `M${coords[0]}L${coords.slice(1).join(" ")}Z`;
+}
+
+const CX = 60;
+const CY = 60;
+const STARBURST_OUTER = starburstPath(CX, CY, 52, 43, 12);
+const STARBURST_INNER = starburstPath(CX, CY, 48, 40, 12);
+
+// Checkmark centered at (60, 60): midpoint of M43,62 L55,74 L77,48 is (60, 61)
+const CHECKMARK = "M43 62L55 74L77 48";
+
 function VerifiedBadge({ className }: { className?: string }) {
   return (
     <div className={`relative ${className ?? ""}`}>
-      {/* Static sparkles — outside the spin */}
+      {/* Static sparkles */}
       <svg
         viewBox="0 0 180 180"
         fill="none"
-        xmlns="http://www.w3.org/2000/svg"
         className="absolute -inset-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)]"
       >
-        {/* 4-point sparkle top-right */}
         <path
           d="M145 28L147 35L154 37L147 39L145 46L143 39L136 37L143 35L145 28Z"
-          fill="#8FBFA8"
-          opacity="0.5"
+          className="fill-primary/40"
         />
-        {/* Dot bottom-left */}
-        <circle cx="30" cy="140" r="3" fill="#8FBFA8" opacity="0.3" />
-        {/* Small dot top-left */}
-        <circle cx="42" cy="42" r="2" fill="#8FBFA8" opacity="0.25" />
+        <circle cx="30" cy="140" r="3" className="fill-primary/25" />
+        <circle cx="42" cy="42" r="2" className="fill-primary/20" />
       </svg>
-      {/* Spinning badge body */}
+      {/* Spinning starburst — transform-origin at exact center */}
       <svg
-        viewBox="0 0 140 140"
+        viewBox="0 0 120 120"
         fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-full w-full animate-[spin_8s_linear_infinite]"
+        className="h-full w-full animate-[spin_14s_linear_infinite]"
+        style={{ transformOrigin: `${CX}px ${CY}px` }}
       >
-        {/* Soft shadow */}
-        <path
-          d="M70 14L83.5 24L100.5 21.4L105.2 38L120 47.4L115.6 64L120 80.6L105.2 90L100.5 106.6L83.5 104L70 114L56.5 104L39.5 106.6L34.8 90L20 80.6L24.4 64L20 47.4L34.8 38L39.5 21.4L56.5 24L70 14Z"
-          fill="#C5DECE"
-          opacity="0.18"
-          transform="translate(2, 3)"
-        />
-        {/* Badge body */}
-        <path
-          d="M70 12L84 22L101.5 19.3L106.3 36.5L121.5 46.2L117 63.5L121.5 80.8L106.3 90.5L101.5 107.7L84 105L70 115L56 105L38.5 107.7L33.7 90.5L18.5 80.8L23 63.5L18.5 46.2L33.7 36.5L38.5 19.3L56 22L70 12Z"
-          fill="#8FBFA8"
-        />
+        <path d={STARBURST_OUTER} className="fill-primary/20" />
+        <path d={STARBURST_INNER} className="fill-primary/35" />
       </svg>
-      {/* Static checkmark overlay */}
+      {/* Static checkmark */}
       <svg
-        viewBox="0 0 140 140"
+        viewBox="0 0 120 120"
         fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="absolute inset-0 h-full w-full"
+        className="absolute inset-0 h-full w-full animate-[scalebeat_3s_ease-in-out_infinite]"
+        style={{ transformOrigin: "center center" }}
       >
         <path
-          d="M48 68L62 82L92 50"
+          d={CHECKMARK}
           stroke="white"
           strokeWidth="7"
           strokeLinecap="round"
@@ -129,7 +142,7 @@ export function OnboardingStepSuccess({
       <h1 className="mt-8 text-2xl font-semibold tracking-tight text-ink sm:text-3xl animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">
         You&apos;re all set, {firstName}!
       </h1>
-      <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-black/55 dark:text-white/60 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-both">
+      <p className="mt-3 max-w-xs text-sm leading-relaxed text-black/55 sm:max-w-sm sm:text-[15px] dark:text-white/60 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-both">
         Your creator profile is ready. Start uploading partnership documents to
         build your first workspace.
       </p>
@@ -140,7 +153,7 @@ export function OnboardingStepSuccess({
           onClick={onContinue}
           className={cn(
             buttonVariants({ size: "lg" }),
-            "h-12 w-full bg-ink text-white hover:bg-ink/90 dark:bg-white dark:text-black dark:hover:bg-white/90"
+            "h-12 w-full bg-primary text-primary-foreground hover:bg-primary/90"
           )}
         >
           Continue to app
@@ -191,6 +204,10 @@ export function OnboardingStepSuccess({
                       value={email}
                       onChange={(e) => updateEmail(index, e.target.value)}
                       placeholder="friend@email.com"
+                      autoComplete="off"
+                      data-1p-ignore
+                      data-lpignore="true"
+                      data-form-type="other"
                       className="h-11 flex-1 rounded-none border border-black/12 bg-white px-4 text-sm text-foreground shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/30 dark:border-white/12 dark:bg-white/[0.04]"
                       autoFocus={index === 0}
                     />
@@ -198,9 +215,9 @@ export function OnboardingStepSuccess({
                       <button
                         type="button"
                         onClick={() => removeEmail(index)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-black/30 transition hover:bg-black/5 hover:text-black/60 dark:text-white/30 dark:hover:bg-white/5 dark:hover:text-white/60"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-black/30 transition hover:bg-black/5 hover:text-black/60 dark:text-white/30 dark:hover:bg-white/5 dark:hover:text-white/60"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -236,7 +253,7 @@ export function OnboardingStepSuccess({
                 disabled={validEmails.length === 0 || isSending}
                 className={cn(
                   buttonVariants(),
-                  "w-full bg-ink text-white hover:bg-ink/90 dark:bg-white dark:text-black dark:hover:bg-white/90",
+                  "w-full bg-primary text-primary-foreground hover:bg-primary/90",
                   validEmails.length === 0 || isSending
                     ? "cursor-not-allowed opacity-40"
                     : ""

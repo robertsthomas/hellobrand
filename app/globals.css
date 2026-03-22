@@ -255,6 +255,11 @@ html.dark ::selection {
   }
 }
 
+@keyframes scalebeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
 .intake-loader-shell {
   background:
     linear-gradient(180deg, rgba(203, 214, 228, 0.92) 0%, rgba(180, 196, 214, 0.96) 100%);
