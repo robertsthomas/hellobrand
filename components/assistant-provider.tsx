@@ -193,7 +193,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         aria-label="Open assistant"
       >
         <span className="shrink-0">
-          <Bot className="h-4 w-4" />
+          <Bot className="h-5 w-5" />
         </span>
         <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,opacity,margin] duration-300 ease-out group-hover:ml-2 group-hover:max-w-[80px] group-hover:opacity-100">
           Assistant

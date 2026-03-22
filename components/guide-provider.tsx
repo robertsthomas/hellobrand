@@ -62,10 +62,35 @@ export function GuideProvider({
     [pathname, hasActiveWorkspace, dismissedStepIds, completedStepIds]
   );
 
-  const activeStep = useMemo(
-    () => getActiveGuideStep(GUIDE_STEPS, guideContext),
-    [guideContext]
-  );
+  // Find the first eligible step whose anchor is actually visible in the DOM.
+  // On mobile the sidebar is hidden, so sidebar-anchored steps are skipped.
+  const [activeStep, setActiveStep] = useState<GuideStep | null>(null);
+
+  useEffect(() => {
+    // Small delay so DOM has settled after navigation
+    const timer = setTimeout(() => {
+      let candidate = getActiveGuideStep(GUIDE_STEPS, guideContext);
+      const tried = new Set<string>();
+
+      while (candidate && !tried.has(candidate.id)) {
+        const el = document.querySelector(candidate.anchorSelector);
+        if (el && el.getBoundingClientRect().width > 0) {
+          break; // anchor is visible
+        }
+        tried.add(candidate.id);
+        // Try next step by temporarily adding this one to dismissed
+        const tempCtx = {
+          ...guideContext,
+          dismissedStepIds: new Set([...guideContext.dismissedStepIds, ...tried])
+        };
+        candidate = getActiveGuideStep(GUIDE_STEPS, tempCtx);
+      }
+
+      setActiveStep(candidate && !tried.has(candidate.id) ? candidate : null);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [guideContext]);
 
   // Auto-complete steps whose condition is met
   useEffect(() => {

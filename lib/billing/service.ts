@@ -16,6 +16,7 @@ import {
   buildPlanAvailability,
   type BillingOverview
 } from "@/lib/billing/plans";
+import { computeBillingInsights } from "@/lib/billing/insights";
 import {
   isFinalizedWebhookStatus,
   resolveCheckoutSessionMerge,
@@ -281,6 +282,12 @@ function buildFileBackedBillingOverview(): BillingOverview {
   const recommendedUpgrade = recommendedUpgradeForCurrentPlan(
     overridePlanTier ?? PlanTier.basic
   );
+  const insights = computeBillingInsights({
+    currentPlanTier: effectivePlanTier,
+    currentPlanInterval: overrideInterval ?? null,
+    planCatalog,
+    payments: []
+  });
 
   return {
     stripeConfigured,
@@ -297,7 +304,8 @@ function buildFileBackedBillingOverview(): BillingOverview {
     planCatalog,
     hasActiveSubscription: isActiveBillingSubscriptionStatus(overrideStatus),
     recommendedUpgradeTier: recommendedUpgrade.tier,
-    recommendedUpgradeLabel: recommendedUpgrade.label
+    recommendedUpgradeLabel: recommendedUpgrade.label,
+    insights
   };
 }
 
@@ -336,7 +344,24 @@ export async function getBillingOverviewForViewer(
   const planCatalog = buildPlanAvailability();
 
   try {
-    const billingAccount = await findBillingAccountWithHistory(viewer.id);
+    const [billingAccount, paymentRecords] = await Promise.all([
+      findBillingAccountWithHistory(viewer.id),
+      prisma.paymentRecord.findMany({
+        where: {
+          deal: {
+            userId: viewer.id,
+            confirmedAt: { not: null }
+          }
+        },
+        select: {
+          amount: true,
+          currency: true,
+          status: true,
+          paidDate: true,
+          updatedAt: true
+        }
+      })
+    ]);
     const overridePlanTier = getDevPlanOverride();
     const overrideInterval = getDevBillingIntervalOverride();
     const overrideStatus = getDevBillingStatusOverride();
@@ -360,6 +385,18 @@ export async function getBillingOverviewForViewer(
     const recommendedUpgrade = recommendedUpgradeForCurrentPlan(
       effectivePlanTier
     );
+    const insights = computeBillingInsights({
+      currentPlanTier: effectivePlanTier,
+      currentPlanInterval: overrideInterval ?? billingAccount?.currentPlanInterval ?? null,
+      planCatalog,
+      payments: paymentRecords.map((record) => ({
+        amount: record.amount,
+        currency: record.currency,
+        status: record.status,
+        paidDate: record.paidDate?.toISOString() ?? null,
+        updatedAt: record.updatedAt.toISOString()
+      }))
+    });
 
     return {
       stripeConfigured,
@@ -378,7 +415,8 @@ export async function getBillingOverviewForViewer(
         effectiveSubscriptionStatus
       ),
       recommendedUpgradeTier: recommendedUpgrade.tier,
-      recommendedUpgradeLabel: recommendedUpgrade.label
+      recommendedUpgradeLabel: recommendedUpgrade.label,
+      insights
     };
   } catch (error) {
     if (!isKnownBillingSetupError(error)) {
@@ -401,7 +439,13 @@ export async function getBillingOverviewForViewer(
       planCatalog,
       hasActiveSubscription: false,
       recommendedUpgradeTier: PlanTier.standard,
-      recommendedUpgradeLabel: "Start with Standard for the full solo-creator workflow."
+      recommendedUpgradeLabel: "Start with Standard for the full solo-creator workflow.",
+      insights: computeBillingInsights({
+        currentPlanTier: null,
+        currentPlanInterval: null,
+        planCatalog,
+        payments: []
+      })
     };
   }
 }

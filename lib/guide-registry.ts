@@ -58,6 +58,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
   },
+  {
+    id: "header_notifications",
+    title: "Stay on top of updates",
+    body: "Open notifications from anywhere to review payment alerts, deadlines, contract risks, and recent workspace activity.",
+    anchorSelector: '[data-guide="header-notifications"]',
+    routeMatch: "/app",
+    side: "left"
+  },
   // Add documents — shown on intake/new workspace page
   {
     id: "add_first_documents",

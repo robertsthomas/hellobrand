@@ -5,6 +5,8 @@ import { hasStripePriceId } from "@/lib/billing/config";
 export type BillingPlanCatalogEntry = {
   tier: PlanTier;
   name: string;
+  monthlyPriceUsd: number;
+  annualPriceUsd: number;
   monthlyPriceLabel: string;
   annualPriceLabel: string;
   annualEquivalentLabel: string;
@@ -26,6 +28,23 @@ export type MarketingPlanAvailability = BillingPlanAvailability & {
   displayAnnualEquivalentLabel: string;
 };
 
+export type BillingInsights = {
+  disclaimer: string;
+  methodology: string;
+  comparisonNotice: string | null;
+  earningsCurrency: string | null;
+  hasMixedCurrencies: boolean;
+  trackedEarningsTotal: number | null;
+  paidToDateTotal: number | null;
+  outstandingTotal: number | null;
+  currentMonthPaidTotal: number | null;
+  yearToDatePaidTotal: number | null;
+  monthlyPlanCostUsd: number;
+  yearlyPlanCostUsd: number;
+  currentMonthNetAfterPlanCostUsd: number | null;
+  yearToDateNetAfterPlanCostUsd: number | null;
+};
+
 export type BillingOverview = {
   stripeConfigured: boolean;
   billingReady: boolean;
@@ -42,12 +61,15 @@ export type BillingOverview = {
   hasActiveSubscription: boolean;
   recommendedUpgradeTier: PlanTier | null;
   recommendedUpgradeLabel: string | null;
+  insights: BillingInsights;
 };
 
 const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
   {
     tier: PlanTier.basic,
     name: "Basic",
+    monthlyPriceUsd: 19,
+    annualPriceUsd: 180,
     monthlyPriceLabel: "$19/mo",
     annualPriceLabel: "$180/yr",
     annualEquivalentLabel: "$15/mo billed annually",
@@ -73,6 +95,8 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
   {
     tier: PlanTier.standard,
     name: "Standard",
+    monthlyPriceUsd: 49,
+    annualPriceUsd: 468,
     monthlyPriceLabel: "$49/mo",
     annualPriceLabel: "$468/yr",
     annualEquivalentLabel: "$39/mo billed annually",
@@ -99,6 +123,8 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
   {
     tier: PlanTier.premium,
     name: "Premium",
+    monthlyPriceUsd: 99,
+    annualPriceUsd: 948,
     monthlyPriceLabel: "$99/mo",
     annualPriceLabel: "$948/yr",
     annualEquivalentLabel: "$79/mo billed annually",

@@ -10,7 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type AuthMode = "sign-in" | "sign-up";
-type VerificationStep = "details" | "code";
+type VerificationStep = "details" | "sign-up-code" | "sign-in-second-factor";
+type SignInSecondFactorState =
+  | {
+      strategy: "email_code";
+      safeIdentifier: string;
+      emailAddressId?: string;
+    }
+  | {
+      strategy: "phone_code";
+      safeIdentifier: string;
+      phoneNumberId?: string;
+    }
+  | {
+      strategy: "totp" | "backup_code";
+      safeIdentifier: null;
+    };
 
 const rightPanelHighlights = [
   "Plain-English contract summaries",
@@ -62,6 +77,7 @@ export function CustomAuthScreen() {
   const [signUpPassword, setSignUpPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
+  const [signInSecondFactor, setSignInSecondFactor] = useState<SignInSecondFactorState | null>(null);
   const [errorMessages, setErrorMessages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
@@ -80,6 +96,7 @@ export function CustomAuthScreen() {
     setMode(nextMode);
     setVerificationStep("details");
     setVerificationCode("");
+    setSignInSecondFactor(null);
     setVerificationNotice(null);
     setErrorMessages([]);
     router.replace(nextMode === "sign-up" ? "/login?mode=sign-up" : "/login", {
@@ -87,10 +104,78 @@ export function CustomAuthScreen() {
     });
   }
 
+  function resetVerificationState() {
+    setVerificationStep("details");
+    setVerificationCode("");
+    setSignInSecondFactor(null);
+    setVerificationNotice(null);
+  }
+
   async function activateSession(sessionId: string) {
     await setActive({ session: sessionId });
     router.push("/app");
     router.refresh();
+  }
+
+  async function moveToSignInSecondFactor(result: NonNullable<typeof signIn>) {
+    const supportedSecondFactors = result.supportedSecondFactors ?? [];
+    const preferredSecondFactor =
+      supportedSecondFactors.find((factor) => factor.strategy === "totp") ??
+      supportedSecondFactors.find((factor) => factor.strategy === "email_code") ??
+      supportedSecondFactors.find((factor) => factor.strategy === "phone_code") ??
+      supportedSecondFactors.find((factor) => factor.strategy === "backup_code");
+
+    if (!preferredSecondFactor) {
+      setErrorMessages([
+        "Your account requires an additional verification method that this screen does not support yet."
+      ]);
+      return;
+    }
+
+    if (preferredSecondFactor.strategy === "totp") {
+      setSignInSecondFactor({ strategy: "totp", safeIdentifier: null });
+      setVerificationStep("sign-in-second-factor");
+      setVerificationNotice("Enter the code from your authenticator app to finish signing in.");
+      return;
+    }
+
+    if (preferredSecondFactor.strategy === "backup_code") {
+      setSignInSecondFactor({ strategy: "backup_code", safeIdentifier: null });
+      setVerificationStep("sign-in-second-factor");
+      setVerificationNotice("Enter one of your backup codes to finish signing in.");
+      return;
+    }
+
+    if (preferredSecondFactor.strategy === "email_code") {
+      await result.prepareSecondFactor({
+        strategy: "email_code",
+        emailAddressId: preferredSecondFactor.emailAddressId
+      });
+      setSignInSecondFactor({
+        strategy: "email_code",
+        safeIdentifier: preferredSecondFactor.safeIdentifier,
+        emailAddressId: preferredSecondFactor.emailAddressId
+      });
+      setVerificationStep("sign-in-second-factor");
+      setVerificationNotice(
+        `We sent a verification code to ${preferredSecondFactor.safeIdentifier}.`
+      );
+      return;
+    }
+
+    await result.prepareSecondFactor({
+      strategy: "phone_code",
+      phoneNumberId: preferredSecondFactor.phoneNumberId
+    });
+    setSignInSecondFactor({
+      strategy: "phone_code",
+      safeIdentifier: preferredSecondFactor.safeIdentifier,
+      phoneNumberId: preferredSecondFactor.phoneNumberId
+    });
+    setVerificationStep("sign-in-second-factor");
+    setVerificationNotice(
+      `We sent a verification code to ${preferredSecondFactor.safeIdentifier}.`
+    );
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
@@ -114,9 +199,13 @@ export function CustomAuthScreen() {
         return;
       }
 
-      setErrorMessages([
-        "This sign-in needs an additional verification step that is not configured in this screen yet."
-      ]);
+      if (result.status === "needs_second_factor") {
+        setVerificationCode("");
+        await moveToSignInSecondFactor(result);
+        return;
+      }
+
+      setErrorMessages(["We couldn't complete that sign-in yet. Please try again."]);
     } catch (error) {
       setErrorMessages(getErrorMessages(error));
     } finally {
@@ -152,7 +241,7 @@ export function CustomAuthScreen() {
       }
 
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setVerificationStep("code");
+      setVerificationStep("sign-up-code");
       setVerificationNotice(`We sent a verification code to ${signUpEmail.trim()}.`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error));
@@ -161,7 +250,7 @@ export function CustomAuthScreen() {
     }
   }
 
-  async function handleVerification(event: FormEvent<HTMLFormElement>) {
+  async function handleSignUpVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!isSignUpLoaded || !signUp) {
@@ -191,6 +280,53 @@ export function CustomAuthScreen() {
     }
   }
 
+  async function handleSignInVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!isSignInLoaded || !signIn || !signInSecondFactor) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessages([]);
+
+    try {
+      const normalizedCode =
+        signInSecondFactor.strategy === "backup_code"
+          ? verificationCode.trim()
+          : verificationCode.replace(/\D/g, "").trim();
+
+      const result =
+        signInSecondFactor.strategy === "totp"
+          ? await signIn.attemptSecondFactor({ strategy: "totp", code: normalizedCode })
+          : signInSecondFactor.strategy === "backup_code"
+            ? await signIn.attemptSecondFactor({
+                strategy: "backup_code",
+                code: normalizedCode
+              })
+            : signInSecondFactor.strategy === "email_code"
+              ? await signIn.attemptSecondFactor({
+                  strategy: "email_code",
+                  code: normalizedCode
+                })
+              : await signIn.attemptSecondFactor({
+                  strategy: "phone_code",
+                  code: normalizedCode
+                });
+
+      if (result.status === "complete" && result.createdSessionId) {
+        await activateSession(result.createdSessionId);
+        return;
+      }
+
+      setErrorMessages(["That verification code did not complete sign-in. Please try again."]);
+    } catch (error) {
+      setErrorMessages(getErrorMessages(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   async function resendVerificationCode() {
     if (!isSignUpLoaded || !signUp) {
       return;
@@ -209,7 +345,71 @@ export function CustomAuthScreen() {
     }
   }
 
-  const isVerificationMode = mode === "sign-up" && verificationStep === "code";
+  async function resendSignInVerificationCode() {
+    if (!isSignInLoaded || !signIn || !signInSecondFactor) {
+      return;
+    }
+
+    if (signInSecondFactor.strategy === "totp") {
+      setVerificationNotice("Open your authenticator app and enter the latest code.");
+      return;
+    }
+
+    if (signInSecondFactor.strategy === "backup_code") {
+      setVerificationNotice("Use one of your remaining backup codes to finish signing in.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessages([]);
+
+    try {
+      if (signInSecondFactor.strategy === "email_code") {
+        await signIn.prepareSecondFactor({
+          strategy: "email_code",
+          emailAddressId: signInSecondFactor.emailAddressId
+        });
+      } else {
+        await signIn.prepareSecondFactor({
+          strategy: "phone_code",
+          phoneNumberId: signInSecondFactor.phoneNumberId
+        });
+      }
+
+      setVerificationNotice(
+        `A fresh verification code was sent to ${signInSecondFactor.safeIdentifier}.`
+      );
+    } catch (error) {
+      setErrorMessages(getErrorMessages(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const isSignUpVerificationMode = mode === "sign-up" && verificationStep === "sign-up-code";
+  const isSignInVerificationMode =
+    mode === "sign-in" && verificationStep === "sign-in-second-factor";
+  const isVerificationMode = isSignUpVerificationMode || isSignInVerificationMode;
+  const verificationLabel =
+    signInSecondFactor?.strategy === "totp"
+      ? "Authenticator code"
+      : signInSecondFactor?.strategy === "backup_code"
+        ? "Backup code"
+        : "Verification code";
+  const verificationPlaceholder =
+    signInSecondFactor?.strategy === "backup_code"
+      ? "Enter a backup code"
+      : "Enter the 6-digit code";
+  const verificationButtonLabel = isSignInVerificationMode ? "Verify and log in" : "Verify email";
+  const verificationBody = isSignInVerificationMode
+    ? signInSecondFactor?.strategy === "totp"
+      ? "Enter the latest code from your authenticator app to finish signing in."
+      : signInSecondFactor?.strategy === "backup_code"
+        ? "Use one of your recovery codes to finish signing in."
+        : "Enter the latest verification code to finish signing in."
+    : "Check your inbox and enter the latest code to finish creating your account.";
+  const canAutoSubmitVerification =
+    signInSecondFactor?.strategy !== "backup_code" || isSignUpVerificationMode;
 
   return (
     <div className="fixed inset-0 grid h-screen overflow-hidden bg-white dark:bg-[#171b1f] lg:grid-cols-[1fr_1fr]">
@@ -255,18 +455,26 @@ export function CustomAuthScreen() {
 
           <div className="mx-auto mt-12 max-w-[420px] lg:mt-16">
             <p className="text-[12px] uppercase tracking-[0.16em] text-muted-foreground">
-              {isVerificationMode ? "Verify your account" : mode === "sign-in" ? "Log in to your account" : "Create your account"}
+              {isVerificationMode
+                ? isSignInVerificationMode
+                  ? "Verify your sign-in"
+                  : "Verify your account"
+                : mode === "sign-in"
+                  ? "Log in to your account"
+                  : "Create your account"}
             </p>
             <h1 className="mt-4 text-[2.25rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[2.5rem]">
               {isVerificationMode
-                ? "Enter your verification code"
+                ? isSignInVerificationMode
+                  ? "One more step"
+                  : "Enter your verification code"
                 : mode === "sign-in"
                   ? "Welcome back"
                   : "Set up your partnership workspace"}
             </h1>
             <p className="mt-3 text-[15px] leading-7 text-muted-foreground">
               {isVerificationMode
-                ? "Check your inbox and enter the latest code to finish creating your account."
+                ? verificationBody
                 : mode === "sign-in"
                   ? "Sign in with your email or username and password."
                   : "Start with email and password. We’ll send a quick verification code after that."}
@@ -286,7 +494,7 @@ export function CustomAuthScreen() {
               </div>
             ) : null}
 
-            {mode === "sign-in" ? (
+            {mode === "sign-in" && verificationStep === "details" ? (
               <form className="mt-8 grid gap-5" onSubmit={handleSignIn}>
                 <div className="grid gap-2">
                   <label htmlFor="sign-in-email" className="text-sm font-medium text-foreground">
@@ -408,29 +616,39 @@ export function CustomAuthScreen() {
                 <div id="clerk-captcha" />
               </form>
             ) : (
-              <form className="mt-8 grid gap-5" ref={verificationFormRef} onSubmit={handleVerification}>
+              <form
+                className="mt-8 grid gap-5"
+                ref={verificationFormRef}
+                onSubmit={isSignInVerificationMode ? handleSignInVerification : handleSignUpVerification}
+              >
                 <div className="grid gap-2">
                   <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
-                    Verification code
+                    {verificationLabel}
                   </label>
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="verification-code"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      maxLength={6}
+                      type="text"
+                      inputMode={signInSecondFactor?.strategy === "backup_code" ? "text" : "numeric"}
+                      autoComplete={
+                        signInSecondFactor?.strategy === "backup_code" ? "off" : "one-time-code"
+                      }
+                      maxLength={signInSecondFactor?.strategy === "backup_code" ? undefined : 6}
                       value={verificationCode}
                       onChange={(event) => {
-                        const value = event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                        const value =
+                          signInSecondFactor?.strategy === "backup_code"
+                            ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
+                            : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
                         setVerificationCode(value);
-                        if (value.length === 6) {
+                        if (canAutoSubmitVerification && value.length === 6) {
                           // Auto-submit after a tick so React state is committed
                           setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
                         }
                       }}
                       className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
-                      placeholder="Enter the 6-digit code"
+                      placeholder={verificationPlaceholder}
                       required
                     />
                   </div>
@@ -439,10 +657,13 @@ export function CustomAuthScreen() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={!isSignUpLoaded || isSubmitting}
+                  disabled={
+                    isSubmitting ||
+                    (isSignInVerificationMode ? !isSignInLoaded : !isSignUpLoaded)
+                  }
                   className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting ? "Verifying..." : "Verify email"}
+                  {isSubmitting ? "Verifying..." : verificationButtonLabel}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
 
@@ -450,9 +671,7 @@ export function CustomAuthScreen() {
                   <button
                     type="button"
                     onClick={() => {
-                      setVerificationStep("details");
-                      setVerificationCode("");
-                      setVerificationNotice(null);
+                      resetVerificationState();
                     }}
                     className="font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
                   >
@@ -460,11 +679,20 @@ export function CustomAuthScreen() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void resendVerificationCode()}
+                    onClick={() =>
+                      void (isSignInVerificationMode
+                        ? resendSignInVerificationCode()
+                        : resendVerificationCode())
+                    }
                     disabled={isSubmitting}
                     className="font-medium text-black/60 underline underline-offset-4 transition hover:text-black disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
                   >
-                    Resend code
+                    {isSignInVerificationMode &&
+                    signInSecondFactor &&
+                    (signInSecondFactor.strategy === "totp" ||
+                      signInSecondFactor.strategy === "backup_code")
+                      ? "Need help?"
+                      : "Resend code"}
                   </button>
                 </div>
               </form>

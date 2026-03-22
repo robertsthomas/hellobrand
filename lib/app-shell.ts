@@ -35,6 +35,22 @@ export const appNavItems: AppNavItem[] = [
 export const primaryAppNavItems = appNavItems.slice(0, 5);
 export const secondaryAppNavItems = appNavItems.slice(5);
 
+export function isAppNavItemActive(pathname: string, href: string) {
+  if (href === "/app") {
+    return pathname === "/app" || pathname === "/app/dashboard";
+  }
+
+  if (href === "/app/deals/history") {
+    return pathname.startsWith("/app/deals/");
+  }
+
+  if (href === "/app/settings") {
+    return pathname === "/app/settings";
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function getAppRouteMeta(pathname: string): AppRouteMeta {
   if (pathname === "/app" || pathname === "/app/dashboard") {
     return { section: "Workspace", title: "Dashboard" };

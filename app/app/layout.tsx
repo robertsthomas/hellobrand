@@ -9,6 +9,7 @@ import {
   getCachedOnboardingState,
   getCachedProfile
 } from "@/lib/cached-data";
+import { generateNotifications } from "@/lib/notifications";
 
 export default async function WorkspaceLayout({
   children
@@ -25,6 +26,7 @@ export default async function WorkspaceLayout({
   const isOnboardingComplete =
     !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;
+  const notifications = generateNotifications(dealAggregates);
 
   // Show full-screen onboarding flow instead of the app
   if (!isOnboardingComplete) {
@@ -45,6 +47,7 @@ export default async function WorkspaceLayout({
       <AppFrame
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}
+        notifications={notifications}
         onboardingComplete
       >
         {children}

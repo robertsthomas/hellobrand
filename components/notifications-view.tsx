@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -10,10 +10,15 @@ import {
   FileText,
   Settings
 } from "lucide-react";
-import type { NotificationItem, NotificationType } from "@/app/app/settings/notifications/page";
 import { Button } from "@/components/ui/button";
-
-const STORAGE_KEY = "hellobrand:notifications:read";
+import {
+  formatNotificationRelativeTime,
+  NOTIFICATIONS_READ_EVENT,
+  loadReadNotificationIds,
+  persistReadNotificationIds,
+  type NotificationItem,
+  type NotificationType
+} from "@/lib/notifications";
 
 type FilterTab = "all" | "unread" | "payments" | "deadlines" | "risks";
 
@@ -43,42 +48,6 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   payment_received: "text-emerald-500"
 };
 
-function loadReadIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function persistReadIds(ids: Set<string>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
-  } catch {
-    // localStorage unavailable
-  }
-}
-
-function relativeTime(dateString: string): string {
-  const now = Date.now();
-  const then = new Date(dateString).getTime();
-  const diffMs = now - then;
-  const diffMinutes = Math.floor(diffMs / 60_000);
-  const diffHours = Math.floor(diffMs / 3_600_000);
-  const diffDays = Math.floor(diffMs / 86_400_000);
-
-  if (diffMinutes < 1) return "Just now";
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric"
-  });
-}
-
 function matchesFilter(
   item: NotificationItem,
   filter: FilterTab,
@@ -106,14 +75,26 @@ export function NotificationsView({
   notifications: NotificationItem[];
 }) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
-  const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
+  const [readIds, setReadIds] = useState<Set<string>>(loadReadNotificationIds);
+
+  useEffect(() => {
+    const syncReadIds = () => setReadIds(loadReadNotificationIds());
+
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
+    window.addEventListener("storage", syncReadIds);
+
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
+      window.removeEventListener("storage", syncReadIds);
+    };
+  }, []);
 
   const markRead = useCallback(
     (id: string) => {
       setReadIds((prev) => {
         const next = new Set(prev);
         next.add(id);
-        persistReadIds(next);
+        persistReadNotificationIds(next);
         return next;
       });
     },
@@ -123,14 +104,14 @@ export function NotificationsView({
   const markAllRead = useCallback(() => {
     setReadIds(() => {
       const next = new Set(notifications.map((n) => n.id));
-      persistReadIds(next);
+      persistReadNotificationIds(next);
       return next;
     });
   }, [notifications]);
 
   const clearRead = useCallback(() => {
     setReadIds(() => {
-      persistReadIds(new Set());
+      persistReadNotificationIds(new Set());
       return new Set();
     });
   }, []);
@@ -239,7 +220,7 @@ export function NotificationsView({
 
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-xs text-muted-foreground">
-                    {relativeTime(item.createdAt)}
+                    {formatNotificationRelativeTime(item.createdAt)}
                   </span>
                   <Link
                     href={`/app/deals/${item.dealId}`}

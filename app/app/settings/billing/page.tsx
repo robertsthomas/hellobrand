@@ -57,6 +57,18 @@ function billingIntro(options: {
   return "Choose the plan that fits how you manage brand partnerships.";
 }
 
+function moneyOrLabel(amount: number | null, currency = "USD", fallback = "Unavailable") {
+  if (amount === null) {
+    return fallback;
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
 export default async function BillingSettingsPage({
   searchParams
 }: {
@@ -235,6 +247,160 @@ export default async function BillingSettingsPage({
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-black/[0.06] bg-white shadow-panel">
+        <div className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
+                Billing insights
+              </p>
+              <h3 className="mt-2 flex items-center gap-1 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                Brand earnings versus HelloBrand cost
+                <InfoTooltip
+                  label="Disclaimer"
+                  content={overview.insights.disclaimer}
+                />
+              </h3>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                A simple creator-facing financial snapshot based on tracked deal payments and
+                current HelloBrand pricing.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-black/[0.06] bg-[#faf8f4] px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                Paid from brands
+              </p>
+              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+                {moneyOrLabel(
+                  overview.insights.paidToDateTotal,
+                  overview.insights.earningsCurrency ?? "USD",
+                  "Mixed currencies"
+                )}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tracked revenue marked paid across your deal records.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                Outstanding from brands
+              </p>
+              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+                {moneyOrLabel(
+                  overview.insights.outstandingTotal,
+                  overview.insights.earningsCurrency ?? "USD",
+                  "Mixed currencies"
+                )}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Includes invoiced, awaiting payment, and late payout states.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                HelloBrand cost
+              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-xl font-semibold tracking-[-0.04em] text-foreground">
+                  {moneyOrLabel(overview.insights.monthlyPlanCostUsd, "USD")}
+                  <span className="ml-2 text-sm font-medium text-muted-foreground">monthly</span>
+                </p>
+                <p className="text-xl font-semibold tracking-[-0.04em] text-foreground">
+                  {moneyOrLabel(overview.insights.yearlyPlanCostUsd, "USD")}
+                  <span className="ml-2 text-sm font-medium text-muted-foreground">yearly</span>
+                </p>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Based on your current HelloBrand plan pricing.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                This month
+              </p>
+              <div className="mt-3 grid gap-2 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Paid from brands</span>
+                  <span className="font-medium text-foreground">
+                    {moneyOrLabel(
+                      overview.insights.currentMonthPaidTotal,
+                      overview.insights.earningsCurrency ?? "USD",
+                      "Mixed currencies"
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">HelloBrand monthly cost</span>
+                  <span className="font-medium text-foreground">
+                    {moneyOrLabel(overview.insights.monthlyPlanCostUsd, "USD")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] pt-2">
+                  <span className="text-muted-foreground">Net after plan cost</span>
+                  <span className="font-semibold text-foreground">
+                    {moneyOrLabel(
+                      overview.insights.currentMonthNetAfterPlanCostUsd,
+                      "USD",
+                      "Hidden"
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                Year view
+              </p>
+              <div className="mt-3 grid gap-2 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">Paid from brands (YTD)</span>
+                  <span className="font-medium text-foreground">
+                    {moneyOrLabel(
+                      overview.insights.yearToDatePaidTotal,
+                      overview.insights.earningsCurrency ?? "USD",
+                      "Mixed currencies"
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-muted-foreground">HelloBrand yearly cost</span>
+                  <span className="font-medium text-foreground">
+                    {moneyOrLabel(overview.insights.yearlyPlanCostUsd, "USD")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] pt-2">
+                  <span className="text-muted-foreground">YTD minus yearly cost</span>
+                  <span className="font-semibold text-foreground">
+                    {moneyOrLabel(
+                      overview.insights.yearToDateNetAfterPlanCostUsd,
+                      "USD",
+                      "Hidden"
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {overview.insights.comparisonNotice ? (
+            <p className="mt-4 text-sm text-amber-700">{overview.insights.comparisonNotice}</p>
+          ) : null}
+
+          <p className="mt-4 text-xs leading-5 text-muted-foreground">
+            {overview.insights.methodology}
+          </p>
         </div>
       </section>
 

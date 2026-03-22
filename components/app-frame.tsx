@@ -11,7 +11,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { AssistantProvider } from "@/components/assistant-provider";
 import { GuideProvider } from "@/components/guide-provider";
 import { GuideTooltip } from "@/components/guide-tooltip";
+import { NotificationsCenter } from "@/components/notifications-center";
 import type { ProductGuideState } from "@/lib/types";
+import type { NotificationItem } from "@/lib/notifications";
 import {
   Sheet,
   SheetContent,
@@ -22,6 +24,7 @@ import {
 import { ThemeSwitch } from "@/components/theme-switch";
 import {
   getAppRouteMeta,
+  isAppNavItemActive,
   primaryAppNavItems,
   secondaryAppNavItems
 } from "@/lib/app-shell";
@@ -31,11 +34,13 @@ export function AppFrame({
   children,
   guideState,
   hasActiveWorkspace,
+  notifications,
   onboardingComplete
 }: {
   children: ReactNode;
   guideState?: ProductGuideState;
   hasActiveWorkspace?: boolean;
+  notifications?: NotificationItem[];
   onboardingComplete?: boolean;
 }) {
   const pathname = usePathname();
@@ -88,12 +93,7 @@ export function AppFrame({
 
   const renderNavItem = (item: (typeof primaryAppNavItems)[number]) => {
     const Icon = item.icon;
-    const active =
-      item.href === "/app"
-        ? pathname === "/app" || pathname === "/app/dashboard"
-        : item.href === "/app/deals/history"
-          ? pathname.startsWith("/app/deals/")
-          : pathname.startsWith(item.href);
+    const active = isAppNavItemActive(pathname, item.href);
 
     const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
 
@@ -260,12 +260,7 @@ export function AppFrame({
                 <nav className="space-y-1">
                   {primaryAppNavItems.map((item) => {
                     const Icon = item.icon;
-                    const active =
-                      item.href === "/app"
-                        ? pathname === "/app" || pathname === "/app/dashboard"
-                        : item.href === "/app/deals/history"
-                          ? pathname.startsWith("/app/deals/")
-                          : pathname.startsWith(item.href);
+                    const active = isAppNavItemActive(pathname, item.href);
                     return (
                       <Link
                         key={item.href}
@@ -293,7 +288,7 @@ export function AppFrame({
                 <div className="space-y-1">
                   {secondaryAppNavItems.map((item) => {
                     const Icon = item.icon;
-                    const active = pathname.startsWith(item.href);
+                    const active = isAppNavItemActive(pathname, item.href);
                     return (
                       <Link
                         key={item.href}
@@ -355,6 +350,7 @@ export function AppFrame({
             </div>
 
             <div className="flex items-center gap-2 lg:gap-3">
+              <NotificationsCenter notifications={notifications ?? []} />
               <ThemeSwitch iconOnly />
             </div>
           </header>
