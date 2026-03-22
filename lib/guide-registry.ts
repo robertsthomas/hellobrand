@@ -17,55 +17,14 @@ export interface GuideContext {
 }
 
 export const GUIDE_STEPS: GuideStep[] = [
+  // Sidebar tour — shown first on dashboard for new users
   {
-    id: "add_first_documents",
-    title: "Add your first documents",
-    body: "Upload a contract, brief, or email thread. HelloBrand will extract terms, flag risks, and build your workspace.",
-    anchorSelector: '[data-guide="add-documents"]',
-    routeMatch: "/app",
-    side: "bottom",
-    autoCompleteCondition: (ctx) => ctx.hasActiveWorkspace
-  },
-  {
-    id: "create_another_workspace",
-    title: "Create another workspace",
-    body: "Each partnership gets its own workspace. Use this button to start a new one anytime.",
+    id: "sidebar_new_workspace",
+    title: "Create a new workspace",
+    body: "Each partnership gets its own workspace. Upload contracts, briefs, or emails to get started.",
     anchorSelector: '[data-guide="sidebar-new-workspace"]',
     routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right",
-    eligibility: (ctx) => ctx.hasActiveWorkspace
-  },
-  {
-    id: "workspace_tabs_intro",
-    title: "Explore your workspace tabs",
-    body: "Each workspace has tabs for the overview, terms, risks, deliverables, brief, emails, documents, and notes.",
-    anchorSelector: '[data-guide="workspace-tabs"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
-  },
-  {
-    id: "brief_tab_tip",
-    title: "Check the brief tab",
-    body: "If your deal includes a campaign brief, you'll find the extracted creative direction, requirements, and timelines here.",
-    anchorSelector: '[data-guide="tab-brief"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
-  },
-  {
-    id: "documents_tab_tip",
-    title: "Manage your documents",
-    body: "View, re-upload, or add new documents to your workspace. HelloBrand re-analyzes terms when you add new files.",
-    anchorSelector: '[data-guide="tab-documents"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
-  },
-  {
-    id: "emails_tab_tip",
-    title: "Connected email insights",
-    body: "When you connect your email, HelloBrand tracks brand communications, surfaces action items, and suggests term updates.",
-    anchorSelector: '[data-guide="tab-emails"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
+    side: "right"
   },
   {
     id: "sidebar_inbox",
@@ -98,6 +57,58 @@ export const GUIDE_STEPS: GuideStep[] = [
     anchorSelector: '[data-guide="sidebar-settings"]',
     routeMatch: /^\/app(\/dashboard)?$/,
     side: "right"
+  },
+  // Add documents — shown on intake/new workspace page
+  {
+    id: "add_first_documents",
+    title: "Add your first documents",
+    body: "Upload a contract, brief, or email thread. HelloBrand will extract terms, flag risks, and build your workspace.",
+    anchorSelector: '[data-guide="add-documents"]',
+    routeMatch: "/app",
+    side: "bottom",
+    autoCompleteCondition: (ctx) => ctx.hasActiveWorkspace
+  },
+  // AI assistant — shown on any app route
+  {
+    id: "assistant_intro",
+    title: "Meet your AI assistant",
+    body: "Ask questions about your deals, draft negotiation emails, or get help understanding contract terms. Available anywhere in the app.",
+    anchorSelector: '[data-guide="assistant-fab"]',
+    routeMatch: "/app",
+    side: "top"
+  },
+  // Deal workspace tabs — shown when viewing a deal
+  {
+    id: "workspace_tabs_intro",
+    title: "Explore your workspace tabs",
+    body: "Each workspace has tabs for the overview, terms, risks, deliverables, brief, emails, documents, and notes.",
+    anchorSelector: '[data-guide="workspace-tabs"]',
+    routeMatch: /^\/app\/deals\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "brief_tab_tip",
+    title: "Check the brief tab",
+    body: "If your deal includes a campaign brief, you'll find the extracted creative direction, requirements, and timelines here.",
+    anchorSelector: '[data-guide="tab-brief"]',
+    routeMatch: /^\/app\/deals\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "documents_tab_tip",
+    title: "Manage your documents",
+    body: "View, re-upload, or add new documents to your workspace. HelloBrand re-analyzes terms when you add new files.",
+    anchorSelector: '[data-guide="tab-documents"]',
+    routeMatch: /^\/app\/deals\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "emails_tab_tip",
+    title: "Connected email insights",
+    body: "When you connect your email, HelloBrand tracks brand communications, surfaces action items, and suggests term updates.",
+    anchorSelector: '[data-guide="tab-emails"]',
+    routeMatch: /^\/app\/deals\/[^/]+$/,
+    side: "bottom"
   }
 ];
 

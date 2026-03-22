@@ -188,6 +188,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       <button
         type="button"
         onClick={() => openAssistant()}
+        data-guide="assistant-fab"
         className="group fixed bottom-6 right-6 z-40 inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-ocean text-sm font-semibold text-white shadow-[0_18px_40px_rgba(14,116,144,0.35)] transition-[width,transform] duration-300 ease-out hover:w-[132px] hover:translate-y-[-1px] dark:border-white/10"
         aria-label="Open assistant"
       >

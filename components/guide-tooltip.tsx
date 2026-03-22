@@ -139,7 +139,7 @@ function getArrowStyle(side: Side, anchorMid: number): React.CSSProperties {
 }
 
 const TOOLTIP_WIDTH = 288; // w-72
-const TOOLTIP_HEIGHT_ESTIMATE = 160;
+const TOOLTIP_HEIGHT_ESTIMATE = 210;
 const PADDING = 12;
 
 function clamp(value: number, min: number, max: number) {
