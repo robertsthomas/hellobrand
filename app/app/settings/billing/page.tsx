@@ -258,6 +258,10 @@ export default async function BillingSettingsPage({
         <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
           Compare plans
         </h3>
+        <p className="mb-5 max-w-[42rem] text-sm leading-6 text-muted-foreground">
+          Choose the level of support that matches how often you manage paid partnerships.
+          For many creators, one organized partnership can cover multiple months of HelloBrand.
+        </p>
         <div className="grid gap-4 lg:grid-cols-3">
           {overview.planCatalog.map((plan) => {
             const isCurrentPlan = overview.currentPlanTier === plan.tier;
@@ -344,6 +348,9 @@ export default async function BillingSettingsPage({
             );
           })}
         </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          The goal is simple: protect more value than your plan costs.
+        </p>
       </section>
     </div>
   );

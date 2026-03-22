@@ -9,6 +9,9 @@ import { ChevronRight, Hand, Menu, Search } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { AssistantProvider } from "@/components/assistant-provider";
+import { GuideProvider } from "@/components/guide-provider";
+import { GuideTooltip } from "@/components/guide-tooltip";
+import type { ProductGuideState } from "@/lib/types";
 import {
   Sheet,
   SheetContent,
@@ -25,9 +28,15 @@ import {
 import { cn } from "@/lib/utils";
 
 export function AppFrame({
-  children
+  children,
+  guideState,
+  hasActiveWorkspace,
+  onboardingComplete
 }: {
   children: ReactNode;
+  guideState?: ProductGuideState;
+  hasActiveWorkspace?: boolean;
+  onboardingComplete?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -86,10 +95,13 @@ export function AppFrame({
           ? pathname.startsWith("/app/deals/")
           : pathname.startsWith(item.href);
 
+    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
+
     return (
       <Link
         key={item.href}
         href={item.href}
+        data-guide={guideId}
         className={cn(
           "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
           active
@@ -108,8 +120,21 @@ export function AppFrame({
     );
   };
 
+  const guideWrapper = onboardingComplete && guideState
+    ? (content: ReactNode) => (
+        <GuideProvider
+          initialGuideState={guideState}
+          hasActiveWorkspace={hasActiveWorkspace ?? false}
+        >
+          {content}
+          <GuideTooltip />
+        </GuideProvider>
+      )
+    : (content: ReactNode) => content;
+
   return (
     <AssistantProvider>
+      {guideWrapper(
       <div className="h-screen overflow-hidden bg-white dark:bg-[#0f1115]">
       <div className="flex h-full overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
@@ -162,6 +187,7 @@ export function AppFrame({
             <div className="space-y-3">
               <Link
                 href="/app/intake/new"
+                data-guide="sidebar-new-workspace"
                 className={cn(
                   buttonVariants({ size: "sm" }),
                   "h-11 w-full justify-between px-4"
@@ -345,6 +371,7 @@ export function AppFrame({
         </div>
       </div>
       </div>
+      )}
     </AssistantProvider>
   );
 }

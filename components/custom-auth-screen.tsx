@@ -404,6 +404,8 @@ export function CustomAuthScreen() {
                   {isSubmitting ? "Creating account..." : "Create account"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
+
+                <div id="clerk-captcha" />
               </form>
             ) : (
               <form className="mt-8 grid gap-5" ref={verificationFormRef} onSubmit={handleVerification}>

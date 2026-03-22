@@ -32,6 +32,9 @@ export function BillingUpgradePanel({
         {humanizeToken(recommendedTier)}
       </h2>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">{recommendation}</p>
+      <p className="mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground">
+        Upgrade when the extra support clearly earns its place in your workflow.
+      </p>
 
       {hasActiveSubscription ? (
         <form action={openBillingPortalAction} className="mt-6">

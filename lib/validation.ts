@@ -261,6 +261,24 @@ export const paymentRecordInputSchema = z.object({
   source: z.string().max(120).nullable().optional()
 });
 
+export const onboardingProfileSubmitSchema = z.object({
+  displayName: z.string().min(1, "Name is required.").max(120),
+  contactEmail: z.string().email("Valid email is required."),
+  primaryHandle: z.string().min(1, "Handle is required.").max(120),
+  selectedPlatforms: z
+    .array(z.string().min(1))
+    .min(1, "Select at least one platform."),
+  platformHandles: z.record(z.string(), z.string().max(120)),
+  contentCategory: z.string().min(1, "Content category is required.").max(120),
+  bio: z.string().max(500).nullable().optional(),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()
+});
+
+export const onboardingGuideUpdateSchema = z.object({
+  stepId: z.string().min(1),
+  action: z.enum(["dismiss", "complete"])
+});
+
 export const profileInputSchema = z.object({
   displayName: z.string().max(120).nullable(),
   creatorLegalName: z.string().max(120).nullable(),

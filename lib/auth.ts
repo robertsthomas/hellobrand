@@ -82,20 +82,49 @@ async function upsertViewerFromSession() {
 
   const effectiveEmail = realEmail ?? defaults.email;
 
-  const user = await prisma.user.upsert({
-    where: { id: session.userId },
-    update: {
-      // Only overwrite the DB email when we have a real one from Clerk,
-      // so we never regress a good address back to the @clerk.local fallback
-      ...(realEmail ? { email: realEmail } : {}),
-      displayName: metaDisplayName ?? defaults.displayName
-    },
-    create: {
-      id: session.userId,
-      email: effectiveEmail,
-      displayName: metaDisplayName ?? defaults.displayName
+  let user;
+
+  try {
+    user = await prisma.user.upsert({
+      where: { id: session.userId },
+      update: {
+        // Only overwrite the DB email when we have a real one from Clerk,
+        // so we never regress a good address back to the @clerk.local fallback
+        ...(realEmail ? { email: realEmail } : {}),
+        displayName: metaDisplayName ?? defaults.displayName
+      },
+      create: {
+        id: session.userId,
+        email: effectiveEmail,
+        displayName: metaDisplayName ?? defaults.displayName
+      }
+    });
+  } catch (error) {
+    // Handle unique constraint on email — another Clerk user ID owns this
+    // email. Find the existing row and update it with the new session ID,
+    // or just fetch by ID if the row was already created concurrently.
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      user = await prisma.user.findUnique({ where: { id: session.userId } });
+
+      if (!user) {
+        // The email conflict is from a different user row — reassign it
+        user = await prisma.user.update({
+          where: { email: effectiveEmail },
+          data: {
+            id: session.userId,
+            displayName: metaDisplayName ?? defaults.displayName
+          }
+        });
+      }
+    } else {
+      throw error;
     }
-  });
+  }
 
   return {
     id: user.id,

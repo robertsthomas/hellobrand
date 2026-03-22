@@ -278,6 +278,15 @@ export default async function LandingPage() {
         {/* ── Final CTA ── */}
         <section className="bg-primary dark:bg-[#1a3d30]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 text-center sm:px-6 md:py-20 lg:px-8 lg:py-24">
+            <div className="mx-auto max-w-[44rem] rounded-[1.5rem] border border-white/14 bg-white/[0.08] px-5 py-4 text-left shadow-sm backdrop-blur-sm sm:px-6">
+              <p className="text-sm font-medium text-white/90">
+                For many creators, one paid partnership can cover multiple months of HelloBrand.
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-white/72">
+                A missed clause, delayed payment, or messy thread can cost more than staying
+                organized from the start.
+              </p>
+            </div>
             <h2 className="mx-auto max-w-[18ch] text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-white sm:text-[2.4rem] md:text-[3rem]">
               Start your next partnership in a workspace that makes sense.
             </h2>

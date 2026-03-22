@@ -211,7 +211,7 @@ async function DealDetailContent({
         ) : null}
 
         <Tabs defaultValue={currentTab} className="gap-6">
-          <TabsList className="h-auto flex-wrap overflow-x-auto rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
+          <TabsList data-guide="workspace-tabs" className="h-auto flex-wrap overflow-x-auto rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
             <TabsTrigger value="overview" className="px-4 py-2">
               Overview
             </TabsTrigger>
@@ -224,13 +224,13 @@ async function DealDetailContent({
             <TabsTrigger value="deliverables" className="px-4 py-2">
               Deliverables
             </TabsTrigger>
-            <TabsTrigger value="brief" className="px-4 py-2">
+            <TabsTrigger value="brief" data-guide="tab-brief" className="px-4 py-2">
               Brief
             </TabsTrigger>
-            <TabsTrigger value="emails" className="px-4 py-2">
+            <TabsTrigger value="emails" data-guide="tab-emails" className="px-4 py-2">
               Emails
             </TabsTrigger>
-            <TabsTrigger value="documents" className="px-4 py-2">
+            <TabsTrigger value="documents" data-guide="tab-documents" className="px-4 py-2">
               Documents
             </TabsTrigger>
             <TabsTrigger value="notes" className="px-4 py-2">

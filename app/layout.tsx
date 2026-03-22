@@ -12,6 +12,7 @@ import { Suspense, type ReactNode } from "react";
 import "@/app/globals.css";
 import { Show } from "@/components/clerk-show";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -43,7 +44,10 @@ async function AppProviders({ children }: { children: ReactNode }) {
           <UserButton />
         </Show>
       </header>
-      <ThemeProvider>{children}</ThemeProvider>
+      <ThemeProvider>
+        {children}
+        <Toaster position="bottom-right" richColors closeButton />
+      </ThemeProvider>
     </ClerkProvider>
   );
 }

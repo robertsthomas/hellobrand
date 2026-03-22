@@ -800,6 +800,23 @@ export interface ProfileRecord {
   updatedAt: string;
 }
 
+export interface ProductGuideState {
+  dismissedStepIds: string[];
+  completedStepIds: string[];
+}
+
+export interface OnboardingStateRecord {
+  id: string;
+  userId: string;
+  profileOnboardingCompletedAt: string | null;
+  profileOnboardingVersion: number;
+  profileOnboardingStateJson: unknown;
+  productGuideVersion: number;
+  productGuideStateJson: ProductGuideState;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProfileAuditRecord {
   id: string;
   profileId: string;

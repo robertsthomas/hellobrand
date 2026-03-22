@@ -70,6 +70,15 @@ export async function getCachedProfile(viewer: Viewer) {
   return getProfileForViewer(viewer);
 }
 
+export async function getCachedOnboardingState(viewer: Viewer) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(`user-${viewer.id}-onboarding`);
+
+  const { getOnboardingStateForViewer } = await import("@/lib/onboarding");
+  return getOnboardingStateForViewer(viewer);
+}
+
 export async function getCachedProfileAudit(viewer: Viewer) {
   "use cache";
   cacheLife("minutes");

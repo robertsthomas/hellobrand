@@ -70,6 +70,7 @@ model User {
   assistantThreads      AssistantThread[]
   assistantSnapshots    AssistantContextSnapshot[]
   billingAccount        BillingAccount?
+  onboardingState       UserOnboardingState?
 }
 
 model Deal {
@@ -621,6 +622,20 @@ model ProfileAuditEvent {
   profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@index([profileId, createdAt])
+}
+
+model UserOnboardingState {
+  id                           String    @id @default(uuid())
+  userId                       String    @unique
+  profileOnboardingCompletedAt DateTime?
+  profileOnboardingVersion     Int       @default(0)
+  profileOnboardingStateJson   Json?
+  productGuideVersion          Int       @default(0)
+  productGuideStateJson        Json?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model IntakeSession {
