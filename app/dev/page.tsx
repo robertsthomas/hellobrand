@@ -1,0 +1,27 @@
+import { notFound, redirect } from "next/navigation";
+
+import { DevDashboardClient } from "@/components/dev/dev-dashboard-client";
+import {
+  getDevDashboardSnapshot,
+  getDevDashboardViewerFromSession,
+  getRequestHost,
+  isLocalDevelopmentRequest
+} from "@/lib/dev-dashboard";
+
+export default async function DevDashboardPage() {
+  const host = await getRequestHost();
+
+  if (!isLocalDevelopmentRequest(host)) {
+    notFound();
+  }
+
+  const viewer = await getDevDashboardViewerFromSession();
+
+  if (!viewer) {
+    redirect("/login");
+  }
+
+  const snapshot = await getDevDashboardSnapshot();
+
+  return <DevDashboardClient viewer={viewer} snapshot={snapshot} />;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Info } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,7 +15,9 @@ export function AppTooltip({
   delayDuration = 250,
   side = "top",
   sideOffset = 6,
-  className
+  className,
+  open,
+  onOpenChange
 }: {
   children: ReactNode;
   content: ReactNode;
@@ -23,10 +25,12 @@ export function AppTooltip({
   side?: "top" | "right" | "bottom" | "left";
   sideOffset?: number;
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
     <TooltipProvider delayDuration={delayDuration}>
-      <Tooltip>
+      <Tooltip open={open} onOpenChange={onOpenChange}>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent
           side={side}
@@ -52,11 +56,80 @@ export function InfoTooltip({
   className?: string;
   delayDuration?: number;
 }) {
+  const [open, setOpen] = useState(false);
+  const [isTouchLikeDevice, setIsTouchLikeDevice] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+    const update = () => {
+      setIsTouchLikeDevice(mediaQuery.matches);
+    };
+
+    update();
+
+    const addListener = mediaQuery.addEventListener?.bind(mediaQuery);
+    const removeListener = mediaQuery.removeEventListener?.bind(mediaQuery);
+
+    if (addListener && removeListener) {
+      addListener("change", update);
+      return () => removeListener("change", update);
+    }
+
+    mediaQuery.addListener(update);
+    return () => mediaQuery.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    if (!open || !isTouchLikeDevice) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!triggerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleScroll = () => {
+      setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", handleScroll, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [isTouchLikeDevice, open]);
+
   return (
-    <AppTooltip content={content} delayDuration={delayDuration} sideOffset={8}>
+    <AppTooltip
+      content={content}
+      delayDuration={delayDuration}
+      sideOffset={8}
+      open={isTouchLikeDevice ? open : undefined}
+      onOpenChange={isTouchLikeDevice ? setOpen : undefined}
+    >
       <button
+        ref={triggerRef}
         type="button"
         aria-label={label}
+        aria-expanded={isTouchLikeDevice ? open : undefined}
+        onClick={(event) => {
+          if (!isTouchLikeDevice) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen((current) => !current);
+        }}
         className={cn(
           "inline-flex h-8 w-8 items-center justify-center text-[#98a2b3] transition hover:text-foreground dark:text-[#8f98a6]",
           className

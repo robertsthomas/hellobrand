@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -8,66 +8,148 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useGuide } from "@/components/guide-provider";
 
+function findVisibleGuideAnchor(selector: string) {
+  const elements = Array.from(document.querySelectorAll(selector));
+
+  return (
+    elements.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }) ?? null
+  );
+}
+
+function getScrollParents(element: Element) {
+  const parents: Array<Element | Window> = [window];
+  let current = element.parentElement;
+
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const overflowX = style.overflowX;
+    const isScrollable =
+      /(auto|scroll|overlay)/.test(overflowY) ||
+      /(auto|scroll|overlay)/.test(overflowX);
+
+    if (isScrollable) {
+      parents.push(current);
+    }
+
+    current = current.parentElement;
+  }
+
+  return parents;
+}
+
+function isInViewport(rect: DOMRect) {
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < window.innerHeight &&
+    rect.left < window.innerWidth
+  );
+}
+
 export function GuideTooltip() {
-  const { activeStep, dismissStep } = useGuide();
+  const { activeStep, remainingCount, isMobile, dismissStep, skipAll } = useGuide();
+  const isLast = remainingCount <= 1;
+  const [displayedStep, setDisplayedStep] = useState(activeStep);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [mounted, setMounted] = useState(false);
-  const observerRef = useRef<ResizeObserver | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+
     if (!activeStep) {
+      setDisplayedStep(null);
       setAnchorRect(null);
       return;
     }
 
-    const findAndTrack = () => {
-      const element = document.querySelector(activeStep.anchorSelector);
-      if (!element) {
+    let cancelled = false;
+
+    const attachToAnchor = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const element = findVisibleGuideAnchor(activeStep.anchorSelector);
+
+      if (!element || element.getBoundingClientRect().width <= 0) {
+        setDisplayedStep(null);
         setAnchorRect(null);
         return;
       }
 
-      const update = () => setAnchorRect(element.getBoundingClientRect());
+      const initialRect = element.getBoundingClientRect();
+      if (!isInViewport(initialRect)) {
+        element.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: "smooth"
+        });
+      }
+
+      const update = () => {
+        setDisplayedStep(activeStep);
+        setAnchorRect(element.getBoundingClientRect());
+      };
       update();
 
-      observerRef.current?.disconnect();
       const observer = new ResizeObserver(update);
       observer.observe(element);
-      observerRef.current = observer;
 
-      window.addEventListener("scroll", update, { passive: true });
+      const scrollParents = getScrollParents(element);
+      for (const parent of scrollParents) {
+        parent.addEventListener("scroll", update, { passive: true });
+      }
       window.addEventListener("resize", update, { passive: true });
 
-      return () => {
+      const settleTimer = window.setTimeout(update, 250);
+
+      cleanupRef.current = () => {
         observer.disconnect();
-        window.removeEventListener("scroll", update);
+        for (const parent of scrollParents) {
+          parent.removeEventListener("scroll", update);
+        }
         window.removeEventListener("resize", update);
+        window.clearTimeout(settleTimer);
       };
     };
 
-    // Small delay to ensure DOM is rendered after navigation
-    const timer = setTimeout(findAndTrack, 150);
+    const frame = window.requestAnimationFrame(attachToAnchor);
+
     return () => {
-      clearTimeout(timer);
-      observerRef.current?.disconnect();
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      cleanupRef.current?.();
+      cleanupRef.current = null;
     };
   }, [activeStep]);
 
-  if (!mounted || !activeStep || !anchorRect) return null;
+  if (!mounted || !displayedStep || !anchorRect || isMobile) return null;
 
-  const preferredSide = activeStep.side ?? "right";
+  const handleDismiss = () => {
+    dismissStep(displayedStep.id);
+  };
+
+  const preferredSide = displayedStep.side ?? "right";
   const { style: tooltipStyle, resolvedSide, anchorMid } = getTooltipPosition(anchorRect, preferredSide);
 
   return createPortal(
     <>
       {/* Pulsing highlight ring on anchor */}
       <div
-        className="pointer-events-none fixed z-[99] rounded-lg ring-2 ring-ocean/40 animate-pulse"
+        className="pointer-events-none fixed z-[98] rounded-lg ring-2 ring-ocean/40 transition-[top,left,width,height] duration-300 ease-out animate-pulse"
         style={{
           top: anchorRect.top - 2,
           left: anchorRect.left - 2,
@@ -76,10 +158,10 @@ export function GuideTooltip() {
         }}
       />
 
-      {/* Tooltip card */}
+      {/* Tooltip card — must be above the highlight ring */}
       <div
-        className="fixed z-[99] w-72 border border-black/10 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-[#1a1d24]"
-        style={tooltipStyle}
+        className="fixed z-[100] w-72 border border-black/10 bg-white p-4 shadow-lg transition-[top,left] duration-300 ease-out dark:border-white/10 dark:bg-[#1a1d24]"
+        style={{ ...tooltipStyle, touchAction: "auto" }}
       >
         {/* Arrow caret */}
         <div
@@ -88,29 +170,29 @@ export function GuideTooltip() {
         />
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-ink">
-            {activeStep.title}
+            {displayedStep.title}
           </h3>
           <button
             type="button"
-            onClick={() => dismissStep(activeStep.id)}
-            className="shrink-0 rounded-sm p-0.5 text-black/40 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
-            aria-label="Dismiss tip"
+            onClick={skipAll}
+            className="relative z-10 shrink-0 touch-manipulation rounded-sm p-2 text-black/40 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+            aria-label="Close all tips"
           >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
         <p className="mt-1.5 text-[13px] leading-5 text-black/60 dark:text-white/65">
-          {activeStep.body}
+          {displayedStep.body}
         </p>
         <button
           type="button"
-          onClick={() => dismissStep(activeStep.id)}
+          onClick={isLast ? skipAll : handleDismiss}
           className={cn(
             buttonVariants({ size: "sm" }),
-            "mt-3 h-8 w-full bg-ocean text-xs text-white hover:bg-ocean/90"
+            "relative z-10 mt-3 h-9 w-full touch-manipulation bg-primary text-xs text-primary-foreground hover:bg-primary/90"
           )}
         >
-          Got it
+          {isLast ? "Finish" : "Next"}
         </button>
       </div>
     </>,

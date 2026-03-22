@@ -20,11 +20,25 @@ import {
 
 interface GuideContextValue {
   activeStep: GuideStep | null;
+  remainingCount: number;
+  isMobile: boolean;
   dismissStep: (id: string) => void;
   completeStep: (id: string) => void;
+  skipAll: () => void;
 }
 
 const GuideCtx = createContext<GuideContextValue | null>(null);
+
+function findVisibleGuideAnchor(selector: string) {
+  const elements = Array.from(document.querySelectorAll(selector));
+
+  return (
+    elements.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }) ?? null
+  );
+}
 
 export function useGuide() {
   const ctx = useContext(GuideCtx);
@@ -37,11 +51,17 @@ export function useGuide() {
 export function GuideProvider({
   children,
   initialGuideState,
-  hasActiveWorkspace
+  hasActiveWorkspace,
+  visibilityKey,
+  onUnavailableStep,
+  onActiveStepChange
 }: {
   children: ReactNode;
   initialGuideState: ProductGuideState;
   hasActiveWorkspace: boolean;
+  visibilityKey?: string | number | boolean;
+  onUnavailableStep?: (step: GuideStep) => boolean;
+  onActiveStepChange?: (step: GuideStep | null) => void;
 }) {
   const pathname = usePathname();
 
@@ -52,18 +72,36 @@ export function GuideProvider({
     () => new Set(initialGuideState.completedStepIds)
   );
 
+  useEffect(() => {
+    setDismissedStepIds(new Set(initialGuideState.dismissedStepIds));
+    setCompletedStepIds(new Set(initialGuideState.completedStepIds));
+  }, [
+    initialGuideState.dismissedStepIds,
+    initialGuideState.completedStepIds
+  ]);
+
+  // lg breakpoint matches the sidebar visibility (hidden lg:flex)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const guideContext = useMemo(
     () => ({
       pathname,
       hasActiveWorkspace,
+      isMobile,
       dismissedStepIds,
       completedStepIds
     }),
-    [pathname, hasActiveWorkspace, dismissedStepIds, completedStepIds]
+    [pathname, hasActiveWorkspace, isMobile, dismissedStepIds, completedStepIds]
   );
 
   // Find the first eligible step whose anchor is actually visible in the DOM.
-  // On mobile the sidebar is hidden, so sidebar-anchored steps are skipped.
   const [activeStep, setActiveStep] = useState<GuideStep | null>(null);
 
   useEffect(() => {
@@ -73,10 +111,19 @@ export function GuideProvider({
       const tried = new Set<string>();
 
       while (candidate && !tried.has(candidate.id)) {
-        const el = document.querySelector(candidate.anchorSelector);
+        // On mobile, show all steps as modals — no anchor visibility check needed
+        if (isMobile) break;
+
+        const el = findVisibleGuideAnchor(candidate.anchorSelector);
         if (el && el.getBoundingClientRect().width > 0) {
           break; // anchor is visible
         }
+
+        if (onUnavailableStep?.(candidate)) {
+          setActiveStep(null);
+          return;
+        }
+
         tried.add(candidate.id);
         // Try next step by temporarily adding this one to dismissed
         const tempCtx = {
@@ -90,7 +137,11 @@ export function GuideProvider({
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [guideContext]);
+  }, [guideContext, onUnavailableStep, visibilityKey]);
+
+  useEffect(() => {
+    onActiveStepChange?.(activeStep);
+  }, [activeStep, onActiveStepChange]);
 
   // Auto-complete steps whose condition is met
   useEffect(() => {
@@ -126,9 +177,30 @@ export function GuideProvider({
     persistGuideUpdate(id, "complete");
   }, []);
 
+  const skipAll = useCallback(() => {
+    const allIds = GUIDE_STEPS.map((s) => s.id);
+    setDismissedStepIds((prev) => {
+      const next = new Set(prev);
+      allIds.forEach((id) => next.add(id));
+      return next;
+    });
+    // Persist all as dismissed
+    allIds.forEach((id) => persistGuideUpdate(id, "dismiss"));
+  }, []);
+
+  const remainingCount = useMemo(() => {
+    let count = 0;
+    for (const step of GUIDE_STEPS) {
+      if (dismissedStepIds.has(step.id) || completedStepIds.has(step.id)) continue;
+      if (step.desktopOnly && isMobile) continue;
+      count++;
+    }
+    return count;
+  }, [dismissedStepIds, completedStepIds, isMobile]);
+
   const value = useMemo(
-    () => ({ activeStep, dismissStep, completeStep }),
-    [activeStep, dismissStep, completeStep]
+    () => ({ activeStep, remainingCount, isMobile, dismissStep, completeStep, skipAll }),
+    [activeStep, remainingCount, isMobile, dismissStep, completeStep, skipAll]
   );
 
   return <GuideCtx.Provider value={value}>{children}</GuideCtx.Provider>;

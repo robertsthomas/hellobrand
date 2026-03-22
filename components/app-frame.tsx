@@ -3,13 +3,14 @@
 import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Hand, Menu, Search } from "lucide-react";
+import { ChevronRight, Hand, Menu, Plus, Search } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { AssistantProvider } from "@/components/assistant-provider";
 import { GuideProvider } from "@/components/guide-provider";
+import { GuideMobileModal } from "@/components/guide-mobile-modal";
 import { GuideTooltip } from "@/components/guide-tooltip";
 import { NotificationsCenter } from "@/components/notifications-center";
 import type { ProductGuideState } from "@/lib/types";
@@ -29,6 +30,15 @@ import {
   secondaryAppNavItems
 } from "@/lib/app-shell";
 import { cn } from "@/lib/utils";
+import type { GuideStep } from "@/lib/guide-registry";
+
+function isSidebarGuideStep(step: GuideStep | null) {
+  return Boolean(step?.anchorSelector.includes('data-guide="sidebar-'));
+}
+
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+}
 
 export function AppFrame({
   children,
@@ -51,11 +61,14 @@ export function AppFrame({
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
   const isInboxRoute = pathname === "/app/inbox";
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
+    if (!guideOpenedMobileMenu) {
+      setMobileMenuOpen(false);
+    }
+  }, [pathname, guideOpenedMobileMenu]);
 
   // Mark this device as having an account so the marketing nav shows "Go to app"
   useEffect(() => {
@@ -76,6 +89,33 @@ export function AppFrame({
     setSidebarQuery(searchParams.get("q") ?? "");
   }, [searchParams]);
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlHeight = html.style.height;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousHtmlOverscrollBehavior = html.style.overscrollBehavior;
+    const previousBodyHeight = body.style.height;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+
+    html.style.height = "100%";
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.height = "100%";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+
+    return () => {
+      html.style.height = previousHtmlHeight;
+      html.style.overflow = previousHtmlOverflow;
+      html.style.overscrollBehavior = previousHtmlOverscrollBehavior;
+      body.style.height = previousBodyHeight;
+      body.style.overflow = previousBodyOverflow;
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+    };
+  }, []);
+
   const handleSidebarSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -90,6 +130,45 @@ export function AppFrame({
     params.set("q", normalizedQuery);
     router.push(`/app/search?${params.toString()}`);
   };
+
+  const requestGuideStepVisibility = useCallback((step: GuideStep) => {
+    if (!isSidebarGuideStep(step) || !isMobileViewport()) {
+      return false;
+    }
+
+    setGuideOpenedMobileMenu(true);
+    setMobileMenuOpen(true);
+    return true;
+  }, []);
+
+  const handleGuideActiveStepChange = useCallback((step: GuideStep | null) => {
+    if (!guideOpenedMobileMenu) {
+      return;
+    }
+
+    if (!step) {
+      return;
+    }
+
+    if (isSidebarGuideStep(step)) {
+      return;
+    }
+
+    setGuideOpenedMobileMenu(false);
+    setMobileMenuOpen(false);
+  }, [guideOpenedMobileMenu]);
+
+  const handleMobileMenuOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen && guideOpenedMobileMenu) {
+      return;
+    }
+
+    setMobileMenuOpen(nextOpen);
+
+    if (!nextOpen) {
+      setGuideOpenedMobileMenu(false);
+    }
+  }, [guideOpenedMobileMenu]);
 
   const renderNavItem = (item: (typeof primaryAppNavItems)[number]) => {
     const Icon = item.icon;
@@ -125,9 +204,13 @@ export function AppFrame({
         <GuideProvider
           initialGuideState={guideState}
           hasActiveWorkspace={hasActiveWorkspace ?? false}
+          visibilityKey={mobileMenuOpen}
+          onUnavailableStep={requestGuideStepVisibility}
+          onActiveStepChange={handleGuideActiveStepChange}
         >
           {content}
           <GuideTooltip />
+          <GuideMobileModal />
         </GuideProvider>
       )
     : (content: ReactNode) => content;
@@ -135,8 +218,8 @@ export function AppFrame({
   return (
     <AssistantProvider>
       {guideWrapper(
-      <div className="h-screen overflow-hidden bg-white dark:bg-[#0f1115]">
-      <div className="flex h-full overflow-hidden dark:bg-[#0f1115]">
+      <div className="h-dvh min-h-dvh overflow-hidden bg-white dark:bg-[#0f1115]">
+      <div className="flex h-full min-h-0 overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
           <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
             <Link href="/app" className="flex items-center gap-3">
@@ -207,11 +290,11 @@ export function AppFrame({
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
+          <Sheet open={mobileMenuOpen} onOpenChange={handleMobileMenuOpenChange}>
             <SheetContent
               side="left"
-              className="w-64 p-0 dark:bg-[#121419]"
+              className="w-64 p-0 pt-[env(safe-area-inset-top)] dark:bg-[#121419]"
               onOpenAutoFocus={(event) => {
                 event.preventDefault();
               }}
@@ -221,7 +304,7 @@ export function AppFrame({
                 <SheetDescription>App navigation and account actions.</SheetDescription>
               </SheetHeader>
               <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-                <Link href="/app" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
+                <Link href="/app" className="flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
                   <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
                     <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
                   </div>
@@ -235,7 +318,7 @@ export function AppFrame({
                 <form
                   onSubmit={(e) => {
                     handleSidebarSearch(e);
-                    setMobileMenuOpen(false);
+                    handleMobileMenuOpenChange(false);
                   }}
                   className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
                 >
@@ -246,7 +329,7 @@ export function AppFrame({
                     onChange={(event) => setSidebarQuery(event.target.value)}
                     placeholder="Search partnerships"
                     aria-label="Search partnerships"
-                    className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
+                    className="min-w-0 flex-1 self-center appearance-none border-0 bg-transparent p-0 leading-none text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
                   />
                 </form>
               </div>
@@ -261,11 +344,13 @@ export function AppFrame({
                   {primaryAppNavItems.map((item) => {
                     const Icon = item.icon;
                     const active = isAppNavItemActive(pathname, item.href);
+                    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
+                        data-guide={guideId}
+                        onClick={() => handleMobileMenuOpenChange(false)}
                         className={cn(
                           "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none",
                           active
@@ -289,11 +374,13 @@ export function AppFrame({
                   {secondaryAppNavItems.map((item) => {
                     const Icon = item.icon;
                     const active = isAppNavItemActive(pathname, item.href);
+                    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
+                        data-guide={guideId}
+                        onClick={() => handleMobileMenuOpenChange(false)}
                         className={cn(
                           "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none",
                           active
@@ -313,7 +400,8 @@ export function AppFrame({
                 <div className="space-y-3">
                   <Link
                     href="/app/intake/new"
-                    onClick={() => setMobileMenuOpen(false)}
+                    data-guide="sidebar-new-workspace"
+                    onClick={() => handleMobileMenuOpenChange(false)}
                     className={cn(buttonVariants({ size: "sm" }), "h-11 w-full justify-between px-4")}
                   >
                     <span>New workspace</span>
@@ -321,7 +409,7 @@ export function AppFrame({
                   <SignOutButton redirectUrl="/login">
                     <button
                       type="button"
-                      onClick={() => setMobileMenuOpen(false)}
+                      onClick={() => handleMobileMenuOpenChange(false)}
                       className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
                     >
                       Log out
@@ -332,38 +420,52 @@ export function AppFrame({
             </SheetContent>
           </Sheet>
 
-          <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border px-6 lg:px-8 dark:border-white/8">
-            <div className="flex min-w-0 items-center">
-              <button
-                type="button"
-                className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{meta.section}</span>
-                <ChevronRight className="h-4 w-4" />
-                <span className="truncate text-foreground">{meta.title}</span>
+          <header className="fixed inset-x-0 top-0 z-30 border-b border-border bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/90 lg:absolute dark:border-white/8 dark:bg-[#111318]/95 dark:supports-[backdrop-filter]:bg-[#111318]/90">
+            <div className="flex h-16 items-center justify-between px-6 lg:h-[72px] lg:px-8">
+              <div className="flex min-w-0 items-center">
+                <button
+                  type="button"
+                  className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
+                  onClick={() => setMobileMenuOpen(true)}
+                  aria-label="Open menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+                <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                  <span className="truncate">{meta.section}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0" />
+                  <span className="truncate text-foreground">{meta.title}</span>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 lg:gap-3">
-              <NotificationsCenter notifications={notifications ?? []} />
-              <ThemeSwitch iconOnly />
+              <div className="flex shrink-0 items-center gap-3">
+                <NotificationsCenter notifications={notifications ?? []} />
+                <ThemeSwitch iconOnly />
+              </div>
             </div>
           </header>
 
           <main
             ref={mainRef}
             className={cn(
-              "workspace-dot-grid flex-1 bg-white dark:bg-[#111318]",
-              isInboxRoute ? "overflow-hidden" : "overflow-auto"
+              "workspace-dot-grid min-h-0 flex-1 overflow-x-hidden bg-white pt-[calc(64px+env(safe-area-inset-top))] lg:pt-[72px] dark:bg-[#111318]",
+              isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"
             )}
           >
             <div className="flex h-full min-h-0 flex-col">{children}</div>
           </main>
+
+          <Link
+            href="/app/intake/new"
+            data-guide="mobile-new-workspace-fab"
+            className={cn(
+              buttonVariants({ size: "icon" }),
+              "fixed bottom-6 left-6 z-40 h-12 w-12 rounded-full shadow-[0_18px_40px_rgba(15,23,42,0.18)] lg:hidden"
+            )}
+            aria-label="Start new workspace"
+          >
+            <Plus className="h-5 w-5" />
+          </Link>
         </div>
       </div>
       </div>

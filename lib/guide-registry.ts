@@ -5,6 +5,7 @@ export interface GuideStep {
   anchorSelector: string;
   routeMatch: RegExp | string;
   side?: "top" | "bottom" | "left" | "right";
+  desktopOnly?: boolean;
   eligibility?: (ctx: GuideContext) => boolean;
   autoCompleteCondition?: (ctx: GuideContext) => boolean;
 }
@@ -12,6 +13,7 @@ export interface GuideStep {
 export interface GuideContext {
   pathname: string;
   hasActiveWorkspace: boolean;
+  isMobile: boolean;
   dismissedStepIds: Set<string>;
   completedStepIds: Set<string>;
 }
@@ -23,40 +25,45 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Create a new workspace",
     body: "Each partnership gets its own workspace. Upload contracts, briefs, or emails to get started.",
     anchorSelector: '[data-guide="sidebar-new-workspace"]',
-    routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right"
+    routeMatch: "/app",
+    side: "right",
+    desktopOnly: true // tooltip only on desktop; modal on mobile
   },
   {
     id: "sidebar_inbox",
     title: "Your inbox at a glance",
     body: "The Inbox aggregates email threads linked to your partnerships. Deal matches appear here automatically.",
     anchorSelector: '[data-guide="sidebar-inbox"]',
-    routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right"
+    routeMatch: "/app",
+    side: "right",
+    desktopOnly: true // tooltip only on desktop; modal on mobile
   },
   {
     id: "sidebar_payments",
     title: "Track your payments",
     body: "See all invoices, due dates, and payment statuses across partnerships in one place.",
     anchorSelector: '[data-guide="sidebar-payments"]',
-    routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right"
+    routeMatch: "/app",
+    side: "right",
+    desktopOnly: true // tooltip only on desktop; modal on mobile
   },
   {
     id: "sidebar_analytics",
     title: "Analytics overview",
     body: "View earnings trends, deal velocity, and portfolio insights to understand your creator business.",
     anchorSelector: '[data-guide="sidebar-analytics"]',
-    routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right"
+    routeMatch: "/app",
+    side: "right",
+    desktopOnly: true // tooltip only on desktop; modal on mobile
   },
   {
     id: "sidebar_settings",
     title: "Customize your settings",
     body: "Update your profile, notification preferences, billing, and accent color from Settings.",
     anchorSelector: '[data-guide="sidebar-settings"]',
-    routeMatch: /^\/app(\/dashboard)?$/,
-    side: "right"
+    routeMatch: "/app",
+    side: "right",
+    desktopOnly: true // tooltip only on desktop; modal on mobile
   },
   {
     id: "header_notifications",
@@ -135,6 +142,7 @@ export function getActiveGuideStep(
         : step.routeMatch.test(ctx.pathname);
 
     if (!routeMatches) continue;
+    if (step.desktopOnly && ctx.isMobile) continue;
     if (step.eligibility && !step.eligibility(ctx)) continue;
     if (step.autoCompleteCondition && step.autoCompleteCondition(ctx)) continue;
 
