@@ -59,14 +59,13 @@ describe("guide registry", () => {
     }
   });
 
-  test("add_first_documents shows after sidebar and header steps on /app routes", () => {
+  test("add_first_documents shows after sidebar steps on /app routes", () => {
     const priorIds = [
       "sidebar_new_workspace",
       "sidebar_inbox",
       "sidebar_payments",
       "sidebar_analytics",
-      "sidebar_settings",
-      "header_notifications"
+      "sidebar_settings"
     ];
     const ctx = makeContext({
       pathname: "/app/intake/new",
@@ -85,8 +84,7 @@ describe("guide registry", () => {
         "sidebar_inbox",
         "sidebar_payments",
         "sidebar_analytics",
-        "sidebar_settings",
-        "header_notifications"
+        "sidebar_settings"
       ])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);

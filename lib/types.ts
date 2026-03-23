@@ -763,6 +763,8 @@ export interface IntakeSessionRecord {
   draftNotes: string | null;
   draftPastedText: string | null;
   draftPastedTextTitle: string | null;
+  duplicateCheckStatus: "pending" | "checking" | "clean" | "duplicates_found" | null;
+  duplicateMatchJson: unknown | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -879,6 +881,7 @@ export interface DealAggregate {
   extractionEvidence: ExtractionEvidenceRecord[];
   summaries: SummaryRecord[];
   currentSummary: SummaryRecord | null;
+  intakeSession: IntakeSessionRecord | null;
 }
 
 export interface AppStore {

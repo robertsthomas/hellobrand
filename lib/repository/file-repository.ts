@@ -215,7 +215,8 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
       )
     ),
     summaries,
-    currentSummary: primarySummaries[0] ?? null
+    currentSummary: primarySummaries[0] ?? null,
+    intakeSession: null
   };
 }
 

@@ -18,6 +18,8 @@ function toIntakeSessionRecord(session: {
   draftNotes?: string | null;
   draftPastedText?: string | null;
   draftPastedTextTitle?: string | null;
+  duplicateCheckStatus?: string | null;
+  duplicateMatchJson?: unknown | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -35,6 +37,8 @@ function toIntakeSessionRecord(session: {
     draftNotes: session.draftNotes ?? null,
     draftPastedText: session.draftPastedText ?? null,
     draftPastedTextTitle: session.draftPastedTextTitle ?? null,
+    duplicateCheckStatus: (session.duplicateCheckStatus ?? null) as IntakeSessionRecord["duplicateCheckStatus"],
+    duplicateMatchJson: session.duplicateMatchJson ?? null,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: iso(session.completedAt),
@@ -162,6 +166,19 @@ export async function syncIntakeSessionForDealId(dealId: string) {
     await startNextQueuedIntakeSessionForUser(session.userId);
   }
 
+  // Trigger background duplicate check when workspace is ready
+  if (
+    nextStatus === "ready_for_confirmation" &&
+    session.status !== "ready_for_confirmation" &&
+    !session.duplicateCheckStatus
+  ) {
+    void triggerDuplicateCheck({
+      dealId,
+      userId: session.userId,
+      sessionId: session.id
+    });
+  }
+
   const refreshed = await prisma.intakeSession.findUnique({ where: { id: session.id } });
   return refreshed ? toIntakeSessionRecord(refreshed) : null;
 }
@@ -172,4 +189,68 @@ export async function getIntakeSessionRecord(sessionId: string) {
   });
 
   return session ? toIntakeSessionRecord(session) : null;
+}
+
+function hasInngestEventKey() {
+  return Boolean(process.env.INNGEST_EVENT_KEY);
+}
+
+async function triggerDuplicateCheck(input: {
+  dealId: string;
+  userId: string;
+  sessionId: string;
+}) {
+  try {
+    if (hasInngestEventKey()) {
+      const { inngest } = await import("@/lib/inngest/client");
+      await inngest.send({
+        name: "workspace/check-duplicates.requested",
+        data: input
+      });
+    } else {
+      // Inline fallback when Inngest is not configured
+      const { findDuplicateDeals } = await import("@/lib/duplicate-detection");
+
+      await prisma.intakeSession.update({
+        where: { id: input.sessionId },
+        data: { duplicateCheckStatus: "checking" }
+      });
+
+      const documents = await prisma.document.findMany({
+        where: { dealId: input.dealId },
+        select: { rawText: true, normalizedText: true, fileName: true }
+      });
+
+      const rawTexts = documents
+        .map((doc) => doc.normalizedText || doc.rawText || "")
+        .filter(Boolean);
+      const fileNames = documents.map((doc) => doc.fileName).filter(Boolean);
+
+      if (rawTexts.length === 0) {
+        await prisma.intakeSession.update({
+          where: { id: input.sessionId },
+          data: { duplicateCheckStatus: "clean" }
+        });
+        return;
+      }
+
+      const matches = (await findDuplicateDeals(input.userId, { rawTexts, fileNames }))
+        .filter((match) => match.dealId !== input.dealId);
+
+      await prisma.intakeSession.update({
+        where: { id: input.sessionId },
+        data: {
+          duplicateCheckStatus: matches.length > 0 ? "duplicates_found" : "clean",
+          duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
+        }
+      });
+    }
+  } catch (error) {
+    console.error("[triggerDuplicateCheck] Failed:", error);
+    // Non-fatal: don't block workspace flow if duplicate check fails
+    await prisma.intakeSession.update({
+      where: { id: input.sessionId },
+      data: { duplicateCheckStatus: "clean" }
+    }).catch(() => {});
+  }
 }

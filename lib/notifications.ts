@@ -7,7 +7,11 @@ export type NotificationType =
   | "contract_risk"
   | "deliverable_approved"
   | "new_contract"
-  | "payment_received";
+  | "payment_received"
+  | "workspace_generating"
+  | "workspace_ready"
+  | "workspace_failed"
+  | "workspace_duplicate_found";
 
 export interface NotificationItem {
   id: string;
@@ -113,6 +117,62 @@ export function generateNotifications(aggregates: DealAggregate[]): Notification
         dealId: deal.id,
         createdAt: doc.updatedAt
       });
+    }
+
+    const { intakeSession } = aggregate;
+    if (intakeSession) {
+      if (
+        intakeSession.status === "processing" ||
+        intakeSession.status === "queued" ||
+        intakeSession.status === "uploading"
+      ) {
+        items.push({
+          id: `workspace-generating-${deal.id}`,
+          type: "workspace_generating",
+          title: `${brandName} workspace is generating`,
+          description: "Your workspace is being analyzed. We'll notify you when it's ready.",
+          dealId: deal.id,
+          createdAt: intakeSession.updatedAt
+        });
+      }
+
+      if (
+        intakeSession.status === "ready_for_confirmation" ||
+        intakeSession.status === "completed"
+      ) {
+        items.push({
+          id: `workspace-ready-${deal.id}`,
+          type: "workspace_ready",
+          title: `${brandName} workspace is ready`,
+          description: "Your workspace has been analyzed and is ready for review.",
+          dealId: deal.id,
+          createdAt: intakeSession.updatedAt
+        });
+      }
+
+      if (intakeSession.status === "failed") {
+        items.push({
+          id: `workspace-failed-${deal.id}`,
+          type: "workspace_failed",
+          title: `${brandName} workspace processing failed`,
+          description: intakeSession.errorMessage ?? "Something went wrong processing your documents.",
+          dealId: deal.id,
+          createdAt: intakeSession.updatedAt
+        });
+      }
+
+      if (intakeSession.duplicateCheckStatus === "duplicates_found" && intakeSession.duplicateMatchJson) {
+        const matches = intakeSession.duplicateMatchJson as Array<{ brandName?: string }>;
+        const matchBrand = matches[0]?.brandName ?? "an existing workspace";
+        items.push({
+          id: `workspace-duplicate-${deal.id}`,
+          type: "workspace_duplicate_found",
+          title: `Possible duplicate: ${brandName}`,
+          description: `This workspace may overlap with ${matchBrand}. Review to merge or keep separate.`,
+          dealId: deal.id,
+          createdAt: intakeSession.updatedAt
+        });
+      }
     }
   }
 

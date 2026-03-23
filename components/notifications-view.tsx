@@ -6,9 +6,12 @@ import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
+  Copy,
   DollarSign,
   FileText,
-  Settings
+  Loader2,
+  Settings,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,11 +23,12 @@ import {
   type NotificationType
 } from "@/lib/notifications";
 
-type FilterTab = "all" | "unread" | "payments" | "deadlines" | "risks";
+type FilterTab = "all" | "unread" | "payments" | "deadlines" | "risks" | "workspaces";
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
+  { key: "workspaces", label: "Workspaces" },
   { key: "payments", label: "Payments" },
   { key: "deadlines", label: "Deadlines" },
   { key: "risks", label: "Risks" }
@@ -36,7 +40,11 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   contract_risk: AlertTriangle,
   deliverable_approved: CheckCircle2,
   new_contract: FileText,
-  payment_received: DollarSign
+  payment_received: DollarSign,
+  workspace_generating: Loader2,
+  workspace_ready: CheckCircle2,
+  workspace_failed: XCircle,
+  workspace_duplicate_found: Copy
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -45,7 +53,11 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   contract_risk: "text-amber-500",
   deliverable_approved: "text-emerald-500",
   new_contract: "text-blue-500",
-  payment_received: "text-emerald-500"
+  payment_received: "text-emerald-500",
+  workspace_generating: "text-blue-500",
+  workspace_ready: "text-emerald-500",
+  workspace_failed: "text-red-500",
+  workspace_duplicate_found: "text-amber-500"
 };
 
 function matchesFilter(
@@ -64,6 +76,13 @@ function matchesFilter(
       return item.type === "upcoming_deadline";
     case "risks":
       return item.type === "contract_risk";
+    case "workspaces":
+      return (
+        item.type === "workspace_generating" ||
+        item.type === "workspace_ready" ||
+        item.type === "workspace_failed" ||
+        item.type === "workspace_duplicate_found"
+      );
     default:
       return true;
   }
@@ -125,6 +144,13 @@ export function NotificationsView({
     const counts: Record<FilterTab, number> = {
       all: notifications.length,
       unread: notifications.filter((n) => !readIds.has(n.id)).length,
+      workspaces: notifications.filter(
+        (n) =>
+          n.type === "workspace_generating" ||
+          n.type === "workspace_ready" ||
+          n.type === "workspace_failed" ||
+          n.type === "workspace_duplicate_found"
+      ).length,
       payments: notifications.filter(
         (n) => n.type === "payment_overdue" || n.type === "payment_received"
       ).length,
@@ -200,7 +226,7 @@ export function NotificationsView({
                 className="flex items-start gap-4 border-b border-black/8 px-5 py-4 transition-colors last:border-b-0 hover:bg-[#f6f7f8] dark:border-white/8 dark:hover:bg-white/[0.04]"
               >
                 <div className={`mt-0.5 shrink-0 ${color}`}>
-                  <Icon className="h-5 w-5" />
+                  <Icon className={`h-5 w-5${item.type === "workspace_generating" ? " animate-spin" : ""}`} />
                 </div>
 
                 {isUnread ? (

@@ -461,7 +461,8 @@ export class PrismaRepository {
         riskFlags: { orderBy: { createdAt: "desc" } },
         emailDrafts: { orderBy: { updatedAt: "desc" } },
         jobs: { orderBy: { updatedAt: "desc" } },
-        summaries: { orderBy: { createdAt: "desc" } }
+        summaries: { orderBy: { createdAt: "desc" } },
+        intakeSession: true
       }
     });
 
@@ -518,7 +519,28 @@ export class PrismaRepository {
       extractionResults: extractionResults.map(toExtractionResultRecord),
       extractionEvidence: extractionEvidence.map(toEvidenceRecord),
       summaries,
-      currentSummary: primarySummaries[0] ?? null
+      currentSummary: primarySummaries[0] ?? null,
+      intakeSession: deal.intakeSession
+        ? {
+            id: deal.intakeSession.id,
+            userId: deal.intakeSession.userId,
+            dealId: deal.intakeSession.dealId,
+            status: deal.intakeSession.status as import("@/lib/types").IntakeSessionStatus,
+            errorMessage: deal.intakeSession.errorMessage,
+            inputSource: (deal.intakeSession.inputSource ?? null) as import("@/lib/types").IntakeSessionRecord["inputSource"],
+            draftBrandName: deal.intakeSession.draftBrandName,
+            draftCampaignName: deal.intakeSession.draftCampaignName,
+            draftNotes: deal.intakeSession.draftNotes,
+            draftPastedText: deal.intakeSession.draftPastedText,
+            draftPastedTextTitle: deal.intakeSession.draftPastedTextTitle,
+            duplicateCheckStatus: (deal.intakeSession.duplicateCheckStatus ?? null) as import("@/lib/types").IntakeSessionRecord["duplicateCheckStatus"],
+            duplicateMatchJson: deal.intakeSession.duplicateMatchJson ?? null,
+            createdAt: iso(deal.intakeSession.createdAt) ?? new Date().toISOString(),
+            updatedAt: iso(deal.intakeSession.updatedAt) ?? new Date().toISOString(),
+            completedAt: iso(deal.intakeSession.completedAt),
+            expiresAt: iso(deal.intakeSession.expiresAt)
+          }
+        : null
     };
   }
 

@@ -100,9 +100,20 @@ export function SettingsEditor({
     paymentRemindersEnabled: initialProfile.paymentRemindersEnabled,
     accentColor: initialProfile.accentColor ?? ""
   });
+  type SettingsForm = typeof form;
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  function updateFormField<Key extends keyof SettingsForm>(
+    key: Key,
+    value: SettingsForm[Key]
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value
+    }));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,12 +201,7 @@ export function SettingsEditor({
             <select
               id="defaultCurrency"
               value={form.defaultCurrency}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  defaultCurrency: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("defaultCurrency", event.currentTarget.value)}
               className="h-12 w-full border border-border bg-white px-4 text-[15px] text-foreground outline-none transition-colors focus:border-primary"
             >
               {["USD", "CAD", "EUR", "GBP", "AUD", "NZD"].map((currency) => (
@@ -213,12 +219,7 @@ export function SettingsEditor({
               min={0}
               max={30}
               value={form.reminderLeadDays}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  reminderLeadDays: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("reminderLeadDays", event.currentTarget.value)}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -227,12 +228,7 @@ export function SettingsEditor({
               id="preferredSignature"
               value={form.preferredSignature}
               placeholder="Best, Sarah"
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  preferredSignature: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("preferredSignature", event.currentTarget.value)}
             />
           </div>
         </div>
@@ -254,23 +250,13 @@ export function SettingsEditor({
             title="Payment reminders"
             description="Keep payment follow-up prompts enabled when invoices are due, pending, or overdue."
             checked={form.paymentRemindersEnabled}
-            onChange={(checked) =>
-              setForm((current) => ({
-                ...current,
-                paymentRemindersEnabled: checked
-              }))
-            }
+            onChange={(checked) => updateFormField("paymentRemindersEnabled", checked)}
           />
           <FlatToggleRow
             title="Conflict alerts"
             description="Flag overlapping dates, exclusivity collisions, and future category conflicts as the partnership graph gets richer."
             checked={form.conflictAlertsEnabled}
-            onChange={(checked) =>
-              setForm((current) => ({
-                ...current,
-                conflictAlertsEnabled: checked
-              }))
-            }
+            onChange={(checked) => updateFormField("conflictAlertsEnabled", checked)}
           />
         </div>
       </section>
@@ -294,9 +280,7 @@ export function SettingsEditor({
                 key={preset.hex}
                 type="button"
                 title={preset.label}
-                onClick={() =>
-                  setForm((current) => ({ ...current, accentColor: preset.hex }))
-                }
+                onClick={() => updateFormField("accentColor", preset.hex)}
                 className={`group relative flex h-11 w-11 items-center justify-center border-2 transition-all ${
                   isSelected
                     ? "border-foreground scale-110"
@@ -341,12 +325,7 @@ export function SettingsEditor({
               id="customAccentColor"
               type="color"
               value={form.accentColor || "#1a4d3e"}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  accentColor: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("accentColor", event.currentTarget.value)}
               className="h-11 w-11 cursor-pointer border border-border bg-transparent p-0.5"
             />
           </div>
@@ -354,9 +333,7 @@ export function SettingsEditor({
           {form.accentColor ? (
             <button
               type="button"
-              onClick={() =>
-                setForm((current) => ({ ...current, accentColor: "" }))
-              }
+              onClick={() => updateFormField("accentColor", "")}
               className="ml-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
             >
               Reset to default
@@ -401,12 +378,7 @@ export function SettingsEditor({
             <FlatInput
               id="settingsDisplayName"
               value={form.displayName}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  displayName: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("displayName", event.currentTarget.value)}
             />
           </div>
           <div className="space-y-2">
@@ -415,12 +387,7 @@ export function SettingsEditor({
               id="settingsContactEmail"
               type="email"
               value={form.contactEmail}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  contactEmail: event.currentTarget.value
-                }))
-              }
+              onChange={(event) => updateFormField("contactEmail", event.currentTarget.value)}
             />
           </div>
         </div>

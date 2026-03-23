@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
   Bell,
   Calendar,
   CheckCircle2,
+  Copy,
   DollarSign,
-  FileText
+  FileText,
+  Loader2,
+  XCircle
 } from "lucide-react";
 
+import { AppTooltip } from "@/components/app-tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -28,6 +33,7 @@ import {
   type NotificationItem,
   type NotificationType
 } from "@/lib/notifications";
+import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
 import { cn } from "@/lib/utils";
 
 const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
@@ -36,7 +42,11 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   contract_risk: AlertTriangle,
   deliverable_approved: CheckCircle2,
   new_contract: FileText,
-  payment_received: DollarSign
+  payment_received: DollarSign,
+  workspace_generating: Loader2,
+  workspace_ready: CheckCircle2,
+  workspace_failed: XCircle,
+  workspace_duplicate_found: Copy
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -45,7 +55,11 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   contract_risk: "text-amber-500",
   deliverable_approved: "text-emerald-500",
   new_contract: "text-blue-500",
-  payment_received: "text-emerald-500"
+  payment_received: "text-emerald-500",
+  workspace_generating: "text-blue-500",
+  workspace_ready: "text-emerald-500",
+  workspace_failed: "text-red-500",
+  workspace_duplicate_found: "text-amber-500"
 };
 
 export function NotificationsCenter({
@@ -53,7 +67,9 @@ export function NotificationsCenter({
 }: {
   notifications: NotificationItem[];
 }) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [showGenerationHint, setShowGenerationHint] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(loadReadNotificationIds);
 
   const previewItems = useMemo(() => notifications.slice(0, 6), [notifications]);
@@ -73,6 +89,33 @@ export function NotificationsCenter({
       window.removeEventListener("storage", syncReadIds);
     };
   }, []);
+
+  useEffect(() => {
+    if (pathname !== "/app") {
+      setShowGenerationHint(false);
+      return;
+    }
+
+    const shouldShowHint =
+      window.sessionStorage.getItem(
+        WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY
+      ) === "1";
+
+    if (!shouldShowHint) {
+      return;
+    }
+
+    window.sessionStorage.removeItem(WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY);
+    setShowGenerationHint(true);
+
+    const timeoutId = window.setTimeout(() => {
+      setShowGenerationHint(false);
+    }, 7000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [pathname]);
 
   const markRead = useCallback((id: string) => {
     setReadIds((prev) => {
@@ -96,19 +139,40 @@ export function NotificationsCenter({
   }, [notifications]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <button
-        type="button"
-        aria-label="Open notifications"
-        onClick={() => setOpen(true)}
-        data-guide="header-notifications"
-        className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          setShowGenerationHint(false);
+        }
+
+        setOpen(nextOpen);
+      }}
+    >
+      <AppTooltip
+        content="Check the notifications drawer for finished workspace generations."
+        delayDuration={0}
+        side="bottom"
+        sideOffset={10}
+        open={showGenerationHint}
+        onOpenChange={setShowGenerationHint}
       >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 ? (
-          <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
-        ) : null}
-      </button>
+        <button
+          type="button"
+          aria-label="Open notifications"
+          onClick={() => {
+            setShowGenerationHint(false);
+            setOpen(true);
+          }}
+          data-guide="header-notifications"
+          className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 ? (
+            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+          ) : null}
+        </button>
+      </AppTooltip>
 
       <SheetContent side="right" className="w-full gap-0 border-l border-border px-0 sm:max-w-md">
         <SheetHeader className="border-b border-border px-5 py-5">
@@ -148,7 +212,7 @@ export function NotificationsCenter({
                   <div key={item.id} className="px-5 py-4">
                     <div className="flex items-start gap-3">
                       <div className={cn("mt-0.5 shrink-0", TYPE_COLORS[item.type])}>
-                        <Icon className="h-4.5 w-4.5" />
+                        <Icon className={cn("h-4.5 w-4.5", item.type === "workspace_generating" && "animate-spin")} />
                       </div>
                       <div className="mt-1 h-2 w-2 shrink-0">
                         {isUnread ? <div className="h-2 w-2 rounded-full bg-red-500" /> : null}

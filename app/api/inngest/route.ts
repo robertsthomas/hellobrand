@@ -8,12 +8,16 @@ import {
   emailPaymentOverdueCheckFunction,
   emailRenewalSweepFunction
 } from "@/lib/inngest/email-functions";
-import { processContractFunction } from "@/lib/inngest/functions";
+import {
+  checkWorkspaceDuplicatesFunction,
+  processContractFunction
+} from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     processContractFunction,
+    checkWorkspaceDuplicatesFunction,
     emailInitialSyncFunction,
     emailIncrementalSyncFunction,
     emailRenewalSweepFunction,

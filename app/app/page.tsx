@@ -8,24 +8,19 @@ import {
   FileClock,
   FileText,
   Receipt,
-  Info,
-  Trash2
+  Info
 } from "lucide-react";
 
-import { deleteIntakeDraftAction } from "@/app/actions";
 import { AppTooltip, InfoTooltip } from "@/components/app-tooltip";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DashboardGreeting } from "@/components/dashboard-greeting";
-import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { DashboardDealsTable } from "@/components/dashboard-deals-table";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
-import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
 import { QuickActionsPanel } from "@/components/quick-actions-panel";
 import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
 import { DashboardSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealAggregates } from "@/lib/cached-data";
@@ -108,12 +103,6 @@ async function DashboardContent() {
     getCachedDealAggregates(viewer),
     listIntakeDraftsForViewer(viewer)
   ]);
-  const queuedIntakeWorkspaces = intakeDrafts.filter(
-    ({ session }) => session.status === "queued"
-  );
-  const resumableDrafts = intakeDrafts.filter(
-    ({ session }) => session.status !== "queued"
-  );
 
   const dealRows = aggregates.map((aggregate) => {
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -255,92 +244,6 @@ async function DashboardContent() {
     }
   ];
 
-  if (dealRows.length === 0) {
-    return (
-      <div className="px-5 py-6 lg:px-8 lg:py-8">
-        <div className="mx-auto max-w-[980px] space-y-10">
-          <section className="max-w-3xl border-t border-black/8 pt-6 dark:border-white/10">
-            <div className="max-w-2xl">
-              <h1 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground">
-                New workspace
-              </h1>
-              <p className="mt-3 max-w-xl text-[15px] leading-7 text-muted-foreground">
-                Add documents or pasted text for one workspace at a time. Nothing
-                is saved to intake drafts here until you start analysis.
-              </p>
-            </div>
-
-            <div className="mt-6 max-w-3xl">
-              <EmptyDashboardUpload
-                initialQueuedWorkspaces={queuedIntakeWorkspaces}
-              />
-            </div>
-          </section>
-
-          {resumableDrafts.length > 0 ? (
-            <section className="max-w-3xl border-t border-black/8 pt-6 dark:border-white/10">
-              <div className="mb-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
-                    Existing drafts
-                  </p>
-                  <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-foreground">
-                    Continue saved intake sessions
-                  </h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    These are older server-side intake sessions. They are separate
-                    from the local workspaces you stage above.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {resumableDrafts.slice(0, 3).map(({ session, deal }) => (
-                  <Card key={session.id} className="gap-0 rounded-none border-black/8 p-5 shadow-none dark:border-white/10">
-                    <div className="flex items-start justify-between gap-4">
-                      <Link
-                        href={
-                          session.status === "draft"
-                            ? `/app/intake/new?draft=${session.id}`
-                            : `/app/intake/${session.id}`
-                        }
-                        className="min-w-0 flex-1"
-                      >
-                        <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
-                          {deal.brandName}
-                        </p>
-                        <h3 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-foreground">
-                          {deal.campaignName}
-                        </h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          Last updated {formatDate(session.updatedAt)}
-                        </p>
-                      </Link>
-                      <div className="flex items-center gap-3">
-                        <Badge className={statusBadgeClass(session.status)}>
-                          {humanizeToken(session.status)}
-                        </Badge>
-                        <form action={deleteIntakeDraftAction}>
-                          <input type="hidden" name="sessionId" value={session.id} />
-                          <DeleteDraftButton
-                            className="inline-flex h-10 w-10 items-center justify-center border border-black/8 text-[#667085] transition hover:border-accent/30 hover:text-accent dark:border-white/10 dark:text-[#a3acb9]"
-                            aria-label={`Delete draft ${deal.campaignName}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </DeleteDraftButton>
-                        </form>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-6">
@@ -429,50 +332,58 @@ async function DashboardContent() {
                   </div>
 
                   <div className="border-t border-black/8 dark:border-white/10">
-                    <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] border-b border-black/8 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:border-white/10 dark:text-[#8f98a6]">
-                      <span>Partnership</span>
-                      <span>Stage</span>
-                      <span>Payment</span>
-                      <span>Next due</span>
-                      <span />
-                    </div>
-
-                    {dealRows.slice(0, 6).map((deal) => (
-                      <div
-                        key={deal.id}
-                        className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 transition-colors hover:bg-[#f6f7f8] md:grid md:grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] md:items-center dark:border-white/8 dark:hover:bg-white/[0.04]"
-                      >
-                        <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
-                          <p className="truncate text-base font-semibold text-foreground">
-                            {deal.campaignName}
-                          </p>
-                          <p className="mt-1 truncate text-sm text-muted-foreground">
-                            {deal.brandName}
-                          </p>
-                        </Link>
-                        <div className="flex items-center justify-between md:block">
-                          <span className="text-xs text-muted-foreground md:hidden">Stage</span>
-                          <Badge className={statusBadgeClass(deal.status)}>
-                            {humanizeToken(deal.status)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between md:block">
-                          <span className="text-xs text-muted-foreground md:hidden">Payment</span>
-                          <span className="text-sm font-medium text-foreground">
-                            {formatCurrency(deal.paymentAmount, deal.currency)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between md:block">
-                          <span className="text-xs text-muted-foreground md:hidden">Next due</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(deal.nextDeliverableDate)}
-                          </span>
-                        </div>
-                        <div className="flex justify-end">
-                          <RecentDealCardMenu dealId={deal.id} dealName={deal.campaignName} />
-                        </div>
+                    {dealRows.length === 0 ? (
+                      <div className="px-1 py-5 text-sm text-muted-foreground">
+                        No workspaces yet. Use the new workspace button when you&apos;re ready to start one.
                       </div>
-                    ))}
+                    ) : (
+                      <>
+                        <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] border-b border-black/8 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:border-white/10 dark:text-[#8f98a6]">
+                          <span>Partnership</span>
+                          <span>Stage</span>
+                          <span>Payment</span>
+                          <span>Next due</span>
+                          <span />
+                        </div>
+
+                        {dealRows.slice(0, 6).map((deal) => (
+                          <div
+                            key={deal.id}
+                            className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 transition-colors hover:bg-[#f6f7f8] md:grid md:grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] md:items-center dark:border-white/8 dark:hover:bg-white/[0.04]"
+                          >
+                            <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
+                              <p className="truncate text-base font-semibold text-foreground">
+                                {deal.campaignName}
+                              </p>
+                              <p className="mt-1 truncate text-sm text-muted-foreground">
+                                {deal.brandName}
+                              </p>
+                            </Link>
+                            <div className="flex items-center justify-between md:block">
+                              <span className="text-xs text-muted-foreground md:hidden">Stage</span>
+                              <Badge className={statusBadgeClass(deal.status)}>
+                                {humanizeToken(deal.status)}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between md:block">
+                              <span className="text-xs text-muted-foreground md:hidden">Payment</span>
+                              <span className="text-sm font-medium text-foreground">
+                                {formatCurrency(deal.paymentAmount, deal.currency)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between md:block">
+                              <span className="text-xs text-muted-foreground md:hidden">Next due</span>
+                              <span className="text-sm text-muted-foreground">
+                                {formatDate(deal.nextDeliverableDate)}
+                              </span>
+                            </div>
+                            <div className="flex justify-end">
+                              <RecentDealCardMenu dealId={deal.id} dealName={deal.campaignName} />
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </section>
 

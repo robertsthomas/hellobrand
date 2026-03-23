@@ -46,7 +46,8 @@ function makeDealAggregate(
     extractionResults: [],
     extractionEvidence: [],
     summaries: [],
-    currentSummary: null
+    currentSummary: null,
+    intakeSession: null
   };
 }
 

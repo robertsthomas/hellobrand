@@ -649,9 +649,11 @@ model IntakeSession {
   draftCampaignName    String?
   draftNotes           String?
   draftPastedText      String?
-  draftPastedTextTitle String?
-  completedAt          DateTime?
-  expiresAt            DateTime?
+  draftPastedTextTitle    String?
+  duplicateCheckStatus    String?
+  duplicateMatchJson      Json?
+  completedAt             DateTime?
+  expiresAt               DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

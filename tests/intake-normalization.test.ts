@@ -21,7 +21,8 @@ function createAggregate(): DealAggregate {
     extractionResults: seed.extractionResults,
     extractionEvidence: seed.extractionEvidence,
     summaries: seed.summaries,
-    currentSummary: seed.summaries[0]
+    currentSummary: seed.summaries[0],
+    intakeSession: null
   };
 }
 

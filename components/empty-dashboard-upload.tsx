@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, MessageSquareText, Play, Plus, Trash2 } from "lucide-react";
+import { FileText, Play, Plus, Trash2 } from "lucide-react";
 
 import { InfoTooltip } from "@/components/app-tooltip";
-import { DuplicateDealDialog } from "@/components/duplicate-deal-dialog";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { DuplicateMatch } from "@/lib/duplicate-detection";
+import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
 import {
   deleteLocalWorkspace,
   loadLocalWorkspace,
@@ -144,10 +143,6 @@ export function EmptyDashboardUpload({
   const [isComposerVisible, setIsComposerVisible] = useState(
     initialQueuedWorkspaces.length === 0
   );
-  const [duplicateLocalWorkspaceId, setDuplicateLocalWorkspaceId] = useState<string | null>(
-    null
-  );
-  const [ignoredDuplicateLocalIds, setIgnoredDuplicateLocalIds] = useState<string[]>([]);
 
   const mode = useIntakeUiStore((state) => state.mode);
   const pendingFiles = useIntakeUiStore((state) => state.pendingFiles);
@@ -162,11 +157,6 @@ export function EmptyDashboardUpload({
   );
   const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
-  const duplicateMatches = useIntakeUiStore((state) => state.duplicateMatches);
-  const isDuplicateCheckPending = useIntakeUiStore((state) => state.isDuplicateCheckPending);
-  const setDuplicateMatches = useIntakeUiStore((state) => state.setDuplicateMatches);
-  const setIsDuplicateCheckPending = useIntakeUiStore((state) => state.setIsDuplicateCheckPending);
-  const clearDuplicateMatches = useIntakeUiStore((state) => state.clearDuplicateMatches);
   const reset = useIntakeUiStore((state) => state.reset);
 
   useEffect(() => {
@@ -205,30 +195,6 @@ export function EmptyDashboardUpload({
     return payload.session.id as string;
   }
 
-  async function checkForDuplicates(input: {
-    files: File[];
-    pastedText: string;
-  }): Promise<DuplicateMatch[]> {
-    try {
-      const formData = new FormData();
-      for (const file of input.files) {
-        formData.append("documents", file);
-      }
-      if (input.pastedText.trim()) {
-        formData.append("pastedText", input.pastedText.trim());
-      }
-
-      const response = await fetch("/api/intake/check-duplicates", {
-        method: "POST",
-        body: formData
-      });
-      const payload = await response.json();
-      return (payload.matches ?? []) as DuplicateMatch[];
-    } catch {
-      return [];
-    }
-  }
-
   async function persistWorkspaceLocally() {
     const item = await saveLocalWorkspace({
       files: pendingFiles,
@@ -246,7 +212,6 @@ export function EmptyDashboardUpload({
     });
 
     setLocalWorkspaces((current) => [...current, item]);
-    clearDuplicateMatches();
     reset(initialMode);
     setIsComposerVisible(false);
   }
@@ -271,86 +236,6 @@ export function EmptyDashboardUpload({
     }
   }
 
-  async function handleAddToExisting(dealId: string) {
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      const localId = duplicateLocalWorkspaceId;
-      const payload = localId ? await loadLocalWorkspace(localId) : null;
-      const files = payload?.files ?? pendingFiles;
-      const nextPastedText = payload?.pastedText ?? pastedText;
-      const brandName =
-        payload?.brandName ?? buildWorkspaceBrand({ pastedText, fallbackBrandName: null });
-      const campaignName =
-        payload?.campaignName ??
-        buildWorkspaceLabel({
-          files: pendingFiles,
-          pastedText,
-          fallbackCampaignName: null
-        });
-
-      const sessionId = await createDraftSessionId({
-        brandName,
-        campaignName
-      });
-
-      const formData = new FormData();
-      for (const file of files) {
-        formData.append("documents", file);
-      }
-      if (nextPastedText.trim()) {
-        formData.append("pastedText", nextPastedText.trim());
-      }
-      formData.append("startProcessing", "1");
-      formData.append("targetDealId", dealId);
-
-      const uploadResponse = await fetch(`/api/intake/${sessionId}/documents`, {
-        method: "POST",
-        body: formData
-      });
-      const uploadPayload = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadPayload.error ?? "Could not add documents to existing workspace.");
-      }
-
-      clearDuplicateMatches();
-      setDuplicateLocalWorkspaceId(null);
-      setIgnoredDuplicateLocalIds([]);
-      if (localId) {
-        await deleteLocalWorkspace(localId);
-        setLocalWorkspaces((current) =>
-          current.filter((workspace) => workspace.localId !== localId)
-        );
-      }
-      reset(initialMode);
-      router.push(`/app/deals/${dealId}`);
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not add to existing workspace."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleCreateNewAnyway() {
-    if (!duplicateLocalWorkspaceId) {
-      return;
-    }
-
-    setIgnoredDuplicateLocalIds((current) =>
-      current.includes(duplicateLocalWorkspaceId)
-        ? current
-        : [...current, duplicateLocalWorkspaceId]
-    );
-    clearDuplicateMatches();
-    setDuplicateLocalWorkspaceId(null);
-    await startAnalysis();
-  }
-
   async function removeLocalWorkspace(localId: string) {
     await deleteLocalWorkspace(localId);
     setLocalWorkspaces((current) => current.filter((workspace) => workspace.localId !== localId));
@@ -367,7 +252,6 @@ export function EmptyDashboardUpload({
 
     setIsSubmitting(true);
     setErrorMessage(null);
-    setIsDuplicateCheckPending(true);
 
     try {
       const createdSessionIds: string[] = [];
@@ -377,21 +261,6 @@ export function EmptyDashboardUpload({
         const payload = await loadLocalWorkspace(workspace.localId);
         if (!payload) {
           throw new Error("A saved workspace is missing its local source data.");
-        }
-
-        if (!ignoredDuplicateLocalIds.includes(workspace.localId)) {
-          const matches = await checkForDuplicates({
-            files: payload.files,
-            pastedText: payload.pastedText
-          });
-
-          if (matches.length > 0) {
-            setDuplicateMatches(matches);
-            setDuplicateLocalWorkspaceId(workspace.localId);
-            setIsSubmitting(false);
-            setIsDuplicateCheckPending(false);
-            return;
-          }
         }
 
         const sessionId = await createDraftSessionId({
@@ -457,18 +326,16 @@ export function EmptyDashboardUpload({
       }
 
       reset(initialMode);
-      clearDuplicateMatches();
-      setDuplicateLocalWorkspaceId(null);
-      setIgnoredDuplicateLocalIds([]);
-      router.push(`/app/intake/${payload.session.id}`);
-      router.refresh();
+      window.sessionStorage.setItem(
+        WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY,
+        "1"
+      );
+      router.push("/app");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start analysis."
       );
       setIsSubmitting(false);
-    } finally {
-      setIsDuplicateCheckPending(false);
     }
   }
 
@@ -610,31 +477,19 @@ export function EmptyDashboardUpload({
             )}
 
             {(selectedFiles.length > 0 || pastedText.trim()) && (
-              <div className="grid gap-2 pt-1">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:inline-flex">
-                    {selectedFiles.length > 0 ? (
-                      <FileText className="h-4 w-4" />
-                    ) : (
-                      <MessageSquareText className="h-4 w-4" />
-                    )}
-                    <span>{pendingSummary}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => void finishWorkspace()}
-                    className={cn(
-                      buttonVariants({
-                        className:
-                          "w-full justify-center gap-2"
-                      })
-                    )}
-                  >
-                    {isSubmitting ? "Generating..." : "Generate workspace"}
-                  </button>
-                </div>
-              </div>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => void finishWorkspace()}
+                className={cn(
+                  buttonVariants({
+                    className:
+                      "w-full justify-center gap-2"
+                  })
+                )}
+              >
+                {isSubmitting ? "Generating..." : "Generate workspace"}
+              </button>
             )}
           </div>
         </div>
@@ -642,14 +497,6 @@ export function EmptyDashboardUpload({
 
       {queuedCount > 0 ? (
         <div className="grid gap-5 border-t border-black/8 pt-5 text-left dark:border-white/10">
-          {duplicateMatches.length > 0 ? (
-            <DuplicateDealDialog
-              matches={duplicateMatches}
-              onAddToExisting={(dealId) => void handleAddToExisting(dealId)}
-              onCreateNew={() => void handleCreateNewAnyway()}
-              isSubmitting={isSubmitting}
-            />
-          ) : null}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
               <h3 className="text-base font-semibold text-foreground">Ready to analyze</h3>
@@ -707,11 +554,7 @@ export function EmptyDashboardUpload({
                   className={cn(buttonVariants({ className: "gap-2" }))}
                 >
                   <Play className="h-4 w-4" />
-                  {isSubmitting
-                    ? isDuplicateCheckPending
-                      ? "Checking duplicates..."
-                      : "Generating workspace..."
-                    : "Generate workspace"}
+                  {isSubmitting ? "Generating..." : "Generate workspace"}
                 </button>
                 {!isComposerVisible ? (
                   <button
@@ -740,11 +583,7 @@ export function EmptyDashboardUpload({
                 className={cn(buttonVariants({ className: "gap-2" }))}
               >
                 <Play className="h-4 w-4" />
-                {isSubmitting
-                  ? isDuplicateCheckPending
-                    ? "Checking duplicates..."
-                    : "Generating workspace..."
-                  : "Generate workspace"}
+                {isSubmitting ? "Generating..." : "Generate workspace"}
               </button>
               {!isComposerVisible ? (
                 <button

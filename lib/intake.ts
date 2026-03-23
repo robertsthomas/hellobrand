@@ -48,6 +48,8 @@ function toIntakeSessionRecord(session: {
   draftNotes: string | null;
   draftPastedText: string | null;
   draftPastedTextTitle: string | null;
+  duplicateCheckStatus?: string | null;
+  duplicateMatchJson?: unknown | null;
   createdAt: Date;
   updatedAt: Date;
   completedAt: Date | null;
@@ -65,6 +67,8 @@ function toIntakeSessionRecord(session: {
     draftNotes: session.draftNotes,
     draftPastedText: session.draftPastedText,
     draftPastedTextTitle: session.draftPastedTextTitle,
+    duplicateCheckStatus: (session.duplicateCheckStatus ?? null) as IntakeSessionRecord["duplicateCheckStatus"],
+    duplicateMatchJson: session.duplicateMatchJson ?? null,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: iso(session.completedAt),

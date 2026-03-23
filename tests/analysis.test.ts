@@ -78,7 +78,8 @@ Brand shall pay Creator $3,000 on Net 45 terms.
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
-      currentSummary: seed.summaries[0]
+      currentSummary: seed.summaries[0],
+      intakeSession: null
     };
 
     const draft = generateEmailDraft(aggregate, "request-faster-payment");
@@ -119,7 +120,8 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
-      currentSummary: seed.summaries[0]
+      currentSummary: seed.summaries[0],
+      intakeSession: null
     };
     const second: DealAggregate = {
       ...first,
@@ -162,7 +164,8 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
-      currentSummary: seed.summaries[0]
+      currentSummary: seed.summaries[0],
+      intakeSession: null
     };
     const second: DealAggregate = {
       ...first,

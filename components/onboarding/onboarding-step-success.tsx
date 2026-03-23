@@ -53,10 +53,10 @@ function VerifiedBadge({ className }: { className?: string }) {
       >
         <path
           d="M145 28L147 35L154 37L147 39L145 46L143 39L136 37L143 35L145 28Z"
-          className="fill-primary/40"
+          className="fill-primary/60"
         />
-        <circle cx="30" cy="140" r="3" className="fill-primary/25" />
-        <circle cx="42" cy="42" r="2" className="fill-primary/20" />
+        <circle cx="30" cy="140" r="3" className="fill-primary/40" />
+        <circle cx="42" cy="42" r="2" className="fill-primary/35" />
       </svg>
       {/* Spinning starburst — transform-origin at exact center */}
       <svg
@@ -65,8 +65,8 @@ function VerifiedBadge({ className }: { className?: string }) {
         className="h-full w-full animate-[spin_14s_linear_infinite]"
         style={{ transformOrigin: `${CX}px ${CY}px` }}
       >
-        <path d={STARBURST_OUTER} className="fill-primary/20" />
-        <path d={STARBURST_INNER} className="fill-primary/35" />
+        <path d={STARBURST_OUTER} className="fill-primary/30" />
+        <path d={STARBURST_INNER} className="fill-primary/60" />
       </svg>
       {/* Static checkmark */}
       <svg
