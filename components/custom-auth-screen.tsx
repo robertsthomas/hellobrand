@@ -15,12 +15,12 @@ type SignInSecondFactorState =
   | {
       strategy: "email_code";
       safeIdentifier: string;
-      emailAddressId?: string;
+      emailAddressId: string;
     }
   | {
       strategy: "email_link";
       safeIdentifier: string;
-      emailAddressId?: string;
+      emailAddressId: string;
     }
   | {
       strategy: "phone_code";
@@ -164,6 +164,13 @@ export function CustomAuthScreen() {
     }
 
     if (preferredSecondFactor.strategy === "email_code") {
+      if (!preferredSecondFactor.emailAddressId) {
+        setErrorMessages([
+          "Your account requires email verification, but the email destination could not be loaded."
+        ]);
+        return;
+      }
+
       await result.prepareSecondFactor({
         strategy: "email_code",
         emailAddressId: preferredSecondFactor.emailAddressId
@@ -181,6 +188,13 @@ export function CustomAuthScreen() {
     }
 
     if (preferredSecondFactor.strategy === "email_link") {
+      if (!preferredSecondFactor.emailAddressId) {
+        setErrorMessages([
+          "Your account requires email verification, but the email destination could not be loaded."
+        ]);
+        return;
+      }
+
       await result.prepareSecondFactor({
         strategy: "email_link",
         redirectUrl:
