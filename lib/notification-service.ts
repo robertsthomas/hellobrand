@@ -538,6 +538,7 @@ export async function emitWorkspaceNotificationForSession(
     | "workspace.duplicate_checking"
     | "workspace.duplicates_found"
     | "workspace.confirmed"
+    | "workspace.cancelled"
   >
 ) {
   if (!ensureDatabase()) {

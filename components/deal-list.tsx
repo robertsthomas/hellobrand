@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { FolderPlus, Trash2 } from "lucide-react";
 
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
+import { EmptyState } from "@/components/patterns/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { DealRecord } from "@/lib/types";
-import { cn, formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 function statusBadgeClass(status: string) {
   if (status === "completed" || status === "paid") {
@@ -42,23 +43,18 @@ export function DealList({
 }) {
   if (deals.length === 0) {
     return (
-      <div className="border border-dashed border-black/10 bg-white px-8 py-16 text-center shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
-        <h2 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground">
-          No workspaces yet
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-muted-foreground">
-          Start a new partnership workspace by uploading the first contract or brand
-          documents.
-        </p>
-        <Link
-          href="/app/intake/new"
-          className={cn(buttonVariants(), "mt-6 px-5")}
-          aria-label="Upload documents for a new partnership workspace"
-          title="Start a new partnership workspace"
-        >
-          New workspace
-        </Link>
-      </div>
+      <EmptyState
+        icon={<FolderPlus className="h-5 w-5" />}
+        title="No workspaces yet"
+        description="Start a new partnership workspace by uploading the first contract or brand documents."
+        action={(
+          <Button asChild aria-label="Upload documents for a new partnership workspace">
+            <Link href="/app/intake/new" title="Start a new partnership workspace">
+              New workspace
+            </Link>
+          </Button>
+        )}
+      />
     );
   }
 

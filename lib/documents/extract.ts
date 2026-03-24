@@ -87,6 +87,18 @@ function llamaParseVersion() {
   return process.env.LLAMA_PARSE_VERSION || "latest";
 }
 
+const LLAMA_PARSE_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+      ms
+    );
+    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
   const { default: LlamaCloud } = await import("@llamaindex/llama-cloud");
   const client = new LlamaCloud({
@@ -94,25 +106,33 @@ async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
   });
   const bytes = new Uint8Array(buffer);
 
-  const file = await client.files.create({
-    file: new File([bytes], fileName),
-    purpose: "parse"
-  });
+  const file = await withTimeout(
+    client.files.create({
+      file: new File([bytes], fileName),
+      purpose: "parse"
+    }),
+    LLAMA_PARSE_TIMEOUT_MS,
+    "LlamaParse file upload"
+  );
 
   const tier = llamaParseTier();
-  const result = await client.parsing.parse({
-    file_id: file.id,
-    tier,
-    version: llamaParseVersion(),
-    expand: ["markdown"],
-    ...(tier === "agentic" || tier === "agentic_plus"
-      ? {
-          agentic_options: {
-            custom_prompt: llamaParsePrompt()
+  const result = await withTimeout(
+    client.parsing.parse({
+      file_id: file.id,
+      tier,
+      version: llamaParseVersion(),
+      expand: ["markdown"],
+      ...(tier === "agentic" || tier === "agentic_plus"
+        ? {
+            agentic_options: {
+              custom_prompt: llamaParsePrompt()
+            }
           }
-        }
-      : {})
-  });
+        : {})
+    }),
+    LLAMA_PARSE_TIMEOUT_MS,
+    "LlamaParse parsing"
+  );
 
   const rawText = Array.isArray(result?.markdown?.pages)
     ? result.markdown.pages
@@ -168,7 +188,35 @@ export function normalizeDocumentText(value: string) {
     previous = line;
   }
 
-  const normalized = deduped.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // Join lines that are part of the same paragraph (PDF line-wrap artifacts).
+  // A non-empty line followed by another non-empty line that doesn't start with
+  // a bullet, number, heading, or special char is likely a continuation.
+  const reflowed: string[] = [];
+  for (let i = 0; i < deduped.length; i++) {
+    const line = deduped[i];
+    const next = deduped[i + 1];
+
+    if (
+      line &&
+      next &&
+      // Current line doesn't end with a sentence terminator or colon
+      !/[.!?:;]$/.test(line) &&
+      // Next line is not empty
+      next.length > 0 &&
+      // Next line doesn't look like a new paragraph/section
+      !/^[\s•\-–—*\d]/.test(next) &&
+      !/^[A-Z][A-Z\s]{3,}/.test(next) && // ALL CAPS heading
+      // Current line is reasonably short (PDF column width artifact)
+      line.length < 100
+    ) {
+      reflowed.push(line + " " + next);
+      i++; // skip next since we merged it
+    } else {
+      reflowed.push(line);
+    }
+  }
+
+  const normalized = reflowed.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
   if (normalized.length < 120) {
     throw new UnreadableDocumentError(
@@ -179,22 +227,42 @@ export function normalizeDocumentText(value: string) {
   return normalized;
 }
 
+export type ExtractionResult = {
+  rawText: string;
+  normalizedText: string;
+  _debug?: {
+    parser: string;
+    durationMs: number;
+    fileSizeBytes: number;
+    extractedChars: number;
+  };
+};
+
 export async function extractDocumentText(
   buffer: Buffer,
   mimeType: string,
   fileName: string
-) {
+): Promise<ExtractionResult> {
+  const startedAt = Date.now();
+  const fileSizeBytes = buffer.length;
+
+  function debugMeta(parser: string, text: string) {
+    const durationMs = Date.now() - startedAt;
+    console.info(`[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`);
+    return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
+  }
+
   if (hasLlamaParseKey() && shouldTryLlamaParse(mimeType, fileName)) {
     try {
-      return await extractWithLlamaParse(buffer, fileName);
+      const result = await extractWithLlamaParse(buffer, fileName);
+      return { ...result, _debug: debugMeta("llamaparse", result.rawText) };
     } catch (error) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("[llamaparse] falling back to local parser", {
-          fileName,
-          mimeType,
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
+      const durationMs = Date.now() - startedAt;
+      console.warn(`[extract] llamaparse FAILED after ${durationMs}ms, falling back to local`, {
+        fileName,
+        mimeType,
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
@@ -205,7 +273,8 @@ export async function extractDocumentText(
     const result = await pdfParse(buffer);
     return {
       rawText: result.text,
-      normalizedText: normalizeDocumentText(result.text)
+      normalizedText: normalizeDocumentText(result.text),
+      _debug: debugMeta("pdf-parse", result.text)
     };
   }
 
@@ -217,7 +286,8 @@ export async function extractDocumentText(
     const result = await mammoth.extractRawText({ buffer });
     return {
       rawText: result.value,
-      normalizedText: normalizeDocumentText(result.value)
+      normalizedText: normalizeDocumentText(result.value),
+      _debug: debugMeta("mammoth", result.value)
     };
   }
 
@@ -225,7 +295,8 @@ export async function extractDocumentText(
     const rawText = buffer.toString("utf8");
     return {
       rawText,
-      normalizedText: normalizeDocumentText(rawText)
+      normalizedText: normalizeDocumentText(rawText),
+      _debug: debugMeta("plaintext", rawText)
     };
   }
 

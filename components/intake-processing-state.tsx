@@ -58,45 +58,18 @@ export function IntakeProcessingState({
     setProcessing(initialProcessing);
   }, [initialProcessing]);
 
+  // Listen for processing updates broadcast by IntakeAutoRefresh
   useEffect(() => {
-    if (!["uploading", "processing"].includes(status)) {
-      return;
-    }
-
-    let disposed = false;
-
-    async function pollProcessing() {
-      try {
-        const response = await fetch(`/api/intake/${sessionId}`, {
-          method: "GET",
-          cache: "no-store"
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = await response.json();
-        const nextProcessing = payload?.processing as IntakeProcessingSnapshot | undefined;
-
-        if (!disposed && nextProcessing) {
-          setProcessing(nextProcessing);
-        }
-      } catch {
-        return;
+    function handleUpdate(event: Event) {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.sessionId === sessionId && detail?.processing) {
+        setProcessing(detail.processing);
       }
     }
 
-    void pollProcessing();
-    const timer = window.setInterval(() => {
-      void pollProcessing();
-    }, 1500);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(timer);
-    };
-  }, [sessionId, status]);
+    window.addEventListener("intake-processing-update", handleUpdate);
+    return () => window.removeEventListener("intake-processing-update", handleUpdate);
+  }, [sessionId]);
 
   const activeIndex = useMemo(() => {
     const currentStage = processing.currentStage;

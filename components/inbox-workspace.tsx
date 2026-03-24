@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -10,10 +11,14 @@ import {
   FileImage,
   FileText,
   FileVideo,
+  Inbox,
   Info,
   MoreHorizontal,
   Paperclip,
+  Plus,
+  Send,
   ShieldAlert,
+  Sparkles,
   X,
   XCircle
 } from "lucide-react";
@@ -655,9 +660,13 @@ export function InboxWorkspace({
       return;
     }
 
-    setIsReviewingCandidates(true);
-    setErrorMessage(null);
+    // Optimistic: close modal and clear state immediately
+    setIsCandidateModalOpen(false);
+    setCandidateGroups([]);
+    setSelectedCandidateIds([]);
+    setIsReviewingCandidates(false);
 
+    // Fire request in background
     try {
       const response = await fetch("/api/email/candidates/review", {
         method: "POST",
@@ -669,28 +678,36 @@ export function InboxWorkspace({
           rejectIds
         })
       });
-      const payload = await response.json();
+
       if (!response.ok) {
-        throw new Error(payload.error ?? "Could not review email candidates.");
+        const payload = await response.json();
+        setErrorMessage(payload.error ?? "Could not review email candidates.");
       }
 
-      setIsCandidateModalOpen(false);
-      setCandidateGroups([]);
-      setSelectedCandidateIds([]);
       router.refresh();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not review email candidates."
       );
-    } finally {
-      setIsReviewingCandidates(false);
+      router.refresh();
     }
   }
 
   async function dismissCandidate(candidateId: string) {
-    setIsReviewingCandidates(true);
     setErrorMessage(null);
 
+    // Optimistic: remove from UI immediately
+    setCandidateGroups((current) =>
+      current
+        .map((group) => ({
+          ...group,
+          matches: group.matches.filter((match) => match.candidate.id !== candidateId)
+        }))
+        .filter((group) => group.matches.length > 0)
+    );
+    setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
+
+    // Fire in background
     try {
       const response = await fetch("/api/email/candidates/review", {
         method: "POST",
@@ -701,27 +718,48 @@ export function InboxWorkspace({
           rejectIds: [candidateId]
         })
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not dismiss email candidate.");
-      }
 
-      setCandidateGroups((current) =>
-        current
-          .map((group) => ({
-            ...group,
-            matches: group.matches.filter((match) => match.candidate.id !== candidateId)
-          }))
-          .filter((group) => group.matches.length > 0)
-      );
-      setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
+      if (!response.ok) {
+        const payload = await response.json();
+        setErrorMessage(payload.error ?? "Could not dismiss email candidate.");
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not dismiss email candidate."
       );
     } finally {
-      setIsReviewingCandidates(false);
     }
+  }
+
+  if (deals.length === 0) {
+    return (
+      <div className="flex h-full min-h-0 flex-col px-5 py-4 lg:px-8 lg:py-5">
+        <div className="mx-auto w-full max-w-[1520px]">
+          <h1 className="text-[31px] font-semibold tracking-[-0.05em] text-foreground lg:text-[36px]">
+            Inbox
+          </h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Your inbox will show email threads linked to your partnerships.
+          </p>
+          <div className="mt-12 flex flex-col items-center text-center">
+            <Inbox className="h-10 w-10 text-muted-foreground/40" />
+            <p className="mt-4 text-sm font-medium text-foreground">
+              No workspaces yet
+            </p>
+            <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
+              Create a workspace first, then connect your email to start matching threads to your deals.
+            </p>
+            <Link
+              href="/app/intake/new"
+              className="mt-5 inline-flex h-10 items-center gap-2 bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+            >
+              <Plus className="h-4 w-4" />
+              New workspace
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -1245,6 +1283,64 @@ export function InboxWorkspace({
                             ) : null}
                           </div>
                         </div>
+
+                        {/* Reply composer — pinned to bottom */}
+                        <div className="border-t border-black/8 bg-white px-5 py-4">
+                          <div className="space-y-3">
+                            <div className={`rounded-lg border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground ${draft ? "min-h-[80px]" : ""}`}>
+                              {isDrafting ? (
+                                <span className="flex items-center gap-2 text-primary">
+                                  <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+                                  Drafting reply...
+                                </span>
+                              ) : draft ? (
+                                <div>
+                                  <p className="text-xs font-medium text-foreground">{draft.subject}</p>
+                                  <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap font-sans text-[12px] leading-6 text-foreground">{draft.body}</pre>
+                                </div>
+                              ) : (
+                                <span className="text-[13px]">Click &quot;AI Draft&quot; to generate a reply...</span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void draftReply()}
+                                  disabled={isDrafting}
+                                  className="inline-flex h-9 items-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 disabled:opacity-60"
+                                >
+                                  <Sparkles className="h-3.5 w-3.5" />
+                                  {draft ? "Regenerate" : "AI Draft"}
+                                </button>
+                                <div className="flex gap-1">
+                                  {(["firm", "collaborative", "exploratory"] as const).map((s) => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => setReplyStance(s)}
+                                      className={`h-7 px-2 text-[10px] font-medium transition ${
+                                        replyStance === s
+                                          ? "bg-foreground text-background"
+                                          : "bg-secondary/40 text-foreground hover:bg-secondary/60"
+                                      }`}
+                                    >
+                                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={!draft || isDrafting}
+                                className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Send
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </>
@@ -1257,43 +1353,49 @@ export function InboxWorkspace({
 
       {isCandidateModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden border border-black/8 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-black/8 px-6 py-5">
+          <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden border border-black/8 bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-4 border-b border-black/8 px-6 py-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  Find emails
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-foreground">
-                  Review likely deal matches
+                <h3 className="text-base font-semibold text-foreground">
+                  Deal matches found
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  We scanned recent synced mail across connected providers and grouped the strongest matches by deal. Confirm the threads you want in the smart inbox.
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Select threads to link to your partnerships.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCandidateModalOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
-                aria-label="Close candidate modal"
+                className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               {candidateGroups.length === 0 ? (
-                <div className="border border-dashed border-border px-5 py-6 text-center text-[13px] text-muted-foreground">
-                  No likely deal-related threads were found yet. We’ll keep expanding the search in the background as more mail is synced.
+                <div className="py-10 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No matches yet. We&apos;ll keep scanning as more mail syncs.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCandidateModalOpen(false)}
+                    className="mt-4 h-10 border border-black/10 px-5 text-sm font-medium text-foreground transition hover:border-black/20"
+                  >
+                    Keep checking
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {candidateGroups.map((group) => (
                     <section key={group.deal.id} className="border border-black/8">
-                      <div className="border-b border-black/8 px-5 py-4">
-                        <p className="text-[15px] font-semibold text-foreground">
+                      <div className="flex items-baseline justify-between border-b border-black/8 px-4 py-3">
+                        <p className="text-sm font-semibold text-foreground">
                           {group.deal.campaignName}
                         </p>
-                        <p className="mt-1 text-[12px] text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           {group.deal.brandName}
                         </p>
                       </div>
@@ -1303,51 +1405,39 @@ export function InboxWorkspace({
                           const isSelected = selectedCandidateIds.includes(match.candidate.id);
 
                           return (
-                            <div key={match.candidate.id} className="px-5 py-4">
-                              <div className="flex items-start gap-4">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleCandidate(match.candidate.id)}
-                                  className="mt-1 h-4 w-4 border border-border"
-                                />
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-[13px] font-semibold text-foreground">
-                                        {match.thread.subject}
-                                      </p>
-                                      <p className="mt-1 text-[12px] text-muted-foreground">
-                                        {providerLabel(match.account.provider)} · {match.account.emailAddress}
-                                      </p>
-                                    </div>
-                                    <span className="bg-[#f4efe4] px-2.5 py-1 text-[10px] font-medium text-[#8a5c12]">
-                                      {Math.round(match.candidate.confidence * 100)}% match
-                                    </span>
-                                  </div>
-
-                                  <p className="mt-3 text-[12px] leading-6 text-muted-foreground">
-                                    {match.thread.snippet || "No preview available."}
+                            <div key={match.candidate.id} className="flex items-start gap-3 px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleCandidate(match.candidate.id)}
+                                className="mt-0.5 h-4 w-4 border border-border"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-start justify-between gap-2">
+                                  <p className="text-[13px] font-medium text-foreground">
+                                    {match.thread.subject}
                                   </p>
-
-                                  <ul className="mt-3 space-y-1">
-                                    {match.candidate.reasons.map((reason) => (
-                                      <li key={reason} className="text-[12px] text-muted-foreground">
-                                        {reason}
-                                      </li>
-                                    ))}
-                                  </ul>
+                                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                                    {Math.round(match.candidate.confidence * 100)}%
+                                  </span>
                                 </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => void dismissCandidate(match.candidate.id)}
-                                  disabled={isReviewingCandidates}
-                                  className="text-[12px] font-medium text-muted-foreground underline-offset-4 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                  Dismiss
-                                </button>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {providerLabel(match.account.provider)} · {match.account.emailAddress}
+                                </p>
+                                {match.thread.snippet ? (
+                                  <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground/70">
+                                    {match.thread.snippet}
+                                  </p>
+                                ) : null}
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => void dismissCandidate(match.candidate.id)}
+                                disabled={isReviewingCandidates}
+                                className="shrink-0 text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+                              >
+                                Dismiss
+                              </button>
                             </div>
                           );
                         })}
@@ -1358,28 +1448,30 @@ export function InboxWorkspace({
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-black/8 px-6 py-4">
-              <p className="text-[12px] text-muted-foreground">
-                Recent threads were scanned immediately. Older synced history will keep expanding in the background.
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => void reviewCandidates("reject_all")}
-                  disabled={candidateGroups.length === 0 || isReviewingCandidates}
-                  className="h-11 border border-black/10 px-4 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Dismiss all
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void reviewCandidates("confirm")}
-                  disabled={selectedCandidateIds.length === 0 || isReviewingCandidates}
-                  className="h-11 border border-black/10 px-4 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isReviewingCandidates ? "Linking..." : "Link selected threads"}
-                </button>
-              </div>
+            <div className="flex items-center justify-end gap-3 border-t border-black/8 px-6 py-3">
+              <button
+                type="button"
+                onClick={() => void reviewCandidates("reject_all")}
+                disabled={candidateGroups.length === 0 || isReviewingCandidates}
+                className="h-9 px-4 text-[13px] font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+              >
+                Dismiss all
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCandidateModalOpen(false)}
+                className="h-9 border border-black/10 px-4 text-[13px] font-medium text-foreground transition hover:border-black/20"
+              >
+                Keep checking
+              </button>
+              <button
+                type="button"
+                onClick={() => void reviewCandidates("confirm")}
+                disabled={selectedCandidateIds.length === 0 || isReviewingCandidates}
+                className="h-9 bg-primary px-4 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              >
+                {isReviewingCandidates ? "Linking..." : `Link ${selectedCandidateIds.length > 0 ? selectedCandidateIds.length : ""} selected`}
+              </button>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ export type NotificationEventType =
   | "workspace.duplicate_checking"
   | "workspace.duplicates_found"
   | "workspace.confirmed"
+  | "workspace.cancelled"
   | "payment.overdue"
   | "payment.received"
   | "deadline.upcoming"
@@ -35,7 +36,8 @@ export type NotificationType =
   | "workspace_ready"
   | "workspace_failed"
   | "workspace_duplicate_found"
-  | "workspace_confirmed";
+  | "workspace_confirmed"
+  | "workspace_cancelled";
 
 export interface NotificationItem {
   id: string;
@@ -89,6 +91,14 @@ const WORKSPACE_SUPERSESSION_MAP: Partial<
   ],
   "workspace.failed": ["workspace.queued", "workspace.processing_started"],
   "workspace.duplicates_found": ["workspace.duplicate_checking"],
+  "workspace.cancelled": [
+    "workspace.queued",
+    "workspace.processing_started",
+    "workspace.ready_for_review",
+    "workspace.failed",
+    "workspace.duplicate_checking",
+    "workspace.duplicates_found"
+  ],
   "workspace.confirmed": [
     "workspace.queued",
     "workspace.processing_started",
@@ -128,6 +138,8 @@ export function notificationTypeForEventType(
       return "workspace_duplicate_found";
     case "workspace.confirmed":
       return "workspace_confirmed";
+    case "workspace.cancelled":
+      return "workspace_cancelled";
   }
 }
 
@@ -147,6 +159,8 @@ function workspaceNotificationHref(input: {
       return `/app/intake/${input.sessionId}/review`;
     case "workspace.confirmed":
       return `/app/deals/${input.dealId}`;
+    case "workspace.cancelled":
+      return "/app";
     default:
       return `/app/intake/${input.sessionId}`;
   }
@@ -158,13 +172,22 @@ function workspaceLabel(input: {
   draftBrandName?: string | null;
   draftCampaignName?: string | null;
 }) {
-  return (
-    input.draftBrandName?.trim() ||
-    input.brandName?.trim() ||
-    input.draftCampaignName?.trim() ||
-    input.campaignName?.trim() ||
-    "Workspace"
-  );
+  const skip = new Set(["workspace", "untitled brand", "untitled deal"]);
+  const candidates = [
+    input.draftBrandName,
+    input.brandName,
+    input.draftCampaignName,
+    input.campaignName
+  ];
+
+  for (const value of candidates) {
+    const trimmed = value?.trim();
+    if (trimmed && !skip.has(trimmed.toLowerCase())) {
+      return trimmed;
+    }
+  }
+
+  return "Your";
 }
 
 export function getWorkspaceSupersededEventTypes(
@@ -296,6 +319,20 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "This workspace has been reviewed and moved into your active partnerships.",
         href,
         dedupeKey: `workspace.confirmed:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.cancelled":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace cancelled`,
+        description: "This workspace was cancelled and removed.",
+        href: "/app",
+        dedupeKey: `workspace.cancelled:${input.sessionId}`,
         createdAt: input.createdAt
       };
     default:

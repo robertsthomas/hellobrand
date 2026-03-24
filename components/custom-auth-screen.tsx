@@ -33,9 +33,9 @@ type SignInSecondFactorState =
     };
 
 const rightPanelHighlights = [
-  "Plain-English contract summaries",
-  "Inbox threads linked to live partnerships",
-  "One workspace for every brand relationship"
+  "Contracts broken down into plain English",
+  "Emails matched to the right partnership",
+  "Every deal organized in one workspace"
 ];
 
 function deriveMode(value: string | null): AuthMode {
@@ -881,14 +881,13 @@ export function CustomAuthScreen() {
 
           <div className="max-w-[440px]">
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/50">
-              Private Workspace
+              Your partnerships, organized
             </p>
             <h2 className="mt-4 text-[2.6rem] font-semibold leading-[1.06] tracking-[-0.04em] xl:text-[3rem]">
-              Keep every brand conversation in one calm place.
+              Stop digging through emails for deal details.
             </h2>
             <p className="mt-4 max-w-[380px] text-[15px] leading-7 text-white/65">
-              Review contracts, sync email threads, and generate workspaces without
-              bouncing between tools.
+              Upload a contract or connect your inbox. HelloBrand pulls out the terms, deadlines, and payments so you don&apos;t have to.
             </p>
 
             <div className="mt-7 grid gap-2.5">
@@ -906,69 +905,52 @@ export function CustomAuthScreen() {
 
           <div className="relative h-[260px]">
             <div className="absolute left-4 top-8 w-[240px] rounded-lg border border-white/10 bg-[#f7f3ee] p-4 text-[#233127] shadow-[0_20px_60px_rgba(7,21,16,0.30)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b695f]">
-                  New workspace
-                </p>
-                <span className="rounded-full bg-[#dfeadf] px-2 py-0.5 text-[9px] font-medium text-[#2b5a44]">
-                  AI Ready
-                </span>
-              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b695f]">
+                Glossier · Spring campaign
+              </p>
               <p className="mt-3 text-base font-semibold text-[#16261f]">
-                Summer launch collaboration
+                $4,200 · Net 30
               </p>
               <p className="mt-1.5 text-xs leading-5 text-[#5b695f]">
-                Contract, email thread, usage rights, and deliverables grouped together.
+                3 Instagram Reels, 1 TikTok. Exclusivity: 60 days, skincare only.
               </p>
             </div>
 
             <div className="absolute bottom-4 left-[35%] w-[220px] rounded-lg border border-white/10 bg-[#efe8dc] p-4 text-[#233127] shadow-[0_18px_52px_rgba(7,21,16,0.28)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6a7468]">
-                  Contract snapshot
-                </p>
-                <span className="text-[10px] font-medium text-[#2b5a44]">Reviewed</span>
-              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6a7468]">
+                Flagged
+              </p>
               <div className="mt-3 grid gap-2">
                 <div className="rounded border border-black/[0.05] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Usage terms</p>
+                  <p className="text-[13px] font-semibold text-amber-700">Perpetual usage</p>
                   <p className="mt-0.5 text-[11px] text-[#6a7468]">
-                    Paid usage and extension windows extracted.
+                    Contract says &quot;in perpetuity,&quot; brief says 6 months.
                   </p>
                 </div>
                 <div className="rounded border border-black/[0.05] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Risk flags</p>
+                  <p className="text-[13px] font-semibold">Late payment</p>
                   <p className="mt-0.5 text-[11px] text-[#6a7468]">
-                    Exclusivity and approval clauses surfaced early.
+                    Invoice is 12 days past due.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="absolute bottom-0 right-0 w-[280px] rounded-lg border border-white/10 bg-white/95 p-4 text-[#1d2430] shadow-[0_24px_70px_rgba(7,21,16,0.35)]">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#69707d]">
-                  Inbox context
-                </p>
-                <span className="text-[10px] font-medium text-[#1a4d3e]">Linked</span>
-              </div>
+            <div className="absolute bottom-0 right-0 w-[260px] rounded-lg border border-white/10 bg-white/95 p-4 text-[#1d2430] shadow-[0_24px_70px_rgba(7,21,16,0.35)]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#69707d]">
+                Next up
+              </p>
               <div className="mt-3 grid gap-2">
                 <div className="rounded border border-black/[0.04] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Campaign brief</p>
+                  <p className="text-[13px] font-semibold">Reels draft due Mar 28</p>
                   <p className="mt-0.5 text-[11px] text-[#69707d]">
-                    Summary generated and ready to review.
+                    First cut for Glossier spring campaign.
                   </p>
                 </div>
                 <div className="rounded border border-black/[0.04] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Negotiation draft</p>
+                  <p className="text-[13px] font-semibold">Reply to Nike by Thu</p>
                   <p className="mt-0.5 text-[11px] text-[#69707d]">
-                    Payment terms and usage revisions suggested.
-                  </p>
-                </div>
-                <div className="rounded border border-black/[0.04] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Next deliverable</p>
-                  <p className="mt-0.5 text-[11px] text-[#69707d]">
-                    Approval deadline tracked inside the workspace.
+                    Marcus asked about the revised exclusivity window.
                   </p>
                 </div>
               </div>

@@ -698,6 +698,16 @@ export async function deleteIntakeDraftForViewer(viewer: Viewer, sessionId: stri
     throw new Error("Completed intake sessions cannot be deleted as drafts.");
   }
 
+  // Emit cancelled notification before deleting (needs session data)
+  try {
+    const { emitWorkspaceNotificationForSession } = await import(
+      "@/lib/notification-service"
+    );
+    await emitWorkspaceNotificationForSession(session.id, "workspace.cancelled");
+  } catch {
+    // Non-critical
+  }
+
   await prisma.intakeSession.delete({
     where: { id: session.id }
   });

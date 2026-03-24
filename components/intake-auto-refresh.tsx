@@ -59,12 +59,22 @@ export function IntakeAutoRefresh({
 
         const payload = await response.json();
         const nextStatus = payload?.session?.status as IntakeSessionStatus | undefined;
+        const nextProcessing = payload?.processing;
 
         if (!nextStatus || disposed) {
           return;
         }
 
         setRemoteStatus(nextStatus);
+
+        // Broadcast processing snapshot so IntakeProcessingState can update stages
+        if (nextProcessing && typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("intake-processing-update", {
+              detail: { sessionId, processing: nextProcessing }
+            })
+          );
+        }
 
         if (
           readyHref &&
@@ -111,14 +121,21 @@ export function IntakeAutoRefresh({
       }
     }
 
-    void pollSession();
-    const timer = window.setInterval(() => {
-      void pollSession();
-    }, 2500);
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    async function pollLoop() {
+      if (disposed) return;
+      await pollSession();
+      if (!disposed) {
+        timeoutId = setTimeout(pollLoop, 3000);
+      }
+    }
+
+    void pollLoop();
 
     return () => {
       disposed = true;
-      window.clearInterval(timer);
+      clearTimeout(timeoutId);
     };
   }, [isSubmitting, pendingSessionId, router, sessionId, shouldPoll, startTransition, status]);
 

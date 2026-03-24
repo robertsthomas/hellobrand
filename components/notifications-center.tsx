@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
@@ -48,7 +48,8 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   workspace_ready: CheckCircle2,
   workspace_failed: XCircle,
   workspace_duplicate_found: Copy,
-  workspace_confirmed: CheckCircle2
+  workspace_confirmed: CheckCircle2,
+  workspace_cancelled: XCircle
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -63,7 +64,8 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   workspace_ready: "text-emerald-500",
   workspace_failed: "text-red-500",
   workspace_duplicate_found: "text-amber-500",
-  workspace_confirmed: "text-emerald-500"
+  workspace_confirmed: "text-emerald-500",
+  workspace_cancelled: "text-black/40 dark:text-white/40"
 };
 
 async function fetchNotifications() {
@@ -92,6 +94,35 @@ export function NotificationsCenter({
   const [items, setItems] = useState<NotificationItem[]>(notifications);
   const [unreadCount, setUnreadCount] = useState(
     notifications.filter(isNotificationUnread).length
+  );
+
+  type OptimisticAction =
+    | { type: "mark_read"; id: string }
+    | { type: "mark_unread"; id: string }
+    | { type: "clear"; id: string }
+    | { type: "mark_all_read" }
+    | { type: "clear_all" };
+
+  const [optimisticItems, applyOptimistic] = useOptimistic(
+    items,
+    (current, action: OptimisticAction) => {
+      switch (action.type) {
+        case "mark_read":
+          return current.map((n) =>
+            n.id === action.id ? { ...n, readAt: new Date().toISOString(), read: true } : n
+          );
+        case "mark_unread":
+          return current.map((n) =>
+            n.id === action.id ? { ...n, readAt: null, read: false } : n
+          );
+        case "clear":
+          return current.filter((n) => n.id !== action.id);
+        case "mark_all_read":
+          return current.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString(), read: true }));
+        case "clear_all":
+          return [];
+      }
+    }
   );
 
   useEffect(() => {
@@ -176,61 +207,68 @@ export function NotificationsCenter({
   const markNotification = useCallback(
     (id: string, action: "mark_read" | "mark_unread" | "clear") => {
       startTransition(async () => {
+        applyOptimistic({ type: action, id });
+
         const response = await fetch(`/api/notifications/${id}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action })
         });
 
         if (!response.ok) {
+          await refresh();
           return;
         }
 
         await refresh();
       });
     },
-    [refresh]
+    [applyOptimistic, refresh]
   );
 
   const markAllRead = useCallback(() => {
     startTransition(async () => {
+      applyOptimistic({ type: "mark_all_read" });
+
       const response = await fetch("/api/notifications", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_all_read" })
       });
 
       if (!response.ok) {
+        await refresh();
         return;
       }
 
       await refresh();
     });
-  }, [refresh]);
+  }, [applyOptimistic, refresh]);
 
   const clearAll = useCallback(() => {
     startTransition(async () => {
+      applyOptimistic({ type: "clear_all" });
+
       const response = await fetch("/api/notifications", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "clear_all" })
       });
 
       if (!response.ok) {
+        await refresh();
         return;
       }
 
       await refresh();
     });
-  }, [refresh]);
+  }, [applyOptimistic, refresh]);
 
-  const previewItems = useMemo(() => items.slice(0, 6), [items]);
+  const optimisticUnreadCount = useMemo(
+    () => optimisticItems.filter(isNotificationUnread).length,
+    [optimisticItems]
+  );
+  const previewItems = useMemo(() => optimisticItems.slice(0, 6), [optimisticItems]);
 
   const notificationTrigger = (
     <button
@@ -244,7 +282,7 @@ export function NotificationsCenter({
       className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
     >
       <Bell className="h-5 w-5" />
-      {unreadCount > 0 ? (
+      {optimisticUnreadCount > 0 ? (
         <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
       ) : null}
     </button>
@@ -342,9 +380,7 @@ export function NotificationsCenter({
           <div className="flex items-start justify-between gap-4 pr-8">
             <div>
               <SheetTitle className="text-lg">Notifications</SheetTitle>
-              <SheetDescription className="mt-1">
-                Quick updates from your workspaces, partnerships, deadlines, and payments.
-              </SheetDescription>
+              <SheetDescription className="sr-only">Recent notifications</SheetDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -352,7 +388,7 @@ export function NotificationsCenter({
                 variant="outline"
                 size="sm"
                 onClick={markAllRead}
-                disabled={isPending || items.length === 0 || unreadCount === 0}
+                disabled={isPending || optimisticItems.length === 0 || optimisticUnreadCount === 0}
               >
                 Mark all read
               </Button>
@@ -361,7 +397,7 @@ export function NotificationsCenter({
                 variant="outline"
                 size="sm"
                 onClick={clearAll}
-                disabled={isPending || items.length === 0}
+                disabled={isPending || optimisticItems.length === 0}
               >
                 Clear all
               </Button>
@@ -389,8 +425,9 @@ export function NotificationsCenter({
                         <Icon
                           className={cn(
                             "h-4.5 w-4.5",
-                            (item.type === "workspace_generating" ||
-                              item.type === "workspace_checking_duplicates") &&
+                            item.status === "active" &&
+                              (item.type === "workspace_generating" ||
+                                item.type === "workspace_checking_duplicates") &&
                               "animate-spin"
                           )}
                         />
@@ -412,10 +449,7 @@ export function NotificationsCenter({
                             {formatNotificationRelativeTime(item.createdAt)}
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {item.description}
-                        </p>
-                        <div className="mt-3 flex items-center gap-3">
+                        <div className="mt-2 flex items-center gap-3">
                           <SheetClose asChild>
                             <Link
                               href={item.href}

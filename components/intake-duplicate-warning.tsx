@@ -39,7 +39,7 @@ export function IntakeDuplicateWarning({
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    if (!["processing", "ready_for_confirmation"].includes(status) || dismissed) {
+    if (status !== "ready_for_confirmation" || dismissed || hasChecked) {
       return;
     }
 
@@ -59,28 +59,16 @@ export function IntakeDuplicateWarning({
           setHasChecked(true);
         }
       } catch {
-        // Silently fail — duplicate check is non-critical
+        // Silently fail
       }
     }
 
-    // First check after a short delay to let text extraction finish
-    const initialTimer = window.setTimeout(() => {
-      void check();
-    }, 3000);
-
-    // Re-check periodically while processing (documents may get text extracted over time)
-    const interval = window.setInterval(() => {
-      if (!hasChecked || matches.length === 0) {
-        void check();
-      }
-    }, 8000);
+    void check();
 
     return () => {
       disposed = true;
-      window.clearTimeout(initialTimer);
-      window.clearInterval(interval);
     };
-  }, [sessionId, status, dismissed, hasChecked, matches.length]);
+  }, [sessionId, status, dismissed, hasChecked]);
 
   const handleDeleteAndNavigate = useCallback(
     async (targetDealId: string) => {

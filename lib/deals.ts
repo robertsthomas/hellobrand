@@ -481,11 +481,19 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     throw new Error("Deal not found.");
   }
 
+  const PIPELINE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes max
+
   await repository.updateDocument(document.id, {
     processingStatus: "processing",
     errorMessage: null
   });
   const pipelineStartedAt = Date.now();
+
+  function checkPipelineTimeout() {
+    if (Date.now() - pipelineStartedAt > PIPELINE_TIMEOUT_MS) {
+      throw new Error("Document processing timed out. The file may be too large or complex.");
+    }
+  }
 
   logDocumentPipeline("info", "pipeline_start", {
     dealId: document.dealId,
@@ -494,6 +502,14 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     sourceType: document.sourceType,
     mimeType: document.mimeType
   });
+
+  function logStageDebug(stage: string, extra?: Record<string, unknown>) {
+    const elapsed = Date.now() - pipelineStartedAt;
+    console.info(
+      `[pipeline] ${stage} | ${document.fileName} | elapsed ${(elapsed / 1000).toFixed(1)}s`,
+      extra ?? ""
+    );
+  }
 
   try {
     const extractionSource = await runStage(
@@ -513,7 +529,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     );
 
     await repository.updateDocument(document.id, extractionSource);
+    logStageDebug("extract_text ✓", extractionSource._debug ?? undefined);
 
+    checkPipelineTimeout();
     const classification = await runStage(
       document.dealId,
       document.id,
@@ -529,7 +547,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       documentKind: classification.documentKind,
       classificationConfidence: classification.confidence
     });
+    logStageDebug("classify_document ✓", { kind: classification.documentKind, confidence: classification.confidence });
 
+    checkPipelineTimeout();
     const sections = await runStage(
       document.dealId,
       document.id,
@@ -548,6 +568,8 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     });
 
     const savedSections = await repository.replaceDocumentSections(document.id, sections);
+    logStageDebug("section_document ✓", { sectionCount: sections.length });
+
     const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
     const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
 
@@ -568,6 +590,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       }))
     });
 
+    checkPipelineTimeout();
     const partialExtractions = await runStage(
       document.dealId,
       document.id,
@@ -604,7 +627,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       extractionCount: partialExtractions.length,
       usedLlm: hasLlmKey()
     });
+    logStageDebug("extract_fields ✓", { extractionCount: partialExtractions.length, usedLlm: hasLlmKey(), model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic" });
 
+    checkPipelineTimeout();
     const extraction = await runStage(
       document.dealId,
       document.id,
@@ -723,7 +748,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         confidence: entry.confidence
       }))
     );
+    logStageDebug("merge_results ✓", { evidenceCount: extractionEvidence.length, brand: extraction.data.brandName });
 
+    checkPipelineTimeout();
     const risks = await runStage(
       document.dealId,
       document.id,
@@ -754,7 +781,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     );
 
     await repository.replaceRiskFlagsForDocument(document.dealId, document.id, risks);
+    logStageDebug("analyze_risks ✓", { riskCount: risks.length, usedLlm: hasLlmKey(), model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic" });
 
+    checkPipelineTimeout();
     const summary = await runStage(
       document.dealId,
       document.id,
@@ -873,11 +902,15 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       await syncIntakeSessionForDealId(document.dealId);
     }
 
+    const totalDurationMs = Date.now() - pipelineStartedAt;
+    logStageDebug("generate_summary ✓", { summaryLength: summary.body.length, usedLlm: hasLlmKey() });
+    logStageDebug(`PIPELINE COMPLETE | total ${(totalDurationMs / 1000).toFixed(1)}s`);
+
     logDocumentPipeline("info", "pipeline_complete", {
       dealId: document.dealId,
       documentId: document.id,
       fileName: document.fileName,
-      durationMs: Date.now() - pipelineStartedAt,
+      durationMs: totalDurationMs,
       riskCount: risks.length,
       summaryLength: summary.body.length,
       deliverablesCount: extraction.data.deliverables?.length ?? 0

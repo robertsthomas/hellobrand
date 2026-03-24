@@ -16,6 +16,7 @@ import {
   AccordionItem,
   AccordionTrigger
 } from "@/components/ui/accordion";
+import { SectionIntro } from "@/components/patterns/section-intro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -86,15 +87,12 @@ export default function HelpPage() {
     <div className="px-8 py-10 lg:px-10 lg:py-12">
       <div className="mx-auto max-w-5xl space-y-10">
         <section className="space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-5xl font-semibold tracking-[-0.06em] text-foreground">
-              How can we help?
-            </h1>
-            <p className="max-w-2xl text-lg text-muted-foreground">
-              Search the knowledge base or browse the common areas creators use
-              most while managing workspaces.
-            </p>
-          </div>
+          <SectionIntro
+            title="How can we help?"
+            description="Search the knowledge base or browse the common areas creators use most while managing workspaces."
+            titleClassName="text-5xl tracking-[-0.06em]"
+            descriptionClassName="max-w-2xl text-lg"
+          />
 
           <div className="relative max-w-3xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -121,15 +119,10 @@ export default function HelpPage() {
         </section>
 
         <section className="space-y-5">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              The questions below cover the current product behavior and the
-              workflows already live in the app.
-            </p>
-          </div>
+          <SectionIntro
+            title="Frequently Asked Questions"
+            description="The questions below cover the current product behavior and the workflows already live in the app."
+          />
 
           <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
             <Accordion type="single" collapsible>
@@ -154,15 +147,10 @@ export default function HelpPage() {
         </section>
 
         <section className="border-t border-black/8 pt-10 dark:border-white/10">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-              Get in Touch
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Use support if the workspace flow is blocked, a document is not
-              parsing correctly, or you need help recovering a partnership.
-            </p>
-          </div>
+          <SectionIntro
+            title="Get in Touch"
+            description="Use support if the workspace flow is blocked, a document is not parsing correctly, or you need help recovering a partnership."
+          />
 
           <div className="mt-6 grid gap-px overflow-hidden border border-black/8 bg-black/8 md:grid-cols-2 dark:border-white/10 dark:bg-white/10">
             <div className="bg-white px-6 py-6 dark:bg-[#161a1f]">

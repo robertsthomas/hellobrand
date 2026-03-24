@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -47,7 +47,8 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   workspace_ready: CheckCircle2,
   workspace_failed: XCircle,
   workspace_duplicate_found: Copy,
-  workspace_confirmed: CheckCircle2
+  workspace_confirmed: CheckCircle2,
+  workspace_cancelled: XCircle
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -62,7 +63,8 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   workspace_ready: "text-emerald-500",
   workspace_failed: "text-red-500",
   workspace_duplicate_found: "text-amber-500",
-  workspace_confirmed: "text-emerald-500"
+  workspace_confirmed: "text-emerald-500",
+  workspace_cancelled: "text-black/40 dark:text-white/40"
 };
 
 async function fetchNotifications() {
@@ -109,6 +111,35 @@ export function NotificationsView({
     notifications.filter(isNotificationUnread).length
   );
 
+  type OptimisticAction =
+    | { type: "mark_read"; id: string }
+    | { type: "mark_unread"; id: string }
+    | { type: "clear"; id: string }
+    | { type: "mark_all_read" }
+    | { type: "clear_all" };
+
+  const [optimisticItems, applyOptimistic] = useOptimistic(
+    items,
+    (current, action: OptimisticAction) => {
+      switch (action.type) {
+        case "mark_read":
+          return current.map((n) =>
+            n.id === action.id ? { ...n, readAt: new Date().toISOString(), read: true } : n
+          );
+        case "mark_unread":
+          return current.map((n) =>
+            n.id === action.id ? { ...n, readAt: null, read: false } : n
+          );
+        case "clear":
+          return current.filter((n) => n.id !== action.id);
+        case "mark_all_read":
+          return current.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString(), read: true }));
+        case "clear_all":
+          return [];
+      }
+    }
+  );
+
   useEffect(() => {
     setItems(notifications);
     setUnreadCount(notifications.filter(isNotificationUnread).length);
@@ -144,76 +175,84 @@ export function NotificationsView({
   const markNotification = useCallback(
     (id: string, action: "mark_read" | "mark_unread" | "clear") => {
       startTransition(async () => {
+        applyOptimistic({ type: action, id });
+
         const response = await fetch(`/api/notifications/${id}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action })
         });
 
         if (!response.ok) {
+          await refresh();
           return;
         }
 
         await refresh();
       });
     },
-    [refresh]
+    [applyOptimistic, refresh]
   );
 
   const markAllRead = useCallback(() => {
     startTransition(async () => {
+      applyOptimistic({ type: "mark_all_read" });
+
       const response = await fetch("/api/notifications", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "mark_all_read" })
       });
 
       if (!response.ok) {
+        await refresh();
         return;
       }
 
       await refresh();
     });
-  }, [refresh]);
+  }, [applyOptimistic, refresh]);
 
   const clearAll = useCallback(() => {
     startTransition(async () => {
+      applyOptimistic({ type: "clear_all" });
+
       const response = await fetch("/api/notifications", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "clear_all" })
       });
 
       if (!response.ok) {
+        await refresh();
         return;
       }
 
       await refresh();
     });
-  }, [refresh]);
+  }, [applyOptimistic, refresh]);
+
+  const optimisticUnreadCount = useMemo(
+    () => optimisticItems.filter(isNotificationUnread).length,
+    [optimisticItems]
+  );
 
   const filtered = useMemo(
-    () => items.filter((item) => matchesFilter(item, activeFilter)),
-    [items, activeFilter]
+    () => optimisticItems.filter((item) => matchesFilter(item, activeFilter)),
+    [optimisticItems, activeFilter]
   );
 
   const tabCounts = useMemo(() => {
     const counts: Record<FilterTab, number> = {
-      all: items.length,
-      unread: unreadCount,
-      workspaces: items.filter((item) => item.category === "workspace").length,
-      payments: items.filter((item) => item.category === "payments").length,
-      deadlines: items.filter((item) => item.category === "deadlines").length,
-      risks: items.filter((item) => item.category === "risks").length
+      all: optimisticItems.length,
+      unread: optimisticUnreadCount,
+      workspaces: optimisticItems.filter((item) => item.category === "workspace").length,
+      payments: optimisticItems.filter((item) => item.category === "payments").length,
+      deadlines: optimisticItems.filter((item) => item.category === "deadlines").length,
+      risks: optimisticItems.filter((item) => item.category === "risks").length
     };
     return counts;
-  }, [items, unreadCount]);
+  }, [optimisticItems, optimisticUnreadCount]);
 
   return (
     <div className="space-y-6">
@@ -255,7 +294,7 @@ export function NotificationsView({
             variant="outline"
             size="sm"
             onClick={markAllRead}
-            disabled={isPending || items.length === 0 || unreadCount === 0}
+            disabled={isPending || optimisticItems.length === 0 || optimisticUnreadCount === 0}
           >
             Mark all read
           </Button>
@@ -263,7 +302,7 @@ export function NotificationsView({
             variant="outline"
             size="sm"
             onClick={clearAll}
-            disabled={isPending || items.length === 0}
+            disabled={isPending || optimisticItems.length === 0}
           >
             Clear all
           </Button>
@@ -293,8 +332,9 @@ export function NotificationsView({
                   <Icon
                     className={cn(
                       "h-5 w-5",
-                      (item.type === "workspace_generating" ||
-                        item.type === "workspace_checking_duplicates") &&
+                      item.status === "active" &&
+                        (item.type === "workspace_generating" ||
+                          item.type === "workspace_checking_duplicates") &&
                         "animate-spin"
                     )}
                   />
