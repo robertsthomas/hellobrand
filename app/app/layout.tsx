@@ -9,7 +9,7 @@ import {
   getCachedOnboardingState,
   getCachedProfile
 } from "@/lib/cached-data";
-import { generateNotifications } from "@/lib/notifications";
+import { listNotificationsForViewer } from "@/lib/notification-service";
 
 export default async function WorkspaceLayout({
   children
@@ -17,16 +17,17 @@ export default async function WorkspaceLayout({
   children: ReactNode;
 }) {
   const viewer = await requireViewer();
-  const [profile, onboardingState, dealAggregates] = await Promise.all([
+  const [profile, onboardingState, dealAggregates, notificationFeed] = await Promise.all([
     getCachedProfile(viewer),
     getCachedOnboardingState(viewer),
-    getCachedDealAggregates(viewer)
+    getCachedDealAggregates(viewer),
+    listNotificationsForViewer(viewer)
   ]);
 
   const isOnboardingComplete =
     !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;
-  const notifications = generateNotifications(dealAggregates);
+  const notifications = notificationFeed.notifications;
 
   // Show full-screen onboarding flow instead of the app
   if (!isOnboardingComplete) {

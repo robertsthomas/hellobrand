@@ -5,6 +5,17 @@ declare global {
   var __hellobrand_prisma__: PrismaClient | undefined;
 }
 
+function buildDatabaseUrl() {
+  const base = process.env.DATABASE_URL;
+  if (!base) return undefined;
+  // Limit connection pool size to avoid exhausting Supabase session-mode pooler
+  const url = new URL(base);
+  if (!url.searchParams.has("connection_limit")) {
+    url.searchParams.set("connection_limit", "5");
+  }
+  return url.toString();
+}
+
 export const prisma =
   global.__hellobrand_prisma__ ??
   new PrismaClient({
@@ -13,7 +24,7 @@ export const prisma =
       ? {
           datasources: {
             db: {
-              url: process.env.DATABASE_URL
+              url: buildDatabaseUrl()
             }
           }
         }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { emitWorkspaceNotificationForCurrentState } from "@/lib/notification-service";
 import { getProfileForViewer } from "@/lib/profile";
 import { assertViewerWithinUsageLimit } from "@/lib/billing/entitlements";
 import { getRepository } from "@/lib/repository";
@@ -434,6 +435,7 @@ export async function createIntakeSessionForViewer(
   }
 
   const synced = await syncIntakeSessionForDealId(draftDeal.id);
+  await emitWorkspaceNotificationForCurrentState(session.id);
   return synced ?? toIntakeSessionRecord(session);
 }
 
@@ -566,6 +568,7 @@ export async function appendDocumentsToIntakeSessionForViewer(
   });
 
   const synced = await syncIntakeSessionForDealId(session.dealId);
+  await emitWorkspaceNotificationForCurrentState(session.id);
   return synced ?? toIntakeSessionRecord(session);
 }
 
@@ -804,6 +807,7 @@ export async function retryIntakeSessionForViewer(viewer: Viewer, sessionId: str
   }
 
   const synced = await syncIntakeSessionForDealId(session.dealId);
+  await emitWorkspaceNotificationForCurrentState(session.id);
   return synced ?? toIntakeSessionRecord(session);
 }
 
@@ -862,6 +866,7 @@ export async function confirmIntakeSessionForViewer(
         errorMessage: null
       }
     });
+    await emitWorkspaceNotificationForCurrentState(session.id);
     return aggregate;
   }
 
@@ -971,6 +976,8 @@ export async function confirmIntakeSessionForViewer(
       errorMessage: null
     }
   });
+
+  await emitWorkspaceNotificationForCurrentState(session.id);
 
   return getDealForViewer(viewer, session.dealId);
 }

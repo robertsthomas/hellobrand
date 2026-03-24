@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
@@ -12,11 +12,12 @@ import {
   DollarSign,
   FileText,
   Loader2,
+  X,
   XCircle
 } from "lucide-react";
 
-import { AppTooltip } from "@/components/app-tooltip";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Sheet,
   SheetClose,
@@ -27,10 +28,9 @@ import {
 } from "@/components/ui/sheet";
 import {
   formatNotificationRelativeTime,
-  NOTIFICATIONS_READ_EVENT,
-  loadReadNotificationIds,
-  persistReadNotificationIds,
+  isNotificationUnread,
   type NotificationItem,
+  type NotificationListResponse,
   type NotificationType
 } from "@/lib/notifications";
 import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
@@ -44,9 +44,11 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   new_contract: FileText,
   payment_received: DollarSign,
   workspace_generating: Loader2,
+  workspace_checking_duplicates: Loader2,
   workspace_ready: CheckCircle2,
   workspace_failed: XCircle,
-  workspace_duplicate_found: Copy
+  workspace_duplicate_found: Copy,
+  workspace_confirmed: CheckCircle2
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -57,10 +59,25 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   new_contract: "text-blue-500",
   payment_received: "text-emerald-500",
   workspace_generating: "text-blue-500",
+  workspace_checking_duplicates: "text-blue-500",
   workspace_ready: "text-emerald-500",
   workspace_failed: "text-red-500",
-  workspace_duplicate_found: "text-amber-500"
+  workspace_duplicate_found: "text-amber-500",
+  workspace_confirmed: "text-emerald-500"
 };
+
+async function fetchNotifications() {
+  const response = await fetch("/api/notifications?limit=100", {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not load notifications.");
+  }
+
+  return (await response.json()) as NotificationListResponse;
+}
 
 export function NotificationsCenter({
   notifications
@@ -69,25 +86,29 @@ export function NotificationsCenter({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const [showGenerationHint, setShowGenerationHint] = useState(false);
-  const [readIds, setReadIds] = useState<Set<string>>(loadReadNotificationIds);
-
-  const previewItems = useMemo(() => notifications.slice(0, 6), [notifications]);
-  const unreadCount = useMemo(
-    () => notifications.filter((item) => !readIds.has(item.id)).length,
-    [notifications, readIds]
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [items, setItems] = useState<NotificationItem[]>(notifications);
+  const [unreadCount, setUnreadCount] = useState(
+    notifications.filter(isNotificationUnread).length
   );
 
   useEffect(() => {
-    const syncReadIds = () => setReadIds(loadReadNotificationIds());
+    setItems(notifications);
+    setUnreadCount(notifications.filter(isNotificationUnread).length);
+  }, [notifications]);
 
-    window.addEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
-    window.addEventListener("storage", syncReadIds);
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    setIsMobileViewport(mediaQuery.matches);
 
-    return () => {
-      window.removeEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
-      window.removeEventListener("storage", syncReadIds);
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobileViewport(event.matches);
     };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   useEffect(() => {
@@ -97,9 +118,7 @@ export function NotificationsCenter({
     }
 
     const shouldShowHint =
-      window.sessionStorage.getItem(
-        WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY
-      ) === "1";
+      window.sessionStorage.getItem(WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY) === "1";
 
     if (!shouldShowHint) {
       return;
@@ -112,31 +131,124 @@ export function NotificationsCenter({
       setShowGenerationHint(false);
     }, 7000);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    return () => window.clearTimeout(timeoutId);
   }, [pathname]);
 
-  const markRead = useCallback((id: string) => {
-    setReadIds((prev) => {
-      if (prev.has(id)) {
-        return prev;
-      }
-
-      const next = new Set(prev);
-      next.add(id);
-      persistReadNotificationIds(next);
-      return next;
-    });
+  const refresh = useCallback(async () => {
+    const next = await fetchNotifications();
+    setItems(next.notifications);
+    setUnreadCount(next.unreadCount);
   }, []);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void refresh();
+  }, [open, refresh]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleFocus = () => {
+      void refresh();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [open, refresh]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [open, refresh]);
+
+  const markNotification = useCallback(
+    (id: string, action: "mark_read" | "mark_unread" | "clear") => {
+      startTransition(async () => {
+        const response = await fetch(`/api/notifications/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ action })
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        await refresh();
+      });
+    },
+    [refresh]
+  );
+
   const markAllRead = useCallback(() => {
-    setReadIds(() => {
-      const next = new Set(notifications.map((item) => item.id));
-      persistReadNotificationIds(next);
-      return next;
+    startTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "mark_all_read" })
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      await refresh();
     });
-  }, [notifications]);
+  }, [refresh]);
+
+  const clearAll = useCallback(() => {
+    startTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "clear_all" })
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      await refresh();
+    });
+  }, [refresh]);
+
+  const previewItems = useMemo(() => items.slice(0, 6), [items]);
+
+  const notificationTrigger = (
+    <button
+      type="button"
+      aria-label="Open notifications"
+      onClick={() => {
+        setShowGenerationHint(false);
+        setOpen(true);
+      }}
+      data-guide="header-notifications"
+      className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
+    >
+      <Bell className="h-5 w-5" />
+      {unreadCount > 0 ? (
+        <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+      ) : null}
+    </button>
+  );
 
   return (
     <Sheet
@@ -149,30 +261,81 @@ export function NotificationsCenter({
         setOpen(nextOpen);
       }}
     >
-      <AppTooltip
-        content="Check the notifications drawer for finished workspace generations."
-        delayDuration={0}
-        side="bottom"
-        sideOffset={10}
-        open={showGenerationHint}
-        onOpenChange={setShowGenerationHint}
-      >
-        <button
-          type="button"
-          aria-label="Open notifications"
-          onClick={() => {
-            setShowGenerationHint(false);
-            setOpen(true);
-          }}
-          data-guide="header-notifications"
-          className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
-        >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 ? (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
-          ) : null}
-        </button>
-      </AppTooltip>
+      {isMobileViewport ? (
+        notificationTrigger
+      ) : (
+        <Popover open={showGenerationHint} onOpenChange={setShowGenerationHint}>
+          <PopoverTrigger asChild>{notificationTrigger}</PopoverTrigger>
+          <PopoverContent
+            align="end"
+            side="bottom"
+            sideOffset={14}
+            className="border-black/10 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-[#1a1d24]"
+          >
+            <div className="absolute -top-1.5 right-8 h-3 w-3 rotate-45 border border-black/10 border-b-0 border-r-0 bg-white dark:border-white/10 dark:bg-[#1a1d24]" />
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-sm font-semibold text-ink dark:text-white">
+                Workspace generation started
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowGenerationHint(false)}
+                className="shrink-0 rounded-sm p-1 text-black/40 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+                aria-label="Dismiss workspace generation tip"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-5 text-black/60 dark:text-white/65">
+              Check the notifications drawer for finished workspace generations.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowGenerationHint(false)}
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "mt-3 h-9 w-full bg-primary text-xs text-primary-foreground hover:bg-primary/90"
+              )}
+            >
+              Got it
+            </button>
+          </PopoverContent>
+        </Popover>
+      )}
+
+      {isMobileViewport && showGenerationHint ? (
+        <div className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+4.75rem)] z-40 border border-black/10 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-[#1a1d24]">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-sm font-semibold text-ink dark:text-white">
+              Workspace generation started
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowGenerationHint(false)}
+              className="shrink-0 rounded-sm p-1 text-black/40 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+              aria-label="Dismiss workspace generation tip"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p className="mt-1.5 text-[13px] leading-5 text-black/60 dark:text-white/65">
+            Check the notifications drawer for finished workspace generations.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setShowGenerationHint(false);
+              setOpen(true);
+            }}
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "mt-3 h-9 w-full bg-primary text-xs text-primary-foreground hover:bg-primary/90"
+            )}
+          >
+            Open notifications
+          </button>
+        </div>
+      ) : null}
 
       <SheetContent side="right" className="w-full gap-0 border-l border-border px-0 sm:max-w-md">
         <SheetHeader className="border-b border-border px-5 py-5">
@@ -180,18 +343,29 @@ export function NotificationsCenter({
             <div>
               <SheetTitle className="text-lg">Notifications</SheetTitle>
               <SheetDescription className="mt-1">
-                Quick updates from your deals, deadlines, and payments.
+                Quick updates from your workspaces, partnerships, deadlines, and payments.
               </SheetDescription>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={markAllRead}
-              disabled={notifications.length === 0 || unreadCount === 0}
-            >
-              Mark all read
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={markAllRead}
+                disabled={isPending || items.length === 0 || unreadCount === 0}
+              >
+                Mark all read
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={clearAll}
+                disabled={isPending || items.length === 0}
+              >
+                Clear all
+              </Button>
+            </div>
           </div>
         </SheetHeader>
 
@@ -206,13 +380,20 @@ export function NotificationsCenter({
             <div className="divide-y divide-border">
               {previewItems.map((item) => {
                 const Icon = TYPE_ICONS[item.type];
-                const isUnread = !readIds.has(item.id);
+                const isUnread = isNotificationUnread(item);
 
                 return (
                   <div key={item.id} className="px-5 py-4">
                     <div className="flex items-start gap-3">
                       <div className={cn("mt-0.5 shrink-0", TYPE_COLORS[item.type])}>
-                        <Icon className={cn("h-4.5 w-4.5", item.type === "workspace_generating" && "animate-spin")} />
+                        <Icon
+                          className={cn(
+                            "h-4.5 w-4.5",
+                            (item.type === "workspace_generating" ||
+                              item.type === "workspace_checking_duplicates") &&
+                              "animate-spin"
+                          )}
+                        />
                       </div>
                       <div className="mt-1 h-2 w-2 shrink-0">
                         {isUnread ? <div className="h-2 w-2 rounded-full bg-red-500" /> : null}
@@ -237,22 +418,36 @@ export function NotificationsCenter({
                         <div className="mt-3 flex items-center gap-3">
                           <SheetClose asChild>
                             <Link
-                              href={`/app/deals/${item.dealId}`}
-                              onClick={() => markRead(item.id)}
+                              href={item.href}
+                              onClick={() => {
+                                if (isUnread) {
+                                  markNotification(item.id, "mark_read");
+                                }
+                              }}
                               className="text-xs font-medium text-foreground transition hover:text-primary"
                             >
                               View details
                             </Link>
                           </SheetClose>
-                          {isUnread ? (
-                            <button
-                              type="button"
-                              onClick={() => markRead(item.id)}
-                              className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
-                            >
-                              Mark read
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              markNotification(
+                                item.id,
+                                isUnread ? "mark_read" : "mark_unread"
+                              )
+                            }
+                            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+                          >
+                            {isUnread ? "Mark read" : "Mark unread"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => markNotification(item.id, "clear")}
+                            className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+                          >
+                            Clear
+                          </button>
                         </div>
                       </div>
                     </div>

@@ -2,9 +2,8 @@ import { Suspense } from "react";
 
 import { NotificationsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
-import { getCachedDealAggregates } from "@/lib/cached-data";
 import { NotificationsView } from "@/components/notifications-view";
-import { generateNotifications } from "@/lib/notifications";
+import { listNotificationsForViewer } from "@/lib/notification-service";
 
 export default function NotificationsSettingsPage() {
   return (
@@ -16,8 +15,7 @@ export default function NotificationsSettingsPage() {
 
 async function NotificationsContent() {
   const viewer = await requireViewer();
-  const aggregates = await getCachedDealAggregates(viewer);
-  const notifications = generateNotifications(aggregates);
+  const notificationFeed = await listNotificationsForViewer(viewer);
 
-  return <NotificationsView notifications={notifications} />;
+  return <NotificationsView notifications={notificationFeed.notifications} />;
 }

@@ -1,3 +1,6 @@
+import { revalidateTag } from "next/cache";
+
+import { emitWorkspaceNotificationForSession } from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
 import type { IntakeSessionRecord } from "@/lib/types";
 
@@ -130,6 +133,11 @@ export async function startQueuedIntakeSessionById(
 
   await enqueuePendingDocumentsForDeal(claimed.dealId);
 
+  // Invalidate cache so the "workspace generating" notification appears immediately
+  revalidateTag(`user-${claimed.userId}-deals`, "max");
+  revalidateTag(`user-${claimed.userId}-notifications`, "max");
+  await emitWorkspaceNotificationForSession(claimed.id, "workspace.processing_started");
+
   return {
     id: claimed.id,
     userId: claimed.userId,
@@ -184,5 +192,8 @@ export async function startNextQueuedIntakeSessionForUser(
   }
 
   await enqueuePendingDocumentsForDeal(claimed.dealId);
+  revalidateTag(`user-${claimed.userId}-deals`, "max");
+  revalidateTag(`user-${claimed.userId}-notifications`, "max");
+  await emitWorkspaceNotificationForSession(claimed.id, "workspace.processing_started");
   return claimed.id;
 }

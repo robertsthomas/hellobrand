@@ -163,6 +163,13 @@ export function CustomAuthScreen() {
       return;
     }
 
+    if (!preferredSecondFactor.phoneNumberId) {
+      setErrorMessages([
+        "Your account requires SMS verification, but the phone destination could not be loaded."
+      ]);
+      return;
+    }
+
     await result.prepareSecondFactor({
       strategy: "phone_code",
       phoneNumberId: preferredSecondFactor.phoneNumberId
@@ -369,7 +376,13 @@ export function CustomAuthScreen() {
           strategy: "email_code",
           emailAddressId: signInSecondFactor.emailAddressId
         });
-      } else {
+      } else if (signInSecondFactor.strategy === "phone_code") {
+        if (!signInSecondFactor.phoneNumberId) {
+          throw new Error(
+            "Your account requires SMS verification, but the phone destination could not be loaded."
+          );
+        }
+
         await signIn.prepareSecondFactor({
           strategy: "phone_code",
           phoneNumberId: signInSecondFactor.phoneNumberId

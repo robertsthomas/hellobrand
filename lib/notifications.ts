@@ -1,5 +1,27 @@
-import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-import type { DealAggregate } from "@/lib/types";
+export type NotificationCategory =
+  | "workspace"
+  | "payments"
+  | "deadlines"
+  | "risks"
+  | "contracts"
+  | "approvals";
+
+export type NotificationStatus = "active" | "cleared" | "superseded";
+
+export type NotificationEventType =
+  | "workspace.queued"
+  | "workspace.processing_started"
+  | "workspace.ready_for_review"
+  | "workspace.failed"
+  | "workspace.duplicate_checking"
+  | "workspace.duplicates_found"
+  | "workspace.confirmed"
+  | "payment.overdue"
+  | "payment.received"
+  | "deadline.upcoming"
+  | "risk.contract"
+  | "document.ready"
+  | "deliverable.approved";
 
 export type NotificationType =
   | "payment_overdue"
@@ -9,199 +31,275 @@ export type NotificationType =
   | "new_contract"
   | "payment_received"
   | "workspace_generating"
+  | "workspace_checking_duplicates"
   | "workspace_ready"
   | "workspace_failed"
-  | "workspace_duplicate_found";
+  | "workspace_duplicate_found"
+  | "workspace_confirmed";
 
 export interface NotificationItem {
   id: string;
+  category: NotificationCategory;
+  eventType: NotificationEventType;
   type: NotificationType;
+  status: NotificationStatus;
+  entityType: string;
+  entityId: string;
   title: string;
   description: string;
-  dealId: string;
+  href: string;
+  dealId: string | null;
+  sessionId: string | null;
   createdAt: string;
+  updatedAt: string;
+  readAt: string | null;
+  clearedAt: string | null;
+  supersededAt: string | null;
+  read: boolean;
 }
 
-export const NOTIFICATIONS_READ_STORAGE_KEY = "hellobrand:notifications:read";
-export const NOTIFICATIONS_READ_EVENT = "hellobrand:notifications:read-change";
+export interface NotificationListResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}
 
-export function generateNotifications(aggregates: DealAggregate[]): NotificationItem[] {
-  const items: NotificationItem[] = [];
+export interface NotificationSeed {
+  category: NotificationCategory;
+  eventType: NotificationEventType;
+  entityType: string;
+  entityId: string;
+  sessionId?: string | null;
+  dealId?: string | null;
+  title: string;
+  description: string;
+  href: string;
+  dedupeKey: string;
+  createdAt?: Date | string;
+}
 
-  for (const aggregate of aggregates) {
-    const { deal, documents, riskFlags, terms } = aggregate;
-    const normalized = buildNormalizedIntakeRecord(aggregate);
-    const brandName = normalized?.brandName ?? deal.brandName;
-    const paymentAmount = terms?.paymentAmount;
-    const currency = terms?.currency ?? "USD";
-    const formattedAmount = paymentAmount
-      ? new Intl.NumberFormat("en-US", { style: "currency", currency }).format(paymentAmount)
-      : null;
+const WORKSPACE_SUPERSESSION_MAP: Partial<
+  Record<NotificationEventType, NotificationEventType[]>
+> = {
+  "workspace.processing_started": ["workspace.queued", "workspace.failed"],
+  "workspace.ready_for_review": [
+    "workspace.queued",
+    "workspace.processing_started",
+    "workspace.failed"
+  ],
+  "workspace.failed": ["workspace.queued", "workspace.processing_started"],
+  "workspace.duplicates_found": ["workspace.duplicate_checking"],
+  "workspace.confirmed": [
+    "workspace.queued",
+    "workspace.processing_started",
+    "workspace.ready_for_review",
+    "workspace.failed",
+    "workspace.duplicate_checking",
+    "workspace.duplicates_found"
+  ]
+};
 
-    if (deal.paymentStatus === "late") {
-      items.push({
-        id: `payment-overdue-${deal.id}`,
-        type: "payment_overdue",
-        title: `${brandName} payment is overdue`,
-        description: formattedAmount
-          ? `Payment of ${formattedAmount} is overdue and needs follow-up.`
-          : "Payment is overdue and needs follow-up.",
-        dealId: deal.id,
-        createdAt: deal.updatedAt
-      });
-    }
-
-    if (deal.paymentStatus === "paid") {
-      items.push({
-        id: `payment-received-${deal.id}`,
-        type: "payment_received",
-        title: `${brandName} payment received`,
-        description: formattedAmount
-          ? `${brandName} paid ${formattedAmount}.`
-          : `Payment has been received from ${brandName}.`,
-        dealId: deal.id,
-        createdAt: deal.updatedAt
-      });
-    }
-
-    const deliverables = terms?.deliverables ?? [];
-    for (const deliverable of deliverables) {
-      if (deliverable.dueDate) {
-        const daysUntil = Math.ceil(
-          (new Date(deliverable.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-
-        if (daysUntil >= 0 && daysUntil <= 7) {
-          items.push({
-            id: `deadline-${deal.id}-${deliverable.id}`,
-            type: "upcoming_deadline",
-            title: `${deliverable.title} due${daysUntil === 0 ? " today" : ` in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`}`,
-            description: `${deliverable.title} for ${brandName} is coming up.`,
-            dealId: deal.id,
-            createdAt: deliverable.dueDate
-          });
-        }
-      }
-
-      if (deliverable.status === "completed") {
-        items.push({
-          id: `approved-${deal.id}-${deliverable.id}`,
-          type: "deliverable_approved",
-          title: `${deliverable.title} approved`,
-          description: `Your ${deliverable.title} ${deliverable.channel ? `on ${deliverable.channel} ` : ""}was approved by ${brandName}.`,
-          dealId: deal.id,
-          createdAt: deal.updatedAt
-        });
-      }
-    }
-
-    const highRisks = riskFlags.filter((flag) => flag.severity === "high");
-    if (highRisks.length > 0) {
-      items.push({
-        id: `risk-${deal.id}`,
-        type: "contract_risk",
-        title: `${brandName} contract has ${highRisks.length} risk flag${highRisks.length === 1 ? "" : "s"}`,
-        description: `Review ${highRisks.length} high-severity item${highRisks.length === 1 ? "" : "s"} before signing.`,
-        dealId: deal.id,
-        createdAt: highRisks[0].createdAt
-      });
-    }
-
-    const readyDocuments = documents.filter((doc) => doc.processingStatus === "ready");
-    for (const doc of readyDocuments) {
-      items.push({
-        id: `contract-${doc.id}`,
-        type: "new_contract",
-        title: `${doc.fileName} processing complete`,
-        description: `${brandName} contract document is ready for review.`,
-        dealId: deal.id,
-        createdAt: doc.updatedAt
-      });
-    }
-
-    const { intakeSession } = aggregate;
-    if (intakeSession) {
-      if (
-        intakeSession.status === "processing" ||
-        intakeSession.status === "queued" ||
-        intakeSession.status === "uploading"
-      ) {
-        items.push({
-          id: `workspace-generating-${deal.id}`,
-          type: "workspace_generating",
-          title: `${brandName} workspace is generating`,
-          description: "Your workspace is being analyzed. We'll notify you when it's ready.",
-          dealId: deal.id,
-          createdAt: intakeSession.updatedAt
-        });
-      }
-
-      if (
-        intakeSession.status === "ready_for_confirmation" ||
-        intakeSession.status === "completed"
-      ) {
-        items.push({
-          id: `workspace-ready-${deal.id}`,
-          type: "workspace_ready",
-          title: `${brandName} workspace is ready`,
-          description: "Your workspace has been analyzed and is ready for review.",
-          dealId: deal.id,
-          createdAt: intakeSession.updatedAt
-        });
-      }
-
-      if (intakeSession.status === "failed") {
-        items.push({
-          id: `workspace-failed-${deal.id}`,
-          type: "workspace_failed",
-          title: `${brandName} workspace processing failed`,
-          description: intakeSession.errorMessage ?? "Something went wrong processing your documents.",
-          dealId: deal.id,
-          createdAt: intakeSession.updatedAt
-        });
-      }
-
-      if (intakeSession.duplicateCheckStatus === "duplicates_found" && intakeSession.duplicateMatchJson) {
-        const matches = intakeSession.duplicateMatchJson as Array<{ brandName?: string }>;
-        const matchBrand = matches[0]?.brandName ?? "an existing workspace";
-        items.push({
-          id: `workspace-duplicate-${deal.id}`,
-          type: "workspace_duplicate_found",
-          title: `Possible duplicate: ${brandName}`,
-          description: `This workspace may overlap with ${matchBrand}. Review to merge or keep separate.`,
-          dealId: deal.id,
-          createdAt: intakeSession.updatedAt
-        });
-      }
-    }
+export function notificationTypeForEventType(
+  eventType: NotificationEventType
+): NotificationType {
+  switch (eventType) {
+    case "payment.overdue":
+      return "payment_overdue";
+    case "payment.received":
+      return "payment_received";
+    case "deadline.upcoming":
+      return "upcoming_deadline";
+    case "risk.contract":
+      return "contract_risk";
+    case "document.ready":
+      return "new_contract";
+    case "deliverable.approved":
+      return "deliverable_approved";
+    case "workspace.queued":
+    case "workspace.processing_started":
+      return "workspace_generating";
+    case "workspace.ready_for_review":
+      return "workspace_ready";
+    case "workspace.failed":
+      return "workspace_failed";
+    case "workspace.duplicate_checking":
+      return "workspace_checking_duplicates";
+    case "workspace.duplicates_found":
+      return "workspace_duplicate_found";
+    case "workspace.confirmed":
+      return "workspace_confirmed";
   }
+}
 
-  return items.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+export function isNotificationUnread(notification: NotificationItem) {
+  return notification.readAt === null;
+}
+
+function workspaceNotificationHref(input: {
+  eventType: NotificationEventType;
+  sessionId: string;
+  dealId: string;
+}) {
+  switch (input.eventType) {
+    case "workspace.ready_for_review":
+    case "workspace.failed":
+    case "workspace.duplicates_found":
+      return `/app/intake/${input.sessionId}/review`;
+    case "workspace.confirmed":
+      return `/app/deals/${input.dealId}`;
+    default:
+      return `/app/intake/${input.sessionId}`;
+  }
+}
+
+function workspaceLabel(input: {
+  brandName?: string | null;
+  campaignName?: string | null;
+  draftBrandName?: string | null;
+  draftCampaignName?: string | null;
+}) {
+  return (
+    input.draftBrandName?.trim() ||
+    input.brandName?.trim() ||
+    input.draftCampaignName?.trim() ||
+    input.campaignName?.trim() ||
+    "Workspace"
   );
 }
 
-export function loadReadNotificationIds() {
-  if (typeof window === "undefined") {
-    return new Set<string>();
-  }
-
-  try {
-    const raw = localStorage.getItem(NOTIFICATIONS_READ_STORAGE_KEY);
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set<string>();
-  } catch {
-    return new Set<string>();
-  }
+export function getWorkspaceSupersededEventTypes(
+  eventType: NotificationEventType
+) {
+  return [...(WORKSPACE_SUPERSESSION_MAP[eventType] ?? [])];
 }
 
-export function persistReadNotificationIds(ids: Set<string>) {
-  try {
-    localStorage.setItem(NOTIFICATIONS_READ_STORAGE_KEY, JSON.stringify([...ids]));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event(NOTIFICATIONS_READ_EVENT));
+export function buildWorkspaceNotificationSeed(input: {
+  sessionId: string;
+  dealId: string;
+  brandName?: string | null;
+  campaignName?: string | null;
+  draftBrandName?: string | null;
+  draftCampaignName?: string | null;
+  errorMessage?: string | null;
+  duplicateMatchJson?: unknown | null;
+  createdAt?: Date | string;
+  eventType: NotificationEventType;
+}): NotificationSeed {
+  const label = workspaceLabel(input);
+  const href = workspaceNotificationHref({
+    eventType: input.eventType,
+    sessionId: input.sessionId,
+    dealId: input.dealId
+  });
+
+  switch (input.eventType) {
+    case "workspace.queued":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace is queued`,
+        description:
+          "Your workspace is queued for analysis. We'll notify you when processing begins and when it's ready.",
+        href,
+        dedupeKey: `workspace.queued:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.processing_started":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace is generating`,
+        description: "Your workspace is being analyzed. We'll notify you when it's ready.",
+        href,
+        dedupeKey: `workspace.processing_started:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.ready_for_review":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace is ready for review`,
+        description: "Your workspace has been analyzed and is ready for review.",
+        href,
+        dedupeKey: `workspace.ready_for_review:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.failed":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace processing failed`,
+        description:
+          input.errorMessage?.trim() || "Something went wrong processing your documents.",
+        href,
+        dedupeKey: `workspace.failed:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.duplicate_checking":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `Checking ${label} for duplicates`,
+        description: "We're checking if this workspace overlaps with any existing ones.",
+        href,
+        dedupeKey: `workspace.duplicate_checking:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.duplicates_found": {
+      const matches = Array.isArray(input.duplicateMatchJson)
+        ? (input.duplicateMatchJson as Array<{ brandName?: string | null }>)
+        : [];
+      const matchBrand = matches[0]?.brandName?.trim() || "an existing workspace";
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `Possible duplicate: ${label}`,
+        description: `This workspace may overlap with ${matchBrand}. Review to merge or keep separate.`,
+        href,
+        dedupeKey: `workspace.duplicates_found:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
     }
-  } catch {
-    // localStorage unavailable
+    case "workspace.confirmed":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `${label} workspace confirmed`,
+        description: "This workspace has been reviewed and moved into your active partnerships.",
+        href,
+        dedupeKey: `workspace.confirmed:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    default:
+      throw new Error(`Unsupported workspace notification event: ${input.eventType}`);
   }
 }
 

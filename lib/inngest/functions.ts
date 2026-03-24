@@ -37,10 +37,17 @@ export const checkWorkspaceDuplicatesFunction = inngest.createFunction(
 
     await step.run("mark-checking", async () => {
       const { prisma } = await import("@/lib/prisma");
+      const { emitWorkspaceNotificationForSession } = await import(
+        "@/lib/notification-service"
+      );
       await prisma.intakeSession.update({
         where: { id: sessionId },
         data: { duplicateCheckStatus: "checking" }
       });
+      await emitWorkspaceNotificationForSession(
+        sessionId,
+        "workspace.duplicate_checking"
+      );
     });
 
     const matches = await step.run("find-duplicates", async () => {
@@ -71,6 +78,11 @@ export const checkWorkspaceDuplicatesFunction = inngest.createFunction(
     });
 
     await step.run("save-results", async () => {
+      const { revalidateTag } = await import("next/cache");
+      const {
+        emitWorkspaceNotificationForSession,
+        supersedeWorkspaceNotificationEvents
+      } = await import("@/lib/notification-service");
       const { prisma } = await import("@/lib/prisma");
       await prisma.intakeSession.update({
         where: { id: sessionId },
@@ -79,6 +91,21 @@ export const checkWorkspaceDuplicatesFunction = inngest.createFunction(
           duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
         }
       });
+
+      // Invalidate cached deals so the notification appears on the dashboard
+      revalidateTag(`user-${userId}-deals`, "max");
+      revalidateTag(`user-${userId}-notifications`, "max");
+
+      if (matches.length > 0) {
+        await emitWorkspaceNotificationForSession(
+          sessionId,
+          "workspace.duplicates_found"
+        );
+      } else {
+        await supersedeWorkspaceNotificationEvents(userId, sessionId, [
+          "workspace.duplicate_checking"
+        ]);
+      }
     });
 
     return {

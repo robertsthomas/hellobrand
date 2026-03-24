@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -13,15 +13,16 @@ import {
   Settings,
   XCircle
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   formatNotificationRelativeTime,
-  NOTIFICATIONS_READ_EVENT,
-  loadReadNotificationIds,
-  persistReadNotificationIds,
+  isNotificationUnread,
   type NotificationItem,
+  type NotificationListResponse,
   type NotificationType
 } from "@/lib/notifications";
+import { cn } from "@/lib/utils";
 
 type FilterTab = "all" | "unread" | "payments" | "deadlines" | "risks" | "workspaces";
 
@@ -42,9 +43,11 @@ const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
   new_contract: FileText,
   payment_received: DollarSign,
   workspace_generating: Loader2,
+  workspace_checking_duplicates: Loader2,
   workspace_ready: CheckCircle2,
   workspace_failed: XCircle,
-  workspace_duplicate_found: Copy
+  workspace_duplicate_found: Copy,
+  workspace_confirmed: CheckCircle2
 };
 
 const TYPE_COLORS: Record<NotificationType, string> = {
@@ -55,34 +58,40 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   new_contract: "text-blue-500",
   payment_received: "text-emerald-500",
   workspace_generating: "text-blue-500",
+  workspace_checking_duplicates: "text-blue-500",
   workspace_ready: "text-emerald-500",
   workspace_failed: "text-red-500",
-  workspace_duplicate_found: "text-amber-500"
+  workspace_duplicate_found: "text-amber-500",
+  workspace_confirmed: "text-emerald-500"
 };
 
-function matchesFilter(
-  item: NotificationItem,
-  filter: FilterTab,
-  readIds: Set<string>
-): boolean {
+async function fetchNotifications() {
+  const response = await fetch("/api/notifications?limit=200", {
+    method: "GET",
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not load notifications.");
+  }
+
+  return (await response.json()) as NotificationListResponse;
+}
+
+function matchesFilter(item: NotificationItem, filter: FilterTab): boolean {
   switch (filter) {
     case "all":
       return true;
     case "unread":
-      return !readIds.has(item.id);
+      return isNotificationUnread(item);
     case "payments":
-      return item.type === "payment_overdue" || item.type === "payment_received";
+      return item.category === "payments";
     case "deadlines":
-      return item.type === "upcoming_deadline";
+      return item.category === "deadlines";
     case "risks":
-      return item.type === "contract_risk";
+      return item.category === "risks";
     case "workspaces":
-      return (
-        item.type === "workspace_generating" ||
-        item.type === "workspace_ready" ||
-        item.type === "workspace_failed" ||
-        item.type === "workspace_duplicate_found"
-      );
+      return item.category === "workspace";
     default:
       return true;
   }
@@ -94,71 +103,117 @@ export function NotificationsView({
   notifications: NotificationItem[];
 }) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
-  const [readIds, setReadIds] = useState<Set<string>>(loadReadNotificationIds);
+  const [isPending, startTransition] = useTransition();
+  const [items, setItems] = useState<NotificationItem[]>(notifications);
+  const [unreadCount, setUnreadCount] = useState(
+    notifications.filter(isNotificationUnread).length
+  );
 
   useEffect(() => {
-    const syncReadIds = () => setReadIds(loadReadNotificationIds());
+    setItems(notifications);
+    setUnreadCount(notifications.filter(isNotificationUnread).length);
+  }, [notifications]);
 
-    window.addEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
-    window.addEventListener("storage", syncReadIds);
-
-    return () => {
-      window.removeEventListener(NOTIFICATIONS_READ_EVENT, syncReadIds);
-      window.removeEventListener("storage", syncReadIds);
-    };
+  const refresh = useCallback(async () => {
+    const next = await fetchNotifications();
+    setItems(next.notifications);
+    setUnreadCount(next.unreadCount);
   }, []);
 
-  const markRead = useCallback(
-    (id: string) => {
-      setReadIds((prev) => {
-        const next = new Set(prev);
-        next.add(id);
-        persistReadNotificationIds(next);
-        return next;
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void refresh();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refresh]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refresh();
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [refresh]);
+
+  const markNotification = useCallback(
+    (id: string, action: "mark_read" | "mark_unread" | "clear") => {
+      startTransition(async () => {
+        const response = await fetch(`/api/notifications/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ action })
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        await refresh();
       });
     },
-    []
+    [refresh]
   );
 
   const markAllRead = useCallback(() => {
-    setReadIds(() => {
-      const next = new Set(notifications.map((n) => n.id));
-      persistReadNotificationIds(next);
-      return next;
-    });
-  }, [notifications]);
+    startTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "mark_all_read" })
+      });
 
-  const clearRead = useCallback(() => {
-    setReadIds(() => {
-      persistReadNotificationIds(new Set());
-      return new Set();
+      if (!response.ok) {
+        return;
+      }
+
+      await refresh();
     });
-  }, []);
+  }, [refresh]);
+
+  const clearAll = useCallback(() => {
+    startTransition(async () => {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "clear_all" })
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      await refresh();
+    });
+  }, [refresh]);
 
   const filtered = useMemo(
-    () => notifications.filter((n) => matchesFilter(n, activeFilter, readIds)),
-    [notifications, activeFilter, readIds]
+    () => items.filter((item) => matchesFilter(item, activeFilter)),
+    [items, activeFilter]
   );
 
   const tabCounts = useMemo(() => {
     const counts: Record<FilterTab, number> = {
-      all: notifications.length,
-      unread: notifications.filter((n) => !readIds.has(n.id)).length,
-      workspaces: notifications.filter(
-        (n) =>
-          n.type === "workspace_generating" ||
-          n.type === "workspace_ready" ||
-          n.type === "workspace_failed" ||
-          n.type === "workspace_duplicate_found"
-      ).length,
-      payments: notifications.filter(
-        (n) => n.type === "payment_overdue" || n.type === "payment_received"
-      ).length,
-      deadlines: notifications.filter((n) => n.type === "upcoming_deadline").length,
-      risks: notifications.filter((n) => n.type === "contract_risk").length
+      all: items.length,
+      unread: unreadCount,
+      workspaces: items.filter((item) => item.category === "workspace").length,
+      payments: items.filter((item) => item.category === "payments").length,
+      deadlines: items.filter((item) => item.category === "deadlines").length,
+      risks: items.filter((item) => item.category === "risks").length
     };
     return counts;
-  }, [notifications, readIds]);
+  }, [items, unreadCount]);
 
   return (
     <div className="space-y-6">
@@ -168,7 +223,7 @@ export function NotificationsView({
             Notifications
           </h1>
           <p className="mt-2 text-muted-foreground">
-            Stay updated on your partnerships and contracts
+            Stay updated on your workspaces, deadlines, payments, and partnership activity.
           </p>
         </div>
         <Button variant="outline" size="icon" aria-label="Notification settings">
@@ -196,11 +251,21 @@ export function NotificationsView({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={markAllRead}>
-            Mark All Read
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={markAllRead}
+            disabled={isPending || items.length === 0 || unreadCount === 0}
+          >
+            Mark all read
           </Button>
-          <Button variant="outline" size="sm" onClick={clearRead}>
-            Clear Read
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearAll}
+            disabled={isPending || items.length === 0}
+          >
+            Clear all
           </Button>
         </div>
       </div>
@@ -217,16 +282,22 @@ export function NotificationsView({
         ) : (
           filtered.map((item) => {
             const Icon = TYPE_ICONS[item.type];
-            const color = TYPE_COLORS[item.type];
-            const isUnread = !readIds.has(item.id);
+            const isUnread = isNotificationUnread(item);
 
             return (
               <div
                 key={item.id}
                 className="flex items-start gap-4 border-b border-black/8 px-5 py-4 transition-colors last:border-b-0 hover:bg-[#f6f7f8] dark:border-white/8 dark:hover:bg-white/[0.04]"
               >
-                <div className={`mt-0.5 shrink-0 ${color}`}>
-                  <Icon className={`h-5 w-5${item.type === "workspace_generating" ? " animate-spin" : ""}`} />
+                <div className={cn("mt-0.5 shrink-0", TYPE_COLORS[item.type])}>
+                  <Icon
+                    className={cn(
+                      "h-5 w-5",
+                      (item.type === "workspace_generating" ||
+                        item.type === "workspace_checking_duplicates") &&
+                        "animate-spin"
+                    )}
+                  />
                 </div>
 
                 {isUnread ? (
@@ -249,20 +320,32 @@ export function NotificationsView({
                     {formatNotificationRelativeTime(item.createdAt)}
                   </span>
                   <Link
-                    href={`/app/deals/${item.dealId}`}
+                    href={item.href}
+                    onClick={() => {
+                      if (isUnread) {
+                        markNotification(item.id, "mark_read");
+                      }
+                    }}
                     className="text-xs font-medium text-foreground transition hover:text-primary"
                   >
-                    View Details
+                    View details
                   </Link>
-                  {isUnread ? (
-                    <button
-                      type="button"
-                      onClick={() => markRead(item.id)}
-                      className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
-                    >
-                      Mark Read
-                    </button>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      markNotification(item.id, isUnread ? "mark_read" : "mark_unread")
+                    }
+                    className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+                  >
+                    {isUnread ? "Mark read" : "Mark unread"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => markNotification(item.id, "clear")}
+                    className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
             );

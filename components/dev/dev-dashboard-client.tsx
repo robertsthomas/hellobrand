@@ -17,7 +17,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NOTIFICATIONS_READ_STORAGE_KEY } from "@/lib/notifications";
 import type { DevDashboardSnapshot, DevDashboardViewer } from "@/lib/dev-dashboard";
 import {
   clearLocalWorkspaces,
@@ -32,6 +31,8 @@ type ResetAction =
   | "clear_both";
 
 const ASSISTANT_TONE_STORAGE_KEY = "hb-assistant-tone";
+const LEGACY_NOTIFICATION_READ_STORAGE_KEY = "hellobrand:notifications:read";
+const LEGACY_TRANSIENT_NOTIFICATION_STORAGE_KEY = "hellobrand:notifications:transient";
 
 function formatCount(value: number | null) {
   if (value === null) {
@@ -120,8 +121,9 @@ export function DevDashboardClient({
         await clearLocalWorkspaces(localWorkspaceIds);
       }
 
-      window.localStorage.removeItem(NOTIFICATIONS_READ_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_NOTIFICATION_READ_STORAGE_KEY);
       window.localStorage.removeItem(ASSISTANT_TONE_STORAGE_KEY);
+      window.sessionStorage.removeItem(LEGACY_TRANSIENT_NOTIFICATION_STORAGE_KEY);
 
       if ("indexedDB" in window) {
         window.indexedDB.deleteDatabase("hellobrand-local-workspace-queue");
@@ -211,7 +213,7 @@ export function DevDashboardClient({
               <div className="rounded border border-border p-4">
                 <div className="text-sm font-medium">Clear local browser test state</div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Removes notification read state, assistant tone preference, and the local workspace queue stored in this browser.
+                  Removes legacy browser-only notification state, assistant tone preference, and the local workspace queue stored in this browser.
                 </p>
                 <Button
                   className="mt-4"

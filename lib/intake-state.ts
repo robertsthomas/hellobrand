@@ -1,3 +1,10 @@
+import { revalidateTag } from "next/cache";
+
+import {
+  emitWorkspaceNotificationForCurrentState,
+  emitWorkspaceNotificationForSession,
+  supersedeWorkspaceNotificationEvents
+} from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
 import { startNextQueuedIntakeSessionForUser } from "@/lib/intake-queue";
 import type { IntakeSessionRecord, IntakeSessionStatus, PaymentStatus } from "@/lib/types";
@@ -166,6 +173,12 @@ export async function syncIntakeSessionForDealId(dealId: string) {
     await startNextQueuedIntakeSessionForUser(session.userId);
   }
 
+  // Invalidate the cached deals so the dashboard picks up the new notification
+  if (nextStatus !== session.status) {
+    revalidateTag(`user-${session.userId}-deals`, "max");
+    revalidateTag(`user-${session.userId}-notifications`, "max");
+  }
+
   // Trigger background duplicate check when workspace is ready
   if (
     nextStatus === "ready_for_confirmation" &&
@@ -180,6 +193,9 @@ export async function syncIntakeSessionForDealId(dealId: string) {
   }
 
   const refreshed = await prisma.intakeSession.findUnique({ where: { id: session.id } });
+  if (nextStatus !== session.status && refreshed) {
+    await emitWorkspaceNotificationForCurrentState(refreshed.id);
+  }
   return refreshed ? toIntakeSessionRecord(refreshed) : null;
 }
 
@@ -215,6 +231,10 @@ async function triggerDuplicateCheck(input: {
         where: { id: input.sessionId },
         data: { duplicateCheckStatus: "checking" }
       });
+      await emitWorkspaceNotificationForSession(
+        input.sessionId,
+        "workspace.duplicate_checking"
+      );
 
       const documents = await prisma.document.findMany({
         where: { dealId: input.dealId },
@@ -231,6 +251,9 @@ async function triggerDuplicateCheck(input: {
           where: { id: input.sessionId },
           data: { duplicateCheckStatus: "clean" }
         });
+        await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
+          "workspace.duplicate_checking"
+        ]);
         return;
       }
 
@@ -244,6 +267,20 @@ async function triggerDuplicateCheck(input: {
           duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
         }
       });
+
+      // Revalidate so duplicate notification appears on dashboard
+      revalidateTag(`user-${input.userId}-deals`, "max");
+      revalidateTag(`user-${input.userId}-notifications`, "max");
+      if (matches.length > 0) {
+        await emitWorkspaceNotificationForSession(
+          input.sessionId,
+          "workspace.duplicates_found"
+        );
+      } else {
+        await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
+          "workspace.duplicate_checking"
+        ]);
+      }
     }
   } catch (error) {
     console.error("[triggerDuplicateCheck] Failed:", error);

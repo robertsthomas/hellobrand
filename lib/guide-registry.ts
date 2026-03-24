@@ -75,6 +75,16 @@ export const GUIDE_STEPS: GuideStep[] = [
     side: "bottom",
     autoCompleteCondition: (ctx) => ctx.hasActiveWorkspace
   },
+  // Notifications — shown after first workspace starts generating
+  {
+    id: "notifications_workspace_generating",
+    title: "Your workspace is generating",
+    body: "We're analyzing your documents in the background. Check the notifications drawer for status updates — you'll see when it's done.",
+    anchorSelector: '[data-guide="header-notifications"]',
+    routeMatch: "/app",
+    side: "bottom",
+    eligibility: (ctx) => ctx.hasActiveWorkspace
+  },
   // AI assistant — shown on any app route
   {
     id: "assistant_intro",

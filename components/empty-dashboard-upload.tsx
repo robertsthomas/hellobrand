@@ -244,18 +244,9 @@ export function EmptyDashboardUpload({
     }
   }
 
-  async function startAnalysis() {
-    if (queuedCount === 0) {
-      setErrorMessage("Save at least one workspace before starting analysis.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
+  async function startAnalysisInBackground() {
     try {
       const createdSessionIds: string[] = [];
-      const promotedServerWorkspaces: ServerQueuedWorkspaceItem[] = [];
 
       for (const workspace of localWorkspaces) {
         const payload = await loadLocalWorkspace(workspace.localId);
@@ -288,24 +279,8 @@ export function EmptyDashboardUpload({
         }
 
         createdSessionIds.push(sessionId);
-        promotedServerWorkspaces.push({
-          sessionId,
-          dealId: uploadPayload.session.dealId as string,
-          brandName: workspace.brandName,
-          campaignName: workspace.campaignName,
-          updatedAt: uploadPayload.session.updatedAt as string,
-          status: "queued",
-          inputSource: uploadPayload.session.inputSource as ServerQueuedWorkspaceItem["inputSource"]
-        });
-
         await deleteLocalWorkspace(workspace.localId);
-        setLocalWorkspaces((current) =>
-          current.filter((entry) => entry.localId !== workspace.localId)
-        );
       }
-
-      setServerQueuedWorkspaces((current) => [...current, ...promotedServerWorkspaces]);
-      setIsComposerVisible(false);
 
       const response = await fetch("/api/intake/queue/start", {
         method: "POST",
@@ -325,18 +300,27 @@ export function EmptyDashboardUpload({
         throw new Error(payload.error ?? "Could not start analysis.");
       }
 
-      reset(initialMode);
-      window.sessionStorage.setItem(
-        WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY,
-        "1"
-      );
-      router.push("/app");
+      router.refresh();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not start analysis."
-      );
-      setIsSubmitting(false);
+      console.error("[startAnalysisInBackground] Failed:", error);
+      router.refresh();
     }
+  }
+
+  async function startAnalysis() {
+    if (queuedCount === 0) {
+      setErrorMessage("Save at least one workspace before starting analysis.");
+      return;
+    }
+
+    setErrorMessage(null);
+    reset(initialMode);
+    window.sessionStorage.setItem(
+      WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY,
+      "1"
+    );
+    router.push("/app");
+    void startAnalysisInBackground();
   }
 
   return (
@@ -488,7 +472,7 @@ export function EmptyDashboardUpload({
                   })
                 )}
               >
-                {isSubmitting ? "Generating..." : "Generate workspace"}
+                {isSubmitting ? "Saving..." : "Save workspace"}
               </button>
             )}
           </div>
@@ -554,7 +538,7 @@ export function EmptyDashboardUpload({
                   className={cn(buttonVariants({ className: "gap-2" }))}
                 >
                   <Play className="h-4 w-4" />
-                  {isSubmitting ? "Generating..." : "Generate workspace"}
+                  Generate workspace
                 </button>
                 {!isComposerVisible ? (
                   <button
@@ -583,7 +567,7 @@ export function EmptyDashboardUpload({
                 className={cn(buttonVariants({ className: "gap-2" }))}
               >
                 <Play className="h-4 w-4" />
-                {isSubmitting ? "Generating..." : "Generate workspace"}
+                Generate workspace
               </button>
               {!isComposerVisible ? (
                 <button

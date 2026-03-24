@@ -108,6 +108,11 @@ export function GuideTooltip() {
       const observer = new ResizeObserver(update);
       observer.observe(element);
 
+      const handleAnchorClick = () => {
+        dismissStep(activeStep.id);
+      };
+      element.addEventListener("click", handleAnchorClick);
+
       const scrollParents = getScrollParents(element);
       for (const parent of scrollParents) {
         parent.addEventListener("scroll", update, { passive: true });
@@ -118,6 +123,7 @@ export function GuideTooltip() {
 
       cleanupRef.current = () => {
         observer.disconnect();
+        element.removeEventListener("click", handleAnchorClick);
         for (const parent of scrollParents) {
           parent.removeEventListener("scroll", update);
         }
@@ -134,7 +140,7 @@ export function GuideTooltip() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [activeStep]);
+  }, [activeStep, dismissStep]);
 
   if (!mounted || !displayedStep || !anchorRect || isMobile) return null;
 
@@ -147,17 +153,6 @@ export function GuideTooltip() {
 
   return createPortal(
     <>
-      {/* Pulsing highlight ring on anchor */}
-      <div
-        className="pointer-events-none fixed z-[98] rounded-lg ring-2 ring-ocean/40 transition-[top,left,width,height] duration-300 ease-out animate-pulse"
-        style={{
-          top: anchorRect.top - 2,
-          left: anchorRect.left - 2,
-          width: anchorRect.width + 4,
-          height: anchorRect.height + 4
-        }}
-      />
-
       {/* Tooltip card — must be above the highlight ring */}
       <div
         className="fixed z-[100] w-72 border border-black/10 bg-white p-4 shadow-lg transition-[top,left] duration-300 ease-out dark:border-white/10 dark:bg-[#1a1d24]"

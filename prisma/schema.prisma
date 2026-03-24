@@ -71,6 +71,7 @@ model User {
   assistantSnapshots    AssistantContextSnapshot[]
   billingAccount        BillingAccount?
   onboardingState       UserOnboardingState?
+  appNotifications      AppNotification[]
 }
 
 model Deal {
@@ -106,6 +107,7 @@ model Deal {
   emailTermSuggestions  EmailDealTermSuggestion[]
   emailActionItems      EmailActionItem[]
   brandContacts         BrandContact[]
+  appNotifications      AppNotification[]
 }
 
 model Document {
@@ -636,6 +638,37 @@ model UserOnboardingState {
   updatedAt                    DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AppNotification {
+  id           String   @id @default(uuid())
+  userId       String
+  category     String
+  eventType    String
+  entityType   String
+  entityId     String
+  sessionId    String?
+  dealId       String?
+  title        String
+  body         String
+  href         String
+  status       String   @default("active")
+  readAt       DateTime?
+  clearedAt    DateTime?
+  supersededAt DateTime?
+  dedupeKey    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, status, createdAt])
+  @@index([userId, readAt, createdAt])
+  @@index([userId, clearedAt, createdAt])
+  @@index([sessionId, status, createdAt])
+  @@index([dealId, status, createdAt])
 }
 
 model IntakeSession {

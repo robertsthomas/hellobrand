@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { getRuntimeDir, getRuntimePath } from "@/lib/runtime-path";
 import { createSeedStore } from "@/lib/repository/seed";
+import { deleteStoredBytes } from "@/lib/storage";
 import type {
   AssistantContextSnapshotRecord,
   AssistantMessageRecord,
@@ -315,9 +316,8 @@ export class FileRepository {
       return false;
     }
 
-    const documentIds = store.documents
-      .filter((entry) => entry.dealId === dealId)
-      .map((entry) => entry.id);
+    const documents = store.documents.filter((entry) => entry.dealId === dealId);
+    const documentIds = documents.map((entry) => entry.id);
 
     store.deals = store.deals.filter((entry) => entry.id !== dealId);
     store.documents = store.documents.filter((entry) => entry.dealId !== dealId);
@@ -347,6 +347,7 @@ export class FileRepository {
     );
 
     await saveStore(store);
+    await Promise.all(documents.map((document) => deleteStoredBytes(document.storagePath)));
     return true;
   }
 

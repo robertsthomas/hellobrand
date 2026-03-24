@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import { prisma } from "@/lib/prisma";
+import { deleteStoredBytes } from "@/lib/storage";
 import type {
   AssistantContextSnapshotRecord,
   AssistantMessageRecord,
@@ -647,7 +648,14 @@ export class PrismaRepository {
   async deleteDeal(userId: string, dealId: string) {
     const existing = await prisma.deal.findFirst({
       where: { id: dealId, userId },
-      select: { id: true }
+      select: {
+        id: true,
+        documents: {
+          select: {
+            storagePath: true
+          }
+        }
+      }
     });
 
     if (!existing) {
@@ -657,6 +665,10 @@ export class PrismaRepository {
     await prisma.deal.delete({
       where: { id: dealId }
     });
+
+    await Promise.all(
+      existing.documents.map((document) => deleteStoredBytes(document.storagePath))
+    );
 
     return true;
   }

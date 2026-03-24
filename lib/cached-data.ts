@@ -33,6 +33,15 @@ export async function getCachedDealAggregates(viewer: Viewer) {
   }));
 }
 
+export async function getCachedIntakeDrafts(viewer: Viewer) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(`user-${viewer.id}-deals`);
+
+  const { listIntakeDraftsForViewer } = await import("@/lib/intake");
+  return listIntakeDraftsForViewer(viewer);
+}
+
 export async function getCachedDealForViewer(viewer: Viewer, dealId: string) {
   "use cache";
   cacheLife("seconds");

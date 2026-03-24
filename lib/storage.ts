@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { createClient } from "@supabase/supabase-js";
@@ -80,4 +80,30 @@ export async function readStoredBytes(storagePath: string) {
   }
 
   return readFile(storagePath);
+}
+
+export async function deleteStoredBytes(storagePath: string) {
+  if (!storagePath || storagePath.startsWith("pasted:")) {
+    return;
+  }
+
+  if (storagePath.startsWith("supabase:")) {
+    const [, bucket, ...rest] = storagePath.split(":");
+    const objectPath = rest.join(":");
+    const { error } = await supabaseAdmin().storage.from(bucket).remove([objectPath]);
+
+    if (error) {
+      throw new Error(error.message || "Could not delete stored document.");
+    }
+
+    return;
+  }
+
+  try {
+    await unlink(storagePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | undefined)?.code !== "ENOENT") {
+      throw error;
+    }
+  }
 }
