@@ -797,7 +797,22 @@ export interface ProfileRecord {
   reminderLeadDays: number | null;
   conflictAlertsEnabled: boolean;
   paymentRemindersEnabled: boolean;
+  emailNotificationsEnabled: boolean;
   accentColor: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationEmailDeliveryRecord {
+  id: string;
+  appNotificationId: string;
+  userId: string;
+  recipientEmail: string;
+  provider: string;
+  providerMessageId: string | null;
+  status: "pending" | "sent" | "failed" | "skipped";
+  errorMessage: string | null;
+  sentAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -98,6 +98,7 @@ export function SettingsEditor({
     reminderLeadDays: String(initialProfile.reminderLeadDays ?? 3),
     conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
     paymentRemindersEnabled: initialProfile.paymentRemindersEnabled,
+    emailNotificationsEnabled: initialProfile.emailNotificationsEnabled,
     accentColor: initialProfile.accentColor ?? ""
   });
   type SettingsForm = typeof form;
@@ -141,6 +142,7 @@ export function SettingsEditor({
               : 3,
           conflictAlertsEnabled: form.conflictAlertsEnabled,
           paymentRemindersEnabled: form.paymentRemindersEnabled,
+          emailNotificationsEnabled: form.emailNotificationsEnabled,
           accentColor: form.accentColor || null
         })
       });
@@ -246,6 +248,12 @@ export function SettingsEditor({
         </div>
 
         <div className="border-t border-border">
+          <FlatToggleRow
+            title="Email notifications"
+            description="Send email only when a workspace is ready for review or fails. Test sends use your approved Resend inbox while onboarding@resend.dev is configured."
+            checked={form.emailNotificationsEnabled}
+            onChange={(checked) => updateFormField("emailNotificationsEnabled", checked)}
+          />
           <FlatToggleRow
             title="Payment reminders"
             description="Keep payment follow-up prompts enabled when invoices are due, pending, or overdue."

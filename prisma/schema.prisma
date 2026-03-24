@@ -72,6 +72,7 @@ model User {
   billingAccount        BillingAccount?
   onboardingState       UserOnboardingState?
   appNotifications      AppNotification[]
+  notificationEmailDeliveries NotificationEmailDelivery[]
 }
 
 model Deal {
@@ -605,6 +606,7 @@ model Profile {
   reminderLeadDays        Int?
   conflictAlertsEnabled   Boolean  @default(true)
   paymentRemindersEnabled Boolean  @default(true)
+  emailNotificationsEnabled Boolean @default(false)
   accentColor             String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
@@ -660,8 +662,9 @@ model AppNotification {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deal Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal          Deal?                      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  emailDelivery NotificationEmailDelivery?
 
   @@unique([userId, dedupeKey])
   @@index([userId, status, createdAt])
@@ -669,6 +672,25 @@ model AppNotification {
   @@index([userId, clearedAt, createdAt])
   @@index([sessionId, status, createdAt])
   @@index([dealId, status, createdAt])
+}
+
+model NotificationEmailDelivery {
+  id                String   @id @default(uuid())
+  appNotificationId String   @unique
+  userId            String
+  recipientEmail    String
+  provider          String
+  providerMessageId String?
+  status            String
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  appNotification AppNotification @relation(fields: [appNotificationId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
 }
 
 model IntakeSession {

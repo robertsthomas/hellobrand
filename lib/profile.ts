@@ -20,6 +20,7 @@ function buildFileBackedProfile(viewer: Viewer): ProfileRecord {
     reminderLeadDays: 3,
     conflictAlertsEnabled: true,
     paymentRemindersEnabled: true,
+    emailNotificationsEnabled: false,
     accentColor: null,
     createdAt: now,
     updatedAt: now
@@ -48,6 +49,7 @@ function toProfileRecord(profile: {
   reminderLeadDays: number | null;
   conflictAlertsEnabled: boolean;
   paymentRemindersEnabled: boolean;
+  emailNotificationsEnabled: boolean;
   accentColor?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -65,6 +67,7 @@ function toProfileRecord(profile: {
     reminderLeadDays: profile.reminderLeadDays,
     conflictAlertsEnabled: profile.conflictAlertsEnabled,
     paymentRemindersEnabled: profile.paymentRemindersEnabled,
+    emailNotificationsEnabled: profile.emailNotificationsEnabled,
     accentColor: profile.accentColor ?? null,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString()
@@ -129,7 +132,8 @@ export async function getProfileForViewer(viewer: Viewer) {
       defaultCurrency: "USD",
       reminderLeadDays: 3,
       conflictAlertsEnabled: true,
-      paymentRemindersEnabled: true
+      paymentRemindersEnabled: true,
+      emailNotificationsEnabled: false
     }
   });
 
@@ -154,6 +158,7 @@ export async function updateProfileForViewer(
     reminderLeadDays?: number | null;
     conflictAlertsEnabled?: boolean;
     paymentRemindersEnabled?: boolean;
+    emailNotificationsEnabled?: boolean;
     accentColor?: string | null;
   }
 ) {
@@ -174,6 +179,8 @@ export async function updateProfileForViewer(
       patch.conflictAlertsEnabled ?? existing?.conflictAlertsEnabled ?? true,
     paymentRemindersEnabled:
       patch.paymentRemindersEnabled ?? existing?.paymentRemindersEnabled ?? true,
+    emailNotificationsEnabled:
+      patch.emailNotificationsEnabled ?? existing?.emailNotificationsEnabled ?? false,
     accentColor: patch.accentColor !== undefined ? patch.accentColor : (existing?.accentColor ?? null)
   };
 
@@ -197,6 +204,7 @@ export async function updateProfileForViewer(
     reminderLeadDays: existing?.reminderLeadDays ?? 3,
     conflictAlertsEnabled: existing?.conflictAlertsEnabled ?? true,
     paymentRemindersEnabled: existing?.paymentRemindersEnabled ?? true,
+    emailNotificationsEnabled: existing?.emailNotificationsEnabled ?? false,
     accentColor: existing?.accentColor ?? null
   };
 
@@ -305,7 +313,8 @@ async function syncProfileToClerk(userId: string, profile: ProfileRecord) {
     payoutNotes: metadata.payoutNotes,
     reminderLeadDays: profile.reminderLeadDays,
     conflictAlertsEnabled: profile.conflictAlertsEnabled,
-    paymentRemindersEnabled: profile.paymentRemindersEnabled
+    paymentRemindersEnabled: profile.paymentRemindersEnabled,
+    emailNotificationsEnabled: profile.emailNotificationsEnabled
   };
 
   // Update Clerk user profile + metadata

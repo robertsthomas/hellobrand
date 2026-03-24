@@ -1,5 +1,6 @@
 import { inngest } from "@/lib/inngest/client";
 import { processDocumentById } from "@/lib/deals";
+import { sendNotificationEmailDelivery } from "@/lib/notification-email";
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document" },
@@ -113,6 +114,28 @@ export const checkWorkspaceDuplicatesFunction = inngest.createFunction(
       dealId,
       sessionId,
       duplicatesFound: matches.length
+    };
+  }
+);
+
+export const notificationEmailSendFunction = inngest.createFunction(
+  { id: "notification-email-send" },
+  { event: "notification/email.send.requested" },
+  async ({ event, step }) => {
+    const appNotificationId = String(event.data.appNotificationId ?? "");
+
+    if (!appNotificationId) {
+      throw new Error("Missing appNotificationId.");
+    }
+
+    const delivery = await step.run("send-notification-email", async () =>
+      sendNotificationEmailDelivery(appNotificationId)
+    );
+
+    return {
+      ok: true,
+      appNotificationId,
+      status: delivery?.status ?? null
     };
   }
 );

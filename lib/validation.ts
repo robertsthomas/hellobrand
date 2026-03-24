@@ -290,5 +290,6 @@ export const profileInputSchema = z.object({
   reminderLeadDays: z.number().int().min(0).max(30).nullable().optional(),
   conflictAlertsEnabled: z.boolean().optional(),
   paymentRemindersEnabled: z.boolean().optional(),
+  emailNotificationsEnabled: z.boolean().optional(),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()
 });

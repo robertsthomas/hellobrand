@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import { enqueueNotificationEmailDelivery } from "@/lib/notification-email";
 import {
   buildWorkspaceNotificationSeed,
   getWorkspaceSupersededEventTypes,
@@ -190,6 +191,13 @@ async function emitWorkspaceNotificationSeed(userId: string, seed: NotificationS
 
   const row = await upsertNotificationSeed(userId, seed);
   await refreshNotificationViews(userId);
+
+  try {
+    await enqueueNotificationEmailDelivery(row.id);
+  } catch (error) {
+    console.error("Failed to enqueue workspace notification email.", error);
+  }
+
   return row;
 }
 

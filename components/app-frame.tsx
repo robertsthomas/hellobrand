@@ -63,6 +63,9 @@ export function AppFrame({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
   const isInboxRoute = pathname === "/app/inbox";
+  const hasWorkspaceNotification = (notifications ?? []).some(
+    (notification) => notification.category === "workspace" && notification.status === "active"
+  );
 
   useEffect(() => {
     if (!guideOpenedMobileMenu) {
@@ -204,6 +207,7 @@ export function AppFrame({
         <GuideProvider
           initialGuideState={guideState}
           hasActiveWorkspace={hasActiveWorkspace ?? false}
+          hasWorkspaceNotification={hasWorkspaceNotification}
           visibilityKey={mobileMenuOpen}
           onUnavailableStep={requestGuideStepVisibility}
           onActiveStepChange={handleGuideActiveStepChange}

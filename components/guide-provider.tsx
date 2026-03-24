@@ -52,6 +52,7 @@ export function GuideProvider({
   children,
   initialGuideState,
   hasActiveWorkspace,
+  hasWorkspaceNotification,
   visibilityKey,
   onUnavailableStep,
   onActiveStepChange
@@ -59,6 +60,7 @@ export function GuideProvider({
   children: ReactNode;
   initialGuideState: ProductGuideState;
   hasActiveWorkspace: boolean;
+  hasWorkspaceNotification: boolean;
   visibilityKey?: string | number | boolean;
   onUnavailableStep?: (step: GuideStep) => boolean;
   onActiveStepChange?: (step: GuideStep | null) => void;
@@ -94,11 +96,19 @@ export function GuideProvider({
     () => ({
       pathname,
       hasActiveWorkspace,
+      hasWorkspaceNotification,
       isMobile,
       dismissedStepIds,
       completedStepIds
     }),
-    [pathname, hasActiveWorkspace, isMobile, dismissedStepIds, completedStepIds]
+    [
+      pathname,
+      hasActiveWorkspace,
+      hasWorkspaceNotification,
+      isMobile,
+      dismissedStepIds,
+      completedStepIds
+    ]
   );
 
   // Find the first eligible step whose anchor is actually visible in the DOM.

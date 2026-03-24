@@ -13,6 +13,7 @@ export interface GuideStep {
 export interface GuideContext {
   pathname: string;
   hasActiveWorkspace: boolean;
+  hasWorkspaceNotification: boolean;
   isMobile: boolean;
   dismissedStepIds: Set<string>;
   completedStepIds: Set<string>;
@@ -73,7 +74,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     anchorSelector: '[data-guide="add-documents"]',
     routeMatch: "/app",
     side: "bottom",
-    autoCompleteCondition: (ctx) => ctx.hasActiveWorkspace
+    autoCompleteCondition: (ctx) =>
+      ctx.hasActiveWorkspace || ctx.hasWorkspaceNotification
   },
   // Notifications — shown after first workspace starts generating
   {
@@ -83,7 +85,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     anchorSelector: '[data-guide="header-notifications"]',
     routeMatch: "/app",
     side: "bottom",
-    eligibility: (ctx) => ctx.hasActiveWorkspace
+    eligibility: (ctx) => ctx.hasWorkspaceNotification
   },
   // AI assistant — shown on any app route
   {

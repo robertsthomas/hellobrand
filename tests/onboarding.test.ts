@@ -10,6 +10,7 @@ function makeContext(overrides: Partial<GuideContext> = {}): GuideContext {
   return {
     pathname: "/app",
     hasActiveWorkspace: false,
+    hasWorkspaceNotification: false,
     isMobile: false,
     dismissedStepIds: new Set(),
     completedStepIds: new Set(),
@@ -89,6 +90,39 @@ describe("guide registry", () => {
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
     expect(step?.id).toBe("assistant_intro");
+  });
+
+  test("add_first_documents auto-completes when a workspace notification exists", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasWorkspaceNotification: true,
+      dismissedStepIds: new Set([
+        "sidebar_new_workspace",
+        "sidebar_inbox",
+        "sidebar_payments",
+        "sidebar_analytics",
+        "sidebar_settings"
+      ])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).toBe("notifications_workspace_generating");
+  });
+
+  test("notifications tip becomes eligible as soon as a workspace notification exists", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasWorkspaceNotification: true,
+      dismissedStepIds: new Set([
+        "sidebar_new_workspace",
+        "sidebar_inbox",
+        "sidebar_payments",
+        "sidebar_analytics",
+        "sidebar_settings",
+        "add_first_documents"
+      ])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).toBe("notifications_workspace_generating");
   });
 
   test("assistant_intro shows on any /app route", () => {

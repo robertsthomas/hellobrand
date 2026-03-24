@@ -10,6 +10,7 @@ import {
 } from "@/lib/inngest/email-functions";
 import {
   checkWorkspaceDuplicatesFunction,
+  notificationEmailSendFunction,
   processContractFunction
 } from "@/lib/inngest/functions";
 
@@ -18,6 +19,7 @@ export const { GET, POST, PUT } = serve({
   functions: [
     processContractFunction,
     checkWorkspaceDuplicatesFunction,
+    notificationEmailSendFunction,
     emailInitialSyncFunction,
     emailIncrementalSyncFunction,
     emailRenewalSweepFunction,

@@ -217,7 +217,7 @@ export async function resetViewerGuideState(userId: string) {
       userId,
       profileOnboardingCompletedAt: existing?.profileOnboardingCompletedAt ?? null,
       profileOnboardingVersion: existing?.profileOnboardingVersion ?? 0,
-      profileOnboardingStateJson: existing?.profileOnboardingStateJson ?? null,
+      profileOnboardingStateJson: existing?.profileOnboardingStateJson ?? undefined,
       productGuideVersion: 1,
       productGuideStateJson: {
         dismissedStepIds: [],
