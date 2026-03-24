@@ -28,6 +28,23 @@ export function isActiveBillingSubscriptionStatus(
   return Boolean(status && ACTIVE_BILLING_SUBSCRIPTION_STATUSES.has(status));
 }
 
+export function resolveEffectiveEntitlementTier(input: {
+  overrideTier?: PlanTier | null;
+  currentPlanTier?: PlanTier | null;
+  currentTrialPlanTier?: PlanTier | null;
+  currentSubscriptionStatus?: BillingSubscriptionStatus | null;
+}) {
+  if (input.overrideTier) {
+    return input.overrideTier;
+  }
+
+  if (input.currentSubscriptionStatus === BillingSubscriptionStatus.trialing) {
+    return input.currentTrialPlanTier ?? input.currentPlanTier ?? PlanTier.basic;
+  }
+
+  return input.currentPlanTier ?? input.currentTrialPlanTier ?? PlanTier.basic;
+}
+
 export function recommendedUpgradeForCurrentPlan(planTier: PlanTier | null) {
   if (!planTier) {
     return {

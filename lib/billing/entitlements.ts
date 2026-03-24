@@ -1,7 +1,10 @@
 import { BillingSubscriptionStatus, PlanTier } from "@prisma/client";
 
 import { getDevPlanOverride } from "@/lib/billing/config";
-import { isActiveBillingSubscriptionStatus } from "@/lib/billing/rules";
+import {
+  isActiveBillingSubscriptionStatus,
+  resolveEffectiveEntitlementTier
+} from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 import { getRepository } from "@/lib/repository";
 import type { Viewer } from "@/lib/types";
@@ -226,11 +229,14 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
     Promise.resolve(workspaceCount)
   ]);
 
-  const effectiveTier =
-    overrideTier ??
-    billingAccount?.currentPlanTier ??
-    billingAccount?.currentTrialPlanTier ??
-    PlanTier.basic;
+  const effectiveSubscriptionStatus =
+    billingAccount?.currentSubscriptionStatus ?? null;
+  const effectiveTier = resolveEffectiveEntitlementTier({
+    overrideTier,
+    currentPlanTier: billingAccount?.currentPlanTier ?? null,
+    currentTrialPlanTier: billingAccount?.currentTrialPlanTier ?? null,
+    currentSubscriptionStatus: effectiveSubscriptionStatus
+  });
   const source: EntitlementSource = overrideTier
     ? "override"
     : billingAccount?.currentPlanTier || billingAccount?.currentTrialPlanTier
@@ -272,10 +278,8 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
     overrideTier,
     currentPlanTier: billingAccount?.currentPlanTier ?? null,
     currentTrialPlanTier: billingAccount?.currentTrialPlanTier ?? null,
-    currentSubscriptionStatus: billingAccount?.currentSubscriptionStatus ?? null,
-    hasActiveSubscription: isActiveBillingSubscriptionStatus(
-      billingAccount?.currentSubscriptionStatus
-    ),
+    currentSubscriptionStatus: effectiveSubscriptionStatus,
+    hasActiveSubscription: isActiveBillingSubscriptionStatus(effectiveSubscriptionStatus),
     features: FEATURE_MATRIX[effectiveTier],
     usage
   };

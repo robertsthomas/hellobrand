@@ -229,7 +229,7 @@ async function requestJson(
       model,
       temperature: 0.1,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: systemPrompt + "\n\nIMPORTANT: Never use em dashes (—) or en dashes (–) in any output. Use commas, periods, or semicolons instead." },
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" },

@@ -18,6 +18,11 @@ type SignInSecondFactorState =
       emailAddressId?: string;
     }
   | {
+      strategy: "email_link";
+      safeIdentifier: string;
+      emailAddressId?: string;
+    }
+  | {
       strategy: "phone_code";
       safeIdentifier: string;
       phoneNumberId?: string;
@@ -88,6 +93,17 @@ export function CustomAuthScreen() {
   }, [queryMode]);
 
   useEffect(() => {
+    if (
+      verificationStep === "sign-in-second-factor" &&
+      isSignInLoaded &&
+      signIn?.status === "complete" &&
+      signIn.createdSessionId
+    ) {
+      void activateSession(signIn.createdSessionId);
+    }
+  }, [isSignInLoaded, signIn, verificationStep]);
+
+  useEffect(() => {
     setErrorMessages([]);
     setIsSubmitting(false);
   }, [mode, verificationStep]);
@@ -122,6 +138,7 @@ export function CustomAuthScreen() {
     const preferredSecondFactor =
       supportedSecondFactors.find((factor) => factor.strategy === "totp") ??
       supportedSecondFactors.find((factor) => factor.strategy === "email_code") ??
+      supportedSecondFactors.find((factor) => factor.strategy === "email_link") ??
       supportedSecondFactors.find((factor) => factor.strategy === "phone_code") ??
       supportedSecondFactors.find((factor) => factor.strategy === "backup_code");
 
@@ -159,6 +176,27 @@ export function CustomAuthScreen() {
       setVerificationStep("sign-in-second-factor");
       setVerificationNotice(
         `We sent a verification code to ${preferredSecondFactor.safeIdentifier}.`
+      );
+      return;
+    }
+
+    if (preferredSecondFactor.strategy === "email_link") {
+      await result.prepareSecondFactor({
+        strategy: "email_link",
+        redirectUrl:
+          typeof window === "undefined"
+            ? "/login?mode=sign-in"
+            : `${window.location.origin}/login?mode=sign-in`,
+        emailAddressId: preferredSecondFactor.emailAddressId
+      });
+      setSignInSecondFactor({
+        strategy: "email_link",
+        safeIdentifier: preferredSecondFactor.safeIdentifier,
+        emailAddressId: preferredSecondFactor.emailAddressId
+      });
+      setVerificationStep("sign-in-second-factor");
+      setVerificationNotice(
+        `We sent a secure sign-in link to ${preferredSecondFactor.safeIdentifier}. Open that email to finish signing in.`
       );
       return;
     }
@@ -376,6 +414,15 @@ export function CustomAuthScreen() {
           strategy: "email_code",
           emailAddressId: signInSecondFactor.emailAddressId
         });
+      } else if (signInSecondFactor.strategy === "email_link") {
+        await signIn.prepareSecondFactor({
+          strategy: "email_link",
+          redirectUrl:
+            typeof window === "undefined"
+              ? "/login?mode=sign-in"
+              : `${window.location.origin}/login?mode=sign-in`,
+          emailAddressId: signInSecondFactor.emailAddressId
+        });
       } else if (signInSecondFactor.strategy === "phone_code") {
         if (!signInSecondFactor.phoneNumberId) {
           throw new Error(
@@ -390,7 +437,35 @@ export function CustomAuthScreen() {
       }
 
       setVerificationNotice(
-        `A fresh verification code was sent to ${signInSecondFactor.safeIdentifier}.`
+        signInSecondFactor.strategy === "email_link"
+          ? `A fresh sign-in link was sent to ${signInSecondFactor.safeIdentifier}.`
+          : `A fresh verification code was sent to ${signInSecondFactor.safeIdentifier}.`
+      );
+    } catch (error) {
+      setErrorMessages(getErrorMessages(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function checkSignInEmailLinkVerification() {
+    if (!isSignInLoaded || !signIn || signInSecondFactor?.strategy !== "email_link") {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessages([]);
+
+    try {
+      const refreshed = await signIn.reload();
+
+      if (refreshed.status === "complete" && refreshed.createdSessionId) {
+        await activateSession(refreshed.createdSessionId);
+        return;
+      }
+
+      setVerificationNotice(
+        `We still need you to open the sign-in link sent to ${signInSecondFactor.safeIdentifier}.`
       );
     } catch (error) {
       setErrorMessages(getErrorMessages(error));
@@ -406,23 +481,36 @@ export function CustomAuthScreen() {
   const verificationLabel =
     signInSecondFactor?.strategy === "totp"
       ? "Authenticator code"
+      : signInSecondFactor?.strategy === "email_link"
+        ? "Email verification link"
       : signInSecondFactor?.strategy === "backup_code"
         ? "Backup code"
         : "Verification code";
   const verificationPlaceholder =
-    signInSecondFactor?.strategy === "backup_code"
+    signInSecondFactor?.strategy === "email_link"
+      ? "Check your inbox for the sign-in link"
+      : signInSecondFactor?.strategy === "backup_code"
       ? "Enter a backup code"
       : "Enter the 6-digit code";
-  const verificationButtonLabel = isSignInVerificationMode ? "Verify and log in" : "Verify email";
+  const verificationButtonLabel =
+    isSignInVerificationMode && signInSecondFactor?.strategy === "email_link"
+      ? "I've clicked the email link"
+      : isSignInVerificationMode
+        ? "Verify and log in"
+        : "Verify email";
   const verificationBody = isSignInVerificationMode
     ? signInSecondFactor?.strategy === "totp"
       ? "Enter the latest code from your authenticator app to finish signing in."
+      : signInSecondFactor?.strategy === "email_link"
+        ? "Open the secure sign-in link from your email to finish signing in."
       : signInSecondFactor?.strategy === "backup_code"
         ? "Use one of your recovery codes to finish signing in."
         : "Enter the latest verification code to finish signing in."
     : "Check your inbox and enter the latest code to finish creating your account.";
   const canAutoSubmitVerification =
-    signInSecondFactor?.strategy !== "backup_code" || isSignUpVerificationMode;
+    (signInSecondFactor?.strategy !== "backup_code" &&
+      signInSecondFactor?.strategy !== "email_link") ||
+    isSignUpVerificationMode;
 
   return (
     <div className="fixed inset-0 grid h-screen overflow-hidden bg-white dark:bg-[#171b1f] lg:grid-cols-[1fr_1fr]">
@@ -434,9 +522,14 @@ export function CustomAuthScreen() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ocean text-white">
                 <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
-              <span className="editorial-display text-2xl font-semibold tracking-[-0.05em] text-[#16261f] dark:text-[#f2ede6]">
-                HelloBrand
-              </span>
+              <div>
+                <p className="editorial-display text-2xl font-semibold tracking-[-0.05em] text-[#16261f] dark:text-[#f2ede6]">
+                  HelloBrand
+                </p>
+                <p className="text-[13px] text-muted-foreground">
+                  Creator partnership operating system
+                </p>
+              </div>
             </Link>
 
             <div className="hidden text-sm text-muted-foreground sm:block">
@@ -632,40 +725,63 @@ export function CustomAuthScreen() {
               <form
                 className="mt-8 grid gap-5"
                 ref={verificationFormRef}
-                onSubmit={isSignInVerificationMode ? handleSignInVerification : handleSignUpVerification}
+                onSubmit={(event) => {
+                  if (
+                    isSignInVerificationMode &&
+                    signInSecondFactor?.strategy === "email_link"
+                  ) {
+                    event.preventDefault();
+                    void checkSignInEmailLinkVerification();
+                    return;
+                  }
+
+                  return isSignInVerificationMode
+                    ? handleSignInVerification(event)
+                    : handleSignUpVerification(event);
+                }}
               >
-                <div className="grid gap-2">
-                  <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
-                    {verificationLabel}
-                  </label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="verification-code"
-                      type="text"
-                      inputMode={signInSecondFactor?.strategy === "backup_code" ? "text" : "numeric"}
-                      autoComplete={
-                        signInSecondFactor?.strategy === "backup_code" ? "off" : "one-time-code"
-                      }
-                      maxLength={signInSecondFactor?.strategy === "backup_code" ? undefined : 6}
-                      value={verificationCode}
-                      onChange={(event) => {
-                        const value =
-                          signInSecondFactor?.strategy === "backup_code"
-                            ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
-                            : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
-                        setVerificationCode(value);
-                        if (canAutoSubmitVerification && value.length === 6) {
-                          // Auto-submit after a tick so React state is committed
-                          setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
-                        }
-                      }}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
-                      placeholder={verificationPlaceholder}
-                      required
-                    />
+                {signInSecondFactor?.strategy === "email_link" && isSignInVerificationMode ? (
+                  <div className="border border-black/10 bg-black/[0.02] px-4 py-4 text-sm text-muted-foreground dark:border-white/12 dark:bg-white/[0.03]">
+                    We emailed a secure sign-in link to{" "}
+                    <span className="font-medium text-foreground">
+                      {signInSecondFactor.safeIdentifier}
+                    </span>
+                    . Open it in this browser, then come back here if you still need to continue.
                   </div>
-                </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
+                      {verificationLabel}
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="verification-code"
+                        type="text"
+                        inputMode={signInSecondFactor?.strategy === "backup_code" ? "text" : "numeric"}
+                        autoComplete={
+                          signInSecondFactor?.strategy === "backup_code" ? "off" : "one-time-code"
+                        }
+                        maxLength={signInSecondFactor?.strategy === "backup_code" ? undefined : 6}
+                        value={verificationCode}
+                        onChange={(event) => {
+                          const value =
+                            signInSecondFactor?.strategy === "backup_code"
+                              ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
+                              : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                          setVerificationCode(value);
+                          if (canAutoSubmitVerification && value.length === 6) {
+                            // Auto-submit after a tick so React state is committed
+                            setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
+                          }
+                        }}
+                        className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                        placeholder={verificationPlaceholder}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <Button
                   type="submit"
@@ -747,17 +863,7 @@ export function CustomAuthScreen() {
         <div className="absolute bottom-[-15%] left-[-10%] h-[440px] w-[440px] rounded-full border border-white/[0.06]" />
 
         <div className="relative flex h-full flex-col justify-between p-10 xl:p-12 text-white">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
-              <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
-            </div>
-            <div>
-              <p className="editorial-display text-[1.6rem] font-semibold tracking-[-0.05em]">
-                HelloBrand
-              </p>
-              <p className="text-[13px] text-white/60">Creator partnership operating system</p>
-            </div>
-          </div>
+          <div />
 
           <div className="max-w-[440px]">
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/50">
@@ -785,7 +891,7 @@ export function CustomAuthScreen() {
           </div>
 
           <div className="relative h-[260px]">
-            <div className="absolute left-4 top-8 w-[240px] rotate-[-6deg] rounded-lg border border-white/10 bg-[#f7f3ee] p-4 text-[#233127] shadow-[0_20px_60px_rgba(7,21,16,0.30)]">
+            <div className="absolute left-4 top-8 w-[240px] rounded-lg border border-white/10 bg-[#f7f3ee] p-4 text-[#233127] shadow-[0_20px_60px_rgba(7,21,16,0.30)]">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b695f]">
                   New workspace
@@ -802,7 +908,30 @@ export function CustomAuthScreen() {
               </p>
             </div>
 
-            <div className="absolute bottom-0 right-0 w-[280px] rotate-[8deg] rounded-lg border border-white/10 bg-white/95 p-4 text-[#1d2430] shadow-[0_24px_70px_rgba(7,21,16,0.35)]">
+            <div className="absolute bottom-4 left-[35%] w-[220px] rounded-lg border border-white/10 bg-[#efe8dc] p-4 text-[#233127] shadow-[0_18px_52px_rgba(7,21,16,0.28)]">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6a7468]">
+                  Contract snapshot
+                </p>
+                <span className="text-[10px] font-medium text-[#2b5a44]">Reviewed</span>
+              </div>
+              <div className="mt-3 grid gap-2">
+                <div className="rounded border border-black/[0.05] px-3 py-2.5">
+                  <p className="text-[13px] font-semibold">Usage terms</p>
+                  <p className="mt-0.5 text-[11px] text-[#6a7468]">
+                    Paid usage and extension windows extracted.
+                  </p>
+                </div>
+                <div className="rounded border border-black/[0.05] px-3 py-2.5">
+                  <p className="text-[13px] font-semibold">Risk flags</p>
+                  <p className="mt-0.5 text-[11px] text-[#6a7468]">
+                    Exclusivity and approval clauses surfaced early.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute bottom-0 right-0 w-[280px] rounded-lg border border-white/10 bg-white/95 p-4 text-[#1d2430] shadow-[0_24px_70px_rgba(7,21,16,0.35)]">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#69707d]">
                   Inbox context

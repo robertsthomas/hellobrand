@@ -69,7 +69,7 @@ export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
       {
         role: "system",
         content:
-          "Summarize the email thread for a creator managing brand partnerships. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps."
+          "Summarize the email thread for a creator managing brand partnerships. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps. Never use em dashes (—) or en dashes (–); use commas, periods, or semicolons instead."
       },
       {
         role: "user",
@@ -145,7 +145,7 @@ export async function generateEmailReplyDraft(
     messages: [
       {
         role: "system",
-        content: `Write a concise creator-professional email reply. Use the thread and partnership context including deal terms, risk flags, and any discrepancies between email claims and contract. Do not invent commitments. Keep the tone practical and clear.${stanceInstruction}\n\nReturn JSON with subject and body.`
+        content: `Write a concise creator-professional email reply. Use the thread and partnership context including deal terms, risk flags, and any discrepancies between email claims and contract. Do not invent commitments. Keep the tone practical and clear. Never use em dashes (—) or en dashes (–); use commas, periods, or semicolons instead.${stanceInstruction}\n\nReturn JSON with subject and body.`
       },
       {
         role: "user",

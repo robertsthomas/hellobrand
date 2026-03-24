@@ -1062,7 +1062,7 @@ export function buildFallbackBrief(aggregate: DealAggregate): GeneratedBrief {
       items: deliverables.map((d) => {
         const parts = [d.title];
         if (d.channel) parts.push(`(${d.channel})`);
-        if (d.dueDate) parts.push(`— due ${d.dueDate}`);
+        if (d.dueDate) parts.push(`due ${d.dueDate}`);
         return parts.join(" ");
       })
     });

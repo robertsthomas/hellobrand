@@ -81,7 +81,7 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     id: "notifications_workspace_generating",
     title: "Your workspace is generating",
-    body: "We're analyzing your documents in the background. Check the notifications drawer for status updates — you'll see when it's done.",
+    body: "We're analyzing your documents in the background. Check the notifications drawer for status updates, you'll see when it's done.",
     anchorSelector: '[data-guide="header-notifications"]',
     routeMatch: "/app",
     side: "bottom",

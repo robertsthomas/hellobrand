@@ -441,7 +441,7 @@ export function DealHistoryTable({
                         </ValueTooltip>
                       ) : (
                         <ValueTooltip content="No active risk flags are currently tracked.">
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="text-sm text-muted-foreground">-</span>
                         </ValueTooltip>
                       )}
                     </TableCell>
