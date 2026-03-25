@@ -144,15 +144,22 @@ async function loadNotificationWithEmailContext(appNotificationId: string) {
   }) as Promise<NotificationWithEmailContext | null>;
 }
 
-function isWorkspaceNotification(notification: NotificationWithEmailContext) {
-  return (
+function shouldSendNotificationEmail(notification: NotificationWithEmailContext) {
+  if (
     notification.category === "workspace" &&
     notification.eventType.startsWith("workspace.")
-  );
-}
+  ) {
+    return (
+      notification.eventType === "workspace.ready_for_review" ||
+      notification.eventType === "workspace.failed"
+    );
+  }
 
-function shouldSendWorkspaceNotificationEmail(eventType: string) {
-  return eventType === "workspace.ready_for_review" || eventType === "workspace.failed";
+  if (notification.category === "inbox") {
+    return notification.eventType === "email.resync_required";
+  }
+
+  return false;
 }
 
 function isTerminalResendError(error: unknown) {
@@ -198,8 +205,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   const notification = await loadNotificationWithEmailContext(appNotificationId);
   if (
     !notification ||
-    !isWorkspaceNotification(notification) ||
-    !shouldSendWorkspaceNotificationEmail(notification.eventType) ||
+    !shouldSendNotificationEmail(notification) ||
     notification.status !== "active"
   ) {
     return null;
@@ -296,9 +302,14 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
   const notification = delivery.appNotification;
   if (
     !notification ||
-    notification.category !== "workspace" ||
-    !notification.eventType.startsWith("workspace.") ||
-    !shouldSendWorkspaceNotificationEmail(notification.eventType) ||
+    !shouldSendNotificationEmail({
+      ...notification,
+      userId: delivery.userId,
+      user: {
+        email: "",
+        profile: null
+      }
+    }) ||
     notification.status !== "active"
   ) {
     return markDeliveryStatus(delivery.id, "skipped", {

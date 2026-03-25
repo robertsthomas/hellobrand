@@ -4,16 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import {
-  AlertTriangle,
   Bell,
-  Calendar,
-  CheckCircle2,
-  Copy,
-  DollarSign,
+  Check,
+  Clock3,
   FileText,
-  Loader2,
+  LoaderCircle,
+  RefreshCw,
+  Search,
+  Shield,
+  Wallet,
   X,
-  XCircle
+  type LucideIcon
 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -36,36 +37,38 @@ import {
 import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
 import { cn } from "@/lib/utils";
 
-const TYPE_ICONS: Record<NotificationType, typeof DollarSign> = {
-  payment_overdue: DollarSign,
-  upcoming_deadline: Calendar,
-  contract_risk: AlertTriangle,
-  deliverable_approved: CheckCircle2,
+const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
+  email_resync_required: RefreshCw,
+  payment_overdue: Wallet,
+  upcoming_deadline: Clock3,
+  contract_risk: Shield,
+  deliverable_approved: Check,
   new_contract: FileText,
-  payment_received: DollarSign,
-  workspace_generating: Loader2,
-  workspace_checking_duplicates: Loader2,
-  workspace_ready: CheckCircle2,
-  workspace_failed: XCircle,
-  workspace_duplicate_found: Copy,
-  workspace_confirmed: CheckCircle2,
-  workspace_cancelled: XCircle
+  payment_received: Wallet,
+  workspace_generating: LoaderCircle,
+  workspace_checking_duplicates: LoaderCircle,
+  workspace_ready: Check,
+  workspace_failed: X,
+  workspace_duplicate_found: Search,
+  workspace_confirmed: Check,
+  workspace_cancelled: X
 };
 
-const TYPE_COLORS: Record<NotificationType, string> = {
-  payment_overdue: "text-red-500",
-  upcoming_deadline: "text-orange-500",
-  contract_risk: "text-amber-500",
-  deliverable_approved: "text-emerald-500",
-  new_contract: "text-blue-500",
-  payment_received: "text-emerald-500",
-  workspace_generating: "text-blue-500",
-  workspace_checking_duplicates: "text-blue-500",
-  workspace_ready: "text-emerald-500",
-  workspace_failed: "text-red-500",
-  workspace_duplicate_found: "text-amber-500",
-  workspace_confirmed: "text-emerald-500",
-  workspace_cancelled: "text-black/40 dark:text-white/40"
+const TYPE_ICON_STYLES: Record<NotificationType, string> = {
+  email_resync_required: "text-[#8a8f98] dark:text-white/35",
+  payment_overdue: "text-[#6b7280] dark:text-white/45",
+  upcoming_deadline: "text-[#6b7280] dark:text-white/45",
+  contract_risk: "text-[#7a6a4f] dark:text-white/50",
+  deliverable_approved: "text-[#5f6f64] dark:text-white/50",
+  new_contract: "text-[#6b7280] dark:text-white/45",
+  payment_received: "text-[#5f6f64] dark:text-white/50",
+  workspace_generating: "text-[#6b7280] dark:text-white/45",
+  workspace_checking_duplicates: "text-[#6b7280] dark:text-white/45",
+  workspace_ready: "text-[#5f6f64] dark:text-white/50",
+  workspace_failed: "text-[#8a8f98] dark:text-white/35",
+  workspace_duplicate_found: "text-[#7a6a4f] dark:text-white/50",
+  workspace_confirmed: "text-[#5f6f64] dark:text-white/50",
+  workspace_cancelled: "text-[#8a8f98] dark:text-white/35"
 };
 
 async function fetchNotifications() {
@@ -421,10 +424,15 @@ export function NotificationsCenter({
                 return (
                   <div key={item.id} className="px-5 py-4">
                     <div className="flex items-start gap-3">
-                      <div className={cn("mt-0.5 shrink-0", TYPE_COLORS[item.type])}>
+                      <div
+                        className={cn(
+                          "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center",
+                          TYPE_ICON_STYLES[item.type]
+                        )}
+                      >
                         <Icon
                           className={cn(
-                            "h-4.5 w-4.5",
+                            "h-[18px] w-[18px] stroke-[1.7]",
                             item.status === "active" &&
                               (item.type === "workspace_generating" ||
                                 item.type === "workspace_checking_duplicates") &&

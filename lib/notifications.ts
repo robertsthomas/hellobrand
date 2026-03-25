@@ -1,5 +1,6 @@
 export type NotificationCategory =
   | "workspace"
+  | "inbox"
   | "payments"
   | "deadlines"
   | "risks"
@@ -9,6 +10,7 @@ export type NotificationCategory =
 export type NotificationStatus = "active" | "cleared" | "superseded";
 
 export type NotificationEventType =
+  | "email.resync_required"
   | "workspace.queued"
   | "workspace.processing_started"
   | "workspace.ready_for_review"
@@ -25,6 +27,7 @@ export type NotificationEventType =
   | "deliverable.approved";
 
 export type NotificationType =
+  | "email_resync_required"
   | "payment_overdue"
   | "upcoming_deadline"
   | "contract_risk"
@@ -115,6 +118,8 @@ export function notificationTypeForEventType(
   switch (eventType) {
     case "payment.overdue":
       return "payment_overdue";
+    case "email.resync_required":
+      return "email_resync_required";
     case "payment.received":
       return "payment_received";
     case "deadline.upcoming":
@@ -141,6 +146,27 @@ export function notificationTypeForEventType(
     case "workspace.cancelled":
       return "workspace_cancelled";
   }
+}
+
+export function buildEmailResyncRequiredNotificationSeed(input: {
+  accountId: string;
+  provider: "gmail" | "outlook";
+  emailAddress: string;
+  createdAt?: Date | string;
+}): NotificationSeed {
+  const providerLabel = input.provider === "gmail" ? "Gmail" : "Outlook";
+
+  return {
+    category: "inbox",
+    eventType: "email.resync_required",
+    entityType: "connected_email_account",
+    entityId: input.accountId,
+    title: `${providerLabel} inbox needs resync`,
+    description: `We couldn't continue syncing ${input.emailAddress}. Reconnect this inbox to start a fresh sync.`,
+    href: "/app/settings",
+    dedupeKey: `email.resync_required:${input.accountId}`,
+    createdAt: input.createdAt
+  };
 }
 
 export function isNotificationUnread(notification: NotificationItem) {

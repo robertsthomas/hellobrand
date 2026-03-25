@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   CircleDot,
   File,
   FileImage,
+  MailSearch,
   FileText,
   FileVideo,
   Inbox,
   Info,
+  LoaderCircle,
   MoreHorizontal,
   Paperclip,
   Plus,
@@ -24,21 +27,200 @@ import {
 } from "lucide-react";
 
 import { AppTooltip } from "@/components/app-tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { buildReplySuggestionThreadVersion } from "@/lib/email/reply-suggestion-version";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type {
   DealRecord,
   EmailActionItemRecord,
   EmailDealCandidateMatchGroup,
   EmailAttachmentRecord,
+  EmailDealEventRecord,
   EmailMessageRecord,
   EmailParticipant,
   EmailThreadDetail,
   EmailThreadListItem,
+  EmailThreadPreviewStateRecord,
   NegotiationStance
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 function providerLabel(provider: string) {
   return provider === "gmail" ? "Gmail" : "Outlook";
+}
+
+function threadSearchText(item: EmailThreadListItem) {
+  return [
+    item.thread.subject,
+    item.thread.snippet,
+    item.account.emailAddress,
+    item.account.provider,
+    ...item.thread.participants.flatMap((participant) => [
+      participant.name ?? "",
+      participant.email,
+    ]),
+    ...item.links.map((link) => link.campaignName),
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function latestUpdatedAt(items: Array<Pick<EmailDealEventRecord | EmailActionItemRecord, "updatedAt">>) {
+  return items.reduce<string | null>((latest, item) => {
+    if (!latest || item.updatedAt > latest) {
+      return item.updatedAt;
+    }
+
+    return latest;
+  }, null);
+}
+
+function hasUnseenPreviewSection(latestAt: string | null, seenAt: string | null | undefined) {
+  if (!latestAt) {
+    return false;
+  }
+
+  return !seenAt || latestAt > seenAt;
+}
+
+type DraftPromptSuggestion = {
+  id: string;
+  label: string;
+  prompt: string;
+};
+
+type ReplyJourney = "idle" | "user_set" | "ai_set" | "ai_generated";
+
+type DraftPromptSuggestionCacheEntry = {
+  version: string;
+  suggestions: DraftPromptSuggestion[];
+};
+
+type DraftRevisionTarget = {
+  subject: string;
+  body: string;
+};
+
+type PreviewSection = "updates" | "actionItems";
+
+const DRAFT_REFINEMENT_OPTIONS = {
+  length: [
+    {
+      label: "Shorter",
+      instruction: "Revise the current draft to be shorter and tighter while preserving the same intent and asks."
+    },
+    {
+      label: "Longer",
+      instruction: "Revise the current draft to be a bit fuller and more detailed while preserving the same intent and asks."
+    }
+  ],
+  tone: [
+    {
+      label: "Formal",
+      instruction: "Revise the current draft to sound more formal and polished while keeping the same message."
+    },
+    {
+      label: "Relaxed",
+      instruction: "Revise the current draft to sound more relaxed and conversational while keeping it professional."
+    },
+    {
+      label: "Warm",
+      instruction: "Revise the current draft to feel warmer and more personable while keeping the same core message."
+    }
+  ],
+  focus: [
+    {
+      label: "Clarify asks",
+      instruction: "Revise the current draft to focus more clearly on the questions or clarifications you need from the brand."
+    },
+    {
+      label: "Protect terms",
+      instruction: "Revise the current draft to focus more on protecting boundaries, scope, timing, and commercial terms."
+    },
+    {
+      label: "Close next steps",
+      instruction: "Revise the current draft to end with clearer next steps and a stronger call to action."
+    }
+  ]
+} as const;
+
+const DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY =
+  "hellobrand:inbox:draft-prompt-suggestions";
+
+function loadDraftPromptSuggestionCache() {
+  if (typeof window === "undefined") {
+    return {} as Record<string, DraftPromptSuggestionCacheEntry>;
+  }
+
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY);
+    if (!raw) {
+      return {} as Record<string, DraftPromptSuggestionCacheEntry>;
+    }
+
+    const parsed = JSON.parse(raw) as Record<
+      string,
+      Partial<DraftPromptSuggestionCacheEntry> | undefined
+    >;
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => {
+        return (
+          Boolean(value?.version) &&
+          Array.isArray(value?.suggestions)
+        );
+      })
+    ) as Record<string, DraftPromptSuggestionCacheEntry>;
+  } catch {
+    return {} as Record<string, DraftPromptSuggestionCacheEntry>;
+  }
+}
+
+function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSuggestion {
+  switch (stance) {
+    case "firm":
+      return {
+        id: "tone-firm",
+        label: "Keep it firm",
+        prompt:
+          "Write the reply in a firm, direct tone. Protect our current position, avoid unnecessary concessions, and only make commitments already supported by the linked workspace context.",
+      };
+    case "exploratory":
+      return {
+        id: "tone-exploratory",
+        label: "Stay exploratory",
+        prompt:
+          "Write the reply in an exploratory tone. Ask clarifying questions where the thread or workspace context is incomplete, and avoid locking in details that are not yet confirmed.",
+      };
+    case "collaborative":
+    default:
+      return {
+        id: "tone-collaborative",
+        label: "Stay collaborative",
+        prompt:
+          "Write the reply in a collaborative tone. Keep it constructive, move the conversation forward, and align the response with the linked workspace context and current thread.",
+      };
+  }
 }
 
 function InboxSelect({
@@ -57,7 +239,7 @@ function InboxSelect({
       <select
         value={value}
         onChange={(event) => onChange(event.currentTarget.value)}
-        className="h-12 w-full appearance-none border border-border bg-white px-4 pr-14 text-[13px] text-foreground outline-none transition focus:border-primary"
+        className="h-11 w-full appearance-none border border-border bg-white px-4 pr-12 text-[13px] text-foreground outline-none transition focus:border-primary"
         style={{
           appearance: "none",
           WebkitAppearance: "none",
@@ -67,7 +249,7 @@ function InboxSelect({
       >
         {children}
       </select>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-12 items-center justify-center border-l border-border/80">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-11 items-center justify-center border-l border-border/80">
         <span className="h-0 w-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-muted-foreground" />
       </div>
     </div>
@@ -318,12 +500,14 @@ function ActionItemRow({ item }: { item: EmailActionItemRecord }) {
 export function InboxWorkspace({
   threads,
   selectedThread: initialSelectedThread,
+  threadPreviewStates: initialThreadPreviewStates,
   deals,
   hasConnectedAccounts,
   selectedFilters
 }: {
   threads: EmailThreadListItem[];
   selectedThread: EmailThreadDetail | null;
+  threadPreviewStates: Record<string, EmailThreadPreviewStateRecord>;
   deals: DealRecord[];
   hasConnectedAccounts: boolean;
   selectedFilters: {
@@ -338,6 +522,9 @@ export function InboxWorkspace({
   const threadCacheRef = useRef<Record<string, EmailThreadDetail>>({});
   const threadRequestRef = useRef<AbortController | null>(null);
   const discoveryRequestRef = useRef<AbortController | null>(null);
+  const replyBodyRef = useRef<HTMLTextAreaElement | null>(null);
+  const aiReplyControlRef = useRef<HTMLDivElement | null>(null);
+  const promptActionControlRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
   const [selectedDealId, setSelectedDealId] = useState<string>("");
@@ -346,6 +533,9 @@ export function InboxWorkspace({
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(initialSelectedThread?.thread.aiSummary ?? null);
   const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
+  const [replySubject, setReplySubject] = useState("");
+  const [replyBody, setReplyBody] = useState("");
+  const [replyJourney, setReplyJourney] = useState<ReplyJourney>("idle");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
@@ -358,23 +548,103 @@ export function InboxWorkspace({
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [replyStance, setReplyStance] = useState<NegotiationStance | "">("collaborative");
+  const [arePreviewUpdatesOpen, setArePreviewUpdatesOpen] = useState(false);
+  const [areActionItemsOpen, setAreActionItemsOpen] = useState(false);
+  const [isPromptCommandOpen, setIsPromptCommandOpen] = useState(false);
+  const [draftInstructions, setDraftInstructions] = useState("");
+  const [threadPreviewStates, setThreadPreviewStates] = useState(initialThreadPreviewStates);
+  const [aiSuggestionCache, setAiSuggestionCache] = useState<
+    Record<string, DraftPromptSuggestionCacheEntry>
+  >(loadDraftPromptSuggestionCache);
+  const [loadingSuggestionThreadIds, setLoadingSuggestionThreadIds] = useState<
+    Record<string, true>
+  >({});
+  const [aiReplyMenuWidth, setAiReplyMenuWidth] = useState<number | null>(null);
+  const [promptActionMenuWidth, setPromptActionMenuWidth] = useState<number | null>(null);
+  const [openRefinementPopover, setOpenRefinementPopover] = useState<
+    "length" | "tone" | "focus" | null
+  >(null);
+  const aiSuggestionCacheRef = useRef(aiSuggestionCache);
+  const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     setSelectedThread(initialSelectedThread);
     setActiveThreadId(initialSelectedThread?.thread.id ?? threads[0]?.thread.id ?? "");
+    setThreadPreviewStates(initialThreadPreviewStates);
     if (initialSelectedThread) {
       threadCacheRef.current[initialSelectedThread.thread.id] = initialSelectedThread;
     }
-  }, [initialSelectedThread, threads]);
+  }, [initialSelectedThread, initialThreadPreviewStates, threads]);
 
   useEffect(() => {
     setSummary(selectedThread?.thread.aiSummary ?? null);
     setDraft(null);
+    setReplySubject("");
+    setReplyBody("");
+    setReplyJourney("idle");
     setErrorMessage(null);
     setSelectedDealId(selectedThread?.links[0]?.dealId ?? "");
+    setIsPromptCommandOpen(false);
+    setDraftInstructions("");
     setIsActionMenuOpen(false);
     setIsLinkModalOpen(false);
+    setArePreviewUpdatesOpen(false);
+    setOpenRefinementPopover(null);
   }, [selectedThread]);
+
+  useEffect(() => {
+    const control = aiReplyControlRef.current;
+    if (!control) {
+      return;
+    }
+
+    const updateWidth = () => {
+      setAiReplyMenuWidth(control.getBoundingClientRect().width);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+
+    observer.observe(control);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [replyJourney, isDrafting]);
+
+  useEffect(() => {
+    const control = promptActionControlRef.current;
+    if (!control) {
+      return;
+    }
+
+    const updateWidth = () => {
+      setPromptActionMenuWidth(control.getBoundingClientRect().width);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateWidth();
+    });
+
+    observer.observe(control);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [draftInstructions, isDrafting]);
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -397,6 +667,19 @@ export function InboxWorkspace({
     };
   }, []);
 
+  useEffect(() => {
+    aiSuggestionCacheRef.current = aiSuggestionCache;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY,
+      JSON.stringify(aiSuggestionCache)
+    );
+  }, [aiSuggestionCache]);
+
   const selectedThreadId = selectedThread?.thread.id ?? "";
   const linkedDealIds = useMemo(
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
@@ -406,12 +689,229 @@ export function InboxWorkspace({
   const latestMessage = selectedMessages[selectedMessages.length - 1] ?? null;
   const earlierMessages = latestMessage ? selectedMessages.slice(0, -1) : [];
   const hasLinkedThreads = threads.length > 0;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredThreads = useMemo(() => {
+    if (!normalizedQuery) {
+      return threads;
+    }
+
+    return threads.filter((item) => threadSearchText(item).includes(normalizedQuery));
+  }, [normalizedQuery, threads]);
   const selectedThreadDeals = useMemo(() => {
     const byId = new Map(deals.map((deal) => [deal.id, deal]));
     return selectedThread?.links
       .map((link) => byId.get(link.dealId))
       .filter((entry): entry is DealRecord => Boolean(entry)) ?? [];
   }, [deals, selectedThread]);
+  const selectedThreadSuggestionVersion = useMemo(
+    () =>
+      selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null,
+    [
+      selectedThread?.thread.updatedAt,
+      selectedThread?.thread.lastMessageAt,
+      selectedThread?.thread.messageCount
+    ]
+  );
+  const selectedThreadPreviewState = selectedThread
+    ? threadPreviewStates[selectedThread.thread.id] ?? null
+    : null;
+  const latestImportantEventAt = useMemo(
+    () => latestUpdatedAt(selectedThread?.importantEvents ?? []),
+    [selectedThread?.importantEvents]
+  );
+  const latestActionItemAt = useMemo(
+    () => latestUpdatedAt(selectedThread?.actionItems ?? []),
+    [selectedThread?.actionItems]
+  );
+  const hasUnseenPreviewUpdates = hasUnseenPreviewSection(
+    latestImportantEventAt,
+    selectedThreadPreviewState?.previewUpdatesSeenAt
+  );
+  const hasUnseenActionItems = hasUnseenPreviewSection(
+    latestActionItemAt,
+    selectedThreadPreviewState?.actionItemsSeenAt
+  );
+
+  const prefetchThreadSuggestions = useCallback(
+    async (
+      thread: Pick<
+        EmailThreadDetail["thread"],
+        "id" | "updatedAt" | "lastMessageAt" | "messageCount"
+      >
+    ) => {
+      const version = buildReplySuggestionThreadVersion(thread);
+      const cached = aiSuggestionCacheRef.current[thread.id];
+
+      if (cached?.version === version && cached.suggestions.length > 0) {
+        return;
+      }
+
+      if (suggestionRequestVersionsRef.current[thread.id] === version) {
+        return;
+      }
+
+      suggestionRequestVersionsRef.current[thread.id] = version;
+      setLoadingSuggestionThreadIds((current) => ({
+        ...current,
+        [thread.id]: true
+      }));
+
+      try {
+        const response = await fetch(`/api/email/threads/${thread.id}/suggestions`);
+        const payload = await response.json();
+
+        if (!response.ok || !Array.isArray(payload.suggestions)) {
+          return;
+        }
+
+        setAiSuggestionCache((current) => {
+          const existing = current[thread.id];
+          if (existing?.version === version && existing.suggestions.length > 0) {
+            return current;
+          }
+
+          return {
+            ...current,
+            [thread.id]: {
+              version,
+              suggestions: payload.suggestions as DraftPromptSuggestion[]
+            }
+          };
+        });
+      } catch {
+        // Keep fallback suggestions when prefetch fails.
+      } finally {
+        if (suggestionRequestVersionsRef.current[thread.id] === version) {
+          delete suggestionRequestVersionsRef.current[thread.id];
+        }
+
+        setLoadingSuggestionThreadIds((current) => {
+          if (!current[thread.id]) {
+            return current;
+          }
+
+          const next = { ...current };
+          delete next[thread.id];
+          return next;
+        });
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!selectedThread || !selectedThreadSuggestionVersion) {
+      return;
+    }
+
+    const cached = aiSuggestionCacheRef.current[selectedThread.thread.id];
+    if (!cached || cached.version === selectedThreadSuggestionVersion) {
+      return;
+    }
+
+    setAiSuggestionCache((current) => {
+      const existing = current[selectedThread.thread.id];
+      if (!existing || existing.version === selectedThreadSuggestionVersion) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[selectedThread.thread.id];
+      return next;
+    });
+  }, [selectedThread, selectedThreadSuggestionVersion]);
+
+  useEffect(() => {
+    if (!selectedThread) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void prefetchThreadSuggestions(selectedThread.thread);
+    }, 2000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    prefetchThreadSuggestions,
+    selectedThread?.thread.id,
+    selectedThread?.thread.updatedAt,
+    selectedThread?.thread.lastMessageAt,
+    selectedThread?.thread.messageCount
+  ]);
+
+  useEffect(() => {
+    if (!isPromptCommandOpen || !selectedThread) {
+      return;
+    }
+
+    void prefetchThreadSuggestions(selectedThread.thread);
+  }, [isPromptCommandOpen, prefetchThreadSuggestions, selectedThread]);
+
+  const currentAiSuggestions = useMemo(() => {
+    if (!selectedThread || !selectedThreadSuggestionVersion) {
+      return [];
+    }
+
+    const cached = aiSuggestionCache[selectedThread.thread.id];
+    if (!cached || cached.version !== selectedThreadSuggestionVersion) {
+      return [];
+    }
+
+    return cached.suggestions;
+  }, [aiSuggestionCache, selectedThread, selectedThreadSuggestionVersion]);
+
+  const linkableDeals = useMemo(
+    () => deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid"),
+    [deals]
+  );
+
+  const isLoadingSuggestions = Boolean(
+    selectedThread && loadingSuggestionThreadIds[selectedThread.thread.id]
+  );
+
+  const promptSuggestions = useMemo(() => {
+    if (currentAiSuggestions.length > 0) {
+      return currentAiSuggestions;
+    }
+
+    // Static fallbacks while AI suggestions load
+    return [
+      { id: "fallback-0", label: "Ask for more details on deliverables", prompt: "Ask the brand to clarify the deliverables, timeline, or creative direction." },
+      { id: "fallback-1", label: "Push back on the terms politely", prompt: "Politely push back on terms that feel unfavorable. Suggest alternatives." },
+      { id: "fallback-2", label: "Confirm availability and interest", prompt: "Write a brief reply confirming availability and interest without overcommitting." },
+    ].slice(0, 3);
+  }, [currentAiSuggestions]);
+  const trimmedDraftInstructions = draftInstructions.trim();
+  const shouldHighlightAiReply = replyJourney === "ai_set" && !isDrafting;
+  const canRefineGeneratedReply =
+    replyJourney === "ai_generated" && replyBody.trim().length > 0 && !isDrafting;
+  const canSendReply =
+    !isDrafting &&
+    replyBody.trim().length > 0 &&
+    (replyJourney === "user_set" || replyJourney === "ai_generated");
+
+  const resizeReplyBody = useCallback(() => {
+    const textarea = replyBodyRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "0px";
+    textarea.style.height = `${Math.max(24, textarea.scrollHeight)}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeReplyBody();
+  }, [replyBody, replyJourney, resizeReplyBody]);
+
+  function applyPromptToNextDraft() {
+    setDraft(null);
+    setReplySubject("");
+    setReplyBody(trimmedDraftInstructions);
+    setReplyJourney("ai_set");
+    setErrorMessage(null);
+    setIsPromptCommandOpen(false);
+  }
 
   function buildInboxUrl(
     next: Partial<typeof selectedFilters> & { thread?: string } = {}
@@ -442,6 +942,59 @@ export function InboxWorkspace({
     router.push(buildInboxUrl({ ...next, thread: next.thread ?? selectedThreadId }));
   }
 
+  async function markPreviewSectionSeen(section: PreviewSection, seenAt: string | null) {
+    if (!selectedThreadId || !seenAt) {
+      return;
+    }
+
+    setThreadPreviewStates((current) => {
+      const existing = current[selectedThreadId];
+      const nextState: EmailThreadPreviewStateRecord = {
+        threadId: selectedThreadId,
+        previewUpdatesSeenAt:
+          section === "updates" ? seenAt : existing?.previewUpdatesSeenAt ?? null,
+        actionItemsSeenAt:
+          section === "actionItems" ? seenAt : existing?.actionItemsSeenAt ?? null,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      return {
+        ...current,
+        [selectedThreadId]: nextState
+      };
+    });
+
+    try {
+      await fetch(`/api/email/threads/${selectedThreadId}/preview-state`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          section,
+          seenAt
+        })
+      });
+    } catch {
+      // Keep the optimistic state; this marker is UI-only.
+    }
+  }
+
+  function handlePreviewUpdatesOpenChange(open: boolean) {
+    setArePreviewUpdatesOpen(open);
+    if (open && hasUnseenPreviewUpdates) {
+      void markPreviewSectionSeen("updates", latestImportantEventAt);
+    }
+  }
+
+  function handleActionItemsOpenChange(open: boolean) {
+    setAreActionItemsOpen(open);
+    if (open && hasUnseenActionItems) {
+      void markPreviewSectionSeen("actionItems", latestActionItemAt);
+    }
+  }
+
   async function loadThread(threadId: string) {
     if (!threadId || threadId === selectedThreadId) {
       return;
@@ -454,6 +1007,7 @@ export function InboxWorkspace({
     const cached = threadCacheRef.current[threadId];
     if (cached) {
       setSelectedThread(cached);
+      void prefetchThreadSuggestions(cached.thread);
       return;
     }
 
@@ -474,6 +1028,7 @@ export function InboxWorkspace({
       const detail = payload.thread as EmailThreadDetail;
       threadCacheRef.current[threadId] = detail;
       setSelectedThread(detail);
+      void prefetchThreadSuggestions(detail.thread);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -531,13 +1086,26 @@ export function InboxWorkspace({
     }
   }
 
-  async function draftReply() {
+  async function draftReply(
+    overrideInstructions?: string | null,
+    revisionTarget?: DraftRevisionTarget | null
+  ) {
     if (!selectedThreadId) {
       return;
     }
 
+    const trimmedInstructions =
+      (overrideInstructions ??
+        (replyJourney === "ai_set" ? replyBody : draftInstructions)).trim();
+
     setIsDrafting(true);
+    setReplyJourney("ai_set");
+    setReplySubject("");
+    if (!revisionTarget && replyJourney !== "ai_set") {
+      setReplyBody("");
+    }
     setIsActionMenuOpen(false);
+    setOpenRefinementPopover(null);
     setErrorMessage(null);
     try {
       const response = await fetch(`/api/email/threads/${selectedThreadId}/draft`, {
@@ -547,7 +1115,9 @@ export function InboxWorkspace({
         },
         body: JSON.stringify({
           dealId: selectedDealId || null,
-          stance: replyStance || null
+          stance: replyStance || null,
+          instructions: trimmedInstructions || null,
+          currentDraft: revisionTarget
         })
       });
       const payload = await response.json();
@@ -555,11 +1125,27 @@ export function InboxWorkspace({
         throw new Error(payload.error ?? "Could not generate reply draft.");
       }
       setDraft(payload.draft ?? null);
+      setReplySubject(payload.draft?.subject ?? "");
+      setReplyBody(payload.draft?.body ?? "");
+      setReplyJourney("ai_generated");
+      setDraftInstructions("");
+      setIsPromptCommandOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not generate reply draft.");
     } finally {
       setIsDrafting(false);
     }
+  }
+
+  async function refineGeneratedDraft(instruction: string) {
+    if (replyJourney !== "ai_generated" || !replyBody.trim()) {
+      return;
+    }
+
+    await draftReply(instruction, {
+      subject: replySubject,
+      body: replyBody
+    });
   }
 
   async function linkSelectedDeal() {
@@ -772,29 +1358,38 @@ export function InboxWorkspace({
                 <h1 className="text-[31px] font-semibold tracking-[-0.05em] text-foreground lg:text-[36px]">
                   Inbox
                 </h1>
-                <p className="mt-1 max-w-3xl text-[13px] leading-6 text-muted-foreground">
-                  Browse linked deal threads, review workspace-relevant updates, and keep email context tied to active deals.
-                </p>
+               
               </div>
 
               <div className="flex items-center gap-3">
                 {hasConnectedAccounts && hasLinkedThreads ? (
                   <AppTooltip
-                    content="We search recent synced mail first, then keep expanding in the background."
+                    content="Find emails"
                     sideOffset={8}
                   >
                     <button
                       type="button"
                       onClick={() => void discoverCandidates()}
                       disabled={isDiscovering}
-                      aria-label="Find emails"
-                      className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-5 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label={isDiscovering ? "Finding emails" : "Find emails"}
+                      className="inline-flex h-11 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
                     >
-                      <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
-                      <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                      <MailSearch
+                        strokeWidth={1.5}
+                        className={`h-5 w-5 shrink-0 ${isDiscovering ? "animate-pulse" : ""}`}
+                      />
                     </button>
                   </AppTooltip>
                 ) : null}
+                <div className="w-full max-w-sm">
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    placeholder="Search linked emails"
+                    aria-label="Search linked emails"
+                    className="h-11 rounded-none border-black/10 bg-white text-[13px] shadow-none dark:border-white/10 dark:bg-[#161a1f]"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -847,29 +1442,22 @@ export function InboxWorkspace({
               </div>
             </section>
           ) : (
-            <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[400px_minmax(0,1fr)]">
+            <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
               <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-[17px] font-semibold text-foreground">Linked Threads</h2>
                     <span className="bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                      {threads.length}
+                      {filteredThreads.length}
                     </span>
                   </div>
 
                   <form
                     onSubmit={(event) => {
                       event.preventDefault();
-                      applyFilters({ thread: "" });
                     }}
-                    className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_170px_210px_auto]"
+                    className="mt-4 grid gap-3 sm:grid-cols-2"
                   >
-                    <input
-                      value={query}
-                      onChange={(event) => setQuery(event.currentTarget.value)}
-                      placeholder="Search linked threads"
-                      className="h-12 min-w-0 border border-border bg-white px-4 text-[13px] text-foreground outline-none transition focus:border-primary"
-                    />
                     <InboxSelect
                       value={selectedFilters.provider}
                       onChange={(value) => applyFilters({ provider: value, thread: "" })}
@@ -889,24 +1477,38 @@ export function InboxWorkspace({
                         </option>
                       ))}
                     </InboxSelect>
-                    <button
-                      type="submit"
-                      className="h-12 border border-black/10 px-5 text-[13px] font-semibold text-foreground transition hover:border-black/20"
-                    >
-                      Search
-                    </button>
                   </form>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto bg-[#fcfcfa] dark:bg-transparent">
-                  {threads.map((item) => {
+                <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-transparent">
+                  {filteredThreads.length === 0 ? (
+                    <div className="px-5 py-8 text-sm text-muted-foreground">
+                      No linked emails match your search.
+                    </div>
+                  ) : filteredThreads.map((item) => {
                     const active = item.thread.id === activeThreadId;
+                    const itemPreviewState = threadPreviewStates[item.thread.id];
+                    const threadHasUnseenUpdates =
+                      item.importantEventCount > 0 &&
+                      hasUnseenPreviewSection(
+                        item.latestImportantEventAt,
+                        itemPreviewState?.previewUpdatesSeenAt
+                      );
+                    const threadHasUnseenActionItems =
+                      item.pendingActionItemCount > 0 &&
+                      hasUnseenPreviewSection(
+                        item.latestPendingActionItemAt,
+                        itemPreviewState?.actionItemsSeenAt
+                      );
 
                     return (
                       <button
                         key={item.thread.id}
                         type="button"
-                        onClick={() => void loadThread(item.thread.id)}
+                        onClick={() => {
+                          void prefetchThreadSuggestions(item.thread);
+                          void loadThread(item.thread.id);
+                        }}
                         onMouseEnter={() => void prefetchThread(item.thread.id)}
                         onFocus={() => void prefetchThread(item.thread.id)}
                         className={`block w-full border-b border-black/6 px-4 py-3 text-left transition dark:border-white/8 ${
@@ -940,26 +1542,19 @@ export function InboxWorkspace({
                               <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
                                 {providerLabel(item.account.provider)}
                               </span>
-                              {item.links.map((link) => (
-                                <span
-                                  key={link.id}
-                                  className="bg-[#f4efe4] px-2.5 py-1 text-[10px] font-medium text-[#8a5c12]"
-                                >
-                                  {link.campaignName}
-                                </span>
-                              ))}
                               {item.importantEventCount > 0 ? (
-                                <span className="bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
-                                  {item.importantEventCount} updates
-                                </span>
-                              ) : null}
-                              {item.pendingTermSuggestionCount > 0 ? (
-                                <span className="bg-[#f8f3e9] px-2.5 py-1 text-[10px] font-medium text-[#8a5c12]">
-                                  Terms suggested
+                                <span className="inline-flex items-center gap-1.5 bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
+                                  {threadHasUnseenUpdates ? (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-[#3152a3]" />
+                                  ) : null}
+                                  {item.importantEventCount} update{item.importantEventCount === 1 ? "" : "s"}
                                 </span>
                               ) : null}
                               {item.pendingActionItemCount > 0 ? (
-                                <span className="bg-[#fef3f2] px-2.5 py-1 text-[10px] font-medium text-[#b42318]">
+                                <span className="inline-flex items-center gap-1.5 bg-[#fef3f2] px-2.5 py-1 text-[10px] font-medium text-[#b42318]">
+                                  {threadHasUnseenActionItems ? (
+                                    <span className="h-1.5 w-1.5 rounded-full bg-[#b42318]" />
+                                  ) : null}
                                   {item.pendingActionItemCount} action{item.pendingActionItemCount === 1 ? "" : "s"}
                                 </span>
                               ) : null}
@@ -972,13 +1567,13 @@ export function InboxWorkspace({
                 </div>
               </section>
 
-              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white lg:mr-28 dark:border-white/10 dark:bg-white/[0.03]">
                 {!selectedThread ? (
                   <div className="px-6 py-10 text-[13px] text-muted-foreground">
                     Select a thread to see the full conversation.
                   </div>
                 ) : (
-                  <>
+                  <div className="flex h-full min-h-0 flex-col">
                     <div className="shrink-0 border-b border-black/8 px-6 py-5 dark:border-white/10">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -989,14 +1584,6 @@ export function InboxWorkspace({
                             <span className="bg-white px-3 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
                               {selectedThread.account.emailAddress}
                             </span>
-                            {selectedThreadDeals.map((deal) => (
-                              <span
-                                key={deal.id}
-                                className="bg-[#f4efe4] px-3 py-1 text-[10px] font-medium text-[#8a5c12]"
-                              >
-                                {deal.campaignName}
-                              </span>
-                            ))}
                           </div>
                           <h2 className="mt-3 max-w-4xl text-[22px] font-semibold tracking-[-0.04em] text-foreground">
                             {selectedThread.thread.subject}
@@ -1015,12 +1602,12 @@ export function InboxWorkspace({
 
                           {isActionMenuOpen ? (
                             <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 border border-black/8 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#161a20]">
-                              <button
-                                type="button"
-                                onClick={() => void summarizeThread()}
-                                disabled={isSummarizing}
-                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
+                                <button
+                                  type="button"
+                                  onClick={() => void summarizeThread()}
+                                  disabled={isSummarizing}
+                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
                                 {isSummarizing ? "Summarizing..." : "Generate summary"}
                               </button>
                               <div className="border-b border-black/6 pb-1 mb-1">
@@ -1036,7 +1623,7 @@ export function InboxWorkspace({
                                       className={`px-2 py-1 text-[10px] font-medium transition ${
                                         replyStance === s
                                           ? "bg-foreground text-background"
-                                          : "bg-secondary/40 text-foreground hover:bg-secondary/60"
+                                          : "bg-secondary/60 text-foreground hover:bg-secondary/85"
                                       }`}
                                     >
                                       {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -1044,23 +1631,15 @@ export function InboxWorkspace({
                                   ))}
                                 </div>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => void draftReply()}
-                                disabled={isDrafting}
-                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isDrafting ? "Drafting..." : "Draft reply"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsActionMenuOpen(false);
-                                  setIsLinkModalOpen(true);
-                                }}
-                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/40"
-                              >
-                                Link deal
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    setIsLinkModalOpen(true);
+                                  }}
+                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
+                                >
+                                Link partnership
                               </button>
                             </div>
                           ) : null}
@@ -1068,8 +1647,7 @@ export function InboxWorkspace({
                       </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-hidden">
-                      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
                         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                           <div className="space-y-5">
                             {isThreadLoading ? (
@@ -1079,44 +1657,61 @@ export function InboxWorkspace({
                             ) : null}
 
                             {selectedThread.importantEvents.length > 0 ? (
-                              <section className="border border-black/8 px-5 py-4">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                                  Important updates
-                                </p>
-                                <div className="mt-3 space-y-3">
-                                  {selectedThread.importantEvents.map((event) => (
-                                    <div key={event.id} className="border-l-2 border-black/10 pl-3">
-                                      <p className="text-[12px] font-semibold text-foreground">
-                                        {event.title}
-                                      </p>
-                                      <p className="mt-1 text-[12px] text-muted-foreground">
-                                        {event.body}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </section>
+                              <Collapsible
+                                open={arePreviewUpdatesOpen}
+                                onOpenChange={handlePreviewUpdatesOpenChange}
+                              >
+                                <section className="border border-black/6 px-4 py-3">
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="flex w-full items-center justify-between text-left"
+                                      aria-label={
+                                        arePreviewUpdatesOpen
+                                          ? "Collapse preview updates"
+                                          : "Expand preview updates"
+                                      }
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                          Updates
+                                        </p>
+                                        {hasUnseenPreviewUpdates ? (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
+                                        ) : null}
+                                      </div>
+                                      <ChevronDown
+                                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${arePreviewUpdatesOpen ? "rotate-180" : ""}`}
+                                      />
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-2 space-y-2">
+                                    {selectedThread.importantEvents.map((event) => (
+                                      <div key={event.id} className="border-l-2 border-black/8 pl-3">
+                                        <p className="text-[12px] font-medium text-foreground">{event.title}</p>
+                                        <p className="text-[11px] text-muted-foreground">{event.body}</p>
+                                      </div>
+                                    ))}
+                                  </CollapsibleContent>
+                                </section>
+                              </Collapsible>
                             ) : null}
 
                             {selectedThread.termSuggestions.length > 0 ? (
-                              <section className="border border-black/8 px-5 py-4">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                                  Suggested workspace term updates
+                              <section className="border border-black/6 px-4 py-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                  Term updates
                                 </p>
-                                <div className="mt-3 space-y-3">
+                                <div className="mt-2 space-y-2">
                                   {selectedThread.termSuggestions.map((suggestion) => (
-                                    <div key={suggestion.id} className="border-l-2 border-black/10 pl-3">
-                                      <p className="text-[12px] font-semibold text-foreground">
-                                        {suggestion.title}
-                                      </p>
-                                      <p className="mt-1 text-[12px] text-muted-foreground">
-                                        {suggestion.summary}
-                                      </p>
+                                    <div key={suggestion.id} className="border-l-2 border-black/8 pl-3">
+                                      <p className="text-[12px] font-medium text-foreground">{suggestion.title}</p>
+                                      <p className="text-[11px] text-muted-foreground">{suggestion.summary}</p>
                                       <a
                                         href={`/app/deals/${suggestion.dealId}?tab=terms`}
-                                        className="mt-2 inline-flex text-[12px] font-medium text-foreground underline-offset-4 hover:underline"
+                                        className="mt-1 inline-flex text-[11px] font-medium text-foreground underline-offset-4 hover:underline"
                                       >
-                                        Review key terms
+                                        Review terms
                                       </a>
                                     </div>
                                   ))}
@@ -1125,40 +1720,52 @@ export function InboxWorkspace({
                             ) : null}
 
                             {selectedThread.actionItems.length > 0 ? (
-                              <section className="border border-[#fecdca]/60 bg-[#fef3f2] px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <CircleDot className="h-4 w-4 text-[#b42318]" />
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#b42318]">
-                                    Action items
-                                  </p>
-                                </div>
-                                <div className="mt-3 space-y-3">
-                                  {selectedThread.actionItems.map((item) => (
-                                    <ActionItemRow key={item.id} item={item} />
-                                  ))}
-                                </div>
-                              </section>
+                              <Collapsible
+                                open={areActionItemsOpen}
+                                onOpenChange={handleActionItemsOpenChange}
+                              >
+                                <section className="border border-black/6 px-4 py-3">
+                                  <CollapsibleTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="flex w-full items-center justify-between text-left"
+                                      aria-label={areActionItemsOpen ? "Collapse action items" : "Expand action items"}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                          Action items ({selectedThread.actionItems.length})
+                                        </p>
+                                        {hasUnseenActionItems ? (
+                                          <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
+                                        ) : null}
+                                      </div>
+                                      <ChevronDown
+                                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${areActionItemsOpen ? "rotate-180" : ""}`}
+                                      />
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-2 space-y-2">
+                                    {selectedThread.actionItems.map((item) => (
+                                      <ActionItemRow key={item.id} item={item} />
+                                    ))}
+                                  </CollapsibleContent>
+                                </section>
+                              </Collapsible>
                             ) : null}
 
                             {selectedThread.promiseDiscrepancies.length > 0 ? (
-                              <section className="border border-[#fde68a]/60 bg-[#fffbeb] px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-[#b45309]" />
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#b45309]">
-                                    Email vs. contract discrepancies
-                                  </p>
-                                </div>
-                                <div className="mt-3 space-y-3">
+                              <section className="border border-black/6 px-4 py-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                  Discrepancies
+                                </p>
+                                <div className="mt-2 space-y-2">
                                   {selectedThread.promiseDiscrepancies.map((d, i) => (
-                                    <div key={`${d.field}-${i}`} className="border-l-2 border-[#f59e0b] pl-3">
-                                      <p className="text-[12px] font-semibold text-foreground">
+                                    <div key={`${d.field}-${i}`} className="border-l-2 border-amber-300 pl-3">
+                                      <p className="text-[12px] font-medium text-foreground">
                                         {d.field}: email says &ldquo;{d.emailClaim}&rdquo;
                                       </p>
-                                      <p className="mt-1 text-[12px] text-muted-foreground">
+                                      <p className="text-[11px] text-muted-foreground">
                                         Contract says &ldquo;{d.contractValue}&rdquo;
-                                      </p>
-                                      <p className="mt-1 text-[11px] italic text-muted-foreground">
-                                        &ldquo;{d.sourceText}&rdquo;
                                       </p>
                                     </div>
                                   ))}
@@ -1253,7 +1860,7 @@ export function InboxWorkspace({
                                         : initialsFromParticipant(latestMessage.from)}
                                     </div>
 
-                                    <div className="min-w-0 flex-1 border-b border-black/8 pb-3">
+                                    <div className="min-w-0 flex-1">
                                       <p className="text-[14px] font-semibold text-foreground">
                                         {latestMessage.direction === "outbound"
                                           ? "You"
@@ -1287,52 +1894,199 @@ export function InboxWorkspace({
                         {/* Reply composer — pinned to bottom */}
                         <div className="border-t border-black/8 bg-white px-5 py-4">
                           <div className="space-y-3">
-                            <div className={`rounded-lg border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground ${draft ? "min-h-[80px]" : ""}`}>
+                            <div className="border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground">
                               {isDrafting ? (
                                 <span className="flex items-center gap-2 text-primary">
-                                  <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-                                  Drafting reply...
+                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                  Generating...
                                 </span>
-                              ) : draft ? (
-                                <div>
-                                  <p className="text-xs font-medium text-foreground">{draft.subject}</p>
-                                  <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap font-sans text-[12px] leading-6 text-foreground">{draft.body}</pre>
-                                </div>
                               ) : (
-                                <span className="text-[13px]">Click &quot;AI Draft&quot; to generate a reply...</span>
+                                <div>
+                                  <Textarea
+                                    ref={replyBodyRef}
+                                    rows={1}
+                                    value={replyBody}
+                                    onChange={(event) => {
+                                      const nextValue = event.currentTarget.value;
+                                      event.currentTarget.style.height = "0px";
+                                      event.currentTarget.style.height = `${Math.max(24, event.currentTarget.scrollHeight)}px`;
+                                      setReplyBody(nextValue);
+                                      if (replyJourney === "ai_set") {
+                                        setDraftInstructions(nextValue);
+                                      } else if (replyJourney === "idle" || replyJourney === "user_set") {
+                                        setReplyJourney(
+                                          nextValue.trim().length > 0 ? "user_set" : "idle"
+                                        );
+                                      }
+                                    }}
+                                    placeholder={
+                                      replyJourney === "ai_set"
+                                        ? 'Refine your prompt, then click "Generate"...'
+                                        : 'Type a reply or click "AI Reply" to generate one...'
+                                    }
+                                    className="h-6 min-h-0 overflow-hidden border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
+                                  />
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void draftReply()}
-                                  disabled={isDrafting}
-                                  className="inline-flex h-9 items-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 disabled:opacity-60"
-                                >
-                                  <Sparkles className="h-3.5 w-3.5" />
-                                  {draft ? "Regenerate" : "AI Draft"}
-                                </button>
-                                <div className="flex gap-1">
-                                  {(["firm", "collaborative", "exploratory"] as const).map((s) => (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => setReplyStance(s)}
-                                      className={`h-7 px-2 text-[10px] font-medium transition ${
-                                        replyStance === s
-                                          ? "bg-foreground text-background"
-                                          : "bg-secondary/40 text-foreground hover:bg-secondary/60"
-                                      }`}
+                                <div ref={aiReplyControlRef} className="flex items-stretch">
+                                  <button
+                                    type="button"
+                                    onClick={() => void draftReply()}
+                                    disabled={isDrafting}
+                                    className={`inline-flex h-9 items-center gap-2 border px-3 text-[12px] font-medium transition disabled:opacity-60 ${
+                                      shouldHighlightAiReply
+                                        ? "animate-pulse border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                                        : "border-black/10 text-foreground hover:bg-black/[0.03]"
+                                    }`}
+                                  >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    {isDrafting
+                                      ? "Replying..."
+                                      : replyJourney === "ai_set"
+                                        ? "Generate"
+                                        : "AI Reply"}
+                                  </button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        aria-label="Open AI reply options"
+                                        className="inline-flex h-9 w-8 items-center justify-center border border-l-0 border-black/10 text-muted-foreground transition hover:bg-black/[0.03] hover:text-foreground"
+                                      >
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    side="top"
+                                    sideOffset={4}
+                                    style={
+                                      aiReplyMenuWidth ? { width: `${aiReplyMenuWidth}px` } : undefined
+                                    }
+                                    className="rounded-none border-black/10 p-0"
+                                  >
+                                    <DropdownMenuItem
+                                      onSelect={() => setIsPromptCommandOpen(true)}
+                                      className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
                                     >
-                                      {s.charAt(0).toUpperCase() + s.slice(1)}
-                                    </button>
-                                  ))}
+                                      Add prompt
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
+                                {canRefineGeneratedReply ? (
+                                  <>
+                                    <Popover
+                                      open={openRefinementPopover === "length"}
+                                      onOpenChange={(open) =>
+                                        setOpenRefinementPopover(open ? "length" : null)
+                                      }
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
+                                        >
+                                          Length
+                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        align="start"
+                                        side="top"
+                                        className="w-40 rounded-none border-black/10 p-1"
+                                      >
+                                        <div className="space-y-1">
+                                          {DRAFT_REFINEMENT_OPTIONS.length.map((option) => (
+                                            <button
+                                              key={option.label}
+                                              type="button"
+                                              onClick={() => void refineGeneratedDraft(option.instruction)}
+                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
+                                            >
+                                              {option.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                    <Popover
+                                      open={openRefinementPopover === "tone"}
+                                      onOpenChange={(open) =>
+                                        setOpenRefinementPopover(open ? "tone" : null)
+                                      }
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
+                                        >
+                                          Tone
+                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        align="start"
+                                        side="top"
+                                        className="w-40 rounded-none border-black/10 p-1"
+                                      >
+                                        <div className="space-y-1">
+                                          {DRAFT_REFINEMENT_OPTIONS.tone.map((option) => (
+                                            <button
+                                              key={option.label}
+                                              type="button"
+                                              onClick={() => void refineGeneratedDraft(option.instruction)}
+                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
+                                            >
+                                              {option.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                    <Popover
+                                      open={openRefinementPopover === "focus"}
+                                      onOpenChange={(open) =>
+                                        setOpenRefinementPopover(open ? "focus" : null)
+                                      }
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
+                                        >
+                                          Focus
+                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent
+                                        align="start"
+                                        side="top"
+                                        className="w-44 rounded-none border-black/10 p-1"
+                                      >
+                                        <div className="space-y-1">
+                                          {DRAFT_REFINEMENT_OPTIONS.focus.map((option) => (
+                                            <button
+                                              key={option.label}
+                                              type="button"
+                                              onClick={() => void refineGeneratedDraft(option.instruction)}
+                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
+                                            >
+                                              {option.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  </>
+                                ) : null}
                               </div>
                               <button
                                 type="button"
-                                disabled={!draft || isDrafting}
+                                disabled={!canSendReply}
                                 className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
                               >
                                 <Send className="h-3.5 w-3.5" />
@@ -1341,15 +2095,117 @@ export function InboxWorkspace({
                             </div>
                           </div>
                         </div>
-                      </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </section>
             </div>
           )}
         </div>
       </div>
+
+      <CommandDialog
+        open={isPromptCommandOpen}
+        onOpenChange={setIsPromptCommandOpen}
+        title="Add draft prompt"
+        description="Add guidance for the AI draft reply."
+      >
+        <CommandInput
+          value={draftInstructions}
+          onValueChange={setDraftInstructions}
+          placeholder="Tone, boundaries, points to mention..."
+          aria-label="Additional prompt for AI draft"
+        />
+        <CommandList className="max-h-[240px]">
+          <CommandEmpty>
+            <p className="text-[13px] text-muted-foreground">Type a custom prompt or pick a suggestion below.</p>
+          </CommandEmpty>
+          <CommandGroup heading="Suggestions">
+            {isLoadingSuggestions && promptSuggestions.length === 0 ? (
+              <div className="flex items-center gap-2 px-3 py-3 text-[13px] text-muted-foreground">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                Generating suggestions...
+              </div>
+            ) : (
+              promptSuggestions.map((suggestion) => (
+                <CommandItem
+                  key={suggestion.id}
+                  value={suggestion.label}
+                  onSelect={() => setDraftInstructions(suggestion.prompt)}
+                >
+                  {suggestion.label}
+                </CommandItem>
+              ))
+            )}
+          </CommandGroup>
+        </CommandList>
+        <div className="flex items-center justify-between border-t border-black/8 px-4 py-3 dark:border-white/10">
+          <p className="text-[12px] text-muted-foreground">
+            Applies to the next draft only.
+          </p>
+          <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftInstructions("");
+                  if (replyJourney === "ai_set") {
+                    setReplyBody("");
+                    setReplyJourney("idle");
+                  }
+                  setIsPromptCommandOpen(false);
+                }}
+              className="inline-flex h-8 items-center px-3 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
+            >
+              Clear
+            </button>
+            <div ref={promptActionControlRef} className="flex items-stretch">
+              <button
+                type="button"
+                onClick={applyPromptToNextDraft}
+                disabled={!trimmedDraftInstructions}
+                className="inline-flex h-8 items-center bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add prompt
+              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Open prompt actions"
+                    disabled={!trimmedDraftInstructions || isDrafting}
+                    className="inline-flex h-8 w-8 items-center justify-center border-l border-white/15 bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  side="top"
+                  sideOffset={4}
+                  style={
+                    promptActionMenuWidth
+                      ? { width: `${promptActionMenuWidth}px` }
+                      : undefined
+                  }
+                  className="rounded-none border-black/10 p-0"
+                >
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setDraft(null);
+                      setReplySubject("");
+                      setReplyBody("");
+                      void draftReply();
+                    }}
+                    className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
+                  >
+                    Use prompt
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
+      </CommandDialog>
 
       {isCandidateModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
@@ -1501,15 +2357,15 @@ export function InboxWorkspace({
       ) : null}
 
       {selectedThread && isLinkModalOpen ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-md border border-black/8 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#161a20]">
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm border border-black/8 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#161a20]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                  Link deal
+                  Link partnership
                 </p>
                 <h3 className="mt-2 text-xl font-semibold text-foreground">
-                  Attach thread to a deal
+                  Pick a workspace
                 </h3>
               </div>
               <button
@@ -1523,7 +2379,7 @@ export function InboxWorkspace({
             </div>
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Select a partnership to link or unlink this thread from your workspace context.
+              Choose an active workspace to link or unlink this thread from the preview context.
             </p>
 
             <div className="mt-5 space-y-4">
@@ -1531,13 +2387,19 @@ export function InboxWorkspace({
                 value={selectedDealId}
                 onChange={setSelectedDealId}
               >
-                <option value="">Select a partnership</option>
-                {deals.map((deal) => (
+                <option value="">Select a workspace</option>
+                {linkableDeals.map((deal) => (
                   <option key={deal.id} value={deal.id}>
                     {deal.campaignName}
                   </option>
                 ))}
               </InboxSelect>
+
+              {linkableDeals.length === 0 ? (
+                <p className="text-[12px] leading-5 text-muted-foreground">
+                  No active workspaces are available to link right now.
+                </p>
+              ) : null}
 
               <div className="flex items-center justify-end gap-3">
                 <button
@@ -1550,14 +2412,14 @@ export function InboxWorkspace({
                 <button
                   type="button"
                   onClick={() => void linkSelectedDeal()}
-                  disabled={!selectedDealId || isLinking}
+                  disabled={!selectedDealId || isLinking || linkableDeals.length === 0}
                   className="h-11 border border-black/10 px-4 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isLinking
                     ? "Updating..."
                     : linkedDealIds.has(selectedDealId)
-                      ? "Unlink from partnership"
-                      : "Link to partnership"}
+                      ? "Unlink workspace"
+                      : "Link workspace"}
                 </button>
               </div>
             </div>

@@ -6,6 +6,29 @@ function normalizeBaseUrl(value: string | undefined) {
   return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
 }
 
+export function getAllowedEmailAppBaseUrls() {
+  return Array.from(
+    new Set(
+      [
+        process.env.NEXT_PUBLIC_APP_URL,
+        process.env.INTEGRATIONS_APP_URL,
+        "http://localhost:3011"
+      ]
+        .map((value) => normalizeBaseUrl(value))
+        .filter(Boolean)
+    )
+  );
+}
+
+export function resolveEmailAppBaseUrl(value: string | null | undefined) {
+  const normalized = normalizeBaseUrl(value ?? undefined);
+  if (getAllowedEmailAppBaseUrls().includes(normalized)) {
+    return normalized;
+  }
+
+  return getAppBaseUrl();
+}
+
 export function getAppBaseUrl() {
   return normalizeBaseUrl(process.env.NEXT_PUBLIC_APP_URL);
 }

@@ -8,14 +8,20 @@ type OAuthStatePayload = {
   provider: EmailProvider;
   nonce: string;
   createdAt: string;
+  returnBaseUrl?: string;
 };
 
-export function createOAuthState(userId: string, provider: EmailProvider) {
+export function createOAuthState(
+  userId: string,
+  provider: EmailProvider,
+  options?: { returnBaseUrl?: string | null }
+) {
   const payload: OAuthStatePayload = {
     userId,
     provider,
     nonce: randomUUID(),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    returnBaseUrl: options?.returnBaseUrl?.trim() || undefined
   };
   const encoded = encodeBase64Url(JSON.stringify(payload));
   const signature = signValue(encoded);

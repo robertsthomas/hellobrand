@@ -66,6 +66,8 @@ model User {
   emailDealEvents       EmailDealEvent[]
   emailTermSuggestions  EmailDealTermSuggestion[]
   emailActionItems      EmailActionItem[]
+  emailReplySuggestions EmailThreadReplySuggestionCache[]
+  emailThreadPreviewStates EmailThreadPreviewState[]
   brandContacts         BrandContact[]
   assistantThreads      AssistantThread[]
   assistantSnapshots    AssistantContextSnapshot[]
@@ -378,6 +380,8 @@ model EmailThread {
   dealEvents       EmailDealEvent[]
   termSuggestions  EmailDealTermSuggestion[]
   actionItems      EmailActionItem[]
+  replySuggestions EmailThreadReplySuggestionCache[]
+  previewStates    EmailThreadPreviewState[]
 
   @@unique([accountId, providerThreadId])
   @@index([accountId, lastMessageAt])
@@ -553,6 +557,39 @@ model EmailActionItem {
   @@unique([dealId, messageId, action])
   @@index([userId, dealId, status, createdAt])
   @@index([userId, status, dueDate])
+  @@index([threadId])
+}
+
+model EmailThreadReplySuggestionCache {
+  id            String   @id @default(uuid())
+  userId        String
+  threadId      String
+  threadVersion String
+  suggestionsJson Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId, threadVersion])
+  @@index([userId, threadId, updatedAt])
+}
+
+model EmailThreadPreviewState {
+  id                   String   @id @default(uuid())
+  userId               String
+  threadId             String
+  previewUpdatesSeenAt DateTime?
+  actionItemsSeenAt    DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@index([userId, updatedAt])
   @@index([threadId])
 }
 

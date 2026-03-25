@@ -10,6 +10,7 @@ import {
   listEmailAccountsForViewer,
   listInboxThreadsForViewer
 } from "@/lib/email/service";
+import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
 
 export default function InboxPage({
   searchParams
@@ -66,14 +67,21 @@ async function InboxContent({
   ]);
 
   const selectedThreadId = resolved.thread ?? threads[0]?.thread.id ?? null;
-  const selectedThread = selectedThreadId
-    ? await getEmailThreadForViewer(viewer, selectedThreadId)
-    : null;
+  const [selectedThread, threadPreviewStates] = await Promise.all([
+    selectedThreadId
+      ? getEmailThreadForViewer(viewer, selectedThreadId)
+      : Promise.resolve(null),
+    listEmailThreadPreviewStatesForViewer(
+      viewer,
+      threads.map((item) => item.thread.id)
+    )
+  ]);
 
   return (
     <InboxWorkspace
       threads={threads}
       selectedThread={selectedThread}
+      threadPreviewStates={threadPreviewStates}
       deals={deals}
       hasConnectedAccounts={emailAccounts.length > 0}
       selectedFilters={{

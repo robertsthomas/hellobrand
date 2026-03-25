@@ -2,27 +2,32 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
-import { createGoogleConnectUrlForViewer } from "@/lib/email/service";
-import { getAppBaseUrl } from "@/lib/email/config";
+import { resolveEmailAppBaseUrl } from "@/lib/email/config";
+import { createGoogleConnectUrlForViewerWithReturnBaseUrl } from "@/lib/email/service";
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const requestBaseUrl = resolveEmailAppBaseUrl(request.nextUrl.origin);
+
   try {
     const viewer = await requireApiViewer();
     await assertViewerHasFeature(viewer, "email_connections");
-    const url = await createGoogleConnectUrlForViewer(viewer);
+    const url = await createGoogleConnectUrlForViewerWithReturnBaseUrl(
+      viewer,
+      requestBaseUrl
+    );
     return NextResponse.redirect(url);
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       const params = new URLSearchParams({
-        redirect_url: `${getAppBaseUrl()}/app/settings`
+        redirect_url: `${requestBaseUrl}/app/settings`
       });
-      return NextResponse.redirect(`${getAppBaseUrl()}/sign-in?${params.toString()}`);
+      return NextResponse.redirect(`${requestBaseUrl}/sign-in?${params.toString()}`);
     }
 
     const params = new URLSearchParams({
       email_error: error instanceof Error ? error.message : "Could not start Google connection.",
       email_provider: "gmail"
     });
-    return NextResponse.redirect(`${getAppBaseUrl()}/app/settings?${params.toString()}`);
+    return NextResponse.redirect(`${requestBaseUrl}/app/settings?${params.toString()}`);
   }
 }

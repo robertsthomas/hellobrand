@@ -6,6 +6,7 @@ import { getRepository } from "@/lib/repository";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { enqueueNotificationEmailDelivery } from "@/lib/notification-email";
 import {
+  buildEmailResyncRequiredNotificationSeed,
   buildWorkspaceNotificationSeed,
   getWorkspaceSupersededEventTypes,
   notificationTypeForEventType,
@@ -199,6 +200,32 @@ async function emitWorkspaceNotificationSeed(userId: string, seed: NotificationS
   }
 
   return row;
+}
+
+async function supersedeAccountNotifications(
+  userId: string,
+  accountId: string,
+  eventTypes: NotificationEventType[]
+) {
+  if (eventTypes.length === 0) {
+    return;
+  }
+
+  await prisma.appNotification.updateMany({
+    where: {
+      userId,
+      entityType: "connected_email_account",
+      entityId: accountId,
+      status: "active",
+      eventType: {
+        in: eventTypes
+      }
+    },
+    data: {
+      status: "superseded",
+      supersededAt: new Date()
+    }
+  });
 }
 
 async function loadSessionNotificationContext(sessionId: string) {
@@ -624,4 +651,46 @@ export async function supersedeWorkspaceNotificationEvents(
 
   await supersedeWorkspaceNotifications(viewerId, sessionId, eventTypes);
   await refreshNotificationViews(viewerId);
+}
+
+export async function emitEmailResyncRequiredNotification(input: {
+  userId: string;
+  accountId: string;
+  provider: "gmail" | "outlook";
+  emailAddress: string;
+  createdAt?: Date | string;
+}) {
+  if (!ensureDatabase()) {
+    return null;
+  }
+
+  const seed = buildEmailResyncRequiredNotificationSeed({
+    accountId: input.accountId,
+    provider: input.provider,
+    emailAddress: input.emailAddress,
+    createdAt: input.createdAt
+  });
+
+  const row = await upsertNotificationSeed(input.userId, seed);
+  await refreshNotificationViews(input.userId);
+
+  try {
+    await enqueueNotificationEmailDelivery(row.id);
+  } catch (error) {
+    console.error("Failed to enqueue inbox resync notification email.", error);
+  }
+
+  return row;
+}
+
+export async function clearEmailResyncRequiredNotification(
+  userId: string,
+  accountId: string
+) {
+  if (!ensureDatabase()) {
+    return;
+  }
+
+  await supersedeAccountNotifications(userId, accountId, ["email.resync_required"]);
+  await refreshNotificationViews(userId);
 }

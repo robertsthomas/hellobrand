@@ -928,9 +928,14 @@ export async function listEmailThreadsForUser(
             gte: recentEventThreshold
           }
         },
+        orderBy: {
+          updatedAt: "desc"
+        },
         select: {
-          id: true
-        }
+          id: true,
+          updatedAt: true
+        },
+        take: 12
       },
       termSuggestions: {
         where: {
@@ -944,9 +949,14 @@ export async function listEmailThreadsForUser(
         where: {
           status: "pending"
         },
+        orderBy: {
+          updatedAt: "desc"
+        },
         select: {
-          id: true
-        }
+          id: true,
+          updatedAt: true
+        },
+        take: 20
       }
     },
     orderBy: {
@@ -963,8 +973,16 @@ export async function listEmailThreadsForUser(
       account: toAccountRecord(row.account),
       links: row.dealLinks.map(toLinkView),
       importantEventCount: row.dealEvents.length,
+      latestImportantEventAt:
+        row.dealEvents
+          .map((event) => iso(event.updatedAt))
+          .find((value): value is string => Boolean(value)) ?? null,
       pendingTermSuggestionCount: row.termSuggestions.length,
-      pendingActionItemCount: row.actionItems.length
+      pendingActionItemCount: row.actionItems.length,
+      latestPendingActionItemAt:
+        row.actionItems
+          .map((item) => iso(item.updatedAt))
+          .find((value): value is string => Boolean(value)) ?? null
     }))
     .filter((row) => {
       if (filters?.linkedDealId && !row.links.some((link) => link.dealId === filters.linkedDealId)) {
@@ -1072,7 +1090,14 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
                 gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
               }
             },
-            select: { id: true }
+            orderBy: {
+              updatedAt: "desc"
+            },
+            select: {
+              id: true,
+              updatedAt: true
+            },
+            take: 12
           },
           termSuggestions: {
             where: {
@@ -1084,7 +1109,14 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
             where: {
               status: "pending"
             },
-            select: { id: true }
+            orderBy: {
+              updatedAt: "desc"
+            },
+            select: {
+              id: true,
+              updatedAt: true
+            },
+            take: 20
           },
           dealLinks: {
             include: {
@@ -1109,8 +1141,16 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
     account: toAccountRecord(row.thread.account),
     links: row.thread.dealLinks.map(toLinkView),
     importantEventCount: row.thread.dealEvents.length,
+    latestImportantEventAt:
+      row.thread.dealEvents
+        .map((event) => iso(event.updatedAt))
+        .find((value): value is string => Boolean(value)) ?? null,
     pendingTermSuggestionCount: row.thread.termSuggestions.length,
-    pendingActionItemCount: row.thread.actionItems.length
+    pendingActionItemCount: row.thread.actionItems.length,
+    latestPendingActionItemAt:
+      row.thread.actionItems
+        .map((item) => iso(item.updatedAt))
+        .find((value): value is string => Boolean(value)) ?? null
   })) satisfies EmailThreadListItem[];
 }
 

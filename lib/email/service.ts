@@ -23,12 +23,16 @@ import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
 import { parseOAuthState } from "@/lib/email/oauth-state";
-import { hasProviderConfig } from "@/lib/email/config";
+import { hasProviderConfig, resolveEmailAppBaseUrl } from "@/lib/email/config";
 import {
   assertViewerHasFeature
 } from "@/lib/billing/entitlements";
 import { listDealAggregatesForViewer, mergeTerms } from "@/lib/deals";
 import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
+import {
+  clearEmailResyncRequiredNotification,
+  emitEmailResyncRequiredNotification
+} from "@/lib/notification-service";
 import {
   disconnectConnectedEmailAccount,
   findConnectedEmailAccountByProviderAddress,
@@ -83,6 +87,10 @@ function tokenExpiresAt(expiresIn: number | undefined) {
   }
 
   return new Date(Date.now() + expiresIn * 1000).toISOString();
+}
+
+function isGmailResyncRequiredError(error: unknown) {
+  return error instanceof Error && error.message === "GMAIL_RESYNC_REQUIRED";
 }
 
 async function assertPremiumInboxAccess(viewer: Viewer) {
@@ -519,10 +527,24 @@ async function syncGmailAccount(
         threadIds.push(saved.id);
       }
     } else {
-      const history = await listGmailHistoryThreadIds(
-        accessToken,
-        gmailHistoryId ?? syncState.lastHistoryId
-      );
+      let history;
+      try {
+        history = await listGmailHistoryThreadIds(
+          accessToken,
+          gmailHistoryId ?? syncState.lastHistoryId
+        );
+      } catch (error) {
+        const isStaleHistory =
+          error instanceof Error &&
+          error.message.includes("Gmail request failed (404)") &&
+          (error.message.includes("Requested entity was not found") ||
+            error.message.includes('"reason":"notFound"') ||
+            error.message.includes('"reason": "notFound"'));
+        if (isStaleHistory) {
+          throw new Error("GMAIL_RESYNC_REQUIRED");
+        }
+        throw error;
+      }
       threadIds = history.threadIds;
       lastHistoryId = history.historyId;
 
@@ -553,6 +575,7 @@ async function syncGmailAccount(
       lastErrorCode: null,
       lastErrorMessage: null
     });
+    await clearEmailResyncRequiredNotification(account.userId, account.id);
 
     const viewer = await getViewerById(account.userId);
     if (viewer && threadIds.length > 0) {
@@ -566,15 +589,33 @@ async function syncGmailAccount(
       threadCount: threadIds.length
     });
   } catch (error) {
+    const requiresResync = isGmailResyncRequiredError(error);
+    if (requiresResync) {
+      await emitEmailResyncRequiredNotification({
+        userId: account.userId,
+        accountId: account.id,
+        provider: "gmail",
+        emailAddress: account.emailAddress
+      });
+    }
+
     await updateConnectedEmailAccount(account.id, {
       status: String(error).toLowerCase().includes("reconnect") ? "reconnect_required" : "error",
-      lastErrorCode: "gmail_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Gmail sync failed."
+      lastErrorCode: requiresResync ? "gmail_resync_required" : "gmail_sync_failed",
+      lastErrorMessage: requiresResync
+        ? "Gmail inbox history expired and needs a fresh resync. Reconnect this inbox to start over."
+        : error instanceof Error
+          ? error.message
+          : "Gmail sync failed."
     });
     await upsertEmailSyncState(account.id, {
       lastErrorAt: new Date().toISOString(),
-      lastErrorCode: "gmail_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Gmail sync failed."
+      lastErrorCode: requiresResync ? "gmail_resync_required" : "gmail_sync_failed",
+      lastErrorMessage: requiresResync
+        ? "Gmail inbox history expired and needs a fresh resync. Reconnect this inbox to start over."
+        : error instanceof Error
+          ? error.message
+          : "Gmail sync failed."
     });
     debug.fail(error);
     throw error;
@@ -910,6 +951,23 @@ export async function createGoogleConnectUrlForViewer(viewer: Viewer) {
   return buildGoogleAuthUrl(createOAuthState(viewer.id, "gmail"));
 }
 
+export async function createGoogleConnectUrlForViewerWithReturnBaseUrl(
+  viewer: Viewer,
+  returnBaseUrl: string | null | undefined
+) {
+  await assertEmailConnectionsAccess(viewer);
+  if (!hasProviderConfig("gmail")) {
+    throw new Error("Google email is not configured.");
+  }
+
+  const { createOAuthState } = await import("@/lib/email/oauth-state");
+  return buildGoogleAuthUrl(
+    createOAuthState(viewer.id, "gmail", {
+      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+    })
+  );
+}
+
 export async function createOutlookConnectUrlForViewer(viewer: Viewer) {
   await assertEmailConnectionsAccess(viewer);
   if (!hasProviderConfig("outlook")) {
@@ -918,6 +976,23 @@ export async function createOutlookConnectUrlForViewer(viewer: Viewer) {
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
   return buildOutlookAuthUrl(createOAuthState(viewer.id, "outlook"));
+}
+
+export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
+  viewer: Viewer,
+  returnBaseUrl: string | null | undefined
+) {
+  await assertEmailConnectionsAccess(viewer);
+  if (!hasProviderConfig("outlook")) {
+    throw new Error("Outlook email is not configured.");
+  }
+
+  const { createOAuthState } = await import("@/lib/email/oauth-state");
+  return buildOutlookAuthUrl(
+    createOAuthState(viewer.id, "outlook", {
+      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+    })
+  );
 }
 
 export async function handleGoogleCallbackForViewer(
@@ -951,10 +1026,10 @@ export async function handleGoogleCallbackForViewer(
     accountId: account.id
   });
 
-  return redirectTarget("/app/settings", {
+  return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
     email_provider: "gmail"
-  });
+  })}`;
 }
 
 export async function handleOutlookCallbackForViewer(
@@ -985,10 +1060,10 @@ export async function handleOutlookCallbackForViewer(
     accountId: account.id
   });
 
-  return redirectTarget("/app/settings", {
+  return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
     email_provider: "outlook"
-  });
+  })}`;
 }
 
 export async function handleGmailWebhookNotification(payload: {
@@ -1079,7 +1154,9 @@ export async function draftReplyForViewer(
   viewer: Viewer,
   threadId: string,
   explicitDealId?: string | null,
-  stance?: NegotiationStance | null
+  stance?: NegotiationStance | null,
+  instructions?: string | null,
+  currentDraft?: { subject: string; body: string } | null
 ) {
   await assertPremiumInboxAccess(viewer);
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
@@ -1092,5 +1169,12 @@ export async function draftReplyForViewer(
     getProfileForViewer(viewer)
   ]);
 
-  return generateEmailReplyDraft(detail, deal as DealAggregate | null, profile, stance ?? null);
+  return generateEmailReplyDraft(
+    detail,
+    deal as DealAggregate | null,
+    profile,
+    stance ?? null,
+    instructions ?? null,
+    currentDraft ?? null
+  );
 }

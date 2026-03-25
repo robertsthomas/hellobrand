@@ -546,8 +546,10 @@ export interface EmailThreadListItem {
   account: ConnectedEmailAccountRecord;
   links: EmailThreadLinkView[];
   importantEventCount: number;
+  latestImportantEventAt: string | null;
   pendingTermSuggestionCount: number;
   pendingActionItemCount: number;
+  latestPendingActionItemAt: string | null;
 }
 
 export interface EmailThreadDetail {
@@ -560,6 +562,14 @@ export interface EmailThreadDetail {
   actionItems: EmailActionItemRecord[];
   promiseDiscrepancies: PromiseDiscrepancy[];
   crossDealConflicts: ConflictResult[];
+}
+
+export interface EmailThreadPreviewStateRecord {
+  threadId: string;
+  previewUpdatesSeenAt: string | null;
+  actionItemsSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EmailDealCandidateMatchView {
