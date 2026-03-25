@@ -17,13 +17,22 @@ import {
   Mail
 } from "lucide-react";
 
+import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
+
+function isMaintenanceModeEnabled() {
+  return process.env.MAINTENANCE_MODE?.trim().toLowerCase() === "true";
+}
 
 export default async function LandingPage() {
   const session = await auth();
 
   if (session.userId) {
     redirect("/app");
+  }
+
+  if (isMaintenanceModeEnabled()) {
+    return <MaintenancePage />;
   }
 
   return (

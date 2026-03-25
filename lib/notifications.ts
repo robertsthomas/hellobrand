@@ -150,11 +150,16 @@ export function notificationTypeForEventType(
 
 export function buildEmailResyncRequiredNotificationSeed(input: {
   accountId: string;
-  provider: "gmail" | "outlook";
+  provider: "gmail" | "outlook" | "yahoo";
   emailAddress: string;
   createdAt?: Date | string;
 }): NotificationSeed {
-  const providerLabel = input.provider === "gmail" ? "Gmail" : "Outlook";
+  const providerLabel =
+    input.provider === "gmail"
+      ? "Gmail"
+      : input.provider === "outlook"
+        ? "Outlook"
+        : "Yahoo";
 
   return {
     category: "inbox",

@@ -22,6 +22,7 @@ import { extractActionItemsFromMessage } from "@/lib/email/action-items";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
+import { buildYahooAuthUrl, exchangeYahooCode, getYahooProfile, refreshYahooAccessToken } from "@/lib/email/providers/yahoo";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { hasProviderConfig, resolveEmailAppBaseUrl } from "@/lib/email/config";
 import {
@@ -235,7 +236,9 @@ async function ensureActiveTokens(account: ConnectedEmailAccountRecord) {
   const refreshed =
     account.provider === "gmail"
       ? await refreshGoogleAccessToken(refreshToken)
-      : await refreshOutlookAccessToken(refreshToken);
+      : account.provider === "outlook"
+        ? await refreshOutlookAccessToken(refreshToken)
+        : await refreshYahooAccessToken(refreshToken);
 
   const nextAccessToken = refreshed.access_token;
   const nextRefreshToken =
@@ -736,13 +739,15 @@ export async function syncEmailAccount(
       options?.gmailHistoryId ?? null,
       options?.recentLimit ?? 20
     );
-  } else {
+  } else if (account.provider === "outlook") {
     await syncOutlookAccount(
       account,
       mode,
       options?.outlookMessageIds ?? [],
       options?.recentLimit ?? 20
     );
+  } else {
+    return getConnectedEmailAccount(account.id);
   }
 
   return getConnectedEmailAccount(account.id);
@@ -766,6 +771,10 @@ export async function renewExpiringEmailSubscriptions() {
         subscriptionExpiresAt: watch?.expiration ? new Date(Number(watch.expiration)).toISOString() : null,
         lastHistoryId: watch?.historyId ?? undefined
       });
+      continue;
+    }
+
+    if (account.provider === "yahoo") {
       continue;
     }
 
@@ -995,6 +1004,23 @@ export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
   );
 }
 
+export async function createYahooConnectUrlForViewerWithReturnBaseUrl(
+  viewer: Viewer,
+  returnBaseUrl: string | null | undefined
+) {
+  await assertEmailConnectionsAccess(viewer);
+  if (!hasProviderConfig("yahoo")) {
+    throw new Error("Yahoo email is not configured.");
+  }
+
+  const { createOAuthState } = await import("@/lib/email/oauth-state");
+  return buildYahooAuthUrl(
+    createOAuthState(viewer.id, "yahoo", {
+      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+    })
+  );
+}
+
 export async function handleGoogleCallbackForViewer(
   viewer: Viewer,
   input: { code: string; state: string }
@@ -1063,6 +1089,36 @@ export async function handleOutlookCallbackForViewer(
   return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
     email_provider: "outlook"
+  })}`;
+}
+
+export async function handleYahooCallbackForViewer(
+  viewer: Viewer,
+  input: { code: string; state: string }
+) {
+  const state = parseOAuthState(input.state);
+  if (state.userId !== viewer.id || state.provider !== "yahoo") {
+    throw new Error("Yahoo OAuth state did not match the current session.");
+  }
+
+  const tokens = await exchangeYahooCode(input.code);
+  const profile = await getYahooProfile(tokens.access_token);
+  await saveConnectedEmailAccount({
+    userId: viewer.id,
+    provider: "yahoo",
+    providerAccountId: profile.providerAccountId,
+    emailAddress: profile.emailAddress,
+    displayName: profile.displayName,
+    scopes: (tokens.scope ?? "").split(" ").filter(Boolean),
+    accessTokenEncrypted: encryptSecret(tokens.access_token),
+    refreshTokenEncrypted: encryptSecret(tokens.refresh_token ?? null),
+    tokenExpiresAt: tokenExpiresAt(tokens.expires_in),
+    status: "connected"
+  });
+
+  return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
+    email_status: "connected",
+    email_provider: "yahoo"
   })}`;
 }
 

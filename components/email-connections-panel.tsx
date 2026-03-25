@@ -29,13 +29,55 @@ function statusLabel(status: SafeEmailAccount["status"]) {
 }
 
 function providerLabel(provider: SafeEmailAccount["provider"]) {
-  return provider === "gmail" ? "Gmail" : "Outlook";
+  switch (provider) {
+    case "gmail":
+      return "Gmail";
+    case "outlook":
+      return "Outlook";
+    case "yahoo":
+      return "Yahoo";
+    default:
+      return provider;
+  }
 }
 
 function providerConnectPath(provider: SafeEmailAccount["provider"]) {
-  return provider === "gmail"
-    ? "/api/email/google/connect"
-    : "/api/email/outlook/connect";
+  switch (provider) {
+    case "gmail":
+      return "/api/email/google/connect";
+    case "outlook":
+      return "/api/email/outlook/connect";
+    case "yahoo":
+      return "/api/email/yahoo/connect";
+    default:
+      return "/app/settings";
+  }
+}
+
+function providerHeading(provider: SafeEmailAccount["provider"]) {
+  switch (provider) {
+    case "gmail":
+      return "Google Gmail";
+    case "outlook":
+      return "Microsoft Outlook";
+    case "yahoo":
+      return "Yahoo Mail";
+    default:
+      return providerLabel(provider);
+  }
+}
+
+function providerDescription(provider: SafeEmailAccount["provider"]) {
+  switch (provider) {
+    case "gmail":
+      return "Use your Google account to sync recent inbox threads and Gmail watch notifications.";
+    case "outlook":
+      return "Use your Microsoft account to sync inbox threads and Graph webhook updates.";
+    case "yahoo":
+      return "Use your Yahoo account to start OAuth setup. Yahoo inbox sync requires Yahoo mail access approval and IMAP enablement.";
+    default:
+      return null;
+  }
 }
 
 export function EmailConnectionsPanel({
@@ -54,7 +96,8 @@ export function EmailConnectionsPanel({
   const grouped = useMemo(
     () => ({
       gmail: accounts.filter((account) => account.provider === "gmail"),
-      outlook: accounts.filter((account) => account.provider === "outlook")
+      outlook: accounts.filter((account) => account.provider === "outlook"),
+      yahoo: accounts.filter((account) => account.provider === "yahoo")
     }),
     [accounts]
   );
@@ -90,7 +133,7 @@ export function EmailConnectionsPanel({
           Email Connections
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Connect Gmail or Outlook to sync inbox threads, attach them to partnerships, and
+          Connect Gmail, Outlook, or Yahoo to sync inbox threads, attach them to partnerships, and
           draft replies from your workspace context.
         </p>
       </div>
@@ -107,7 +150,7 @@ export function EmailConnectionsPanel({
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        {(["gmail", "outlook"] as const).map((provider) => {
+        {(["gmail", "outlook", "yahoo"] as const).map((provider) => {
           const records = grouped[provider];
 
           return (
@@ -121,12 +164,10 @@ export function EmailConnectionsPanel({
                     {providerLabel(provider)}
                   </p>
                   <h3 className="mt-2 text-xl font-semibold text-foreground">
-                    {provider === "gmail" ? "Google Gmail" : "Microsoft Outlook"}
+                    {providerHeading(provider)}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    {provider === "gmail"
-                      ? "Use your Google account to sync recent inbox threads and Gmail watch notifications."
-                      : "Use your Microsoft account to sync inbox threads and Graph webhook updates."}
+                    {providerDescription(provider)}
                   </p>
                 </div>
 
@@ -180,6 +221,13 @@ export function EmailConnectionsPanel({
                         <p>Last sync: {formatDate(account.lastSyncAt) || "Not yet synced"}</p>
                         <p>Token expiry: {formatDate(account.tokenExpiresAt) || "Unknown"}</p>
                       </div>
+
+                      {account.provider === "yahoo" ? (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          Yahoo Mail thread sync stays pending until Yahoo approves mail access for
+                          this app and the IMAP sync path is enabled.
+                        </p>
+                      ) : null}
 
                       {account.lastErrorMessage ? (
                         <p className="mt-3 text-sm text-red-600">{account.lastErrorMessage}</p>

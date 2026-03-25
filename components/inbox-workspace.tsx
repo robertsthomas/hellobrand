@@ -66,7 +66,16 @@ import type {
 import { formatDate } from "@/lib/utils";
 
 function providerLabel(provider: string) {
-  return provider === "gmail" ? "Gmail" : "Outlook";
+  switch (provider) {
+    case "gmail":
+      return "Gmail";
+    case "outlook":
+      return "Outlook";
+    case "yahoo":
+      return "Yahoo";
+    default:
+      return provider;
+  }
 }
 
 function threadSearchText(item: EmailThreadListItem) {
@@ -1465,6 +1474,7 @@ export function InboxWorkspace({
                       <option value="">All providers</option>
                       <option value="gmail">Gmail</option>
                       <option value="outlook">Outlook</option>
+                      <option value="yahoo">Yahoo</option>
                     </InboxSelect>
                     <InboxSelect
                       value={selectedFilters.dealId}

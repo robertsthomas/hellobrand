@@ -7,7 +7,16 @@ import type { EmailThreadListItem } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
 function providerLabel(provider: string) {
-  return provider === "gmail" ? "Gmail" : "Outlook";
+  switch (provider) {
+    case "gmail":
+      return "Gmail";
+    case "outlook":
+      return "Outlook";
+    case "yahoo":
+      return "Yahoo";
+    default:
+      return provider;
+  }
 }
 
 export function DealEmailPanel({
@@ -106,7 +115,7 @@ export function DealEmailPanel({
                 Emails
               </h2>
               <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-                Connect Gmail or Outlook in Settings to sync inbox threads into this partnership workspace.
+                Connect Gmail, Outlook, or Yahoo in Settings to sync inbox threads into this partnership workspace.
               </p>
             </div>
           </div>

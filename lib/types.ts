@@ -52,7 +52,7 @@ export type DraftIntent =
   | "confirm-deliverables"
   | "confirm-revised-brief";
 
-export type EmailProvider = "gmail" | "outlook";
+export type EmailProvider = "gmail" | "outlook" | "yahoo";
 export type EmailAccountStatus =
   | "connected"
   | "syncing"

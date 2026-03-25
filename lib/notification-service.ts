@@ -656,7 +656,7 @@ export async function supersedeWorkspaceNotificationEvents(
 export async function emitEmailResyncRequiredNotification(input: {
   userId: string;
   accountId: string;
-  provider: "gmail" | "outlook";
+  provider: "gmail" | "outlook" | "yahoo";
   emailAddress: string;
   createdAt?: Date | string;
 }) {

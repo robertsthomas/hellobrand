@@ -10,6 +10,17 @@ import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedProfile } from "@/lib/cached-data";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 
+function emailProviderLabel(provider: string | undefined) {
+  switch (provider) {
+    case "outlook":
+      return "Outlook";
+    case "yahoo":
+      return "Yahoo";
+    case "gmail":
+    default:
+      return "Gmail";
+  }
+}
 
 export default function SettingsPage({
   searchParams
@@ -58,7 +69,9 @@ async function SettingsContent({
           }))}
           statusMessage={
             resolvedSearchParams?.email_status === "connected"
-              ? `${resolvedSearchParams.email_provider === "outlook" ? "Outlook" : "Gmail"} connected. Initial sync started.`
+              ? resolvedSearchParams.email_provider === "yahoo"
+                ? "Yahoo connected. Mail sync requires Yahoo mail access approval before inbox import can start."
+                : `${emailProviderLabel(resolvedSearchParams.email_provider)} connected. Initial sync started.`
               : null
           }
           errorMessage={resolvedSearchParams?.email_error ?? null}
@@ -68,7 +81,7 @@ async function SettingsContent({
           <FeatureUpgradeCard
             eyebrow="Premium connections"
             title="Email connections unlock on Premium"
-            description="Connect Gmail or Outlook to sync inbox threads, link communications to partnerships, and power HelloBrand's communication intelligence."
+            description="Connect Gmail, Outlook, or Yahoo to sync inbox threads, link communications to partnerships, and power HelloBrand's communication intelligence."
             requiredTier={PlanTier.premium}
             currentTier={entitlements.effectiveTier}
             hasActiveSubscription={entitlements.hasActiveSubscription}

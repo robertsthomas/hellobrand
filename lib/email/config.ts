@@ -48,6 +48,10 @@ export function getOutlookRedirectUri() {
   return `${getIntegrationBaseUrl()}/api/email/outlook/callback`;
 }
 
+export function getYahooRedirectUri() {
+  return `${getIntegrationBaseUrl()}/api/email/yahoo/callback`;
+}
+
 export function getMicrosoftTenantId() {
   return process.env.MICROSOFT_TENANT_ID?.trim() || "common";
 }
@@ -65,7 +69,13 @@ export function hasProviderConfig(provider: EmailProvider) {
     return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   }
 
-  return Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
+  if (provider === "outlook") {
+    return Boolean(
+      process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+    );
+  }
+
+  return Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET);
 }
 
 export const gmailScopes = [
@@ -82,6 +92,13 @@ export const outlookScopes = [
   "offline_access",
   "User.Read",
   "Mail.Read"
+];
+
+export const yahooScopes = [
+  "openid",
+  "profile",
+  "email",
+  "mail-r"
 ];
 
 export function getEmailSummaryModel() {
