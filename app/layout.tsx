@@ -29,6 +29,7 @@ async function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <ClerkProvider
+      waitlistUrl="/waitlist"
       appearance={{
         layout: {
           showOptionalFields: false

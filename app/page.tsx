@@ -287,21 +287,15 @@ export default async function LandingPage() {
         {/* ── Final CTA ── */}
         <section className="bg-primary dark:bg-[#1a3d30]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 text-center sm:px-6 md:py-20 lg:px-8 lg:py-24">
-            <div className="mx-auto max-w-[44rem] rounded-[1.5rem] border border-white/14 bg-white/[0.08] px-5 py-4 text-left shadow-sm backdrop-blur-sm sm:px-6">
-              <p className="text-sm font-medium text-white/90">
-                For many creators, one paid partnership can cover multiple months of HelloBrand.
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-white/72">
-                A missed clause, delayed payment, or messy thread can cost more than staying
-                organized from the start.
-              </p>
-            </div>
+            <p className="mx-auto mb-8 inline-block rounded-full bg-white/10 px-5 py-2 text-sm font-medium text-white/90 sm:mb-10">
+              One paid partnership can cover months of HelloBrand
+            </p>
             <h2 className="mx-auto max-w-[18ch] text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-white sm:text-[2.4rem] md:text-[3rem]">
               Start your next partnership in a workspace that makes sense.
             </h2>
             <p className="mx-auto mt-4 max-w-[50ch] text-[0.95rem] leading-relaxed text-white/75 sm:mt-5 sm:text-[1.05rem]">
               Review terms, keep every thread attached, and stay ahead of due
-              dates — all from one operating layer built for creators.
+              dates, all from one operating layer built for creators.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
               <Link
@@ -324,7 +318,7 @@ export default async function LandingPage() {
         {/* ── Footer ── */}
         <footer className="border-t border-black/[0.04] bg-white dark:border-white/[0.06] dark:bg-[#101318]">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-8 sm:text-sm lg:px-8">
-            <p>&copy; 2026 HelloBrand. Sample data shown for preview only.</p>
+            <p>&copy; 2026 HelloBrand</p>
             <p>HelloBrand is not a law firm. This is not legal advice.</p>
           </div>
         </footer>
