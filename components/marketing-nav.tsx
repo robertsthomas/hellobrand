@@ -43,7 +43,7 @@ export function MarketingNav() {
           <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
             <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
           </div>
-          <span className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
+          <span className="text-[1.625rem] font-bold tracking-[-0.05em] text-[#1a2634] dark:text-[#eef2f5]">
             HelloBrand
           </span>
         </Link>
@@ -71,7 +71,7 @@ export function MarketingNav() {
         {/* Desktop */}
         <div className="hidden items-center gap-4 md:flex">
           <ThemeButton />
-          <div className="flex items-center gap-8 text-[14px] font-medium text-muted-foreground">
+          <div className="flex items-center gap-8 text-[14px] font-medium text-[#667085] dark:text-[#c4cad2]">
             <Link href="/pricing" className="transition hover:text-foreground">
               Pricing
             </Link>

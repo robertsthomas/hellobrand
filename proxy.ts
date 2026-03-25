@@ -19,11 +19,7 @@ function isMaintenanceAllowedPath(pathname: string) {
 
 function isMaintenanceBlockedPath(pathname: string) {
   return (
-    pathname.startsWith("/app") ||
-    pathname === "/login" ||
-    pathname.startsWith("/auth/login") ||
-    pathname.startsWith("/sign-in") ||
-    pathname.startsWith("/sign-up")
+    pathname.startsWith("/app")
   );
 }
 

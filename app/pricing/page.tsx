@@ -7,12 +7,14 @@ export default async function PricingPage() {
   const plans = await buildMarketingPlanAvailability();
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#fefcfa] text-foreground dark:bg-[#0f1115]">
       <MarketingNav />
       <section className="px-5 py-16 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-5xl font-semibold text-ink">Pricing for creators</h1>
+            <h1 className="text-5xl font-semibold text-[#1a2634] dark:text-[#eef2f5]">
+              Pricing for creators
+            </h1>
             <p className="mt-5 text-lg text-black/60 dark:text-white/65">
               AI-powered partnership management from contract to payment. Start
               with the essentials and upgrade as your workflow grows.
@@ -22,7 +24,7 @@ export default async function PricingPage() {
             {plans.map((plan) => (
               <article
                 key={plan.name}
-                className={`rounded-[2rem] border border-black/5 dark:border-white/10 p-7 shadow-panel ${
+                className={`rounded-[2rem] border border-black/5 p-7 shadow-panel dark:border-white/10 ${
                   plan.popular
                     ? "bg-ocean text-white dark:bg-sand dark:text-[#18201d]"
                     : "bg-white/85 dark:bg-white/[0.06]"
