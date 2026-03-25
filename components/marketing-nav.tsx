@@ -29,7 +29,7 @@ function ThemeButton() {
   );
 }
 
-export function MarketingNav() {
+export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean }) {
   const [returning, setReturning] = useState(false);
 
   useEffect(() => {
@@ -50,6 +50,12 @@ export function MarketingNav() {
 
         {/* Mobile */}
         <div className="flex items-center gap-3 md:hidden">
+          <Link
+            href="/blog"
+            className="text-sm font-medium text-[#667085] transition hover:text-foreground dark:text-[#c4cad2]"
+          >
+            Blog
+          </Link>
           <ThemeButton />
           {returning ? (
             <Link
@@ -75,9 +81,14 @@ export function MarketingNav() {
             <Link href="/pricing" className="transition hover:text-foreground">
               Pricing
             </Link>
-            <Link href="/waitlist" className="transition hover:text-foreground">
-              Waitlist
+            <Link href="/blog" className="transition hover:text-foreground">
+              Blog
             </Link>
+            {showWaitlist ? (
+              <Link href="/waitlist" className="transition hover:text-foreground">
+                Waitlist
+              </Link>
+            ) : null}
             {returning ? (
               <Link
                 href="/login"

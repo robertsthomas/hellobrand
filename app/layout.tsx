@@ -13,6 +13,7 @@ import "@/app/globals.css";
 import { Show } from "@/components/clerk-show";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { getSiteUrl, siteConfig } from "@/lib/site";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -20,8 +21,33 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HelloBrand",
-  description: "Plain-English contract review for creators."
+  metadataBase: new URL(getSiteUrl()),
+  title: {
+    default: "HelloBrand",
+    template: "%s"
+  },
+  applicationName: siteConfig.name,
+  description: siteConfig.description,
+  keywords: [
+    "creator contracts",
+    "brand partnership management",
+    "creator workflow",
+    "deliverable tracking",
+    "creator payments",
+    "influencer contract review"
+  ],
+  openGraph: {
+    type: "website",
+    siteName: siteConfig.name,
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: getSiteUrl()
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteConfig.name,
+    description: siteConfig.description
+  }
 };
 
 async function AppProviders({ children }: { children: ReactNode }) {

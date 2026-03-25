@@ -12,14 +12,9 @@ function isMaintenanceAllowedPath(pathname: string) {
     pathname === "/privacy" ||
     pathname === "/waitlist" ||
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/webhooks") ||
     pathname === "/favicon.ico" ||
     pathname === "/icon"
-  );
-}
-
-function isMaintenanceBlockedPath(pathname: string) {
-  return (
-    pathname.startsWith("/app")
   );
 }
 
@@ -33,8 +28,12 @@ export default clerkMiddleware((auth, request: NextRequest) => {
     return NextResponse.next();
   }
 
-  if (!isMaintenanceBlockedPath(pathname)) {
-    return NextResponse.next();
+  // Block API routes with 503 during maintenance
+  if (pathname.startsWith("/api")) {
+    return NextResponse.json(
+      { error: "Service temporarily unavailable" },
+      { status: 503 }
+    );
   }
 
   return NextResponse.redirect(new URL("/", request.url));

@@ -300,6 +300,29 @@ html.dark ::selection {
   50% { transform: scale(1.08); }
 }
 
+@keyframes hello-hand-wave {
+  0%, 100% {
+    transform: rotate(18deg);
+  }
+  20% {
+    transform: rotate(30deg);
+  }
+  40% {
+    transform: rotate(8deg);
+  }
+  60% {
+    transform: rotate(28deg);
+  }
+  80% {
+    transform: rotate(14deg);
+  }
+}
+
+.group:hover .hello-hand-wave {
+  transform-origin: 70% 85%;
+  animation: hello-hand-wave 680ms ease-in-out;
+}
+
 .intake-loader-shell {
   background:
     linear-gradient(180deg, rgba(203, 214, 228, 0.92) 0%, rgba(180, 196, 214, 0.96) 100%);

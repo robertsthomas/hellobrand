@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -19,6 +20,27 @@ import {
 
 import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
+import { absoluteUrl, siteConfig } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "HelloBrand",
+  description: siteConfig.description,
+  alternates: {
+    canonical: "/"
+  },
+  openGraph: {
+    title: "HelloBrand",
+    description: siteConfig.description,
+    url: absoluteUrl("/"),
+    siteName: siteConfig.name,
+    type: "website"
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "HelloBrand",
+    description: siteConfig.description
+  }
+};
 
 function isMaintenanceModeEnabled() {
   return process.env.MAINTENANCE_MODE?.trim().toLowerCase() === "true";
@@ -37,7 +59,7 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#fefcfa] text-foreground dark:bg-[#0f1115]">
-      <MarketingNav />
+      <MarketingNav showWaitlist={isMaintenanceModeEnabled()} />
 
       <main>
         {/* ── Hero ── */}
