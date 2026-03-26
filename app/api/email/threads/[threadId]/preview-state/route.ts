@@ -16,23 +16,29 @@ export async function POST(
     const body = (await request.json().catch(() => null)) as
       | {
           section?: "updates" | "actionItems";
-          seenAt?: string;
+          action?: "seen" | "clear";
+          timestamp?: string;
         }
       | null;
 
-    if (!body?.section || !body?.seenAt) {
-      return fail("Section and seenAt are required.");
+    if (!body?.section || !body?.timestamp) {
+      return fail("Section and timestamp are required.");
     }
 
     if (body.section !== "updates" && body.section !== "actionItems") {
       return fail("Invalid preview section.");
     }
 
+    if (body.action && body.action !== "seen" && body.action !== "clear") {
+      return fail("Invalid preview state action.");
+    }
+
     const previewState = await markEmailThreadPreviewSectionSeenForViewer({
       viewer,
       threadId,
       section: body.section,
-      seenAt: body.seenAt
+      action: body.action ?? "seen",
+      timestamp: body.timestamp
     });
 
     return ok({ previewState });

@@ -567,6 +567,7 @@ export interface EmailThreadDetail {
 export interface EmailThreadPreviewStateRecord {
   threadId: string;
   previewUpdatesSeenAt: string | null;
+  previewUpdatesClearedAt: string | null;
   actionItemsSeenAt: string | null;
   createdAt: string;
   updatedAt: string;

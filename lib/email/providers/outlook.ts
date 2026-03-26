@@ -398,6 +398,30 @@ export async function fetchOutlookMessage(accessToken: string, messageId: string
   };
 }
 
+export async function fetchOutlookAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+) {
+  const response = await fetch(
+    `${GRAPH_API_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/$value`,
+    {
+      headers: {
+        authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Microsoft Graph request failed (${response.status}): ${await response.text()}`);
+  }
+
+  return {
+    bytes: Buffer.from(await response.arrayBuffer()),
+    sizeBytes: Number(response.headers.get("content-length") ?? 0)
+  };
+}
+
 export async function createOutlookSubscription(accessToken: string) {
   const expirationDateTime = new Date(Date.now() + 60 * 60 * 1000).toISOString();
   return graphRequest<{

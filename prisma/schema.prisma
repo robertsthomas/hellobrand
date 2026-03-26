@@ -565,6 +565,7 @@ model EmailThreadPreviewState {
   userId               String
   threadId             String
   previewUpdatesSeenAt DateTime?
+  previewUpdatesClearedAt DateTime?
   actionItemsSeenAt    DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

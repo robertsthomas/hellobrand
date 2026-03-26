@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
-import { fail, ok } from "@/lib/http";
-import { draftReplyForViewer } from "@/lib/email/service";
+import { fail } from "@/lib/http";
+import { streamDraftReplyForViewer } from "@/lib/email/service";
 
 export const maxDuration = 60;
 
@@ -27,25 +27,27 @@ export async function POST(
     const validStances = ["firm", "collaborative", "exploratory"];
     const stance = validStances.includes(body.stance ?? "") ? body.stance as "firm" | "collaborative" | "exploratory" : null;
     const instructions = body.instructions?.trim() || null;
-    const draft = await draftReplyForViewer(
-      viewer,
-      threadId,
-      body.dealId ?? null,
-      stance,
-      instructions,
+    const currentDraft =
       body.currentDraft?.subject?.trim() && body.currentDraft?.body?.trim()
         ? {
             subject: body.currentDraft.subject.trim(),
             body: body.currentDraft.body.trim()
           }
-        : null
+        : null;
+    const draftStream = await streamDraftReplyForViewer(
+      viewer,
+      threadId,
+      body.dealId ?? null,
+      stance,
+      instructions,
+      currentDraft
     );
 
-    if (!draft) {
+    if (!draftStream) {
       return fail("Email thread not found.", 404);
     }
 
-    return ok({ draft });
+    return draftStream;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not generate reply draft.";

@@ -65,6 +65,11 @@ async function InboxContent({
     listDealsForViewer(viewer),
     listEmailAccountsForViewer(viewer)
   ]);
+  const connectedProviders = [...new Set(emailAccounts.map((account) => account.provider))];
+  const selectedProvider =
+    resolved.provider && connectedProviders.includes(resolved.provider as (typeof connectedProviders)[number])
+      ? resolved.provider
+      : "";
 
   const selectedThreadId = resolved.thread ?? threads[0]?.thread.id ?? null;
   const [selectedThread, threadPreviewStates] = await Promise.all([
@@ -84,9 +89,10 @@ async function InboxContent({
       threadPreviewStates={threadPreviewStates}
       deals={deals}
       hasConnectedAccounts={emailAccounts.length > 0}
+      connectedProviders={connectedProviders}
       selectedFilters={{
         q: resolved.q ?? "",
-        provider: resolved.provider ?? "",
+        provider: selectedProvider,
         accountId: resolved.accountId ?? "",
         dealId: resolved.dealId ?? ""
       }}

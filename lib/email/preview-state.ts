@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { EmailThreadPreviewStateRecord, Viewer } from "@/lib/types";
 
 type PreviewSection = "updates" | "actionItems";
+type PreviewStateAction = "seen" | "clear";
 
 type ThreadPreviewStateDelegate = {
   findMany: (args: {
@@ -13,6 +14,7 @@ type ThreadPreviewStateDelegate = {
     Array<{
       threadId: string;
       previewUpdatesSeenAt: Date | null;
+      previewUpdatesClearedAt: Date | null;
       actionItemsSeenAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
@@ -27,17 +29,20 @@ type ThreadPreviewStateDelegate = {
     };
     update: {
       previewUpdatesSeenAt?: Date;
+      previewUpdatesClearedAt?: Date;
       actionItemsSeenAt?: Date;
     };
     create: {
       userId: string;
       threadId: string;
       previewUpdatesSeenAt?: Date;
+      previewUpdatesClearedAt?: Date;
       actionItemsSeenAt?: Date;
     };
   }) => Promise<{
     threadId: string;
     previewUpdatesSeenAt: Date | null;
+    previewUpdatesClearedAt: Date | null;
     actionItemsSeenAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -53,6 +58,7 @@ function iso(value: Date | null | undefined) {
 function toPreviewStateRecord(state: {
   threadId: string;
   previewUpdatesSeenAt: Date | null;
+  previewUpdatesClearedAt: Date | null;
   actionItemsSeenAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +66,7 @@ function toPreviewStateRecord(state: {
   return {
     threadId: state.threadId,
     previewUpdatesSeenAt: iso(state.previewUpdatesSeenAt),
+    previewUpdatesClearedAt: iso(state.previewUpdatesClearedAt),
     actionItemsSeenAt: iso(state.actionItemsSeenAt),
     createdAt: iso(state.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(state.updatedAt) ?? new Date().toISOString()
@@ -144,7 +151,8 @@ export async function markEmailThreadPreviewSectionSeenForViewer(input: {
   viewer: Viewer;
   threadId: string;
   section: PreviewSection;
-  seenAt: string;
+  action?: PreviewStateAction;
+  timestamp: string;
 }): Promise<EmailThreadPreviewStateRecord | null> {
   const delegate = getThreadPreviewStateDelegate();
 
@@ -152,15 +160,23 @@ export async function markEmailThreadPreviewSectionSeenForViewer(input: {
     return null;
   }
 
-  const seenDate = new Date(input.seenAt);
+  const seenDate = new Date(input.timestamp);
   if (Number.isNaN(seenDate.getTime())) {
     throw new Error("Invalid preview state timestamp.");
   }
 
+  const action = input.action ?? "seen";
   const data =
-    input.section === "updates"
-      ? { previewUpdatesSeenAt: seenDate }
-      : { actionItemsSeenAt: seenDate };
+    action === "clear"
+      ? input.section === "updates"
+        ? {
+            previewUpdatesSeenAt: seenDate,
+            previewUpdatesClearedAt: seenDate
+          }
+        : { actionItemsSeenAt: seenDate }
+      : input.section === "updates"
+        ? { previewUpdatesSeenAt: seenDate }
+        : { actionItemsSeenAt: seenDate };
 
   try {
     const saved = await delegate.upsert({

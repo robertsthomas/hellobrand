@@ -440,6 +440,25 @@ export async function fetchGmailThreadsByIds(
   return threads.map((thread) => mapGmailThread(thread, emailAddress));
 }
 
+export async function fetchGmailAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string
+) {
+  const payload = await gmailRequest<{
+    data?: string;
+    size?: number;
+  }>(
+    `/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`,
+    accessToken
+  );
+
+  return {
+    bytes: Buffer.from((payload.data ?? "").replace(/-/g, "+").replace(/_/g, "/"), "base64"),
+    sizeBytes: Number(payload.size ?? 0)
+  };
+}
+
 export async function listGmailHistoryThreadIds(accessToken: string, startHistoryId: string) {
   const payload = await gmailRequest<{
     history?: Array<{

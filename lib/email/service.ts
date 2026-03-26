@@ -16,12 +16,12 @@ import type {
   Viewer
 } from "@/lib/types";
 import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
-import { generateEmailReplyDraft, generateEmailThreadSummary } from "@/lib/email/ai";
+import { generateEmailReplyDraft, generateEmailThreadSummary, streamEmailReplyDraft } from "@/lib/email/ai";
 import { detectImportantEmailEvents, buildEmailTermSuggestion, detectPromiseDiscrepancies, scoreThreadAgainstDeal } from "@/lib/email/smart-inbox";
 import { extractActionItemsFromMessage } from "@/lib/email/action-items";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
-import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
-import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
+import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailAttachment, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
+import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookAttachment, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
 import { buildYahooAuthUrl, exchangeYahooCode, getYahooProfile, refreshYahooAccessToken } from "@/lib/email/providers/yahoo";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { hasProviderConfig, resolveEmailAppBaseUrl } from "@/lib/email/config";
@@ -40,6 +40,7 @@ import {
   findConnectedEmailAccountBySubscriptionId,
   acquireConnectedEmailAccountSyncLease,
   getConnectedEmailAccount,
+  getEmailAttachmentForUser,
   getEmailCandidateMatchForUser,
   getEmailCandidateMatchForDealThread,
   getConnectedEmailAccountForUser,
@@ -851,6 +852,49 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
   return detail;
 }
 
+export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: string) {
+  await assertPremiumInboxAccess(viewer);
+  if (!process.env.DATABASE_URL) {
+    return null;
+  }
+
+  const attachment = await getEmailAttachmentForUser(viewer.id, attachmentId);
+  if (!attachment) {
+    return null;
+  }
+
+  const { accessToken } = await ensureActiveTokens(attachment.account);
+  if (!accessToken) {
+    throw new Error("Could not access the connected inbox.");
+  }
+
+  const payload =
+    attachment.account.provider === "gmail"
+      ? await fetchGmailAttachment(
+          accessToken,
+          attachment.providerMessageId,
+          attachment.providerAttachmentId
+        )
+      : attachment.account.provider === "outlook"
+        ? await fetchOutlookAttachment(
+            accessToken,
+            attachment.providerMessageId,
+            attachment.providerAttachmentId
+          )
+        : null;
+
+  if (!payload) {
+    throw new Error("Attachment preview is not supported for this provider.");
+  }
+
+  return {
+    filename: attachment.filename,
+    mimeType: attachment.mimeType || "application/octet-stream",
+    sizeBytes: payload.sizeBytes || attachment.sizeBytes,
+    bytes: payload.bytes
+  };
+}
+
 export async function listLinkedEmailThreadsForViewerDeal(viewer: Viewer, dealId: string) {
   if (!process.env.DATABASE_URL) {
     return [];
@@ -1228,4 +1272,34 @@ export async function draftReplyForViewer(
     instructions ?? null,
     currentDraft ?? null
   );
+}
+
+export async function streamDraftReplyForViewer(
+  viewer: Viewer,
+  threadId: string,
+  explicitDealId?: string | null,
+  stance?: NegotiationStance | null,
+  instructions?: string | null,
+  currentDraft?: { subject: string; body: string } | null
+) {
+  await assertPremiumInboxAccess(viewer);
+  const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
+  if (!detail) {
+    return null;
+  }
+
+  const [deal, profile] = await Promise.all([
+    loadLinkedDealAggregate(viewer, detail, explicitDealId),
+    getProfileForViewer(viewer)
+  ]);
+
+  return streamEmailReplyDraft({
+    viewer,
+    thread: detail,
+    partnership: deal as DealAggregate | null,
+    profile,
+    stance: stance ?? null,
+    instructions: instructions ?? null,
+    currentDraft: currentDraft ?? null
+  });
 }

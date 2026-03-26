@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCompletion } from "@ai-sdk/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -27,6 +28,7 @@ import {
 } from "lucide-react";
 
 import { AppTooltip } from "@/components/app-tooltip";
+import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
 import {
   Collapsible,
   CollapsibleContent,
@@ -40,6 +42,13 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,6 +119,14 @@ function hasUnseenPreviewSection(latestAt: string | null, seenAt: string | null 
   }
 
   return !seenAt || latestAt > seenAt;
+}
+
+function isPreviewSectionCleared(latestAt: string | null, clearedAt: string | null | undefined) {
+  if (!latestAt || !clearedAt) {
+    return false;
+  }
+
+  return latestAt <= clearedAt;
 }
 
 type PreviewUpdateEntry = {
@@ -347,7 +364,35 @@ function messagePreview(message: EmailMessageRecord) {
   return body.replace(/\s+/g, " ").slice(0, 140);
 }
 
+function attachmentPreviewMode(attachment: EmailAttachmentRecord) {
+  if (attachment.mimeType.startsWith("image/")) {
+    return "image" as const;
+  }
+
+  if (attachment.mimeType.startsWith("video/")) {
+    return "video" as const;
+  }
+
+  if (
+    attachment.mimeType.includes("pdf") ||
+    attachment.filename.toLowerCase().endsWith(".pdf")
+  ) {
+    return "pdf" as const;
+  }
+
+  if (
+    attachment.mimeType.startsWith("text/") ||
+    attachment.filename.toLowerCase().endsWith(".txt")
+  ) {
+    return "text" as const;
+  }
+
+  return "download" as const;
+}
+
 function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[] }) {
+  const [previewAttachment, setPreviewAttachment] = useState<EmailAttachmentRecord | null>(null);
+
   if (attachments.length === 0) {
     return null;
   }
@@ -376,9 +421,11 @@ function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[]
           const Icon = attachmentIcon(attachment);
 
           return (
-            <div
+            <button
               key={attachment.id}
-              className="border border-black/8 bg-white p-3 shadow-[0_1px_0_rgba(17,24,39,0.04)] dark:border-white/10 dark:bg-[#161a20]"
+              type="button"
+              onClick={() => setPreviewAttachment(attachment)}
+              className="border border-black/8 bg-white p-3 text-left shadow-[0_1px_0_rgba(17,24,39,0.04)] transition hover:border-black/20 hover:bg-secondary/20 dark:border-white/10 dark:bg-[#161a20] dark:hover:border-white/20"
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-secondary/50 text-foreground dark:bg-white/10 dark:text-white">
@@ -393,15 +440,112 @@ function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[]
                     {attachment.mimeType.split("/")[1] || "file"}
                   </p>
                   <p className="mt-2 text-[11px] font-medium text-[#31513b] dark:text-white/80">
-                    Provider attachment
+                    Click to preview
                   </p>
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      <AttachmentPreviewDialog
+        attachment={previewAttachment}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewAttachment(null);
+          }
+        }}
+      />
     </div>
+  );
+}
+
+function AttachmentPreviewDialog({
+  attachment,
+  onOpenChange
+}: {
+  attachment: EmailAttachmentRecord | null;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const mode = attachment ? attachmentPreviewMode(attachment) : null;
+  const previewUrl = attachment
+    ? `/api/email/attachments/${attachment.id}`
+    : "";
+  const downloadUrl = attachment
+    ? `/api/email/attachments/${attachment.id}?download=1`
+    : "";
+
+  return (
+    <Dialog open={Boolean(attachment)} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100vh-3rem)] max-w-[min(1100px,calc(100vw-2rem))] overflow-hidden p-0">
+        {attachment ? (
+          <div className="flex h-[min(82vh,900px)] flex-col">
+            <DialogHeader className="shrink-0 border-b border-black/8 px-6 py-4 text-left">
+              <DialogTitle className="pr-10 text-base">{attachment.filename}</DialogTitle>
+              <DialogDescription className="flex items-center gap-2 text-[12px]">
+                <span>{attachment.mimeType}</span>
+                <span>·</span>
+                <span>{formatAttachmentSize(attachment.sizeBytes)}</span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="min-h-0 flex-1 bg-[#f6f6f1]">
+              {mode === "image" ? (
+                <div className="flex h-full items-center justify-center p-4">
+                  <img
+                    src={previewUrl}
+                    alt={attachment.filename}
+                    className="max-h-full max-w-full object-contain shadow-lg"
+                  />
+                </div>
+              ) : mode === "video" ? (
+                <div className="flex h-full items-center justify-center p-4">
+                  <video
+                    controls
+                    className="max-h-full max-w-full bg-black shadow-lg"
+                    src={previewUrl}
+                  />
+                </div>
+              ) : mode === "pdf" || mode === "text" ? (
+                <AttachmentDocumentPreview
+                  kind={mode}
+                  previewUrl={previewUrl}
+                  downloadUrl={downloadUrl}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    This file type may not render inline in the browser. Open it in a new tab to preview or download it.
+                  </p>
+                  <a
+                    href={downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:border-black/20"
+                  >
+                    Open in new tab
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {mode !== "download" ? (
+              <div className="shrink-0 border-t border-black/8 px-6 py-3">
+                <a
+                  href={downloadUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex text-[12px] font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Open in new tab
+                </a>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -521,6 +665,7 @@ export function InboxWorkspace({
   threadPreviewStates: initialThreadPreviewStates,
   deals,
   hasConnectedAccounts,
+  connectedProviders,
   selectedFilters
 }: {
   threads: EmailThreadListItem[];
@@ -528,6 +673,7 @@ export function InboxWorkspace({
   threadPreviewStates: Record<string, EmailThreadPreviewStateRecord>;
   deals: DealRecord[];
   hasConnectedAccounts: boolean;
+  connectedProviders: string[];
   selectedFilters: {
     q: string;
     provider: string;
@@ -550,6 +696,7 @@ export function InboxWorkspace({
   const [activeThreadId, setActiveThreadId] = useState(initialSelectedThread?.thread.id ?? threads[0]?.thread.id ?? "");
   const [isThreadLoading, setIsThreadLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(initialSelectedThread?.thread.aiSummary ?? null);
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
   const [replySubject, setReplySubject] = useState("");
   const [replyBody, setReplyBody] = useState("");
@@ -584,6 +731,27 @@ export function InboxWorkspace({
   >(null);
   const aiSuggestionCacheRef = useRef(aiSuggestionCache);
   const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
+  const selectedThreadId = selectedThread?.thread.id ?? "";
+  const {
+    completion: draftCompletion,
+    complete: completeDraft,
+    setCompletion: setDraftCompletion,
+    stop: stopDraftStream
+  } = useCompletion({
+    api: `/api/email/threads/${selectedThreadId || "__unselected__"}/draft`,
+    streamProtocol: "text",
+    onError: (error) => {
+      setErrorMessage(error.message || "Could not generate reply draft.");
+      setIsDrafting(false);
+    },
+    onFinish: (_prompt, completion) => {
+      setDraft((current) => ({
+        subject: current?.subject ?? replySubject,
+        body: completion
+      }));
+      setIsDrafting(false);
+    }
+  });
 
   useEffect(() => {
     setSelectedThread(initialSelectedThread);
@@ -596,11 +764,13 @@ export function InboxWorkspace({
 
   useEffect(() => {
     setSummary(selectedThread?.thread.aiSummary ?? null);
+    setDraftCompletion("");
     setDraft(null);
     setReplySubject("");
     setReplyBody("");
     setReplyJourney("idle");
     setErrorMessage(null);
+    setIsSummaryDialogOpen(false);
     setSelectedDealId(selectedThread?.links[0]?.dealId ?? "");
     setIsPromptCommandOpen(false);
     setDraftInstructions("");
@@ -608,7 +778,7 @@ export function InboxWorkspace({
     setIsLinkModalOpen(false);
     setArePreviewUpdatesOpen(false);
     setOpenRefinementPopover(null);
-  }, [selectedThread]);
+  }, [selectedThread, setDraftCompletion]);
 
   useEffect(() => {
     const control = aiReplyControlRef.current;
@@ -682,8 +852,18 @@ export function InboxWorkspace({
     return () => {
       threadRequestRef.current?.abort();
       discoveryRequestRef.current?.abort();
+      stopDraftStream();
     };
-  }, []);
+  }, [stopDraftStream]);
+
+  useEffect(() => {
+    if (!draftCompletion) {
+      return;
+    }
+
+    setReplyBody(draftCompletion);
+    setReplyJourney("ai_generated");
+  }, [draftCompletion]);
 
   useEffect(() => {
     aiSuggestionCacheRef.current = aiSuggestionCache;
@@ -698,7 +878,6 @@ export function InboxWorkspace({
     );
   }, [aiSuggestionCache]);
 
-  const selectedThreadId = selectedThread?.thread.id ?? "";
   const linkedDealIds = useMemo(
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
     [selectedThread]
@@ -770,6 +949,12 @@ export function InboxWorkspace({
     latestPreviewUpdateAt,
     selectedThreadPreviewState?.previewUpdatesSeenAt
   );
+  const arePreviewUpdatesCleared = isPreviewSectionCleared(
+    latestPreviewUpdateAt,
+    selectedThreadPreviewState?.previewUpdatesClearedAt
+  );
+  const shouldShowPreviewUpdates =
+    selectedThreadUpdates.length > 0 && !arePreviewUpdatesCleared;
   const hasUnseenActionItems = hasUnseenPreviewSection(
     latestActionItemAt,
     selectedThreadPreviewState?.actionItemsSeenAt
@@ -928,6 +1113,7 @@ export function InboxWorkspace({
   const shouldHighlightAiReply = replyJourney === "ai_set" && !isDrafting;
   const canRefineGeneratedReply =
     replyJourney === "ai_generated" && replyBody.trim().length > 0 && !isDrafting;
+  const canClearReplyText = replyBody.trim().length > 0;
   const canSendReply =
     !isDrafting &&
     replyBody.trim().length > 0 &&
@@ -996,6 +1182,7 @@ export function InboxWorkspace({
         threadId: selectedThreadId,
         previewUpdatesSeenAt:
           section === "updates" ? seenAt : existing?.previewUpdatesSeenAt ?? null,
+        previewUpdatesClearedAt: existing?.previewUpdatesClearedAt ?? null,
         actionItemsSeenAt:
           section === "actionItems" ? seenAt : existing?.actionItemsSeenAt ?? null,
         createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -1016,7 +1203,50 @@ export function InboxWorkspace({
         },
         body: JSON.stringify({
           section,
-          seenAt
+          action: "seen",
+          timestamp: seenAt
+        })
+      });
+    } catch {
+      // Keep the optimistic state; this marker is UI-only.
+    }
+  }
+
+  async function clearPreviewUpdates() {
+    if (!selectedThreadId || !latestPreviewUpdateAt) {
+      return;
+    }
+
+    const timestamp = latestPreviewUpdateAt;
+
+    setThreadPreviewStates((current) => {
+      const existing = current[selectedThreadId];
+      const nextState: EmailThreadPreviewStateRecord = {
+        threadId: selectedThreadId,
+        previewUpdatesSeenAt: timestamp,
+        previewUpdatesClearedAt: timestamp,
+        actionItemsSeenAt: existing?.actionItemsSeenAt ?? null,
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      return {
+        ...current,
+        [selectedThreadId]: nextState
+      };
+    });
+    setArePreviewUpdatesOpen(false);
+
+    try {
+      await fetch(`/api/email/threads/${selectedThreadId}/preview-state`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          section: "updates",
+          action: "clear",
+          timestamp
         })
       });
     } catch {
@@ -1121,6 +1351,7 @@ export function InboxWorkspace({
         throw new Error(payload.error ?? "Could not summarize email thread.");
       }
       setSummary(payload.summary ?? null);
+      setIsSummaryDialogOpen(Boolean(payload.summary));
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not summarize email thread.");
@@ -1140,10 +1371,17 @@ export function InboxWorkspace({
     const trimmedInstructions =
       (overrideInstructions ??
         (replyJourney === "ai_set" ? replyBody : draftInstructions)).trim();
+    const nextSubject =
+      revisionTarget?.subject?.trim() ||
+      (selectedThread?.thread.subject.startsWith("Re:")
+        ? selectedThread.thread.subject
+        : `Re: ${selectedThread?.thread.subject ?? ""}`);
 
     setIsDrafting(true);
     setReplyJourney("ai_set");
-    setReplySubject("");
+    setDraftCompletion("");
+    setDraft({ subject: nextSubject, body: "" });
+    setReplySubject(nextSubject);
     if (!revisionTarget && replyJourney !== "ai_set") {
       setReplyBody("");
     }
@@ -1151,33 +1389,39 @@ export function InboxWorkspace({
     setOpenRefinementPopover(null);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/email/threads/${selectedThreadId}/draft`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
+      await completeDraft("", {
+        body: {
           dealId: selectedDealId || null,
           stance: replyStance || null,
           instructions: trimmedInstructions || null,
-          currentDraft: revisionTarget
-        })
+          currentDraft: revisionTarget ?? null
+        }
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not generate reply draft.");
-      }
-      setDraft(payload.draft ?? null);
-      setReplySubject(payload.draft?.subject ?? "");
-      setReplyBody(payload.draft?.body ?? "");
-      setReplyJourney("ai_generated");
       setDraftInstructions("");
       setIsPromptCommandOpen(false);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Could not generate reply draft.");
-    } finally {
       setIsDrafting(false);
     }
+  }
+
+  function cancelDraftReply() {
+    stopDraftStream();
+    setIsDrafting(false);
+    setReplyJourney(replyBody.trim().length > 0 ? "ai_generated" : "idle");
+  }
+
+  function clearDraftComposer() {
+    stopDraftStream();
+    setIsDrafting(false);
+    setDraftCompletion("");
+    setDraft(null);
+    setReplySubject("");
+    setReplyBody("");
+    setDraftInstructions("");
+    setReplyJourney("idle");
+    setIsPromptCommandOpen(false);
+    setOpenRefinementPopover(null);
   }
 
   async function refineGeneratedDraft(instruction: string) {
@@ -1506,9 +1750,9 @@ export function InboxWorkspace({
                       onChange={(value) => applyFilters({ provider: value, thread: "" })}
                     >
                       <option value="">All providers</option>
-                      <option value="gmail">Gmail</option>
-                      <option value="outlook">Outlook</option>
-                      <option value="yahoo">Yahoo</option>
+                      <option value="gmail" disabled={!connectedProviders.includes("gmail")}>Gmail</option>
+                      <option value="outlook" disabled={!connectedProviders.includes("outlook")}>Outlook</option>
+                      <option value="yahoo" disabled={!connectedProviders.includes("yahoo")}>Yahoo</option>
                     </InboxSelect>
                     <InboxSelect
                       value={selectedFilters.dealId}
@@ -1700,35 +1944,45 @@ export function InboxWorkspace({
                               </div>
                             ) : null}
 
-                            {selectedThreadUpdates.length > 0 ? (
+                            {shouldShowPreviewUpdates ? (
                               <Collapsible
                                 open={arePreviewUpdatesOpen}
                                 onOpenChange={handlePreviewUpdatesOpenChange}
                               >
                                 <section className="border border-black/6 px-4 py-3">
-                                  <CollapsibleTrigger asChild>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <CollapsibleTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                        aria-label={
+                                          arePreviewUpdatesOpen
+                                            ? "Collapse preview updates"
+                                            : "Expand preview updates"
+                                        }
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                            Updates
+                                          </p>
+                                          {hasUnseenPreviewUpdates ? (
+                                            <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
+                                          ) : null}
+                                        </div>
+                                        <ChevronDown
+                                          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${arePreviewUpdatesOpen ? "rotate-180" : ""}`}
+                                        />
+                                      </button>
+                                    </CollapsibleTrigger>
                                     <button
                                       type="button"
-                                      className="flex w-full items-center justify-between text-left"
-                                      aria-label={
-                                        arePreviewUpdatesOpen
-                                          ? "Collapse preview updates"
-                                          : "Expand preview updates"
-                                      }
+                                      onClick={() => void clearPreviewUpdates()}
+                                      disabled={hasUnseenPreviewUpdates}
+                                      className="shrink-0 text-[11px] font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                                     >
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                          Updates
-                                        </p>
-                                        {hasUnseenPreviewUpdates ? (
-                                          <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
-                                        ) : null}
-                                      </div>
-                                      <ChevronDown
-                                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${arePreviewUpdatesOpen ? "rotate-180" : ""}`}
-                                      />
+                                      Clear
                                     </button>
-                                  </CollapsibleTrigger>
+                                  </div>
                                   <CollapsibleContent className="mt-2 space-y-2">
                                     {selectedThreadUpdates.map((update) => (
                                       <div key={update.id} className="border-l-2 border-black/8 pl-3">
@@ -1837,17 +2091,6 @@ export function InboxWorkspace({
                               </section>
                             ) : null}
 
-                            {summary ? (
-                              <section className="border border-black/8 px-5 py-4">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                                  AI summary
-                                </p>
-                                <p className="mt-3 whitespace-pre-wrap text-[12px] leading-6 text-foreground">
-                                  {summary}
-                                </p>
-                              </section>
-                            ) : null}
-
                             {draft ? (
                               <section className="border border-black/8 px-5 py-4">
                                 <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -1925,39 +2168,38 @@ export function InboxWorkspace({
                         <div className="border-t border-black/8 bg-white px-5 py-4">
                           <div className="space-y-3">
                             <div className="border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground">
-                              {isDrafting ? (
-                                <span className="flex items-center gap-2 text-primary">
-                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                                  Generating...
-                                </span>
-                              ) : (
-                                <div>
-                                  <Textarea
-                                    ref={replyBodyRef}
-                                    rows={1}
-                                    value={replyBody}
-                                    onChange={(event) => {
-                                      const nextValue = event.currentTarget.value;
-                                      event.currentTarget.style.height = "0px";
-                                      event.currentTarget.style.height = `${Math.max(24, event.currentTarget.scrollHeight)}px`;
-                                      setReplyBody(nextValue);
-                                      if (replyJourney === "ai_set") {
-                                        setDraftInstructions(nextValue);
-                                      } else if (replyJourney === "idle" || replyJourney === "user_set") {
-                                        setReplyJourney(
-                                          nextValue.trim().length > 0 ? "user_set" : "idle"
-                                        );
-                                      }
-                                    }}
-                                    placeholder={
-                                      replyJourney === "ai_set"
-                                        ? 'Refine your prompt, then click "Generate"...'
-                                        : 'Type a reply or click "AI Reply" to generate one...'
+                              <div>
+                                <Textarea
+                                  ref={replyBodyRef}
+                                  rows={1}
+                                  value={replyBody}
+                                  onChange={(event) => {
+                                    const nextValue = event.currentTarget.value;
+                                    event.currentTarget.style.height = "0px";
+                                    event.currentTarget.style.height = `${Math.max(24, event.currentTarget.scrollHeight)}px`;
+                                    setReplyBody(nextValue);
+                                    if (replyJourney === "ai_set") {
+                                      setDraftInstructions(nextValue);
+                                    } else if (replyJourney === "idle" || replyJourney === "user_set") {
+                                      setReplyJourney(
+                                        nextValue.trim().length > 0 ? "user_set" : "idle"
+                                      );
                                     }
-                                    className="h-6 min-h-0 overflow-hidden border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
-                                  />
-                                </div>
-                              )}
+                                  }}
+                                  placeholder={
+                                    replyJourney === "ai_set"
+                                      ? 'Refine your prompt, then click "Generate"...'
+                                      : 'Type a reply or click "AI Reply" to generate one...'
+                                  }
+                                  className="h-6 min-h-0 overflow-hidden border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
+                                />
+                                {isDrafting ? (
+                                  <span className="mt-2 flex items-center gap-2 text-[11px] text-primary">
+                                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                    Writing draft...
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
@@ -1975,6 +2217,8 @@ export function InboxWorkspace({
                                     <Sparkles className="h-3.5 w-3.5" />
                                     {isDrafting
                                       ? "Replying..."
+                                      : replyJourney === "ai_generated"
+                                        ? "Regenerate"
                                       : replyJourney === "ai_set"
                                         ? "Generate"
                                         : "AI Reply"}
@@ -2004,9 +2248,25 @@ export function InboxWorkspace({
                                     >
                                       Add prompt
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onSelect={clearDraftComposer}
+                                      disabled={!canClearReplyText}
+                                      className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
+                                    >
+                                      Clear text
+                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                   </DropdownMenu>
                                 </div>
+                                {isDrafting ? (
+                                  <button
+                                    type="button"
+                                    onClick={cancelDraftReply}
+                                    className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
+                                  >
+                                    Cancel
+                                  </button>
+                                ) : null}
                                 {canRefineGeneratedReply ? (
                                   <>
                                     <Popover
@@ -2236,6 +2496,22 @@ export function InboxWorkspace({
           </div>
         </div>
       </CommandDialog>
+
+      <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>AI Summary</DialogTitle>
+            <DialogDescription>
+              Thread summary for this partnership conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <p className="whitespace-pre-wrap text-[13px] leading-7 text-foreground">
+              {summary ?? "No summary available yet."}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {isCandidateModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">

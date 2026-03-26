@@ -476,6 +476,52 @@ export async function getConnectedEmailAccount(accountId: string) {
   return account ? toAccountRecord(account) : null;
 }
 
+export async function getEmailAttachmentForUser(userId: string, attachmentId: string) {
+  const attachment = await prisma.emailAttachment.findFirst({
+    where: {
+      id: attachmentId,
+      message: {
+        thread: {
+          account: {
+            userId
+          }
+        }
+      }
+    },
+    select: {
+      id: true,
+      filename: true,
+      mimeType: true,
+      sizeBytes: true,
+      providerAttachmentId: true,
+      message: {
+        select: {
+          providerMessageId: true,
+          thread: {
+            select: {
+              account: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  if (!attachment) {
+    return null;
+  }
+
+  return {
+    id: attachment.id,
+    filename: attachment.filename,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    providerAttachmentId: attachment.providerAttachmentId,
+    providerMessageId: attachment.message.providerMessageId,
+    account: toAccountRecord(attachment.message.thread.account)
+  };
+}
+
 export async function getConnectedEmailAccountForUser(userId: string, accountId: string) {
   const account = await prisma.connectedEmailAccount.findFirst({
     where: { id: accountId, userId }

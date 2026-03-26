@@ -1,6 +1,15 @@
-import { aiCachePolicy, runOpenRouterTask } from "@/lib/ai/gateway";
+import { streamText } from "ai";
+
+import {
+  aiCachePolicy,
+  buildAiInputHash,
+  finalizeAiStreamExecution,
+  prepareAiStreamExecution,
+  runOpenRouterTask
+} from "@/lib/ai/gateway";
+import { assistantProvider } from "@/lib/assistant/provider";
 import { buildEmailThreadVersion } from "@/lib/email/reply-suggestion-version";
-import type { DealAggregate, EmailThreadDetail, NegotiationStance, ProfileRecord } from "@/lib/types";
+import type { DealAggregate, EmailThreadDetail, NegotiationStance, ProfileRecord, Viewer } from "@/lib/types";
 
 function plainTextThread(thread: EmailThreadDetail) {
   return thread.messages
@@ -146,20 +155,7 @@ function fallbackDraft(
   };
 }
 
-function normalizeEmailDraftText(value: string) {
-  return value
-    .replace(/\r\n/g, "\n")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/__(.*?)__/g, "$1")
-    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
-    .replace(/\[Brand\/Agency Name\]/gi, "there")
-    .replace(/\[Brand Name\]/gi, "there")
-    .replace(/\[Agency Name\]/gi, "there")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-export async function generateEmailReplyDraft(
+function buildEmailReplyDraftRequest(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
   profile: ProfileRecord,
@@ -187,37 +183,35 @@ export async function generateEmailReplyDraft(
   const currentDraftContext = currentDraft?.body?.trim()
     ? `Current draft subject: ${currentDraft.subject.trim()}\nCurrent draft body:\n${currentDraft.body.trim()}`
     : "None";
+  const workspaceSummary = workspaceContext(partnership);
   const threadText = plainTextThread(thread);
-  const cache = aiCachePolicy({
-    taskKey: "email_draft",
-    scopeKey: [
-      "email-draft",
-      thread.thread.id,
-      buildEmailThreadVersion(thread.thread),
-      partnership?.deal.id ?? "no-deal",
-      partnership?.deal.updatedAt ?? "no-deal-version"
-    ].join(":"),
-    input: {
-      discrepancyContext,
-      actionContext,
-      currentDraftContext,
-      instructionContext,
-      stance: stance ?? null,
-      workspaceContext: workspaceContext(partnership),
-      signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
-      threadText
-    }
-  });
 
-  const result = await runOpenRouterTask<{ subject: string; body: string }>({
-    context: {
-      featureKey: "premium_inbox",
-      taskKey: "email_draft"
-    },
+  return {
+    fallback,
+    cache: aiCachePolicy({
+      taskKey: "email_draft",
+      scopeKey: [
+        "email-draft",
+        thread.thread.id,
+        buildEmailThreadVersion(thread.thread),
+        partnership?.deal.id ?? "no-deal",
+        partnership?.deal.updatedAt ?? "no-deal-version"
+      ].join(":"),
+      input: {
+        discrepancyContext,
+        actionContext,
+        currentDraftContext,
+        instructionContext,
+        stance: stance ?? null,
+        workspaceContext: workspaceSummary,
+        signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
+        threadText
+      }
+    }),
     systemPrompt: `Write a concise creator-professional email reply. Use the linked workspace context as the primary business context for the email, not only the inbox thread history. The custom user prompt is optional and applies only to this next draft. If a custom user prompt is present, follow it when it does not conflict with the linked workspace facts. If it conflicts with workspace facts, preserve the workspace facts and incorporate the custom prompt as far as safely possible. Never invent commitments, approvals, dates, deliverables, usage rights, payment terms, or legal positions. Keep the tone practical and clear. Write plain email prose only, not markdown. Do not use bold, bullets, numbered lists, headings, or placeholder names like [Brand Name] or [Agency Name]. If you do not know the recipient name, use a normal generic greeting like "Hi there,". If a current draft is provided, revise that draft instead of starting from scratch unless the context requires a substantial rewrite.${stanceInstruction}\n\nReturn JSON with subject and body.`,
     userPrompt: [
       "Linked workspace context:",
-      workspaceContext(partnership),
+      workspaceSummary,
       "",
       "Email vs contract discrepancies from this thread:",
       discrepancyContext,
@@ -235,9 +229,59 @@ export async function generateEmailReplyDraft(
       "",
       `Current thread:\n${threadText}`
     ].join("\n"),
-    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
+    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35
+  };
+}
+
+function draftTextResponse(body: string) {
+  return new Response(body, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store"
+    }
+  });
+}
+
+function normalizeEmailDraftText(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
+    .replace(/\[Brand\/Agency Name\]/gi, "there")
+    .replace(/\[Brand Name\]/gi, "there")
+    .replace(/\[Agency Name\]/gi, "there")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export async function generateEmailReplyDraft(
+  thread: EmailThreadDetail,
+  partnership: DealAggregate | null,
+  profile: ProfileRecord,
+  stance?: NegotiationStance | null,
+  instructions?: string | null,
+  currentDraft?: { subject: string; body: string } | null
+) {
+  const request = buildEmailReplyDraftRequest(
+    thread,
+    partnership,
+    profile,
+    stance,
+    instructions,
+    currentDraft
+  );
+
+  const result = await runOpenRouterTask<{ subject: string; body: string }>({
+    context: {
+      featureKey: "premium_inbox",
+      taskKey: "email_draft"
+    },
+    systemPrompt: request.systemPrompt,
+    userPrompt: request.userPrompt,
+    temperature: request.temperature,
     responseFormat: { type: "json_object" },
-    cache,
+    cache: request.cache,
     parse: (content) => {
       try {
         const parsed = JSON.parse(content) as {
@@ -252,15 +296,104 @@ export async function generateEmailReplyDraft(
           };
         }
       } catch {
-        return fallback;
+        return request.fallback;
       }
 
-      return fallback;
+      return request.fallback;
     },
     serialize: (value) => value
   });
 
-  return result?.data ?? fallback;
+  return result?.data ?? request.fallback;
+}
+
+export async function streamEmailReplyDraft(input: {
+  viewer: Viewer;
+  thread: EmailThreadDetail;
+  partnership: DealAggregate | null;
+  profile: ProfileRecord;
+  stance?: NegotiationStance | null;
+  instructions?: string | null;
+  currentDraft?: { subject: string; body: string } | null;
+}) {
+  const request = buildEmailReplyDraftRequest(
+    input.thread,
+    input.partnership,
+    input.profile,
+    input.stance ?? null,
+    input.instructions ?? null,
+    input.currentDraft ?? null
+  );
+  const prepared = await prepareAiStreamExecution({
+    userId: input.viewer.id,
+    taskKey: "email_draft",
+    featureKey: "premium_inbox",
+    metadata: {
+      threadId: input.thread.thread.id,
+      stance: input.stance ?? null
+    }
+  });
+
+  if (prepared.budgetDecision === "blocked") {
+    return draftTextResponse(request.fallback.body);
+  }
+
+  const provider = assistantProvider(prepared.fallbacks);
+  if (!provider) {
+    return draftTextResponse(request.fallback.body);
+  }
+
+  const inputHash = buildAiInputHash({
+    viewerId: input.viewer.id,
+    threadId: input.thread.thread.id,
+    stance: input.stance ?? null,
+    instructions: input.instructions ?? null,
+    currentDraft: input.currentDraft ?? null,
+    systemPrompt: request.systemPrompt,
+    userPrompt: request.userPrompt
+  });
+
+  const result = streamText({
+    model: provider.chat(prepared.requestedModel, {
+      user: input.viewer.id,
+      provider: {
+        allow_fallbacks: prepared.fallbacks.length > 0,
+        data_collection: "deny",
+        zdr: true
+      },
+      cache_control: {
+        type: "ephemeral",
+        ttl: "5m"
+      }
+    }),
+    system: `${request.systemPrompt}\n\nReturn only the email body text. Do not include a subject line, JSON, markdown, bullets, or headings.`,
+    prompt: request.userPrompt,
+    maxOutputTokens: prepared.maxTokens,
+    temperature: request.temperature,
+    onFinish: async ({ totalUsage, model }) => {
+      await finalizeAiStreamExecution({
+        context: {
+          userId: input.viewer.id,
+          taskKey: "email_draft",
+          featureKey: "premium_inbox",
+          metadata: {
+            threadId: input.thread.thread.id,
+            stance: input.stance ?? null
+          }
+        },
+        prepared,
+        usage: {
+          promptTokens: totalUsage.inputTokens ?? 0,
+          completionTokens: totalUsage.outputTokens ?? 0,
+          totalTokens: totalUsage.totalTokens ?? 0
+        },
+        resolvedModel: model.modelId ?? prepared.requestedModel,
+        inputHash
+      });
+    }
+  });
+
+  return result.toTextStreamResponse();
 }
 
 export async function generateReplySuggestions(
