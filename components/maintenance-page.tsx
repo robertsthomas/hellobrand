@@ -33,9 +33,9 @@ export function MaintenancePage() {
         <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
           <div className="px-8 pb-10 pt-8 sm:px-12 sm:pb-14 sm:pt-10">
             {/* Logo */}
-            <div className="flex items-center gap-2.5">
+            <div className="group flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center bg-primary text-white">
-                <Hand className="h-4 w-4 rotate-[18deg]" strokeWidth={2.15} />
+                <Hand className="hello-hand-wave h-4 w-4 rotate-[18deg]" strokeWidth={2.15} />
               </div>
               <span className="text-[15px] font-semibold tracking-[-0.01em] text-[#1a2634]">
                 HelloBrand

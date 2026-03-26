@@ -36,7 +36,7 @@ function ThemeButton({ className }: { className?: string }) {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08]",
+        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground dark:text-[#1a2634] dark:hover:bg-black/[0.06] dark:hover:text-[#1a2634]",
         className
       )}
     >
@@ -55,11 +55,11 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
   return (
     <nav className="sticky top-0 z-40 border-b border-black/5 bg-[#fefcfa]/95 backdrop-blur dark:border-white/10 dark:bg-[#101318]/92">
       <div className="mx-auto flex h-[60px] max-w-[1280px] items-center justify-between px-5 sm:h-[72px] sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" className="group flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-            <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
+            <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
           </div>
-          <span className="text-[1.45rem] font-bold tracking-[-0.05em] text-[#1a2634] sm:text-[1.625rem] dark:text-[#eef2f5]">
+          <span className="text-[1.45rem] font-bold tracking-[-0.05em] text-[#1a2634] sm:text-[1.625rem]">
             HelloBrand
           </span>
         </Link>
@@ -69,7 +69,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
           {returning ? (
             <Link
               href="/login"
-              className="inline-flex h-10 items-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white"
+              className="inline-flex h-10 items-center whitespace-nowrap rounded-none bg-primary px-4 text-sm font-medium text-white"
             >
               Go to app
             </Link>
@@ -77,7 +77,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
             <Link
               href="/upload"
               onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_mobile" })}
-              className="inline-flex h-10 items-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white"
+              className="inline-flex h-10 items-center whitespace-nowrap rounded-none bg-primary px-4 text-sm font-medium text-white"
             >
               Upload free
             </Link>
@@ -88,7 +88,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-10 w-10 rounded-lg border-black/10 bg-white/90 text-[#1a2634] dark:border-white/12 dark:bg-white/5 dark:text-[#eef2f5]"
+                className="h-10 w-10 rounded-none border-black/10 bg-white/90 text-[#1a2634] dark:border-white/12 dark:bg-[#171b20] dark:text-white dark:hover:bg-[#1d232a]"
               >
                 <Menu className="h-[18px] w-[18px]" />
                 <span className="sr-only">Open navigation menu</span>
@@ -111,6 +111,14 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
 
               <div className="flex flex-1 flex-col px-4 py-5">
                 <div className="space-y-2">
+                  <SheetClose asChild>
+                    <Link
+                      href="/"
+                      className="flex h-12 items-center rounded-xl px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                    >
+                      Home
+                    </Link>
+                  </SheetClose>
                   <SheetClose asChild>
                     <Link
                       href="/pricing"
@@ -167,15 +175,18 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
         {/* Desktop */}
         <div className="hidden items-center gap-4 md:flex">
           <ThemeButton />
-          <div className="flex items-center gap-8 text-[14px] font-medium text-[#667085] dark:text-[#c4cad2]">
-            <Link href="/pricing" className="transition hover:text-foreground">
+          <div className="flex items-center gap-8 text-[14px] font-medium text-[#667085] dark:text-[#667085]">
+            <Link href="/" className="transition hover:text-foreground dark:hover:text-foreground">
+              Home
+            </Link>
+            <Link href="/pricing" className="transition hover:text-foreground dark:hover:text-foreground">
               Pricing
             </Link>
-            <Link href="/blog" className="transition hover:text-foreground">
+            <Link href="/blog" className="transition hover:text-foreground dark:hover:text-foreground">
               Blog
             </Link>
             {showWaitlist ? (
-              <Link href="/waitlist" className="transition hover:text-foreground">
+              <Link href="/waitlist" className="transition hover:text-foreground dark:hover:text-foreground">
                 Waitlist
               </Link>
             ) : null}

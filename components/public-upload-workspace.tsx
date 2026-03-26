@@ -91,7 +91,7 @@ export function PublicUploadWorkspace() {
             message:
               typeof payload.error === "string"
                 ? payload.error
-                : "You’ve used the free anonymous uploads for now.",
+                : "You’ve used the free uploads for now.",
             signUpHref: redirectTo,
             signInHref: buildAuthHref("sign-in", "/app/intake/new")
           });
@@ -133,7 +133,7 @@ export function PublicUploadWorkspace() {
     return (
       <PublicContractBreakdown
         breakdown={breakdown}
-        eyebrow="Anonymous preview"
+        eyebrow="Document breakdown"
         title="Here’s what we found"
         description="You’ve already seen the value. Save this deal to track deliverables, revisit the document, and keep payment follow-up in one place."
         actions={
@@ -230,7 +230,7 @@ export function PublicUploadWorkspace() {
                   <ShieldAlert className="h-6 w-6" />
                 </div>
                 <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                  Your free anonymous uploads are used up.
+                  Your free uploads are used up.
                 </h2>
                 <p className="mx-auto mt-4 max-w-[50ch] text-sm leading-6 text-muted-foreground">
                   {uploadLimitGate.message}

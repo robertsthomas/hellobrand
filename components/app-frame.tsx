@@ -226,9 +226,9 @@ export function AppFrame({
       <div className="flex h-full min-h-0 overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
           <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-            <Link href="/app" className="flex items-center gap-3">
+            <Link href="/app" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-                <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
+                <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
               <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
                 HelloBrand
@@ -308,9 +308,9 @@ export function AppFrame({
                 <SheetDescription>App navigation and account actions.</SheetDescription>
               </SheetHeader>
               <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-                <Link href="/app" className="flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
+                <Link href="/app" className="group flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
                   <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-                    <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
+                    <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
                   </div>
                   <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
                     HelloBrand

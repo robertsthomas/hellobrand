@@ -240,9 +240,9 @@ export function ProfileOnboardingModal({
     <div className="flex min-h-screen flex-col bg-white dark:bg-[#0f1115]">
       {/* Thin top bar with logo */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-black/5 px-4 sm:h-16 sm:px-8 dark:border-white/8">
-        <div className="flex items-center gap-2.5">
+        <div className="group flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground">
-            <Hand className="h-4 w-4 rotate-[18deg]" strokeWidth={2.15} />
+            <Hand className="hello-hand-wave h-4 w-4 rotate-[18deg]" strokeWidth={2.15} />
           </div>
           <span className="text-lg font-bold tracking-[-0.04em] text-foreground">
             HelloBrand

@@ -7,38 +7,16 @@ import {
   createBlogPostCoverImage
 } from "@/lib/blog-cover";
 
-export const size = BLOG_POST_COVER_SIZE;
 export const contentType = BLOG_POST_COVER_CONTENT_TYPE;
+export const size = BLOG_POST_COVER_SIZE;
 
-type BlogPostOgImageProps = {
+type BlogPostCoverRouteProps = {
   params: Promise<{
     slug: string;
   }>;
 };
 
-export async function generateImageMetadata({
-  params
-}: BlogPostOgImageProps) {
-  const { slug } = await params;
-  const post = getBlogPostBySlug(slug);
-
-  if (!post) {
-    return [];
-  }
-
-  return [
-    {
-      id: post.slug,
-      alt: post.title,
-      contentType,
-      size
-    }
-  ];
-}
-
-export default async function BlogPostOpengraphImage({
-  params
-}: BlogPostOgImageProps) {
+export async function GET(_: Request, { params }: BlogPostCoverRouteProps) {
   const { slug } = await params;
   const post = getBlogPostBySlug(slug);
 

@@ -19,6 +19,7 @@ import {
   Sparkles
 } from "lucide-react";
 
+import { DocumentScanShowcase } from "@/components/document-scan-showcase";
 import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
 import { PublicFunnelLink } from "@/components/public-funnel-link";
@@ -69,9 +70,6 @@ export default async function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.25),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.10),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.08),transparent)]" />
 
           <div className="relative mx-auto max-w-[1200px] px-5 pb-16 pt-12 text-center sm:px-6 md:pb-20 md:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary/70 sm:text-[12px] dark:text-[#8ec6b1]/80">
-              Creator contract clarity
-            </p>
 
             <h1 className="mx-auto mt-5 max-w-[13ch] text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
               Understand your brand deals in seconds.
@@ -113,10 +111,12 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        <DocumentScanShowcase />
+
         <section className="bg-white dark:bg-[#101318]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="mx-auto max-w-[620px] text-center">
-              <Eyebrow>What you’ll instantly see</Eyebrow>
+              <Eyebrow>What HelloBrand pulls out</Eyebrow>
               <h2 className="mt-4 text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
                 Enough value to know whether the deal needs a closer look.
               </h2>
@@ -408,9 +408,8 @@ function SidebarItem({
 }) {
   return (
     <div
-      className={`flex h-9 items-center gap-3 px-3 text-[13px] font-medium ${
-        active ? "bg-secondary/55 text-foreground" : "text-muted-foreground"
-      }`}
+      className={`flex h-9 items-center gap-3 px-3 text-[13px] font-medium ${active ? "bg-secondary/55 text-foreground" : "text-muted-foreground"
+        }`}
     >
       <Icon
         className={`h-4 w-4 shrink-0 ${active ? "text-primary dark:text-[#8ec6b1]" : ""}`}
@@ -712,11 +711,10 @@ function InboxPreview() {
           ].map((thread) => (
             <div
               key={thread.title}
-              className={`border px-3.5 py-2.5 ${
-                thread.active
+              className={`border px-3.5 py-2.5 ${thread.active
                   ? "border-primary/15 bg-primary/[0.04] dark:border-[#8ec6b1]/20 dark:bg-[#8ec6b1]/[0.06]"
                   : "border-black/[0.06] bg-white dark:border-white/[0.08] dark:bg-white/[0.02]"
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

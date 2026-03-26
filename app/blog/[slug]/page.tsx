@@ -92,12 +92,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound();
   }
 
+  const coverImageAbsoluteUrl = post.coverImageUrl.startsWith("http")
+    ? post.coverImageUrl
+    : absoluteUrl(post.coverImageUrl);
+
   const articleJsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     headline: post.title,
     description: post.description,
-    image: [post.coverImageUrl, getBlogPostOgImageUrl(post.slug)],
+    image: [coverImageAbsoluteUrl, getBlogPostOgImageUrl(post.slug)],
     datePublished: post.publishedAt,
     dateModified: post.updatedAt ?? post.publishedAt,
     articleSection: post.category,
@@ -167,6 +171,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           <p className="mt-4 text-[1.05rem] leading-relaxed text-[#555] dark:text-[#999]">
             {post.description}
           </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {post.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-[#e3dccb] bg-[#f9f6ee] px-3 py-1 text-[11px] font-medium tracking-[0.01em] text-[#5b5140] dark:border-[#2a2d31] dark:bg-[#111418] dark:text-[#a3abb6]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
           <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="flex flex-wrap items-center gap-4 text-[13px] text-[#888] dark:text-[#666]">
               <span>By {post.author}</span>
@@ -189,22 +203,25 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                 alt={post.coverImageAlt}
                 fill
                 priority
+                unoptimized={!post.coverImageUrl.startsWith("http")}
                 sizes="(min-width: 1024px) 768px, 100vw"
                 className="object-cover"
               />
             </div>
-            <figcaption className="px-4 py-3 text-[12px] text-[#888] dark:text-[#666]">
-              Photo by{" "}
-              <a
-                href={post.coverImageCreditUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-[#555] transition hover:text-primary dark:text-[#999] dark:hover:text-[#8ec6b1]"
-              >
-                {post.coverImageCreditName}
-              </a>{" "}
-              on Unsplash
-            </figcaption>
+            {post.coverImageCreditName && post.coverImageCreditUrl ? (
+              <figcaption className="px-4 py-3 text-[12px] text-[#888] dark:text-[#666]">
+                Photo by{" "}
+                <a
+                  href={post.coverImageCreditUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-[#555] transition hover:text-primary dark:text-[#999] dark:hover:text-[#8ec6b1]"
+                >
+                  {post.coverImageCreditName}
+                </a>{" "}
+                on Unsplash
+              </figcaption>
+            ) : null}
           </figure>
         </header>
 

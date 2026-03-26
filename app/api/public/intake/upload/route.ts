@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       counts.ipCount >= ANONYMOUS_UPLOAD_MAX_COUNT
     ) {
       const message =
-        "You’ve used all 3 free anonymous uploads. Create an account to continue inside HelloBrand.";
+        "You’ve used all 3 free uploads. Create an account to continue inside HelloBrand.";
       await logPublicFunnelEvent("anonymous_upload_failed", {
         message,
         code: ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE,

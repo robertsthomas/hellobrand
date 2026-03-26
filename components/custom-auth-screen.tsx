@@ -548,9 +548,9 @@ export function CustomAuthScreen() {
       <div className="flex flex-col justify-between overflow-y-auto px-8 py-10 sm:px-12 lg:px-16 lg:py-12">
         <div>
           <div className="flex items-start justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3">
+            <Link href="/" className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ocean text-white">
-                <Hand className="h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
+                <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
               <div>
                 <p className="editorial-display text-2xl font-semibold tracking-[-0.05em] text-[#16261f] dark:text-[#f2ede6]">
