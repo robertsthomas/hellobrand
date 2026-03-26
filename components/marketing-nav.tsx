@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
+import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -74,10 +75,11 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
             </Link>
           ) : (
             <Link
-              href="/login?mode=sign-up"
+              href="/upload"
+              onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_mobile" })}
               className="inline-flex h-10 items-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white"
             >
-              Get started
+              Upload free
             </Link>
           )}
           <Sheet>
@@ -148,10 +150,11 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                       </Link>
                     ) : (
                       <Link
-                        href="/login?mode=sign-up"
+                        href="/upload"
+                        onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_drawer" })}
                         className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
                       >
-                        Get started
+                        Upload free
                       </Link>
                     )}
                   </SheetClose>
@@ -185,10 +188,11 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
               </Link>
             ) : (
               <Link
-                href="/login?mode=sign-up"
+                href="/upload"
+                onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_desktop" })}
                 className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
               >
-                Get started
+                Upload free
               </Link>
             )}
           </div>

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
-import { ProfileOnboardingModal } from "@/components/onboarding/profile-onboarding-modal";
+import { ProfileOnboardingBanner } from "@/components/profile-onboarding-banner";
 import { requireViewer } from "@/lib/auth";
 import {
   getCachedDealAggregates,
@@ -29,19 +29,6 @@ export default async function WorkspaceLayout({
   const hasActiveWorkspace = dealAggregates.length > 0;
   const notifications = notificationFeed.notifications;
 
-  // Show full-screen onboarding flow instead of the app
-  if (!isOnboardingComplete) {
-    return (
-      <ProfileOnboardingModal
-        viewer={{
-          id: viewer.id,
-          email: viewer.email,
-          displayName: viewer.displayName
-        }}
-      />
-    );
-  }
-
   return (
     <>
       <AccentColorProvider accentColor={profile.accentColor} />
@@ -49,8 +36,15 @@ export default async function WorkspaceLayout({
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}
         notifications={notifications}
-        onboardingComplete
+        onboardingComplete={isOnboardingComplete}
       >
+        {!isOnboardingComplete ? (
+          <ProfileOnboardingBanner
+            email={viewer.email}
+            initialName={profile.creatorLegalName ?? profile.displayName ?? viewer.displayName}
+            initialHandle={profile.businessName ?? ""}
+          />
+        ) : null}
         {children}
       </AppFrame>
     </>

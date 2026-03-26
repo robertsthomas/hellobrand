@@ -8,6 +8,7 @@ import type {
   BriefData,
   DealAggregate,
   DealTermsRecord,
+  DeliverableItem,
   DocumentAnalysisResult,
   DocumentClassificationResult,
   DocumentKind,
@@ -262,6 +263,152 @@ function parseDeliverables(text: string, evidence: FieldEvidence[]) {
         0.82
       );
     }
+  }
+
+  return deliverables;
+}
+
+function getTopDocumentLines(text: string, count = 6) {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, count);
+}
+
+function isBriefLikeDocumentKind(documentKind: DocumentKind) {
+  return (
+    documentKind === "campaign_brief" ||
+    documentKind === "deliverables_brief" ||
+    documentKind === "pitch_deck"
+  );
+}
+
+function isGenericCampaignName(value: string | null | undefined) {
+  if (!value) {
+    return true;
+  }
+
+  return /^(concept|campaign concept|brief|overview)$/i.test(value.trim());
+}
+
+function inferBriefBrandName(text: string) {
+  const [firstLine] = getTopDocumentLines(text, 1);
+  if (!firstLine) {
+    return null;
+  }
+
+  const candidate = firstLine
+    .replace(/\b(influencer|campaign|creative|content)\s+brief\b/gi, "")
+    .replace(/\bbrief\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return candidate.length > 1 ? candidate : null;
+}
+
+function shouldUseInferredBriefBrandName(
+  currentBrandName: string | null | undefined,
+  inferredBrandName: string | null | undefined
+) {
+  if (!inferredBrandName) {
+    return false;
+  }
+
+  if (!currentBrandName) {
+    return true;
+  }
+
+  const current = currentBrandName.trim().toLowerCase();
+  const inferredTokens = inferredBrandName
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (
+    /hook|second|requirement|guideline|messaging|concept/.test(current) ||
+    current.length > 40
+  ) {
+    return true;
+  }
+
+  return !inferredTokens.some((token) => current.includes(token));
+}
+
+function inferBriefCampaignName(text: string, fileName?: string | null) {
+  const topLines = getTopDocumentLines(text, 4);
+
+  for (const line of topLines.slice(1)) {
+    if (
+      line.length > 2 &&
+      line.length < 100 &&
+      !/^(overview|key messaging|creative territories|creative requirements|required elements)$/i.test(
+        line
+      )
+    ) {
+      return line;
+    }
+  }
+
+  if (!fileName) {
+    return null;
+  }
+
+  const stem = fileName
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const afterBrief = stem.match(/\bbrief\b\s+(.+)$/i)?.[1]?.trim();
+  return afterBrief?.length ? afterBrief : null;
+}
+
+function parseBriefDeliverables(text: string, evidence: FieldEvidence[]) {
+  const deliverables: DeliverableItem[] = [];
+  const seen = new Set<string>();
+  const patterns = [
+    {
+      pattern: /\big\s+reel\s+or\s+tiktok\b/i,
+      title: "IG Reel or TikTok",
+      channel: "Instagram/TikTok"
+    },
+    {
+      pattern: /\b(?:ig|instagram)\s+story\b/i,
+      title: "IG Story",
+      channel: "Instagram"
+    },
+    {
+      pattern: /\b(?:tiktok|tik tok)\b/i,
+      title: "TikTok",
+      channel: "TikTok"
+    }
+  ];
+
+  for (const { pattern, title, channel } of patterns) {
+    const match = pattern.exec(text);
+    if (!match || seen.has(title)) {
+      continue;
+    }
+
+    const index = match.index ?? 0;
+    deliverables.push({
+      id: randomUUID(),
+      title,
+      dueDate: null,
+      channel,
+      quantity: 1,
+      status: "pending",
+      description: sentenceAround(text, index)
+    });
+    seen.add(title);
+    pushEvidence(
+      evidence,
+      "deliverables",
+      sentenceAround(text, index),
+      null,
+      0.72
+    );
   }
 
   return deliverables;
@@ -895,6 +1042,43 @@ export function buildCreatorSummary(
 
   const topRisk = risks[0];
 
+  if (extraction.data.briefData) {
+    const brandOrCampaign = [extraction.data.brandName, extraction.data.campaignName]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .join(" • ");
+    const keyPoints = [
+      ...extraction.data.briefData.messagingPoints,
+      ...extraction.data.briefData.talkingPoints
+    ].slice(0, 2);
+    const overview =
+      extraction.data.briefData.campaignOverview ??
+      extraction.data.briefData.creativeConceptOverview;
+    const deliverableLine =
+      deliverables.length > 0
+        ? deliverables
+            .map((item) =>
+              item.quantity && item.quantity > 1
+                ? `${item.quantity} ${item.title}`
+                : item.title
+            )
+            .join(", ")
+        : "creator content requirements that still need manual confirmation";
+
+    return {
+      body: [
+        brandOrCampaign
+          ? `This brief is for ${brandOrCampaign}.`
+          : "This document reads like a creator brief.",
+        overview ? overview : `It calls for ${deliverableLine}.`,
+        keyPoints.length > 0 ? `Key messaging includes ${keyPoints.join(" and ")}.` : null,
+        topRisk ? `Main watchout: ${topRisk.title.toLowerCase()}.` : null
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" "),
+      version: "v1"
+    };
+  }
+
   return {
     body: `This deal appears to cover ${deliverableLine} for ${amount}. Payment terms are ${extraction.data.paymentTerms ?? "not clearly stated"}, and the brand receives ${rightsLine}. The main watchout right now is ${topRisk.title.toLowerCase()}.`,
     version: "v1"
@@ -1011,6 +1195,28 @@ export function fallbackAnalyzeDocument(
       : classifyDocumentHeuristically(text, options?.fileName);
   const sections = splitIntoSections(text, classification.documentKind);
   const extraction = extractStructuredTerms(text, sections, classification.documentKind);
+
+  if (isBriefLikeDocumentKind(classification.documentKind)) {
+    const briefData = extractBriefData(text, classification.documentKind);
+    if (briefData) {
+      extraction.data.briefData = briefData;
+    }
+
+    const inferredBrandName = inferBriefBrandName(text);
+    if (shouldUseInferredBriefBrandName(extraction.data.brandName, inferredBrandName)) {
+      extraction.data.brandName = inferredBrandName;
+    }
+
+    if (isGenericCampaignName(extraction.data.campaignName)) {
+      extraction.data.campaignName =
+        inferBriefCampaignName(text, options?.fileName) ?? extraction.data.campaignName;
+    }
+
+    if ((extraction.data.deliverables?.length ?? 0) === 0) {
+      extraction.data.deliverables = parseBriefDeliverables(text, extraction.evidence);
+    }
+  }
+
   const riskFlags = analyzeCreatorRisks(text, "pending-document", extraction);
   const summary = buildCreatorSummary(extraction, riskFlags);
 

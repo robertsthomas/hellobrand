@@ -8,6 +8,7 @@ import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
 type AuthMode = "sign-in" | "sign-up";
 type VerificationStep = "details" | "sign-up-code" | "sign-in-second-factor";
@@ -73,6 +74,10 @@ export function CustomAuthScreen() {
   const { isLoaded: isSignUpLoaded, signUp } = useSignUp();
 
   const queryMode = useMemo(() => deriveMode(searchParams.get("mode")), [searchParams]);
+  const redirectTarget = useMemo(
+    () => safeRedirectPath(searchParams.get("redirect")),
+    [searchParams]
+  );
 
   const [mode, setMode] = useState<AuthMode>(queryMode);
   const [verificationStep, setVerificationStep] = useState<VerificationStep>("details");
@@ -115,7 +120,14 @@ export function CustomAuthScreen() {
     setSignInSecondFactor(null);
     setVerificationNotice(null);
     setErrorMessages([]);
-    router.replace(nextMode === "sign-up" ? "/login?mode=sign-up" : "/login", {
+    const nextUrl = new URLSearchParams();
+    if (nextMode === "sign-up") {
+      nextUrl.set("mode", "sign-up");
+    }
+    if (redirectTarget !== "/app") {
+      nextUrl.set("redirect", redirectTarget);
+    }
+    router.replace(`/login${nextUrl.toString() ? `?${nextUrl.toString()}` : ""}`, {
       scroll: false
     });
   }
@@ -129,7 +141,7 @@ export function CustomAuthScreen() {
 
   async function activateSession(sessionId: string) {
     await setActive({ session: sessionId });
-    router.push("/app");
+    router.push(redirectTarget);
     router.refresh();
   }
 
@@ -195,14 +207,16 @@ export function CustomAuthScreen() {
         return;
       }
 
-      await result.prepareSecondFactor({
-        strategy: "email_link",
-        redirectUrl:
-          typeof window === "undefined"
-            ? "/login?mode=sign-in"
-            : `${window.location.origin}/login?mode=sign-in`,
-        emailAddressId: preferredSecondFactor.emailAddressId
-      });
+        await result.prepareSecondFactor({
+          strategy: "email_link",
+          redirectUrl:
+            typeof window === "undefined"
+              ? `/login?mode=sign-in&redirect=${encodeURIComponent(redirectTarget)}`
+              : `${window.location.origin}/login?mode=sign-in&redirect=${encodeURIComponent(
+                  redirectTarget
+                )}`,
+          emailAddressId: preferredSecondFactor.emailAddressId
+        });
       setSignInSecondFactor({
         strategy: "email_link",
         safeIdentifier: preferredSecondFactor.safeIdentifier,
@@ -433,8 +447,10 @@ export function CustomAuthScreen() {
           strategy: "email_link",
           redirectUrl:
             typeof window === "undefined"
-              ? "/login?mode=sign-in"
-              : `${window.location.origin}/login?mode=sign-in`,
+              ? `/login?mode=sign-in&redirect=${encodeURIComponent(redirectTarget)}`
+              : `${window.location.origin}/login?mode=sign-in&redirect=${encodeURIComponent(
+                  redirectTarget
+                )}`,
           emailAddressId: signInSecondFactor.emailAddressId
         });
       } else if (signInSecondFactor.strategy === "phone_code") {

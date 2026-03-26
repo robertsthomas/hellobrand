@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   ChevronRight,
@@ -11,15 +12,16 @@ import {
   Hand,
   Inbox,
   type LucideIcon,
+  Mail,
   Receipt,
   Search,
   Shield,
-  Sparkles,
-  Mail
+  Sparkles
 } from "lucide-react";
 
 import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
+import { PublicFunnelLink } from "@/components/public-funnel-link";
 import { HeroTabRail } from "@/components/hero-tab-rail";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
@@ -60,48 +62,49 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#fefcfa] text-foreground dark:bg-[#0f1115]">
-      <MarketingNav showWaitlist={isMaintenanceModeEnabled()} />
+      <MarketingNav showWaitlist={false} />
 
       <main>
-        {/* ── Hero ── */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.25),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.10),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.08),transparent)]" />
 
           <div className="relative mx-auto max-w-[1200px] px-5 pb-16 pt-12 text-center sm:px-6 md:pb-20 md:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
             <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-primary/70 sm:text-[12px] dark:text-[#8ec6b1]/80">
-              Creator partnership workspace
+              Creator contract clarity
             </p>
 
-            <h1 className="mx-auto mt-5 max-w-[16ch] text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
-              Your partnerships, all in one sunny place.
+            <h1 className="mx-auto mt-5 max-w-[13ch] text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
+              Understand your brand deals in seconds.
             </h1>
 
-            <p className="mx-auto mt-5 max-w-[48ch] text-[1rem] leading-relaxed text-[#5d6876] sm:mt-6 sm:text-[1.1rem] dark:text-[#aab3bf]">
-              Review contracts, manage brand email threads, track payments, and
-              stay on top of every deliverable — without the spreadsheet chaos.
+            <p className="mx-auto mt-5 max-w-[50ch] text-[1rem] leading-relaxed text-[#5d6876] sm:mt-6 sm:text-[1.1rem] dark:text-[#aab3bf]">
+              Upload your contract. HelloBrand breaks it down into plain English,
+              highlights risks, and shows the deliverables and payment terms before
+              you ever need an account.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
-              <Link
-                href="/login"
+              <PublicFunnelLink
+                href="/upload"
+                eventName="landing_upload_cta_clicked"
                 className="inline-flex h-12 items-center justify-center gap-2 bg-primary px-7 text-[15px] font-semibold text-white shadow-md transition hover:bg-primary/92 hover:shadow-lg"
               >
-                Get started free
+                Upload a Contract
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="#features"
+              </PublicFunnelLink>
+              <PublicFunnelLink
+                href="/sample"
+                eventName="landing_sample_cta_clicked"
                 className="inline-flex h-12 items-center justify-center border border-black/8 bg-white px-7 text-[15px] font-semibold text-foreground shadow-sm transition hover:bg-secondary dark:border-white/12 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
               >
-                See how it works
-              </Link>
+                Try a Sample Contract
+              </PublicFunnelLink>
             </div>
 
             <p className="mt-4 text-[13px] text-[#9ba5b0] sm:text-sm dark:text-[#78828e]">
-              Free during early access. No credit card required.
+              Private and secure. No legal knowledge needed. Built for creators.
             </p>
 
-            {/* Hero dashboard preview — clipped with fade */}
             <div className="relative mx-auto mt-10 max-w-[1080px] sm:mt-14">
               <div className="max-h-[320px] overflow-hidden [mask-image:linear-gradient(to_bottom,black_50%,transparent_100%)] sm:max-h-[400px] md:max-h-[480px]">
                 <HeroDashboard />
@@ -110,17 +113,16 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Value props ── */}
         <section className="bg-white dark:bg-[#101318]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="mx-auto max-w-[620px] text-center">
-              <Eyebrow>Everything you need</Eyebrow>
+              <Eyebrow>What you’ll instantly see</Eyebrow>
               <h2 className="mt-4 text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
-                One workspace replaces five tabs.
+                Enough value to know whether the deal needs a closer look.
               </h2>
               <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                Contracts, inbox threads, deliverables, and payments live
-                together so nothing slips through the cracks.
+                The first upload should already answer the questions creators care
+                about before anything gets saved into a workspace.
               </p>
             </div>
 
@@ -128,18 +130,18 @@ export default async function LandingPage() {
               {[
                 {
                   icon: FileText,
-                  title: "Contract review",
-                  body: "Upload agreements and get plain-language summaries with risk watchouts highlighted."
+                  title: "Plain-English summary",
+                  body: "See what the contract is asking for without reading every clause line by line."
                 },
                 {
-                  icon: Inbox,
-                  title: "Linked inbox",
-                  body: "Brand emails, negotiation threads, and approvals stay connected to the right partnership."
+                  icon: AlertTriangle,
+                  title: "Risk watchouts",
+                  body: "Spot usage rights, payment gaps, and other terms that deserve a second look."
                 },
                 {
                   icon: Receipt,
-                  title: "Payment tracking",
-                  body: "Invoice timing, payout status, and follow-up notes visible right beside each partnership."
+                  title: "Deliverables and payment",
+                  body: "Pull out what you owe, what the brand owes, and when each part should happen."
                 }
               ].map((card) => {
                 const Icon = card.icon;
@@ -164,56 +166,72 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Feature deep-dives with context ── */}
         <section id="features" className="bg-[#faf8f5] dark:bg-[#0e1014]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
-
-            {/* Feature 1: Partnership management */}
             <div className="grid items-center gap-8 md:gap-12 lg:grid-cols-[1fr_1.15fr]">
               <div>
-                <Eyebrow>Partnership management</Eyebrow>
+                <Eyebrow>Sample breakdown</Eyebrow>
                 <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  Every brand partnership lives in one organized workspace.
+                  See the kind of output you get before you upload your own deal.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  See status, value, and risk in one place so the next move is always clear.
+                  HelloBrand surfaces the plain-English summary, the risky terms,
+                  and the core money and deliverable details in one pass.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
-                    "Track partnership status from review to paid",
-                    "Surface risk flags before you sign",
-                    "Filter and search across all partnerships"
+                    "Plain-language summary of the contract",
+                    "Risk flags with simple explanations",
+                    "A clear list of deliverables and payment timing"
                   ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground">
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground"
+                    >
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#8ec6b1]" />
                       <span>{item}</span>
                     </li>
                   ))}
                 </ul>
+                <div className="mt-7">
+                  <PublicFunnelLink
+                    href="/sample"
+                    eventName="landing_sample_cta_clicked"
+                    payload={{ location: "sample_section" }}
+                    className="inline-flex h-11 items-center justify-center gap-2 bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/92"
+                  >
+                    Try the sample contract
+                    <ArrowRight className="h-4 w-4" />
+                  </PublicFunnelLink>
+                </div>
               </div>
               <PartnershipsPreview />
             </div>
 
-            {/* Feature 2: Smart inbox */}
             <div className="mt-16 grid items-center gap-8 md:mt-24 md:gap-12 lg:grid-cols-[1.15fr_1fr]">
               <div className="order-2 lg:order-1">
                 <InboxPreview />
               </div>
               <div className="order-1 lg:order-2">
-                <Eyebrow>Smart inbox</Eyebrow>
+                <Eyebrow>Save and track after</Eyebrow>
                 <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  Brand emails stay connected to the right partnership.
+                  Once the contract looks real, turn it into a workspace.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  Keep every approval, revision, and negotiation thread attached to the right workspace.
+                  The account step should happen after the value moment, when the
+                  creator wants to keep the deal, track follow-up, and manage the
+                  thread in context.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
-                    "Auto-link threads to matching partnerships",
-                    "Keep negotiation history in context",
-                    "Never lose a follow-up between tools"
+                    "Keep brand emails attached to the saved deal",
+                    "Store the contract breakdown in one place",
+                    "Come back to the workspace without starting over"
                   ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground">
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground"
+                    >
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#8ec6b1]" />
                       <span>{item}</span>
                     </li>
@@ -222,23 +240,26 @@ export default async function LandingPage() {
               </div>
             </div>
 
-            {/* Feature 3: Payment tracking */}
             <div className="mt-16 grid items-center gap-8 md:mt-24 md:gap-12 lg:grid-cols-[1fr_1.15fr]">
               <div>
-                <Eyebrow>Payment tracking</Eyebrow>
+                <Eyebrow>Follow-through</Eyebrow>
                 <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  Know exactly where your money stands.
+                  Keep deliverables and payments from slipping after signature.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  Track invoices, balances, and payout timing without leaving the partnership workspace.
+                  The public upload gets the user engaged. The saved workspace keeps
+                  the deal useful by tracking what is due and what is still unpaid.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
-                    "See tracked, outstanding, and late totals",
-                    "Invoice status tied to each partnership",
-                    "Payment reminders that write themselves"
+                    "Track due dates and outstanding balances",
+                    "Keep payment status beside the contract terms",
+                    "Stay organized after the initial contract review"
                   ].map((item) => (
-                    <li key={item} className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground">
+                    <li
+                      key={item}
+                      className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground"
+                    >
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#8ec6b1]" />
                       <span>{item}</span>
                     </li>
@@ -247,17 +268,15 @@ export default async function LandingPage() {
               </div>
               <PaymentsPreview />
             </div>
-
           </div>
         </section>
 
-        {/* ── How it works ── */}
         <section className="bg-white dark:bg-[#101318]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="mx-auto max-w-[620px] text-center">
               <Eyebrow>How it works</Eyebrow>
               <h2 className="mt-4 text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
-                Three steps to organized partnership ops.
+                Upload, understand, then save it if it matters.
               </h2>
             </div>
 
@@ -266,23 +285,20 @@ export default async function LandingPage() {
                 {
                   step: "01",
                   title: "Drop in a contract",
-                  body: "Upload a PDF, paste a brief, or forward a brand email. HelloBrand creates a workspace around it."
+                  body: "Upload a PDF, DOCX, DOC, or TXT file. No signup wall comes first."
                 },
                 {
                   step: "02",
-                  title: "Review the terms",
-                  body: "Get plain-language summaries, risk flags, and cross-partnership conflict warnings — no legalese."
+                  title: "See the breakdown",
+                  body: "Get the plain-English summary, risk watchouts, payment details, and deliverables."
                 },
                 {
                   step: "03",
-                  title: "Track everything after",
-                  body: "Deliverables, payment timing, and follow-up threads stay in one calm dashboard view."
+                  title: "Save and track it",
+                  body: "Create an account only when you want to keep the deal, manage follow-up, and return later."
                 }
               ].map((item) => (
-                <article
-                  key={item.step}
-                  className="app-surface p-6"
-                >
+                <article key={item.step} className="app-surface p-6">
                   <span className="text-[3rem] font-bold leading-none tracking-[-0.06em] text-primary/20 dark:text-[#8ec6b1]/20">
                     {item.step}
                   </span>
@@ -298,38 +314,40 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ── Final CTA ── */}
         <section className="bg-primary dark:bg-[#1a3d30]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 text-center sm:px-6 md:py-20 lg:px-8 lg:py-24">
             <p className="mx-auto mb-8 inline-block rounded-full bg-white/10 px-5 py-2 text-sm font-medium text-white/90 sm:mb-10">
-              One paid partnership can cover months of HelloBrand
+              The first upload takes less than 10 seconds
             </p>
             <h2 className="mx-auto max-w-[18ch] text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-white sm:text-[2.4rem] md:text-[3rem]">
-              Start your next partnership in a workspace that makes sense.
+              Don’t sign another contract blindly.
             </h2>
             <p className="mx-auto mt-4 max-w-[50ch] text-[0.95rem] leading-relaxed text-white/75 sm:mt-5 sm:text-[1.05rem]">
-              Review terms, keep every thread attached, and stay ahead of due
-              dates, all from one operating layer built for creators.
+              Start with one upload, understand the terms quickly, and save the deal
+              and create a workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
-              <Link
-                href="/login"
+              <PublicFunnelLink
+                href="/upload"
+                eventName="landing_upload_cta_clicked"
+                payload={{ location: "final_cta" }}
                 className="inline-flex h-12 items-center justify-center gap-2 bg-white px-7 text-[15px] font-semibold text-primary shadow-md transition hover:bg-white/92"
               >
-                Get started free
+                Upload Your First Contract
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/pricing"
+              </PublicFunnelLink>
+              <PublicFunnelLink
+                href="/sample"
+                eventName="landing_sample_cta_clicked"
+                payload={{ location: "final_cta" }}
                 className="inline-flex h-12 items-center justify-center border border-white/20 bg-white/[0.08] px-7 text-[15px] font-semibold text-white transition hover:bg-white/[0.14]"
               >
-                View pricing
-              </Link>
+                Try a Sample Contract
+              </PublicFunnelLink>
             </div>
           </div>
         </section>
 
-        {/* ── Footer ── */}
         <footer className="border-t border-black/[0.04] bg-white dark:border-white/[0.06] dark:bg-[#101318]">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-8 sm:text-sm lg:px-8">
             <p>&copy; 2026 HelloBrand</p>
@@ -340,8 +358,6 @@ export default async function LandingPage() {
     </div>
   );
 }
-
-/* ─── Shared atoms ─── */
 
 function Eyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -393,9 +409,7 @@ function SidebarItem({
   return (
     <div
       className={`flex h-9 items-center gap-3 px-3 text-[13px] font-medium ${
-        active
-          ? "bg-secondary/55 text-foreground"
-          : "text-muted-foreground"
+        active ? "bg-secondary/55 text-foreground" : "text-muted-foreground"
       }`}
     >
       <Icon
@@ -406,13 +420,10 @@ function SidebarItem({
   );
 }
 
-/* ─── Hero dashboard ─── */
-
 function HeroDashboard() {
   return (
     <div className="app-surface overflow-hidden shadow-[0_32px_80px_rgba(15,23,42,0.08)] dark:shadow-[0_32px_80px_rgba(0,0,0,0.35)]">
       <div className="grid lg:grid-cols-[210px_1fr]">
-        {/* Sidebar */}
         <aside className="hidden border-r border-black/[0.06] bg-white lg:block dark:border-white/[0.08] dark:bg-[#121419]">
           <div className="flex h-14 items-center border-b border-black/[0.06] px-5 dark:border-white/[0.08]">
             <div className="flex items-center gap-2.5">
@@ -454,36 +465,34 @@ function HeroDashboard() {
 
           <div className="border-t border-black/[0.06] px-4 py-3.5 dark:border-white/[0.08]">
             <div className="flex h-9 items-center justify-between bg-primary px-3 text-[12px] font-semibold text-white">
-              <span>New workspace</span>
+              <span>Save deal</span>
               <ChevronRight className="h-3.5 w-3.5" />
             </div>
           </div>
         </aside>
 
-        {/* Main area */}
         <div className="min-w-0">
           <div className="flex h-14 items-center border-b border-black/[0.06] bg-white px-5 dark:border-white/[0.08] dark:bg-[#121419]">
             <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-              <span>Workspace</span>
+              <span>Upload</span>
               <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-foreground">Dashboard</span>
+              <span className="text-foreground">Contract breakdown</span>
             </div>
           </div>
 
           <div className="workspace-dot-grid p-4 md:p-5">
-            {/* Greeting */}
             <div className="app-surface p-5">
-              <p className="text-[13px] text-muted-foreground">Friday, March 21</p>
+              <p className="text-[13px] text-muted-foreground">Anonymous preview</p>
               <h2 className="mt-2 text-[1.5rem] font-bold tracking-[-0.05em] text-foreground sm:text-[2rem] lg:text-[2.5rem]">
-                Good morning, Sarah
+                Northline creator agreement
               </h2>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-4">
                 {[
-                  ["Active workspaces", "4", "1 waiting on approval"],
-                  ["Tracked revenue", "$18,400", "Across 6 live partnerships"],
-                  ["Outstanding", "$2,150", "1 payment due this week"],
-                  ["Risk alerts", "2", "Usage and timing watchouts"]
+                  ["Deliverables", "5 items", "3 TikToks, 2 Stories"],
+                  ["Payment", "$2,500", "Net 60 after final post"],
+                  ["Risk flags", "2", "Usage rights and payment timing"],
+                  ["Status", "Needs review", "Before creator signs"]
                 ].map(([label, value, note]) => (
                   <div
                     key={label}
@@ -499,35 +508,33 @@ function HeroDashboard() {
               </div>
             </div>
 
-            {/* Tabs + content */}
-            <HeroTabRail items={["Overview", "Partnerships", "Deliverables", "Payments"]} />
+            <HeroTabRail items={["Summary", "Risks", "Deliverables", "Payment"]} />
 
             <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-              {/* Review queue */}
               <div className="app-surface p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Cross-workspace watchouts
+                      Watchouts
                     </p>
                     <h3 className="mt-1.5 text-[1.3rem] font-semibold tracking-[-0.04em] text-foreground">
-                      Quick review queue
+                      Clauses worth reviewing
                     </h3>
                   </div>
                   <span className="flex items-center gap-1.5 border border-accent/20 bg-accent/[0.06] px-2.5 py-1 text-[11px] font-medium text-accent dark:border-accent/30 dark:bg-accent/[0.1]">
-                    <CheckCircle2 className="h-3 w-3" />
+                    <AlertTriangle className="h-3 w-3" />
                     2 flagged
                   </span>
                 </div>
                 <div className="mt-4 space-y-3">
                   {[
                     {
-                      title: "Usage window overlaps spring sneaker campaign",
-                      note: "Paid usage extends beyond preferred six-week approval window."
+                      title: "Perpetual usage rights",
+                      note: "Brand can reuse the creator content forever unless the clause gets narrowed."
                     },
                     {
-                      title: "Invoice follow-up due for Studio Meridian retainer",
-                      note: "Payment due date is inside the next 7-day billing cycle."
+                      title: "Payment has no late-fee leverage",
+                      note: "Contract says net 60 but does not define a penalty or escalation if payment is late."
                     }
                   ].map((item) => (
                     <div
@@ -543,17 +550,16 @@ function HeroDashboard() {
                 </div>
               </div>
 
-              {/* This week + recent */}
               <div className="space-y-4">
                 <div className="app-surface p-5">
                   <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    This week
+                    Summary
                   </p>
                   <div className="mt-3 space-y-2.5">
                     {[
-                      ["Contract summary ready", "Creator collaboration brief"],
-                      ["1 invoice due Friday", "Northline launch flight"],
-                      ["2 deliverables upcoming", "Approval copy and live post"]
+                      ["3 TikTok posts", "Draft and publish by March 30"],
+                      ["2 Instagram stories", "Tag brand and include campaign link"],
+                      ["Final payment after approval", "Paid within 60 days of final accepted post"]
                     ].map(([title, body]) => (
                       <div
                         key={title}
@@ -569,16 +575,16 @@ function HeroDashboard() {
                 <div className="app-surface p-5">
                   <div className="flex items-center justify-between">
                     <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Recent workspaces
+                      Next step
                     </p>
-                    <span className="text-[12px] text-muted-foreground">View all</span>
+                    <span className="text-[12px] text-muted-foreground">Save to track</span>
                   </div>
                   <div className="mt-3 space-y-2.5">
                     {[
-                      ["Northline Spark launch", "Under review", "$4,800"],
-                      ["Studio Meridian edit", "Awaiting approval", "$3,250"],
-                      ["Coastline matcha package", "Paid", "$2,900"]
-                    ].map(([title, status, amount]) => (
+                      ["Keep this deal", "Turn the breakdown into a saved workspace"],
+                      ["Track deliverables", "Use the contract terms as a checklist"],
+                      ["Follow up on payment", "Come back when payout timing matters"]
+                    ].map(([title, status]) => (
                       <div
                         key={title}
                         className="flex items-center justify-between gap-3 border border-black/[0.06] bg-[#fcfbf9] px-3.5 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.02]"
@@ -587,7 +593,7 @@ function HeroDashboard() {
                           <p className="truncate text-[13px] font-medium text-foreground">{title}</p>
                           <p className="text-[12px] text-muted-foreground">{status}</p>
                         </div>
-                        <span className="text-[13px] font-semibold text-foreground">{amount}</span>
+                        <span className="text-[13px] font-semibold text-foreground">Ready</span>
                       </div>
                     ))}
                   </div>
@@ -601,68 +607,63 @@ function HeroDashboard() {
   );
 }
 
-/* ─── Preview: Partnerships ─── */
-
 function PartnershipsPreview() {
   return (
-    <PreviewChrome title="Partnerships">
+    <PreviewChrome title="Sample contract">
       <div className="app-surface p-4 sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Workspace</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Example breakdown
+            </p>
             <h3 className="mt-1.5 text-[1.4rem] font-bold tracking-[-0.04em] text-foreground sm:text-[1.6rem]">
-              All partnerships
+              Brand deal, translated
             </h3>
           </div>
           <span className="inline-flex h-9 items-center bg-primary px-4 text-[13px] font-semibold text-white">
-            New workspace
+            Plain English
           </span>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 md:grid-cols-4">
           {[
-            ["Total partnerships", "6"],
-            ["Active", "4"],
-            ["Tracked", "$18,400"],
-            ["Avg size", "$3,066"]
-          ].map(([label, value]) => (
+            ["Summary", "5 items", "3 TikToks + 2 Stories"],
+            ["Payment", "$2.5K", "Net 60 after approval"],
+            ["Deadline", "Mar 30", "Final post due"],
+            ["Risks", "2 flags", "Usage + payment terms"]
+          ].map(([label, value, note]) => (
             <div
               key={label}
-              className="border border-black/[0.06] bg-[#fcfbf9] p-3 dark:border-white/[0.08] dark:bg-white/[0.02]"
+              className="flex min-h-[108px] flex-col justify-between border border-black/[0.06] bg-[#fcfbf9] p-3 dark:border-white/[0.08] dark:bg-white/[0.02]"
             >
               <p className="text-[11px] text-muted-foreground sm:text-[12px]">{label}</p>
-              <p className="mt-2 text-[1.1rem] font-bold tracking-[-0.04em] text-foreground sm:mt-3 sm:text-[1.4rem]">
+              <p className="mt-2 text-[1.05rem] font-bold tracking-[-0.04em] text-foreground sm:mt-3 sm:text-[1.25rem]">
                 {value}
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                {note}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="mt-4 overflow-x-auto sm:mt-5">
-          <div className="min-w-[520px] border border-black/[0.06] dark:border-white/[0.08]">
-            <div className="grid grid-cols-[1.1fr_1.3fr_0.8fr_0.9fr_0.9fr] gap-3 bg-[#f9f8f6] px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground dark:bg-white/[0.02]">
-              <span>Brand</span>
-              <span>Campaign</span>
-              <span>Amount</span>
-              <span>Status</span>
-              <span>Risks</span>
-            </div>
-            {[
-              ["Northline", "Spring creator launch", "$4,800", "Under review", "3 flags"],
-              ["Studio Meridian", "Weekly edit package", "$3,250", "Approval", "1 flag"],
-              ["Cedar Goods", "Home refresh reel", "$2,900", "Paid", "0 flags"]
-            ].map(([brand, campaign, amount, status, risks]) => (
-              <div
-                key={campaign}
-                className="grid grid-cols-[1.1fr_1.3fr_0.8fr_0.9fr_0.9fr] gap-3 border-t border-black/[0.06] bg-white px-4 py-3 text-[13px] dark:border-white/[0.08] dark:bg-[#13181d]"
-              >
-                <span className="font-medium text-foreground">{brand}</span>
-                <span className="text-muted-foreground">{campaign}</span>
-                <span className="font-medium text-foreground">{amount}</span>
-                <span className="text-accent dark:text-accent">{status}</span>
-                <span className="text-muted-foreground">{risks}</span>
-              </div>
-            ))}
+        <div className="mt-4 grid gap-3 sm:mt-5">
+          <div className="border border-black/[0.06] bg-white p-4 dark:border-white/[0.08] dark:bg-[#13181d]">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              Summary
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-foreground">
+              You are required to post 3 TikToks and 2 Instagram stories by March 30.
+            </p>
+          </div>
+          <div className="border border-black/[0.06] bg-white p-4 dark:border-white/[0.08] dark:bg-[#13181d]">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+              Risks
+            </p>
+            <p className="mt-2 text-[13px] leading-relaxed text-foreground">
+              Brand has perpetual usage rights and the contract does not add clear
+              leverage for late payment.
+            </p>
           </div>
         </div>
       </div>
@@ -670,15 +671,15 @@ function PartnershipsPreview() {
   );
 }
 
-/* ─── Preview: Inbox ─── */
-
 function InboxPreview() {
   return (
-    <PreviewChrome title="Inbox">
+    <PreviewChrome title="Saved workspace">
       <div className="app-surface p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Linked inbox</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Linked inbox
+            </p>
             <h3 className="mt-1.5 text-[1.2rem] font-semibold tracking-[-0.04em] text-foreground sm:text-[1.3rem]">
               Partnership threads
             </h3>
@@ -690,9 +691,24 @@ function InboxPreview() {
 
         <div className="mt-4 space-y-2.5">
           {[
-            { title: "Northline campaign follow-up", note: "Linked to spring creator launch", time: "5m ago", active: true },
-            { title: "Studio Meridian revision", note: "Possible match for weekly edit", time: "22m ago", active: false },
-            { title: "Cedar Goods invoice question", note: "Linked to home refresh reel", time: "1h ago", active: false }
+            {
+              title: "Northline campaign follow-up",
+              note: "Linked to spring creator launch",
+              time: "5m ago",
+              active: true
+            },
+            {
+              title: "Studio Meridian revision",
+              note: "Possible match for weekly edit",
+              time: "22m ago",
+              active: false
+            },
+            {
+              title: "Cedar Goods invoice question",
+              note: "Linked to home refresh reel",
+              time: "1h ago",
+              active: false
+            }
           ].map((thread) => (
             <div
               key={thread.title}
@@ -716,8 +732,6 @@ function InboxPreview() {
     </PreviewChrome>
   );
 }
-
-/* ─── Preview: Payments ─── */
 
 function PaymentsPreview() {
   return (

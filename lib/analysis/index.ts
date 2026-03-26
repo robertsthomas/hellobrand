@@ -17,13 +17,16 @@ export async function analyzeDocument(
   }
 
   try {
-    const riskFlags = await analyzeRisksWithLlm(
-      text,
-      fallback.classification.documentKind,
-      fallback.extraction,
-      fallback.riskFlags,
-      "pending-document"
-    );
+    const shouldRunRiskLlm = fallback.classification.documentKind === "contract";
+    const riskFlags = shouldRunRiskLlm
+      ? await analyzeRisksWithLlm(
+          text,
+          fallback.classification.documentKind,
+          fallback.extraction,
+          fallback.riskFlags,
+          "pending-document"
+        )
+      : fallback.riskFlags;
     const summary = await generateSummaryWithLlm(
       fallback.extraction,
       riskFlags,

@@ -293,3 +293,26 @@ export const profileInputSchema = z.object({
   emailNotificationsEnabled: z.boolean().optional(),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()
 });
+
+export const publicFunnelEventNames = [
+  "landing_upload_cta_clicked",
+  "landing_sample_cta_clicked",
+  "sample_scroll_depth",
+  "sample_upload_cta_clicked",
+  "anonymous_upload_started",
+  "anonymous_upload_succeeded",
+  "anonymous_upload_failed",
+  "anonymous_save_cta_clicked",
+  "anonymous_auth_returned",
+  "anonymous_claim_succeeded",
+  "anonymous_claim_failed"
+] as const;
+
+export const publicFunnelEventSchema = z.object({
+  name: z.enum(publicFunnelEventNames),
+  payload: z.record(z.string(), z.unknown()).optional().default({})
+});
+
+export const publicAnonymousClaimSchema = z.object({
+  analysisToken: z.string().min(10).max(255)
+});

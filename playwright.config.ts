@@ -33,7 +33,9 @@ export default defineConfig({
       NEXT_DIST_DIR: `.next/e2e-${project.tier}`,
       NEXT_PUBLIC_APP_URL: project.baseURL,
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
+        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
+        "pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk",
+      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? "sk_test_ZXhhbXBsZQ",
       HELLOBRAND_DEV_PLAN: project.tier,
       HELLOBRAND_E2E_ENABLED: "1",
       HELLOBRAND_E2E_AUTH_SECRET: E2E_LOCAL_AUTH_SECRET,

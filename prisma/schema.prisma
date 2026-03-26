@@ -78,6 +78,46 @@ model User {
   notificationEmailDeliveries NotificationEmailDelivery[]
 }
 
+model AnonymousAnalysisSession {
+  id              String    @id @default(uuid())
+  token           String    @unique
+  fileName        String
+  mimeType        String
+  sourceType      String
+  visitorId       String?
+  ipHash          String?
+  fileHash        String?
+  storagePath     String?
+  rawText         String?
+  normalizedText  String
+  analysisJson    Json
+  breakdownJson   Json
+  claimedByUserId String?
+  claimedDealId   String?
+  claimedAt       DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([expiresAt])
+  @@index([claimedAt, expiresAt])
+  @@index([visitorId, fileHash, expiresAt])
+  @@index([visitorId, createdAt])
+  @@index([ipHash, createdAt])
+}
+
+model AnonymousUploadLedger {
+  id        String   @id @default(uuid())
+  visitorId String
+  ipHash    String
+  fileHash  String
+  createdAt DateTime @default(now())
+
+  @@index([visitorId, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([visitorId, fileHash, createdAt])
+}
+
 model Deal {
   id                  String    @id @default(uuid())
   userId              String
