@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { getEmailThreadForViewer } from "@/lib/email/service";
 import { getPersistedReplySuggestionsForThread } from "@/lib/email/reply-suggestion-cache";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }
-) {
+  ) {
   try {
     const viewer = await requireApiViewer();
+    await assertViewerHasFeature(viewer, "premium_inbox");
     const { threadId } = await params;
     const thread = await getEmailThreadForViewer(viewer, threadId);
 

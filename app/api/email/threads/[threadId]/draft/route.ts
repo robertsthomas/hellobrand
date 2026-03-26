@@ -5,6 +5,8 @@ import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";
 import { draftReplyForViewer } from "@/lib/email/service";
 
+export const maxDuration = 60;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ threadId: string }> }

@@ -115,10 +115,7 @@ export function getEmailSummaryModel() {
 export function getEmailDraftModel() {
   return (
     process.env.OPENROUTER_MODEL_EMAIL_DRAFT ||
-    process.env.LLM_MODEL_SUMMARY ||
-    process.env.OPENROUTER_MODEL_SUMMARY ||
-    process.env.LLM_MODEL ||
-    process.env.OPENROUTER_MODEL ||
-    "openai/gpt-5-chat"
+    process.env.LLM_MODEL_EMAIL_DRAFT ||
+    "google/gemini-2.5-flash"
   );
 }

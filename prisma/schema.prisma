@@ -57,23 +57,24 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  profile               Profile?
-  intakeSessions        IntakeSession[]
-  intakeBatches         IntakeBatch[]
-  deals                 Deal[]
-  emailAccounts         ConnectedEmailAccount[]
-  emailCandidateMatches EmailDealCandidateMatch[]
-  emailDealEvents       EmailDealEvent[]
-  emailTermSuggestions  EmailDealTermSuggestion[]
-  emailActionItems      EmailActionItem[]
-  emailReplySuggestions EmailThreadReplySuggestionCache[]
-  emailThreadPreviewStates EmailThreadPreviewState[]
-  brandContacts         BrandContact[]
-  assistantThreads      AssistantThread[]
-  assistantSnapshots    AssistantContextSnapshot[]
-  billingAccount        BillingAccount?
-  onboardingState       UserOnboardingState?
-  appNotifications      AppNotification[]
+  profile                     Profile?
+  intakeSessions              IntakeSession[]
+  intakeBatches               IntakeBatch[]
+  deals                       Deal[]
+  emailAccounts               ConnectedEmailAccount[]
+  emailCandidateMatches       EmailDealCandidateMatch[]
+  emailDealEvents             EmailDealEvent[]
+  emailTermSuggestions        EmailDealTermSuggestion[]
+  emailActionItems            EmailActionItem[]
+  emailThreadPreviewStates    EmailThreadPreviewState[]
+  brandContacts               BrandContact[]
+  assistantThreads            AssistantThread[]
+  assistantSnapshots          AssistantContextSnapshot[]
+  billingAccount              BillingAccount?
+  aiUsageEvents               AiUsageEvent[]
+  aiCacheEntries              AiCacheEntry[]
+  onboardingState             UserOnboardingState?
+  appNotifications            AppNotification[]
   notificationEmailDeliveries NotificationEmailDelivery[]
 }
 
@@ -380,7 +381,6 @@ model EmailThread {
   dealEvents       EmailDealEvent[]
   termSuggestions  EmailDealTermSuggestion[]
   actionItems      EmailActionItem[]
-  replySuggestions EmailThreadReplySuggestionCache[]
   previewStates    EmailThreadPreviewState[]
 
   @@unique([accountId, providerThreadId])
@@ -560,32 +560,16 @@ model EmailActionItem {
   @@index([threadId])
 }
 
-model EmailThreadReplySuggestionCache {
-  id            String   @id @default(uuid())
-  userId        String
-  threadId      String
-  threadVersion String
-  suggestionsJson Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, threadId, threadVersion])
-  @@index([userId, threadId, updatedAt])
-}
-
 model EmailThreadPreviewState {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   userId               String
   threadId             String
   previewUpdatesSeenAt DateTime?
   actionItemsSeenAt    DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@unique([userId, threadId])
@@ -631,22 +615,22 @@ model Job {
 }
 
 model Profile {
-  id                      String   @id @default(uuid())
-  userId                  String   @unique
-  displayName             String?
-  creatorLegalName        String?
-  businessName            String?
-  contactEmail            String?
-  preferredSignature      String?
-  payoutDetails           String?
-  defaultCurrency         String?
-  reminderLeadDays        Int?
-  conflictAlertsEnabled   Boolean  @default(true)
-  paymentRemindersEnabled Boolean  @default(true)
-  emailNotificationsEnabled Boolean @default(false)
-  accentColor             String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                        String   @id @default(uuid())
+  userId                    String   @unique
+  displayName               String?
+  creatorLegalName          String?
+  businessName              String?
+  contactEmail              String?
+  preferredSignature        String?
+  payoutDetails             String?
+  defaultCurrency           String?
+  reminderLeadDays          Int?
+  conflictAlertsEnabled     Boolean  @default(true)
+  paymentRemindersEnabled   Boolean  @default(true)
+  emailNotificationsEnabled Boolean  @default(false)
+  accentColor               String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   auditEvents ProfileAuditEvent[]
@@ -680,7 +664,7 @@ model UserOnboardingState {
 }
 
 model AppNotification {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
   category     String
   eventType    String
@@ -691,13 +675,13 @@ model AppNotification {
   title        String
   body         String
   href         String
-  status       String   @default("active")
+  status       String    @default("active")
   readAt       DateTime?
   clearedAt    DateTime?
   supersededAt DateTime?
   dedupeKey    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   deal          Deal?                      @relation(fields: [dealId], references: [id], onDelete: SetNull)
@@ -712,8 +696,8 @@ model AppNotification {
 }
 
 model NotificationEmailDelivery {
-  id                String   @id @default(uuid())
-  appNotificationId String   @unique
+  id                String    @id @default(uuid())
+  appNotificationId String    @unique
   userId            String
   recipientEmail    String
   provider          String
@@ -721,8 +705,8 @@ model NotificationEmailDelivery {
   status            String
   errorMessage      String?
   sentAt            DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   appNotification AppNotification @relation(fields: [appNotificationId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -741,11 +725,11 @@ model IntakeSession {
   draftCampaignName    String?
   draftNotes           String?
   draftPastedText      String?
-  draftPastedTextTitle    String?
-  duplicateCheckStatus    String?
-  duplicateMatchJson      Json?
-  completedAt             DateTime?
-  expiresAt               DateTime?
+  draftPastedTextTitle String?
+  duplicateCheckStatus String?
+  duplicateMatchJson   Json?
+  completedAt          DateTime?
+  expiresAt            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -809,6 +793,7 @@ model BillingAccount {
   subscriptions BillingSubscription[]
   trialLedgers  BillingTrialLedger[]
   usageLedgers  BillingUsageLedger[]
+  aiUsageEvents AiUsageEvent[]
   webhookEvents BillingWebhookEvent[]
 
   @@index([currentPlanTier, currentSubscriptionStatus])
@@ -887,6 +872,62 @@ model BillingUsageLedger {
 
   @@unique([billingAccountId, featureKey, windowKey])
   @@index([billingAccountId, periodEnd])
+}
+
+model AiUsageEvent {
+  id               String   @id @default(uuid())
+  userId           String?
+  billingAccountId String?
+  featureKey       String
+  taskKey          String
+  provider         String
+  requestedModel   String
+  resolvedModel    String
+  status           String
+  cacheStatus      String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  estimatedCostUsd Float    @default(0)
+  requestKey       String
+  inputHash        String
+  metadataJson     Json?
+  createdAt        DateTime @default(now())
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  billingAccount BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([billingAccountId, createdAt])
+  @@index([featureKey, taskKey, createdAt])
+  @@index([taskKey, createdAt])
+  @@index([requestKey])
+}
+
+model AiCacheEntry {
+  id               String   @id @default(uuid())
+  userId           String?
+  featureKey       String
+  taskKey          String
+  scopeKey         String
+  inputHash        String
+  promptVersion    String
+  routeVersion     String
+  requestedModel   String
+  resolvedModel    String
+  payloadJson      Json
+  usageJson        Json?
+  estimatedCostUsd Float    @default(0)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([featureKey, taskKey, scopeKey, inputHash, promptVersion, routeVersion])
+  @@index([userId, taskKey, updatedAt])
+  @@index([taskKey, expiresAt])
+  @@index([expiresAt])
 }
 
 model BillingWebhookEvent {

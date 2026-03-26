@@ -74,14 +74,6 @@ export function GuideProvider({
     () => new Set(initialGuideState.completedStepIds)
   );
 
-  useEffect(() => {
-    setDismissedStepIds(new Set(initialGuideState.dismissedStepIds));
-    setCompletedStepIds(new Set(initialGuideState.completedStepIds));
-  }, [
-    initialGuideState.dismissedStepIds,
-    initialGuideState.completedStepIds
-  ]);
-
   // lg breakpoint matches the sidebar visibility (hidden lg:flex)
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {

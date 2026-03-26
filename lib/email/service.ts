@@ -52,9 +52,9 @@ import {
   listEmailThreadsForUser,
   listLinkedEmailThreadsForDeal,
   markEmailCandidateMatchForDealThread,
+  replaceEmailDealEventsForMessage,
   saveConnectedEmailAccount,
   saveEmailActionItem,
-  saveEmailDealEvent,
   saveEmailDealTermSuggestion,
   saveEmailRiskFlag,
   saveEmailThreadSummary,
@@ -386,18 +386,13 @@ async function processLinkedThreadUpdates(
       for (const message of thread.messages) {
         // 1. Existing: detect important events
         const events = detectImportantEmailEvents(message);
-        for (const event of events) {
-          await saveEmailDealEvent({
-            userId: viewer.id,
-            dealId: link.dealId,
-            threadId: thread.thread.id,
-            messageId: message.id,
-            category: event.category,
-            title: event.title,
-            body: event.body,
-            metadata: event.metadata
-          });
-        }
+        await replaceEmailDealEventsForMessage({
+          userId: viewer.id,
+          dealId: link.dealId,
+          threadId: thread.thread.id,
+          messageId: message.id,
+          events
+        });
 
         // 2. Existing: extract and apply term suggestions
         const suggestion = buildEmailTermSuggestion(aggregate, thread, message);

@@ -1,5 +1,10 @@
 import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from "ai";
 
+import {
+  buildAiInputHash,
+  finalizeAiStreamExecution,
+  prepareAiStreamExecution
+} from "@/lib/ai/gateway";
 import { assistantMessageText, assistantRecordsToUIMessages } from "@/lib/assistant/messages";
 import { buildAssistantPrompt } from "@/lib/assistant/prompt";
 import { assistantProvider } from "@/lib/assistant/provider";
@@ -55,12 +60,6 @@ export async function streamAssistantResponse(input: {
   context: AssistantClientContext;
   scope: AssistantScope;
 }) {
-  const provider = assistantProvider();
-
-  if (!provider) {
-    throw new Error("No assistant model provider configured.");
-  }
-
   const repository = getRepository();
   const userSnapshot = await ensureAssistantSnapshot(input.viewer, "user");
   const dealSnapshot =
@@ -69,12 +68,42 @@ export async function streamAssistantResponse(input: {
       : null;
   const uiMessages = assistantRecordsToUIMessages(input.persistedMessages);
   const modelMessages = await convertToModelMessages(uiMessages);
+  const prepared = await prepareAiStreamExecution({
+    userId: input.viewer.id,
+    taskKey: "assistant_chat",
+    featureKey: "assistant_chat",
+    metadata: {
+      scope: input.scope,
+      threadId: input.thread.id
+    }
+  });
+
+  if (prepared.budgetDecision === "blocked") {
+    throw new Error("Assistant AI is temporarily unavailable due to current usage limits.");
+  }
+
+  const provider = assistantProvider(prepared.fallbacks);
+
+  if (!provider) {
+    throw new Error("No assistant model provider configured.");
+  }
+
+  const inputHash = buildAiInputHash({
+    viewerId: input.viewer.id,
+    scope: input.scope,
+    context: input.context,
+    messages: input.persistedMessages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content
+    }))
+  });
 
   const result = streamText({
-    model: provider.chat("anthropic/claude-sonnet-4.6", {
+    model: provider.chat(prepared.requestedModel, {
       user: input.viewer.id,
       provider: {
-        allow_fallbacks: true,
+        allow_fallbacks: prepared.fallbacks.length > 0,
         data_collection: "deny",
         zdr: true
       },
@@ -90,6 +119,7 @@ export async function streamAssistantResponse(input: {
       userSnapshotSummary: userSnapshot?.summary ?? null
     }),
     messages: modelMessages,
+    maxOutputTokens: prepared.maxTokens,
     temperature: 0.2,
     stopWhen: stepCountIs(5),
     tools: buildAssistantTools({
@@ -103,6 +133,31 @@ export async function streamAssistantResponse(input: {
   return result.toUIMessageStreamResponse({
     originalMessages: uiMessages,
     onFinish: async ({ messages }) => {
+      const [usage, response] = await Promise.all([
+        result.totalUsage,
+        result.response
+      ]);
+
+      await finalizeAiStreamExecution({
+        context: {
+          userId: input.viewer.id,
+          taskKey: "assistant_chat",
+          featureKey: "assistant_chat",
+          metadata: {
+            scope: input.scope,
+            threadId: input.thread.id
+          }
+        },
+        prepared,
+        usage: {
+          promptTokens: usage.inputTokens ?? 0,
+          completionTokens: usage.outputTokens ?? 0,
+          totalTokens: usage.totalTokens ?? 0
+        },
+        resolvedModel: response.modelId ?? prepared.requestedModel,
+        inputHash
+      });
+
       await persistAssistantMessages({
         viewerId: input.viewer.id,
         threadId: input.thread.id,

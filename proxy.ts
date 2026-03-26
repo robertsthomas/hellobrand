@@ -13,6 +13,9 @@ function isMaintenanceAllowedPath(pathname: string) {
     pathname === "/waitlist" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/webhooks") ||
+    pathname.startsWith("/api/email/google/callback") ||
+    pathname.startsWith("/api/email/outlook/callback") ||
+    pathname.startsWith("/api/email/yahoo/callback") ||
     pathname === "/favicon.ico" ||
     pathname === "/icon"
   );

@@ -876,7 +876,7 @@ export async function saveSyncedEmailThread(
     return tx.emailThread.findUniqueOrThrow({
       where: { id: thread.id }
     });
-  });
+  }, { timeout: 30000 });
 
   return toThreadRecord(result);
 }
@@ -942,7 +942,8 @@ export async function listEmailThreadsForUser(
           status: "pending"
         },
         select: {
-          id: true
+          id: true,
+          updatedAt: true
         }
       },
       actionItems: {
@@ -972,10 +973,11 @@ export async function listEmailThreadsForUser(
       thread: toThreadRecord(row),
       account: toAccountRecord(row.account),
       links: row.dealLinks.map(toLinkView),
-      importantEventCount: row.dealEvents.length,
+      importantEventCount: row.dealEvents.length + row.termSuggestions.length,
       latestImportantEventAt:
-        row.dealEvents
+        [...row.dealEvents, ...row.termSuggestions]
           .map((event) => iso(event.updatedAt))
+          .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
           .find((value): value is string => Boolean(value)) ?? null,
       pendingTermSuggestionCount: row.termSuggestions.length,
       pendingActionItemCount: row.actionItems.length,
@@ -1103,7 +1105,10 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
             where: {
               status: "pending"
             },
-            select: { id: true }
+            select: {
+              id: true,
+              updatedAt: true
+            }
           },
           actionItems: {
             where: {
@@ -1140,10 +1145,11 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
     thread: toThreadRecord(row.thread),
     account: toAccountRecord(row.thread.account),
     links: row.thread.dealLinks.map(toLinkView),
-    importantEventCount: row.thread.dealEvents.length,
+    importantEventCount: row.thread.dealEvents.length + row.thread.termSuggestions.length,
     latestImportantEventAt:
-      row.thread.dealEvents
+      [...row.thread.dealEvents, ...row.thread.termSuggestions]
         .map((event) => iso(event.updatedAt))
+        .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
         .find((value): value is string => Boolean(value)) ?? null,
     pendingTermSuggestionCount: row.thread.termSuggestions.length,
     pendingActionItemCount: row.thread.actionItems.length,
@@ -1479,6 +1485,61 @@ export async function saveEmailDealEvent(input: {
   });
 
   return toDealEventRecord(saved);
+}
+
+export async function replaceEmailDealEventsForMessage(input: {
+  userId: string;
+  dealId: string;
+  threadId: string;
+  messageId: string;
+  events: Array<{
+    category: EmailDealEventRecord["category"];
+    title: string;
+    body: string;
+    metadata?: Record<string, unknown>;
+  }>;
+}) {
+  const categories = [...new Set(input.events.map((event) => event.category))];
+
+  if (categories.length === 0) {
+    await prisma.emailDealEvent.deleteMany({
+      where: {
+        userId: input.userId,
+        dealId: input.dealId,
+        threadId: input.threadId,
+        messageId: input.messageId
+      }
+    });
+
+    return [];
+  }
+
+  await prisma.emailDealEvent.deleteMany({
+    where: {
+      userId: input.userId,
+      dealId: input.dealId,
+      threadId: input.threadId,
+      messageId: input.messageId,
+      category: {
+        notIn: categories
+      }
+    }
+  });
+
+  return Promise.all(
+    input.events.map((event) =>
+      saveEmailDealEvent({
+        userId: input.userId,
+        dealId: input.dealId,
+        threadId: input.threadId,
+        messageId: input.messageId,
+        category: event.category,
+        title: event.title,
+        body: event.body,
+        metadata: event.metadata
+      })
+    )
+  );
 }
 
 export async function listEmailDealEventsForThread(userId: string, threadId: string) {

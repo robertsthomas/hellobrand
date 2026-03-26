@@ -1,35 +1,6 @@
-import OpenAI from "openai";
-
-import { getEmailDraftModel, getEmailSummaryModel } from "@/lib/email/config";
+import { aiCachePolicy, runOpenRouterTask } from "@/lib/ai/gateway";
+import { buildEmailThreadVersion } from "@/lib/email/reply-suggestion-version";
 import type { DealAggregate, EmailThreadDetail, NegotiationStance, ProfileRecord } from "@/lib/types";
-
-function providerConfig() {
-  if (!process.env.OPENROUTER_API_KEY) {
-    return null;
-  }
-
-  return {
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer":
-        process.env.OPENROUTER_SITE_URL ||
-        process.env.INTEGRATIONS_APP_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3011",
-      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
-    }
-  };
-}
-
-function client() {
-  const config = providerConfig();
-  if (!config) {
-    return null;
-  }
-
-  return new OpenAI(config);
-}
 
 function plainTextThread(thread: EmailThreadDetail) {
   return thread.messages
@@ -115,33 +86,37 @@ function workspaceContext(partnership: DealAggregate | null) {
     documents || "- None",
     "",
     "Workspace extracted structure:",
-    extractionEvidence || "- None",
+    extractionEvidence || "- None"
   ].join("\n");
 }
 
 export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
-  const api = client();
-  if (!api) {
-    return fallbackSummary(thread);
-  }
-
-  const response = await api.chat.completions.create({
-    model: getEmailSummaryModel(),
-    temperature: 0.2,
-    messages: [
-      {
-        role: "system",
-        content:
-          "Summarize the email thread for a creator managing brand partnerships. Keep it concise, factual, and useful. Call out asks, commitments, payment/timeline/usage-rights signals, and next steps. Never use em dashes (—) or en dashes (–); use commas, periods, or semicolons instead."
-      },
-      {
-        role: "user",
-        content: plainTextThread(thread)
-      }
-    ]
+  const fallback = fallbackSummary(thread);
+  const threadText = plainTextThread(thread);
+  const cache = aiCachePolicy({
+    taskKey: "email_summary",
+    scopeKey: `email-thread:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
+    input: {
+      threadId: thread.thread.id,
+      threadText
+    }
   });
 
-  return response.choices[0]?.message?.content?.trim() || fallbackSummary(thread);
+  const result = await runOpenRouterTask<string>({
+    context: {
+      featureKey: "premium_inbox",
+      taskKey: "email_summary"
+    },
+    systemPrompt:
+      "Summarize the email thread for a creator managing brand partnerships. Keep it concise, factual, and useful. Call out asks, commitments, payment or timeline signals, usage-rights signals, and next steps. Never use em dashes or en dashes; use commas, periods, or semicolons instead.",
+    userPrompt: threadText,
+    temperature: 0.2,
+    cache,
+    parse: (content) => content.trim() || fallback,
+    serialize: (value) => value
+  });
+
+  return result?.data ?? fallback;
 }
 
 function fallbackDraft(
@@ -192,11 +167,7 @@ export async function generateEmailReplyDraft(
   instructions?: string | null,
   currentDraft?: { subject: string; body: string } | null
 ) {
-  const api = client();
-  if (!api) {
-    return fallbackDraft(thread, partnership, profile, instructions, currentDraft);
-  }
-
+  const fallback = fallbackDraft(thread, partnership, profile, instructions, currentDraft);
   const discrepancyContext = thread.promiseDiscrepancies.length > 0
     ? thread.promiseDiscrepancies.map((d) => `- ${d.field}: email says "${d.emailClaim}", contract says "${d.contractValue}"`).join("\n")
     : "- None";
@@ -206,117 +177,140 @@ export async function generateEmailReplyDraft(
     : "- None";
 
   const stanceInstruction = stance === "firm"
-    ? "\nStance: FIRM — Reference specific contract clauses, politely decline scope creep, hold boundaries on agreed terms. Be professional but clear about what was agreed."
+    ? "\nStance: FIRM. Reference specific contract clauses, politely decline scope creep, and hold boundaries on agreed terms. Be professional but clear about what was agreed."
     : stance === "collaborative"
-    ? "\nStance: COLLABORATIVE — Acknowledge the request, express willingness to discuss, suggest compromises while protecting key terms. Warm but aware."
-    : stance === "exploratory"
-    ? "\nStance: EXPLORATORY — Ask clarifying questions, express interest without commitment, gather more information before responding substantively."
-    : "";
+      ? "\nStance: COLLABORATIVE. Acknowledge the request, express willingness to discuss, and suggest compromises while protecting key terms."
+      : stance === "exploratory"
+        ? "\nStance: EXPLORATORY. Ask clarifying questions, express interest without commitment, and gather more information before responding substantively."
+        : "";
   const instructionContext = instructions?.trim() || "None";
   const currentDraftContext = currentDraft?.body?.trim()
     ? `Current draft subject: ${currentDraft.subject.trim()}\nCurrent draft body:\n${currentDraft.body.trim()}`
     : "None";
-
-  const response = await api.chat.completions.create({
-    model: getEmailDraftModel(),
-    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
-    messages: [
-      {
-        role: "system",
-        content: `Write a concise creator-professional email reply. Use the linked workspace context as the primary business context for the email, not only the inbox thread history. The custom user prompt is optional and applies only to this next draft. If a custom user prompt is present, follow it when it does not conflict with the linked workspace facts. If it conflicts with workspace facts, preserve the workspace facts and incorporate the custom prompt as far as safely possible. Never invent commitments, approvals, dates, deliverables, usage rights, payment terms, or legal positions. Keep the tone practical and clear. Write plain email prose only, not markdown. Do not use bold, bullets, numbered lists, headings, or placeholder names like [Brand Name] or [Agency Name]. If you do not know the recipient name, use a normal generic greeting like "Hi there,". If a current draft is provided, revise that draft instead of starting from scratch unless the context requires a substantial rewrite.${stanceInstruction}\n\nReturn JSON with subject and body.`
-      },
-      {
-        role: "user",
-        content: [
-          "Linked workspace context:",
-          workspaceContext(partnership),
-          "",
-          "Email vs contract discrepancies from this thread:",
-          discrepancyContext,
-          "",
-          "Pending action items from this thread:",
-          actionContext,
-          "",
-          "Current draft to revise:",
-          currentDraftContext,
-          "",
-          "Custom user prompt for this next draft only:",
-          instructionContext,
-          "",
-          `Profile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}`,
-          "",
-          `Current thread:\n${plainTextThread(thread)}`,
-        ].join("\n")
-      }
-    ],
-    response_format: { type: "json_object" }
+  const threadText = plainTextThread(thread);
+  const cache = aiCachePolicy({
+    taskKey: "email_draft",
+    scopeKey: [
+      "email-draft",
+      thread.thread.id,
+      buildEmailThreadVersion(thread.thread),
+      partnership?.deal.id ?? "no-deal",
+      partnership?.deal.updatedAt ?? "no-deal-version"
+    ].join(":"),
+    input: {
+      discrepancyContext,
+      actionContext,
+      currentDraftContext,
+      instructionContext,
+      stance: stance ?? null,
+      workspaceContext: workspaceContext(partnership),
+      signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
+      threadText
+    }
   });
 
-  try {
-    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as {
-      subject?: string;
-      body?: string;
-    };
+  const result = await runOpenRouterTask<{ subject: string; body: string }>({
+    context: {
+      featureKey: "premium_inbox",
+      taskKey: "email_draft"
+    },
+    systemPrompt: `Write a concise creator-professional email reply. Use the linked workspace context as the primary business context for the email, not only the inbox thread history. The custom user prompt is optional and applies only to this next draft. If a custom user prompt is present, follow it when it does not conflict with the linked workspace facts. If it conflicts with workspace facts, preserve the workspace facts and incorporate the custom prompt as far as safely possible. Never invent commitments, approvals, dates, deliverables, usage rights, payment terms, or legal positions. Keep the tone practical and clear. Write plain email prose only, not markdown. Do not use bold, bullets, numbered lists, headings, or placeholder names like [Brand Name] or [Agency Name]. If you do not know the recipient name, use a normal generic greeting like "Hi there,". If a current draft is provided, revise that draft instead of starting from scratch unless the context requires a substantial rewrite.${stanceInstruction}\n\nReturn JSON with subject and body.`,
+    userPrompt: [
+      "Linked workspace context:",
+      workspaceContext(partnership),
+      "",
+      "Email vs contract discrepancies from this thread:",
+      discrepancyContext,
+      "",
+      "Pending action items from this thread:",
+      actionContext,
+      "",
+      "Current draft to revise:",
+      currentDraftContext,
+      "",
+      "Custom user prompt for this next draft only:",
+      instructionContext,
+      "",
+      `Profile signature:\n${profile.preferredSignature ?? profile.displayName ?? "Creator"}`,
+      "",
+      `Current thread:\n${threadText}`
+    ].join("\n"),
+    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
+    responseFormat: { type: "json_object" },
+    cache,
+    parse: (content) => {
+      try {
+        const parsed = JSON.parse(content) as {
+          subject?: string;
+          body?: string;
+        };
 
-    if (parsed.subject?.trim() && parsed.body?.trim()) {
-      return {
-        subject: normalizeEmailDraftText(parsed.subject),
-        body: normalizeEmailDraftText(parsed.body)
-      };
-    }
-  } catch {
-    // fall through to fallback
-  }
+        if (parsed.subject?.trim() && parsed.body?.trim()) {
+          return {
+            subject: normalizeEmailDraftText(parsed.subject),
+            body: normalizeEmailDraftText(parsed.body)
+          };
+        }
+      } catch {
+        return fallback;
+      }
 
-  return fallbackDraft(thread, partnership, profile, instructions, currentDraft);
+      return fallback;
+    },
+    serialize: (value) => value
+  });
+
+  return result?.data ?? fallback;
 }
-
-const SUGGESTIONS_MODEL = "google/gemini-2.0-flash-001";
 
 export async function generateReplySuggestions(
   thread: EmailThreadDetail
 ): Promise<{ id: string; label: string; prompt: string }[]> {
-  const api = client();
-  if (!api) {
-    return fallbackSuggestions(thread);
-  }
+  const fallback = fallbackSuggestions(thread);
+  const threadText = plainTextThread(thread);
+  const cache = aiCachePolicy({
+    taskKey: "email_suggestions",
+    scopeKey: `email-suggestions:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
+    input: {
+      threadId: thread.thread.id,
+      threadText
+    }
+  });
 
-  try {
-    const response = await api.chat.completions.create({
-      model: SUGGESTIONS_MODEL,
-      temperature: 0.4,
-      max_tokens: 300,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You generate 3 short reply prompt suggestions for a creator responding to a brand email. Each suggestion is a brief action the creator might want to take. Return a JSON array of objects with \"label\" (short, 6-10 words, action-oriented) and \"prompt\" (1 sentence instruction for an AI reply generator). Never use em dashes or en dashes. Be specific to the email content."
-        },
-        {
-          role: "user",
-          content: `Thread:\n${plainTextThread(thread)}`
-        }
-      ],
-      response_format: { type: "json_object" }
-    });
+  const result = await runOpenRouterTask<{ id: string; label: string; prompt: string }[]>({
+    context: {
+      featureKey: "premium_inbox",
+      taskKey: "email_suggestions"
+    },
+    systemPrompt:
+      'You generate 3 short reply prompt suggestions for a creator responding to a brand email. Each suggestion is a brief action the creator might want to take. Return JSON with shape { "suggestions": [{ "label": "short action label", "prompt": "one-sentence instruction" }] }. Never use em dashes or en dashes. Be specific to the email content.',
+    userPrompt: `Thread:\n${threadText}`,
+    temperature: 0.4,
+    responseFormat: { type: "json_object" },
+    cache,
+    parse: (content) => {
+      try {
+        const parsed = JSON.parse(content) as {
+          suggestions?: { label?: string; prompt?: string }[];
+        };
+        const items = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
 
-    const raw = response.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw) as {
-      suggestions?: { label?: string; prompt?: string }[];
-    };
-    const items = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+        return items
+          .filter((entry) => entry.label?.trim() && entry.prompt?.trim())
+          .slice(0, 3)
+          .map((entry, index) => ({
+            id: `ai-${index}`,
+            label: entry.label!.trim(),
+            prompt: entry.prompt!.trim()
+          }));
+      } catch {
+        return fallback;
+      }
+    },
+    serialize: (value) => value
+  });
 
-    return items
-      .filter((s) => s.label?.trim() && s.prompt?.trim())
-      .slice(0, 3)
-      .map((s, i) => ({
-        id: `ai-${i}`,
-        label: s.label!.trim(),
-        prompt: s.prompt!.trim()
-      }));
-  } catch {
-    return fallbackSuggestions(thread);
-  }
+  return result?.data?.length ? result.data : fallback;
 }
 
 function fallbackSuggestions(thread: EmailThreadDetail) {

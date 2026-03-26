@@ -435,10 +435,13 @@ export function AppFrame({
                 >
                   <Menu className="h-5 w-5" />
                 </button>
-                <div className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-                  <span className="truncate">{meta.section}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0" />
-                  <span className="truncate text-foreground">{meta.title}</span>
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-foreground lg:hidden">{meta.title}</div>
+                  <div className="hidden min-w-0 items-center gap-2 text-sm text-muted-foreground lg:flex">
+                    <span className="truncate">{meta.section}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0" />
+                    <span className="truncate text-foreground">{meta.title}</span>
+                  </div>
                 </div>
               </div>
 

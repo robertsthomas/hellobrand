@@ -2,26 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EmailThreadDetail, Viewer } from "@/lib/types";
 
-const {
-  findUniqueMock,
-  upsertMock,
-  deleteManyMock,
-  generateReplySuggestionsMock
-} = vi.hoisted(() => ({
-  findUniqueMock: vi.fn(),
-  upsertMock: vi.fn(),
-  deleteManyMock: vi.fn(),
+const { generateReplySuggestionsMock } = vi.hoisted(() => ({
   generateReplySuggestionsMock: vi.fn()
-}));
-
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    emailThreadReplySuggestionCache: {
-      findUnique: findUniqueMock,
-      upsert: upsertMock,
-      deleteMany: deleteManyMock
-    }
-  }
 }));
 
 vi.mock("@/lib/email/ai", () => ({
@@ -84,35 +66,12 @@ const viewer: Viewer = {
   mode: "demo"
 };
 
-describe("reply suggestion cache", () => {
+describe("reply suggestion cache adapter", () => {
   beforeEach(() => {
-    findUniqueMock.mockReset();
-    upsertMock.mockReset();
-    deleteManyMock.mockReset();
     generateReplySuggestionsMock.mockReset();
-    process.env.DATABASE_URL = "postgres://example";
   });
 
-  it("returns persisted suggestions for the current thread version", async () => {
-    const persisted = [
-      {
-        id: "cached-1",
-        label: "Ask for more detail",
-        prompt: "Ask the brand to clarify the deliverables."
-      }
-    ];
-    findUniqueMock.mockResolvedValue({
-      suggestionsJson: persisted
-    });
-
-    const result = await getPersistedReplySuggestionsForThread(viewer, buildThreadDetail());
-
-    expect(result).toEqual(persisted);
-    expect(generateReplySuggestionsMock).not.toHaveBeenCalled();
-    expect(upsertMock).not.toHaveBeenCalled();
-  });
-
-  it("generates and persists new suggestions when no current version is cached", async () => {
+  it("delegates to the AI suggestion generator", async () => {
     const generated = [
       {
         id: "ai-0",
@@ -120,38 +79,12 @@ describe("reply suggestion cache", () => {
         prompt: "Confirm the next steps and ask for timeline details."
       }
     ];
-    findUniqueMock.mockResolvedValue(null);
+    const thread = buildThreadDetail();
     generateReplySuggestionsMock.mockResolvedValue(generated);
-
-    const thread = buildThreadDetail({
-      updatedAt: "2026-03-24T13:00:00.000Z",
-      lastMessageAt: "2026-03-24T13:00:00.000Z",
-      messageCount: 5
-    });
 
     const result = await getPersistedReplySuggestionsForThread(viewer, thread);
 
     expect(result).toEqual(generated);
     expect(generateReplySuggestionsMock).toHaveBeenCalledWith(thread);
-    expect(upsertMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          userId_threadId_threadVersion: {
-            userId: "user-1",
-            threadId: "thread-1",
-            threadVersion: "2026-03-24T13:00:00.000Z:2026-03-24T13:00:00.000Z:5"
-          }
-        }
-      })
-    );
-    expect(deleteManyMock).toHaveBeenCalledWith({
-      where: {
-        userId: "user-1",
-        threadId: "thread-1",
-        threadVersion: {
-          not: "2026-03-24T13:00:00.000Z:2026-03-24T13:00:00.000Z:5"
-        }
-      }
-    });
   });
 });

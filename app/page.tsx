@@ -20,6 +20,7 @@ import {
 
 import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
+import { HeroTabRail } from "@/components/hero-tab-rail";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -175,10 +176,7 @@ export default async function LandingPage() {
                   Every brand partnership lives in one organized workspace.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  No more scattered spreadsheets or lost email chains. See every
-                  active partnership, its status, contract value, and risk flags
-                  at a glance. Filter by brand, stage, or amount to focus on
-                  what needs attention right now.
+                  See status, value, and risk in one place so the next move is always clear.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
@@ -207,10 +205,7 @@ export default async function LandingPage() {
                   Brand emails stay connected to the right partnership.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  HelloBrand links incoming email threads to their matching
-                  workspace automatically. Negotiation context, revision notes,
-                  and approval chains live alongside the contract — not buried
-                  in your personal inbox.
+                  Keep every approval, revision, and negotiation thread attached to the right workspace.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
@@ -235,10 +230,7 @@ export default async function LandingPage() {
                   Know exactly where your money stands.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  Track invoices, outstanding balances, and payout timelines
-                  right inside the partnership workspace. No separate spreadsheet, no
-                  guessing when the brand will pay — just clear numbers tied to
-                  real contracts.
+                  Track invoices, balances, and payout timing without leaving the partnership workspace.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
@@ -508,20 +500,7 @@ function HeroDashboard() {
             </div>
 
             {/* Tabs + content */}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["Overview", "Partnerships", "Deliverables", "Payments"].map((tab, i) => (
-                <span
-                  key={tab}
-                  className={`px-3.5 py-2 text-[13px] font-medium ${
-                    i === 0
-                      ? "bg-foreground text-background"
-                      : "border border-black/[0.06] bg-white text-muted-foreground dark:border-white/[0.08] dark:bg-white/[0.02]"
-                  }`}
-                >
-                  {tab}
-                </span>
-              ))}
-            </div>
+            <HeroTabRail items={["Overview", "Partnerships", "Deliverables", "Payments"]} />
 
             <div className="mt-4 grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
               {/* Review queue */}

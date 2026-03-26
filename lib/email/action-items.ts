@@ -1,6 +1,5 @@
-import OpenAI from "openai";
-
-import { getEmailSummaryModel } from "@/lib/email/config";
+import { aiCachePolicy, runOpenRouterTask } from "@/lib/ai/gateway";
+import { buildEmailMessageVersion } from "@/lib/email/reply-suggestion-version";
 import type {
   DealAggregate,
   EmailActionItemRecord,
@@ -12,34 +11,6 @@ interface ActionItemDraft {
   dueDate: string | null;
   urgency: EmailActionItemRecord["urgency"];
   sourceText: string | null;
-}
-
-function providerConfig() {
-  if (!process.env.OPENROUTER_API_KEY) {
-    return null;
-  }
-
-  return {
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-    defaultHeaders: {
-      "HTTP-Referer":
-        process.env.OPENROUTER_SITE_URL ||
-        process.env.INTEGRATIONS_APP_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3011",
-      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
-    }
-  };
-}
-
-function client() {
-  const config = providerConfig();
-  if (!config) {
-    return null;
-  }
-
-  return new OpenAI(config);
 }
 
 const ASK_PATTERNS: Array<{
@@ -126,68 +97,74 @@ export async function extractActionItemsFromMessage(
     return [];
   }
 
-  const api = client();
-  if (!api) {
-    return regexFallbackExtraction(message);
-  }
-
+  const fallback = regexFallbackExtraction(message);
   const dealContext = aggregate
     ? `Deal: ${aggregate.deal.brandName} - ${aggregate.deal.campaignName}. Status: ${aggregate.deal.status}.`
     : "No linked deal context.";
+  const cache = aiCachePolicy({
+    taskKey: "email_action_items",
+    scopeKey: `email-action-items:${message.id}:${buildEmailMessageVersion(message)}`,
+    input: {
+      dealContext,
+      from: message.from?.email ?? "unknown",
+      subject: message.subject,
+      text: text.slice(0, 3000)
+    }
+  });
 
-  try {
-    const response = await api.chat.completions.create({
-      model: getEmailSummaryModel(),
-      temperature: 0.15,
-      messages: [
-        {
-          role: "system",
-          content: `You are an assistant for a creator managing brand partnerships. Extract action items directed at the creator from the email message. Only include concrete asks — things the creator needs to do, respond to, send, confirm, sign, or review.
+  const result = await runOpenRouterTask<ActionItemDraft[]>({
+    context: {
+      featureKey: "premium_inbox",
+      taskKey: "email_action_items"
+    },
+    systemPrompt: `You are an assistant for a creator managing brand partnerships. Extract action items directed at the creator from the email message. Only include concrete asks, things the creator needs to do, respond to, send, confirm, sign, or review.
 
 Return JSON: { "items": [{ "action": "...", "dueDate": "YYYY-MM-DD" or null, "urgency": "low"|"medium"|"high", "sourceText": "..." }] }
 
 Rules:
-- "action": brief imperative sentence (e.g., "Send revised draft to brand team")
+- "action": brief imperative sentence
 - "dueDate": ISO date if explicitly mentioned, null otherwise
 - "urgency": "high" if deadline is within 3 days or marked urgent, "medium" for clear asks, "low" for soft requests
 - "sourceText": the exact sentence or phrase from the email that contains the ask
 - Maximum 5 items
 - Skip pleasantries, greetings, and generic sign-offs
-- Only extract asks directed AT the creator, not commitments made BY the brand`
-        },
-        {
-          role: "user",
-          content: `${dealContext}\n\nFrom: ${message.from?.email ?? "unknown"}\nSubject: ${message.subject}\n\n${text.slice(0, 3000)}`
+- Only extract asks directed at the creator, not commitments made by the brand`,
+    userPrompt: `${dealContext}\n\nFrom: ${message.from?.email ?? "unknown"}\nSubject: ${message.subject}\n\n${text.slice(0, 3000)}`,
+    temperature: 0.15,
+    responseFormat: { type: "json_object" },
+    cache,
+    parse: (content) => {
+      try {
+        const parsed = JSON.parse(content) as {
+          items?: Array<{
+            action?: string;
+            dueDate?: string | null;
+            urgency?: string;
+            sourceText?: string;
+          }>;
+        };
+
+        if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
+          return fallback;
         }
-      ],
-      response_format: { type: "json_object" }
-    });
 
-    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as {
-      items?: Array<{
-        action?: string;
-        dueDate?: string | null;
-        urgency?: string;
-        sourceText?: string;
-      }>;
-    };
+        return parsed.items
+          .filter((item) => item.action?.trim())
+          .map((item) => ({
+            action: item.action!.trim(),
+            dueDate: item.dueDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? item.dueDate : null,
+            urgency: (["low", "medium", "high"].includes(item.urgency ?? "")
+              ? item.urgency
+              : "medium") as ActionItemDraft["urgency"],
+            sourceText: item.sourceText?.slice(0, 200) ?? null
+          }))
+          .slice(0, 5);
+      } catch {
+        return fallback;
+      }
+    },
+    serialize: (value) => value
+  });
 
-    if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
-      return regexFallbackExtraction(message);
-    }
-
-    return parsed.items
-      .filter((item) => item.action?.trim())
-      .map((item) => ({
-        action: item.action!.trim(),
-        dueDate: item.dueDate?.match(/^\d{4}-\d{2}-\d{2}$/) ? item.dueDate : null,
-        urgency: (["low", "medium", "high"].includes(item.urgency ?? "")
-          ? item.urgency
-          : "medium") as ActionItemDraft["urgency"],
-        sourceText: item.sourceText?.slice(0, 200) ?? null
-      }))
-      .slice(0, 5);
-  } catch {
-    return regexFallbackExtraction(message);
-  }
+  return result?.data?.length ? result.data : fallback;
 }

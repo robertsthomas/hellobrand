@@ -94,7 +94,7 @@ function threadSearchText(item: EmailThreadListItem) {
     .toLowerCase();
 }
 
-function latestUpdatedAt(items: Array<Pick<EmailDealEventRecord | EmailActionItemRecord, "updatedAt">>) {
+function latestUpdatedAt(items: Array<{ updatedAt: string }>) {
   return items.reduce<string | null>((latest, item) => {
     if (!latest || item.updatedAt > latest) {
       return item.updatedAt;
@@ -111,6 +111,15 @@ function hasUnseenPreviewSection(latestAt: string | null, seenAt: string | null 
 
   return !seenAt || latestAt > seenAt;
 }
+
+type PreviewUpdateEntry = {
+  id: string;
+  title: string;
+  body: string;
+  updatedAt: string;
+  href?: string;
+  ctaLabel?: string;
+};
 
 type DraftPromptSuggestion = {
   id: string;
@@ -724,16 +733,41 @@ export function InboxWorkspace({
   const selectedThreadPreviewState = selectedThread
     ? threadPreviewStates[selectedThread.thread.id] ?? null
     : null;
-  const latestImportantEventAt = useMemo(
-    () => latestUpdatedAt(selectedThread?.importantEvents ?? []),
-    [selectedThread?.importantEvents]
+  const selectedThreadUpdates = useMemo<PreviewUpdateEntry[]>(() => {
+    if (!selectedThread) {
+      return [];
+    }
+
+    const eventUpdates = selectedThread.importantEvents.map((event) => ({
+      id: `event:${event.id}`,
+      title: event.title,
+      body: event.body,
+      updatedAt: event.updatedAt
+    }));
+
+    const termUpdates = selectedThread.termSuggestions.map((suggestion) => ({
+      id: `term:${suggestion.id}`,
+      title: suggestion.title,
+      body: suggestion.summary,
+      updatedAt: suggestion.updatedAt,
+      href: `/app/deals/${suggestion.dealId}?tab=terms`,
+      ctaLabel: "Review terms"
+    }));
+
+    return [...eventUpdates, ...termUpdates].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt)
+    );
+  }, [selectedThread]);
+  const latestPreviewUpdateAt = useMemo(
+    () => latestUpdatedAt(selectedThreadUpdates),
+    [selectedThreadUpdates]
   );
   const latestActionItemAt = useMemo(
     () => latestUpdatedAt(selectedThread?.actionItems ?? []),
     [selectedThread?.actionItems]
   );
   const hasUnseenPreviewUpdates = hasUnseenPreviewSection(
-    latestImportantEventAt,
+    latestPreviewUpdateAt,
     selectedThreadPreviewState?.previewUpdatesSeenAt
   );
   const hasUnseenActionItems = hasUnseenPreviewSection(
@@ -993,7 +1027,7 @@ export function InboxWorkspace({
   function handlePreviewUpdatesOpenChange(open: boolean) {
     setArePreviewUpdatesOpen(open);
     if (open && hasUnseenPreviewUpdates) {
-      void markPreviewSectionSeen("updates", latestImportantEventAt);
+      void markPreviewSectionSeen("updates", latestPreviewUpdateAt);
     }
   }
 
@@ -1666,7 +1700,7 @@ export function InboxWorkspace({
                               </div>
                             ) : null}
 
-                            {selectedThread.importantEvents.length > 0 ? (
+                            {selectedThreadUpdates.length > 0 ? (
                               <Collapsible
                                 open={arePreviewUpdatesOpen}
                                 onOpenChange={handlePreviewUpdatesOpenChange}
@@ -1696,37 +1730,23 @@ export function InboxWorkspace({
                                     </button>
                                   </CollapsibleTrigger>
                                   <CollapsibleContent className="mt-2 space-y-2">
-                                    {selectedThread.importantEvents.map((event) => (
-                                      <div key={event.id} className="border-l-2 border-black/8 pl-3">
-                                        <p className="text-[12px] font-medium text-foreground">{event.title}</p>
-                                        <p className="text-[11px] text-muted-foreground">{event.body}</p>
+                                    {selectedThreadUpdates.map((update) => (
+                                      <div key={update.id} className="border-l-2 border-black/8 pl-3">
+                                        <p className="text-[12px] font-medium text-foreground">{update.title}</p>
+                                        <p className="text-[11px] text-muted-foreground">{update.body}</p>
+                                        {update.href && update.ctaLabel ? (
+                                          <a
+                                            href={update.href}
+                                            className="mt-1 inline-flex text-[11px] font-medium text-foreground underline-offset-4 hover:underline"
+                                          >
+                                            {update.ctaLabel}
+                                          </a>
+                                        ) : null}
                                       </div>
                                     ))}
                                   </CollapsibleContent>
                                 </section>
                               </Collapsible>
-                            ) : null}
-
-                            {selectedThread.termSuggestions.length > 0 ? (
-                              <section className="border border-black/6 px-4 py-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                  Term updates
-                                </p>
-                                <div className="mt-2 space-y-2">
-                                  {selectedThread.termSuggestions.map((suggestion) => (
-                                    <div key={suggestion.id} className="border-l-2 border-black/8 pl-3">
-                                      <p className="text-[12px] font-medium text-foreground">{suggestion.title}</p>
-                                      <p className="text-[11px] text-muted-foreground">{suggestion.summary}</p>
-                                      <a
-                                        href={`/app/deals/${suggestion.dealId}?tab=terms`}
-                                        className="mt-1 inline-flex text-[11px] font-medium text-foreground underline-offset-4 hover:underline"
-                                      >
-                                        Review terms
-                                      </a>
-                                    </div>
-                                  ))}
-                                </div>
-                              </section>
                             ) : null}
 
                             {selectedThread.actionItems.length > 0 ? (

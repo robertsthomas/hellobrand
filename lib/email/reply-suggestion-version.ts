@@ -6,10 +6,27 @@ export type ReplySuggestion = {
   prompt: string;
 };
 
-export function buildReplySuggestionThreadVersion(
+export function buildEmailThreadVersion(
   thread: Pick<EmailThreadDetail["thread"], "updatedAt" | "lastMessageAt" | "messageCount">
 ) {
   return [thread.updatedAt, thread.lastMessageAt, thread.messageCount].join(":");
+}
+
+export function buildReplySuggestionThreadVersion(
+  thread: Pick<EmailThreadDetail["thread"], "updatedAt" | "lastMessageAt" | "messageCount">
+) {
+  return buildEmailThreadVersion(thread);
+}
+
+export function buildEmailMessageVersion(
+  message: Pick<EmailThreadDetail["messages"][number], "id" | "updatedAt" | "receivedAt" | "sentAt">
+) {
+  return [
+    message.id,
+    message.updatedAt,
+    message.receivedAt ?? "",
+    message.sentAt ?? ""
+  ].join(":");
 }
 
 export function sanitizeReplySuggestions(value: unknown): ReplySuggestion[] {

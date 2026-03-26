@@ -1,6 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 
-export function assistantProvider() {
+export function assistantProvider(fallbacks: string[] = []) {
   if (!process.env.OPENROUTER_API_KEY) {
     return null;
   }
@@ -17,8 +17,12 @@ export function assistantProvider() {
         "http://localhost:3011",
       "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
     },
-    extraBody: {
-      models: ["openai/gpt-5.2", "openai/gpt-5-mini"]
-    }
+    ...(fallbacks.length > 0
+      ? {
+          extraBody: {
+            models: fallbacks
+          }
+        }
+      : {})
   });
 }

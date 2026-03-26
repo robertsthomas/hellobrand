@@ -180,13 +180,24 @@ export function scoreThreadAgainstDeal(
   };
 }
 
-function textForMessage(message: EmailMessageRecord) {
-  return compactText([
-    message.subject,
-    message.textBody ?? "",
-    ...message.attachments.map((attachment) => attachment.filename),
-    ...message.attachments.map((attachment) => attachment.extractedText ?? "")
-  ].join("\n")).toLowerCase();
+function textForMessage(
+  message: EmailMessageRecord,
+  options?: {
+    includeAttachmentNames?: boolean;
+    includeAttachmentExtractedText?: boolean;
+  }
+) {
+  const parts = [message.subject, message.textBody ?? ""];
+
+  if (options?.includeAttachmentNames) {
+    parts.push(...message.attachments.map((attachment) => attachment.filename));
+  }
+
+  if (options?.includeAttachmentExtractedText) {
+    parts.push(...message.attachments.map((attachment) => attachment.extractedText ?? ""));
+  }
+
+  return compactText(parts.join("\n")).toLowerCase();
 }
 
 function firstLine(text: string) {
@@ -206,11 +217,11 @@ export function detectImportantEmailEvents(
     title: string;
   }> = [
     { category: "payment", pattern: /\b(invoice|payment|paid|wire|ach|net\s*\d+|remit)\b/i, title: "Payment-related update" },
-    { category: "timeline", pattern: /\b(due|deadline|schedule|reschedule|tomorrow|friday|monday|date|calendar)\b/i, title: "Timeline or scheduling update" },
+    { category: "timeline", pattern: /\b(due|deadline|timeline|schedule|reschedule|calendar|tomorrow|next week|this week|by (?:eod|end of day|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b/i, title: "Timeline or scheduling update" },
     { category: "deliverable", pattern: /\b(deliverable|draft|final|revision|reel|story|post|video|ugc)\b/i, title: "Deliverable-related update" },
     { category: "approval", pattern: /\b(approve|approved|approval|looks good|accepted|reject|rejected|declined)\b/i, title: "Approval status update" },
-    { category: "rights", pattern: /\b(usage|rights|whitelist|whitelisting|exclusiv|organic|paid social|license|term|territory)\b/i, title: "Usage rights or exclusivity update" },
-    { category: "ask", pattern: /\b(can you|could you|please|need you|let me know|confirm|send over|share)\b/i, title: "Action requested from the creator" }
+    { category: "rights", pattern: /\b(usage|rights|whitelist|whitelisting|exclusiv|organic|paid social|license|territory)\b/i, title: "Usage rights or exclusivity update" },
+    { category: "ask", pattern: /\b(can you|could you|would you|need you to|please (?:confirm|send|share|review|approve|sign|reply)|let me know (?:if|when|whether)|confirm(?: that| you can)?|send over|share (?:your|the)|review and sign|sign and return)\b/i, title: "Action requested from the creator" }
   ];
 
   for (const check of checks) {
@@ -291,7 +302,10 @@ export function buildEmailTermSuggestion(
   thread: EmailThreadDetail,
   message: EmailMessageRecord
 ): TermSuggestionDraft | null {
-  const text = textForMessage(message);
+  const text = textForMessage(message, {
+    includeAttachmentNames: true,
+    includeAttachmentExtractedText: true
+  });
   const current = existingTerms(aggregate);
   const payment = parsePaymentTerms(text);
   const usage = parseUsageHints(text);

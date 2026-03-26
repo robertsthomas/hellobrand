@@ -1,5 +1,4 @@
-import OpenAI from "openai";
-
+import { aiCachePolicy, hasAiClient, runOpenRouterTask } from "@/lib/ai/gateway";
 import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict-intelligence";
 import type {
   BriefData,
@@ -52,36 +51,8 @@ function logLlmDebug(
   });
 }
 
-function providerConfig() {
-  if (process.env.OPENROUTER_API_KEY) {
-    return {
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer":
-          process.env.OPENROUTER_SITE_URL ||
-          process.env.INTEGRATIONS_APP_URL ||
-          process.env.NEXT_PUBLIC_APP_URL ||
-          "http://localhost:3011",
-        "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
-      }
-    };
-  }
-
-  return null;
-}
-
-function client() {
-  const config = providerConfig();
-  if (!config) {
-    throw new Error("No LLM provider configured.");
-  }
-
-  return new OpenAI(config);
-}
-
 export function hasLlmKey() {
-  return Boolean(providerConfig());
+  return hasAiClient();
 }
 
 function parseModelList(value: string | undefined) {
@@ -92,7 +63,7 @@ function parseModelList(value: string | undefined) {
   return value
     .split(",")
     .map((entry) => entry.trim())
-    .filter(Boolean);
+    .filter((entry) => Boolean(entry) && !entry.startsWith("anthropic/"));
 }
 
 function taskSpecificModel(task: LlmTask) {
@@ -161,30 +132,33 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
   const defaultRoutes: Record<LlmTask, LlmRoute> = {
     extract_section: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-chat", "anthropic/claude-sonnet-4.5"]
+      fallbacks: ["openai/gpt-5-mini"]
     },
     analyze_risks: {
-      primary: "anthropic/claude-sonnet-4.5",
-      fallbacks: ["openai/gpt-5-chat", "google/gemini-3-pro-preview"]
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-mini"]
     },
     generate_summary: {
-      primary: "openai/gpt-5-chat",
-      fallbacks: ["google/gemini-3-flash-preview", "anthropic/claude-sonnet-4.5"]
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-mini"]
     },
     generate_brief: {
-      primary: "openai/gpt-5-chat",
-      fallbacks: ["anthropic/claude-sonnet-4.5", "google/gemini-3-flash-preview"]
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-mini"]
     }
   };
 
   const sharedFallbacks = parseModelList(
     process.env.LLM_MODEL_FALLBACKS || process.env.OPENROUTER_MODEL_FALLBACKS
   );
-  const primary =
+  const requestedPrimary =
     taskSpecificModel(task) ||
     process.env.LLM_MODEL ||
     process.env.OPENROUTER_MODEL ||
     defaultRoutes[task].primary;
+  const primary = requestedPrimary.startsWith("anthropic/")
+    ? defaultRoutes[task].primary
+    : requestedPrimary;
   const fallbacks = [
     ...taskSpecificFallbacks(task),
     ...sharedFallbacks,
@@ -216,6 +190,23 @@ async function requestJson(
   const route = getLlmRoute(task);
   const model = route.primary;
   const startedAt = Date.now();
+  const scopeParts = [
+    task,
+    typeof debugMeta?.documentId === "string" ? debugMeta.documentId : null,
+    typeof debugMeta?.dealId === "string" ? debugMeta.dealId : null,
+    typeof debugMeta?.sectionIndex === "number" ? String(debugMeta.sectionIndex) : null,
+    typeof debugMeta?.purpose === "string" ? debugMeta.purpose : null
+  ].filter(Boolean);
+  const cache = aiCachePolicy({
+    taskKey: task,
+    scopeKey: scopeParts.join(":") || task,
+    input: {
+      task,
+      systemPrompt,
+      userPrompt,
+      debugMeta
+    }
+  });
 
   logLlmDebug("info", "request_start", {
     model,
@@ -225,40 +216,40 @@ async function requestJson(
   });
 
   try {
-    const response = await client().chat.completions.create({
-      model,
+    const response = await runOpenRouterTask<Record<string, unknown>>({
+      context: {
+        featureKey: task === "generate_brief" ? "brief_generation" : "document_analysis",
+        taskKey: task,
+        metadata: debugMeta
+      },
+      systemPrompt:
+        systemPrompt +
+        "\n\nIMPORTANT: Never use em dashes (—) or en dashes (–) in any output. Use commas, periods, or semicolons instead.",
+      userPrompt,
       temperature: 0.1,
-      messages: [
-        { role: "system", content: systemPrompt + "\n\nIMPORTANT: Never use em dashes (—) or en dashes (–) in any output. Use commas, periods, or semicolons instead." },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      ...(route.fallbacks.length > 0
-        ? {
-            extra_body: {
-              models: route.fallbacks
-            }
-          }
-        : {})
-    } as never);
+      responseFormat: { type: "json_object" },
+      cache,
+      parse: (content) => safeParseJson(content),
+      serialize: (value) => value
+    });
 
-    const content = response.choices?.[0]?.message?.content;
-
-    if (!content || typeof content !== "string") {
-      throw new Error("Model returned an empty response.");
+    if (!response) {
+      throw new Error("LLM budget limit reached.");
     }
 
     logLlmDebug("info", "request_complete", {
       model,
-      resolvedModel: response.model ?? model,
+      resolvedModel: response.resolvedModel,
       fallbacks: route.fallbacks,
       task,
       durationMs: Date.now() - startedAt,
-      responseChars: content.length,
+      responseChars: JSON.stringify(response.data).length,
+      cacheHit: response.cacheHit,
+      budgetDecision: response.budgetDecision,
       ...debugMeta
     });
 
-    return safeParseJson(content);
+    return response.data;
   } catch (error) {
     logLlmDebug("error", "request_failed", {
       model,

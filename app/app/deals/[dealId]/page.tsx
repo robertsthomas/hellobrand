@@ -211,32 +211,34 @@ async function DealDetailContent({
         ) : null}
 
         <Tabs defaultValue={currentTab} className="gap-6">
-          <TabsList data-guide="workspace-tabs" className="h-auto flex-wrap overflow-x-auto rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
-            <TabsTrigger value="overview" className="px-4 py-2">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="terms" className="px-4 py-2">
-              Key Terms
-            </TabsTrigger>
-            <TabsTrigger value="risks" className="px-4 py-2">
-              Risks
-            </TabsTrigger>
-            <TabsTrigger value="deliverables" className="px-4 py-2">
-              Deliverables
-            </TabsTrigger>
-            <TabsTrigger value="brief" data-guide="tab-brief" className="px-4 py-2">
-              Brief
-            </TabsTrigger>
-            <TabsTrigger value="emails" data-guide="tab-emails" className="px-4 py-2">
-              Emails
-            </TabsTrigger>
-            <TabsTrigger value="documents" data-guide="tab-documents" className="px-4 py-2">
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="notes" className="px-4 py-2">
-              Notes
-            </TabsTrigger>
-          </TabsList>
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max min-w-full flex-nowrap gap-1 rounded-lg border border-black/8 bg-white p-1 sm:w-auto sm:min-w-0 sm:flex-wrap dark:border-white/10 dark:bg-white/[0.03]">
+              <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Key Terms
+              </TabsTrigger>
+              <TabsTrigger value="risks" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Risks
+              </TabsTrigger>
+              <TabsTrigger value="deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Deliverables
+              </TabsTrigger>
+              <TabsTrigger value="brief" data-guide="tab-brief" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Brief
+              </TabsTrigger>
+              <TabsTrigger value="emails" data-guide="tab-emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Emails
+              </TabsTrigger>
+              <TabsTrigger value="documents" data-guide="tab-documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Documents
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Notes
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
             <DealContextPanel terms={terms} />
