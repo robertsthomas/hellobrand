@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 
+import { stripOnboardingHandlePrefix } from "@/lib/onboarding-draft";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 
@@ -15,12 +16,6 @@ const ACCENT_PRESETS = [
   { label: "Amber", hex: "#b45309" },
   { label: "Slate", hex: "#334155" }
 ] as const;
-
-/** Strip leading @ for storage. */
-function stripAt(value: string) {
-  const trimmed = value.trim();
-  return trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
-}
 
 export function OnboardingStepIdentity({
   displayName,
@@ -41,12 +36,14 @@ export function OnboardingStepIdentity({
   setAccentColor: (value: string) => void;
   onContinue: () => void;
 }) {
-  const canContinue = displayName.trim().length > 0 && stripAt(primaryHandle).length > 0;
+  const canContinue =
+    displayName.trim().length > 0 &&
+    stripOnboardingHandlePrefix(primaryHandle).length > 0;
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!canContinue) return;
-    setPrimaryHandle(stripAt(primaryHandle));
+    setPrimaryHandle(stripOnboardingHandlePrefix(primaryHandle));
     onContinue();
   };
 

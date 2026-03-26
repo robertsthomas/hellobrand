@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 
+import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
 import { prisma } from "@/lib/prisma";
 
 export type DevDashboardViewer = {
@@ -86,10 +87,6 @@ export async function getDevDashboardViewerFromSession(): Promise<DevDashboardVi
   }
 
   const claims = (session.sessionClaims as Record<string, unknown> | undefined) ?? null;
-  const publicMeta =
-    (claims?.publicMetadata ??
-      claims?.public_metadata) as Record<string, unknown> | undefined;
-
   return {
     id: session.userId,
     email: firstString(
@@ -99,7 +96,7 @@ export async function getDevDashboardViewerFromSession(): Promise<DevDashboardVi
       claims?.["email_address"]
     ),
     displayName: firstString(
-      publicMeta?.displayName,
+      getClerkMetadataDisplayName(claims),
       claims?.fullName,
       claims?.full_name,
       [claims?.firstName, claims?.lastName].filter(Boolean).join(" "),

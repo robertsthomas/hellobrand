@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useCompletion } from "@ai-sdk/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -29,6 +28,10 @@ import {
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
+import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
+import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
+import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
+import { useInboxThreadSelection } from "@/components/use-inbox-thread-selection";
 import {
   Collapsible,
   CollapsibleContent,
@@ -62,7 +65,6 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   DealRecord,
   EmailActionItemRecord,
-  EmailDealCandidateMatchGroup,
   EmailAttachmentRecord,
   EmailDealEventRecord,
   EmailMessageRecord,
@@ -144,19 +146,10 @@ type DraftPromptSuggestion = {
   prompt: string;
 };
 
-type ReplyJourney = "idle" | "user_set" | "ai_set" | "ai_generated";
-
 type DraftPromptSuggestionCacheEntry = {
   version: string;
   suggestions: DraftPromptSuggestion[];
 };
-
-type DraftRevisionTarget = {
-  subject: string;
-  body: string;
-};
-
-type PreviewSection = "updates" | "actionItems";
 
 const DRAFT_REFINEMENT_OPTIONS = {
   length: [
@@ -236,14 +229,14 @@ function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSugg
     case "firm":
       return {
         id: "tone-firm",
-        label: "Keep it firm",
+        label: "Keep it direct",
         prompt:
           "Write the reply in a firm, direct tone. Protect our current position, avoid unnecessary concessions, and only make commitments already supported by the linked workspace context.",
       };
     case "exploratory":
       return {
         id: "tone-exploratory",
-        label: "Stay exploratory",
+        label: "Lead with questions",
         prompt:
           "Write the reply in an exploratory tone. Ask clarifying questions where the thread or workspace context is incomplete, and avoid locking in details that are not yet confirmed.",
       };
@@ -251,10 +244,22 @@ function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSugg
     default:
       return {
         id: "tone-collaborative",
-        label: "Stay collaborative",
+        label: "Keep it balanced",
         prompt:
           "Write the reply in a collaborative tone. Keep it constructive, move the conversation forward, and align the response with the linked workspace context and current thread.",
       };
+  }
+}
+
+function replyStyleLabel(stance: NegotiationStance) {
+  switch (stance) {
+    case "firm":
+      return "Direct";
+    case "exploratory":
+      return "Clarifying";
+    case "collaborative":
+    default:
+      return "Balanced";
   }
 }
 
@@ -683,41 +688,12 @@ export function InboxWorkspace({
 }) {
   const router = useRouter();
   const actionMenuRef = useRef<HTMLDivElement | null>(null);
-  const threadCacheRef = useRef<Record<string, EmailThreadDetail>>({});
-  const threadRequestRef = useRef<AbortController | null>(null);
-  const discoveryRequestRef = useRef<AbortController | null>(null);
-  const replyBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const aiReplyControlRef = useRef<HTMLDivElement | null>(null);
   const promptActionControlRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
-  const [selectedDealId, setSelectedDealId] = useState<string>("");
-  const [selectedThread, setSelectedThread] = useState<EmailThreadDetail | null>(initialSelectedThread);
-  const [activeThreadId, setActiveThreadId] = useState(initialSelectedThread?.thread.id ?? threads[0]?.thread.id ?? "");
-  const [isThreadLoading, setIsThreadLoading] = useState(false);
-  const [summary, setSummary] = useState<string | null>(initialSelectedThread?.thread.aiSummary ?? null);
-  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
-  const [draft, setDraft] = useState<{ subject: string; body: string } | null>(null);
-  const [replySubject, setReplySubject] = useState("");
-  const [replyBody, setReplyBody] = useState("");
-  const [replyJourney, setReplyJourney] = useState<ReplyJourney>("idle");
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [isDrafting, setIsDrafting] = useState(false);
-  const [isLinking, setIsLinking] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false);
-  const [isDiscovering, setIsDiscovering] = useState(false);
-  const [isReviewingCandidates, setIsReviewingCandidates] = useState(false);
-  const [candidateGroups, setCandidateGroups] = useState<EmailDealCandidateMatchGroup[]>([]);
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [replyStance, setReplyStance] = useState<NegotiationStance | "">("collaborative");
-  const [arePreviewUpdatesOpen, setArePreviewUpdatesOpen] = useState(false);
-  const [areActionItemsOpen, setAreActionItemsOpen] = useState(false);
-  const [isPromptCommandOpen, setIsPromptCommandOpen] = useState(false);
-  const [draftInstructions, setDraftInstructions] = useState("");
-  const [threadPreviewStates, setThreadPreviewStates] = useState(initialThreadPreviewStates);
   const [aiSuggestionCache, setAiSuggestionCache] = useState<
     Record<string, DraftPromptSuggestionCacheEntry>
   >(loadDraftPromptSuggestionCache);
@@ -726,59 +702,105 @@ export function InboxWorkspace({
   >({});
   const [aiReplyMenuWidth, setAiReplyMenuWidth] = useState<number | null>(null);
   const [promptActionMenuWidth, setPromptActionMenuWidth] = useState<number | null>(null);
-  const [openRefinementPopover, setOpenRefinementPopover] = useState<
-    "length" | "tone" | "focus" | null
-  >(null);
   const aiSuggestionCacheRef = useRef(aiSuggestionCache);
   const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
-  const selectedThreadId = selectedThread?.thread.id ?? "";
   const {
-    completion: draftCompletion,
-    complete: completeDraft,
-    setCompletion: setDraftCompletion,
-    stop: stopDraftStream
-  } = useCompletion({
-    api: `/api/email/threads/${selectedThreadId || "__unselected__"}/draft`,
-    streamProtocol: "text",
-    onError: (error) => {
-      setErrorMessage(error.message || "Could not generate reply draft.");
-      setIsDrafting(false);
-    },
-    onFinish: (_prompt, completion) => {
-      setDraft((current) => ({
-        subject: current?.subject ?? replySubject,
-        body: completion
-      }));
-      setIsDrafting(false);
-    }
+    candidateGroups,
+    cancelDiscovery,
+    closeCandidateModal,
+    discoverCandidates,
+    dismissCandidate,
+    isCandidateModalOpen,
+    isDiscovering,
+    isReviewingCandidates,
+    reviewCandidates,
+    selectedCandidateIds,
+    toggleCandidate
+  } = useInboxCandidateDiscovery({
+    onErrorMessage: setErrorMessage,
+    onRefresh: () => router.refresh()
+  });
+  const {
+    activeThreadId,
+    isThreadLoading,
+    loadThread: loadSelectedThread,
+    prefetchThread,
+    selectedThread,
+    selectedThreadId
+  } = useInboxThreadSelection({
+    initialSelectedThread,
+    onErrorMessage: setErrorMessage,
+    threads
+  });
+  const linkedDealIds = useMemo(
+    () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
+    [selectedThread]
+  );
+  const {
+    areActionItemsOpen,
+    arePreviewUpdatesOpen,
+    clearPreviewUpdates,
+    handleActionItemsOpenChange,
+    handlePreviewUpdatesOpenChange,
+    isLinkModalOpen,
+    isLinking,
+    isSummarizing,
+    isSummaryDialogOpen,
+    linkSelectedDeal,
+    selectedDealId,
+    setLinkModalOpen,
+    setSelectedDealId,
+    setSummaryDialogOpen,
+    summarizeThread,
+    summary,
+    threadPreviewStates
+  } = useInboxThreadDetailState({
+    initialSelectedThread,
+    initialThreadPreviewStates,
+    linkedDealIds,
+    onErrorMessage: setErrorMessage,
+    onRefresh: () => router.refresh(),
+    selectedThread,
+    selectedThreadId
+  });
+  const {
+    draft,
+    replySubject,
+    replyBody,
+    replyJourney,
+    isDrafting,
+    replyStance,
+    isPromptCommandOpen,
+    draftInstructions,
+    openRefinementPopover,
+    trimmedDraftInstructions,
+    shouldHighlightAiReply,
+    canRefineGeneratedReply,
+    canClearReplyText,
+    canSendReply,
+    replyBodyRef,
+    setReplyStance,
+    setPromptCommandOpen,
+    setDraftInstructions,
+    setOpenRefinementPopover,
+    handleReplyBodyChange,
+    applyPromptToNextDraft,
+    clearPromptDialog,
+    draftReply,
+    usePromptForDraft,
+    cancelDraftReply,
+    clearDraftComposer,
+    refineGeneratedDraft
+  } = useInboxReplyComposer({
+    selectedDealId,
+    selectedThread,
+    setErrorMessage
   });
 
   useEffect(() => {
-    setSelectedThread(initialSelectedThread);
-    setActiveThreadId(initialSelectedThread?.thread.id ?? threads[0]?.thread.id ?? "");
-    setThreadPreviewStates(initialThreadPreviewStates);
-    if (initialSelectedThread) {
-      threadCacheRef.current[initialSelectedThread.thread.id] = initialSelectedThread;
-    }
-  }, [initialSelectedThread, initialThreadPreviewStates, threads]);
-
-  useEffect(() => {
-    setSummary(selectedThread?.thread.aiSummary ?? null);
-    setDraftCompletion("");
-    setDraft(null);
-    setReplySubject("");
-    setReplyBody("");
-    setReplyJourney("idle");
     setErrorMessage(null);
-    setIsSummaryDialogOpen(false);
-    setSelectedDealId(selectedThread?.links[0]?.dealId ?? "");
-    setIsPromptCommandOpen(false);
-    setDraftInstructions("");
     setIsActionMenuOpen(false);
-    setIsLinkModalOpen(false);
-    setArePreviewUpdatesOpen(false);
-    setOpenRefinementPopover(null);
-  }, [selectedThread, setDraftCompletion]);
+  }, [selectedThread]);
 
   useEffect(() => {
     const control = aiReplyControlRef.current;
@@ -849,23 +871,6 @@ export function InboxWorkspace({
   }, []);
 
   useEffect(() => {
-    return () => {
-      threadRequestRef.current?.abort();
-      discoveryRequestRef.current?.abort();
-      stopDraftStream();
-    };
-  }, [stopDraftStream]);
-
-  useEffect(() => {
-    if (!draftCompletion) {
-      return;
-    }
-
-    setReplyBody(draftCompletion);
-    setReplyJourney("ai_generated");
-  }, [draftCompletion]);
-
-  useEffect(() => {
     aiSuggestionCacheRef.current = aiSuggestionCache;
 
     if (typeof window === "undefined") {
@@ -878,10 +883,6 @@ export function InboxWorkspace({
     );
   }, [aiSuggestionCache]);
 
-  const linkedDealIds = useMemo(
-    () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
-    [selectedThread]
-  );
   const selectedMessages = selectedThread?.messages ?? [];
   const latestMessage = selectedMessages[selectedMessages.length - 1] ?? null;
   const earlierMessages = latestMessage ? selectedMessages.slice(0, -1) : [];
@@ -1109,39 +1110,6 @@ export function InboxWorkspace({
       { id: "fallback-2", label: "Confirm availability and interest", prompt: "Write a brief reply confirming availability and interest without overcommitting." },
     ].slice(0, 3);
   }, [currentAiSuggestions]);
-  const trimmedDraftInstructions = draftInstructions.trim();
-  const shouldHighlightAiReply = replyJourney === "ai_set" && !isDrafting;
-  const canRefineGeneratedReply =
-    replyJourney === "ai_generated" && replyBody.trim().length > 0 && !isDrafting;
-  const canClearReplyText = replyBody.trim().length > 0;
-  const canSendReply =
-    !isDrafting &&
-    replyBody.trim().length > 0 &&
-    (replyJourney === "user_set" || replyJourney === "ai_generated");
-
-  const resizeReplyBody = useCallback(() => {
-    const textarea = replyBodyRef.current;
-    if (!textarea) {
-      return;
-    }
-
-    textarea.style.height = "0px";
-    textarea.style.height = `${Math.max(24, textarea.scrollHeight)}px`;
-  }, []);
-
-  useEffect(() => {
-    resizeReplyBody();
-  }, [replyBody, replyJourney, resizeReplyBody]);
-
-  function applyPromptToNextDraft() {
-    setDraft(null);
-    setReplySubject("");
-    setReplyBody(trimmedDraftInstructions);
-    setReplyJourney("ai_set");
-    setErrorMessage(null);
-    setIsPromptCommandOpen(false);
-  }
-
   function buildInboxUrl(
     next: Partial<typeof selectedFilters> & { thread?: string } = {}
   ) {
@@ -1171,437 +1139,13 @@ export function InboxWorkspace({
     router.push(buildInboxUrl({ ...next, thread: next.thread ?? selectedThreadId }));
   }
 
-  async function markPreviewSectionSeen(section: PreviewSection, seenAt: string | null) {
-    if (!selectedThreadId || !seenAt) {
-      return;
-    }
-
-    setThreadPreviewStates((current) => {
-      const existing = current[selectedThreadId];
-      const nextState: EmailThreadPreviewStateRecord = {
-        threadId: selectedThreadId,
-        previewUpdatesSeenAt:
-          section === "updates" ? seenAt : existing?.previewUpdatesSeenAt ?? null,
-        previewUpdatesClearedAt: existing?.previewUpdatesClearedAt ?? null,
-        actionItemsSeenAt:
-          section === "actionItems" ? seenAt : existing?.actionItemsSeenAt ?? null,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      return {
-        ...current,
-        [selectedThreadId]: nextState
-      };
-    });
-
-    try {
-      await fetch(`/api/email/threads/${selectedThreadId}/preview-state`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          section,
-          action: "seen",
-          timestamp: seenAt
-        })
-      });
-    } catch {
-      // Keep the optimistic state; this marker is UI-only.
-    }
-  }
-
-  async function clearPreviewUpdates() {
-    if (!selectedThreadId || !latestPreviewUpdateAt) {
-      return;
-    }
-
-    const timestamp = latestPreviewUpdateAt;
-
-    setThreadPreviewStates((current) => {
-      const existing = current[selectedThreadId];
-      const nextState: EmailThreadPreviewStateRecord = {
-        threadId: selectedThreadId,
-        previewUpdatesSeenAt: timestamp,
-        previewUpdatesClearedAt: timestamp,
-        actionItemsSeenAt: existing?.actionItemsSeenAt ?? null,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      return {
-        ...current,
-        [selectedThreadId]: nextState
-      };
-    });
-    setArePreviewUpdatesOpen(false);
-
-    try {
-      await fetch(`/api/email/threads/${selectedThreadId}/preview-state`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          section: "updates",
-          action: "clear",
-          timestamp
-        })
-      });
-    } catch {
-      // Keep the optimistic state; this marker is UI-only.
-    }
-  }
-
-  function handlePreviewUpdatesOpenChange(open: boolean) {
-    setArePreviewUpdatesOpen(open);
-    if (open && hasUnseenPreviewUpdates) {
-      void markPreviewSectionSeen("updates", latestPreviewUpdateAt);
-    }
-  }
-
-  function handleActionItemsOpenChange(open: boolean) {
-    setAreActionItemsOpen(open);
-    if (open && hasUnseenActionItems) {
-      void markPreviewSectionSeen("actionItems", latestActionItemAt);
-    }
-  }
-
   async function loadThread(threadId: string) {
     if (!threadId || threadId === selectedThreadId) {
       return;
     }
 
-    setActiveThreadId(threadId);
-    setErrorMessage(null);
     window.history.replaceState(null, "", buildInboxUrl({ thread: threadId }));
-
-    const cached = threadCacheRef.current[threadId];
-    if (cached) {
-      setSelectedThread(cached);
-      void prefetchThreadSuggestions(cached.thread);
-      return;
-    }
-
-    threadRequestRef.current?.abort();
-    const controller = new AbortController();
-    threadRequestRef.current = controller;
-
-    setIsThreadLoading(true);
-    try {
-      const response = await fetch(`/api/email/threads/${threadId}`, {
-        signal: controller.signal
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not load email thread.");
-      }
-
-      const detail = payload.thread as EmailThreadDetail;
-      threadCacheRef.current[threadId] = detail;
-      setSelectedThread(detail);
-      void prefetchThreadSuggestions(detail.thread);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
-      setErrorMessage(error instanceof Error ? error.message : "Could not load email thread.");
-    } finally {
-      if (threadRequestRef.current === controller) {
-        threadRequestRef.current = null;
-      }
-      setIsThreadLoading(false);
-    }
-  }
-
-  async function prefetchThread(threadId: string) {
-    if (!threadId || threadCacheRef.current[threadId]) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/email/threads/${threadId}`);
-      const payload = await response.json();
-      if (!response.ok || !payload.thread) {
-        return;
-      }
-
-      threadCacheRef.current[threadId] = payload.thread as EmailThreadDetail;
-    } catch {
-      // Ignore prefetch failures. Selection will fall back to the normal fetch path.
-    }
-  }
-
-  async function summarizeThread() {
-    if (!selectedThreadId) {
-      return;
-    }
-
-    setIsSummarizing(true);
-    setIsActionMenuOpen(false);
-    setErrorMessage(null);
-    try {
-      const response = await fetch(`/api/email/threads/${selectedThreadId}/summarize`, {
-        method: "POST"
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not summarize email thread.");
-      }
-      setSummary(payload.summary ?? null);
-      setIsSummaryDialogOpen(Boolean(payload.summary));
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not summarize email thread.");
-    } finally {
-      setIsSummarizing(false);
-    }
-  }
-
-  async function draftReply(
-    overrideInstructions?: string | null,
-    revisionTarget?: DraftRevisionTarget | null
-  ) {
-    if (!selectedThreadId) {
-      return;
-    }
-
-    const trimmedInstructions =
-      (overrideInstructions ??
-        (replyJourney === "ai_set" ? replyBody : draftInstructions)).trim();
-    const nextSubject =
-      revisionTarget?.subject?.trim() ||
-      (selectedThread?.thread.subject.startsWith("Re:")
-        ? selectedThread.thread.subject
-        : `Re: ${selectedThread?.thread.subject ?? ""}`);
-
-    setIsDrafting(true);
-    setReplyJourney("ai_set");
-    setDraftCompletion("");
-    setDraft({ subject: nextSubject, body: "" });
-    setReplySubject(nextSubject);
-    if (!revisionTarget && replyJourney !== "ai_set") {
-      setReplyBody("");
-    }
-    setIsActionMenuOpen(false);
-    setOpenRefinementPopover(null);
-    setErrorMessage(null);
-    try {
-      await completeDraft("", {
-        body: {
-          dealId: selectedDealId || null,
-          stance: replyStance || null,
-          instructions: trimmedInstructions || null,
-          currentDraft: revisionTarget ?? null
-        }
-      });
-      setDraftInstructions("");
-      setIsPromptCommandOpen(false);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not generate reply draft.");
-      setIsDrafting(false);
-    }
-  }
-
-  function cancelDraftReply() {
-    stopDraftStream();
-    setIsDrafting(false);
-    setReplyJourney(replyBody.trim().length > 0 ? "ai_generated" : "idle");
-  }
-
-  function clearDraftComposer() {
-    stopDraftStream();
-    setIsDrafting(false);
-    setDraftCompletion("");
-    setDraft(null);
-    setReplySubject("");
-    setReplyBody("");
-    setDraftInstructions("");
-    setReplyJourney("idle");
-    setIsPromptCommandOpen(false);
-    setOpenRefinementPopover(null);
-  }
-
-  async function refineGeneratedDraft(instruction: string) {
-    if (replyJourney !== "ai_generated" || !replyBody.trim()) {
-      return;
-    }
-
-    await draftReply(instruction, {
-      subject: replySubject,
-      body: replyBody
-    });
-  }
-
-  async function linkSelectedDeal() {
-    if (!selectedThreadId || !selectedDealId) {
-      return;
-    }
-
-    setIsLinking(true);
-    setErrorMessage(null);
-    try {
-      const endpoint = linkedDealIds.has(selectedDealId) ? "unlink" : "link";
-      const response = await fetch(`/api/email/threads/${selectedThreadId}/${endpoint}`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          dealId: selectedDealId
-        })
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not update deal link.");
-      }
-      setIsLinkModalOpen(false);
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not update deal link.");
-    } finally {
-      setIsLinking(false);
-    }
-  }
-
-  function toggleCandidate(candidateId: string) {
-    setSelectedCandidateIds((current) =>
-      current.includes(candidateId)
-        ? current.filter((id) => id !== candidateId)
-        : [...current, candidateId]
-    );
-  }
-
-  async function discoverCandidates() {
-    discoveryRequestRef.current?.abort();
-    const controller = new AbortController();
-    discoveryRequestRef.current = controller;
-    setIsDiscovering(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await fetch("/api/email/candidates/discover", {
-        method: "POST",
-        signal: controller.signal
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not scan inbox for deal threads.");
-      }
-
-      const groups = (payload.candidates ?? []) as EmailDealCandidateMatchGroup[];
-      setCandidateGroups(groups);
-      setSelectedCandidateIds(
-        groups.flatMap((group) => group.matches.map((match) => match.candidate.id))
-      );
-      setIsCandidateModalOpen(true);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
-
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not scan inbox for deal threads."
-      );
-    } finally {
-      if (discoveryRequestRef.current === controller) {
-        discoveryRequestRef.current = null;
-      }
-      setIsDiscovering(false);
-    }
-  }
-
-  function cancelDiscovery() {
-    discoveryRequestRef.current?.abort();
-    discoveryRequestRef.current = null;
-    setIsDiscovering(false);
-  }
-
-  async function reviewCandidates(action: "confirm" | "reject_all") {
-    const visibleIds = candidateGroups.flatMap((group) =>
-      group.matches.map((match) => match.candidate.id)
-    );
-    const confirmIds = action === "confirm" ? selectedCandidateIds : [];
-    const rejectIds =
-      action === "confirm"
-        ? []
-        : visibleIds;
-
-    if (confirmIds.length === 0 && rejectIds.length === 0) {
-      return;
-    }
-
-    // Optimistic: close modal and clear state immediately
-    setIsCandidateModalOpen(false);
-    setCandidateGroups([]);
-    setSelectedCandidateIds([]);
-    setIsReviewingCandidates(false);
-
-    // Fire request in background
-    try {
-      const response = await fetch("/api/email/candidates/review", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          confirmIds,
-          rejectIds
-        })
-      });
-
-      if (!response.ok) {
-        const payload = await response.json();
-        setErrorMessage(payload.error ?? "Could not review email candidates.");
-      }
-
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not review email candidates."
-      );
-      router.refresh();
-    }
-  }
-
-  async function dismissCandidate(candidateId: string) {
-    setErrorMessage(null);
-
-    // Optimistic: remove from UI immediately
-    setCandidateGroups((current) =>
-      current
-        .map((group) => ({
-          ...group,
-          matches: group.matches.filter((match) => match.candidate.id !== candidateId)
-        }))
-        .filter((group) => group.matches.length > 0)
-    );
-    setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
-
-    // Fire in background
-    try {
-      const response = await fetch("/api/email/candidates/review", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          rejectIds: [candidateId]
-        })
-      });
-
-      if (!response.ok) {
-        const payload = await response.json();
-        setErrorMessage(payload.error ?? "Could not dismiss email candidate.");
-      }
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not dismiss email candidate."
-      );
-    } finally {
-    }
+    await loadSelectedThread(threadId);
   }
 
   if (deals.length === 0) {
@@ -1892,7 +1436,10 @@ export function InboxWorkspace({
                             <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 border border-black/8 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#161a20]">
                                 <button
                                   type="button"
-                                  onClick={() => void summarizeThread()}
+                                  onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    void summarizeThread();
+                                  }}
                                   disabled={isSummarizing}
                                   className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -1900,7 +1447,7 @@ export function InboxWorkspace({
                               </button>
                               <div className="border-b border-black/6 pb-1 mb-1">
                                 <p className="px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                                  Reply stance
+                                  Reply style
                                 </p>
                                 <div className="flex gap-1 px-3 py-1">
                                   {(["firm", "collaborative", "exploratory"] as const).map((s) => (
@@ -1914,7 +1461,7 @@ export function InboxWorkspace({
                                           : "bg-secondary/60 text-foreground hover:bg-secondary/85"
                                       }`}
                                     >
-                                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                                      {replyStyleLabel(s)}
                                     </button>
                                   ))}
                                 </div>
@@ -1923,7 +1470,7 @@ export function InboxWorkspace({
                                   type="button"
                                   onClick={() => {
                                     setIsActionMenuOpen(false);
-                                    setIsLinkModalOpen(true);
+                                    setLinkModalOpen(true);
                                   }}
                                   className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
                                 >
@@ -1947,7 +1494,13 @@ export function InboxWorkspace({
                             {shouldShowPreviewUpdates ? (
                               <Collapsible
                                 open={arePreviewUpdatesOpen}
-                                onOpenChange={handlePreviewUpdatesOpenChange}
+                                onOpenChange={(open) =>
+                                  handlePreviewUpdatesOpenChange(
+                                    open,
+                                    hasUnseenPreviewUpdates,
+                                    latestPreviewUpdateAt
+                                  )
+                                }
                               >
                                 <section className="border border-black/6 px-4 py-3">
                                   <div className="flex items-center justify-between gap-3">
@@ -1976,7 +1529,9 @@ export function InboxWorkspace({
                                     </CollapsibleTrigger>
                                     <button
                                       type="button"
-                                      onClick={() => void clearPreviewUpdates()}
+                                      onClick={() =>
+                                        void clearPreviewUpdates(latestPreviewUpdateAt)
+                                      }
                                       disabled={hasUnseenPreviewUpdates}
                                       className="shrink-0 text-[11px] font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                                     >
@@ -2006,7 +1561,13 @@ export function InboxWorkspace({
                             {selectedThread.actionItems.length > 0 ? (
                               <Collapsible
                                 open={areActionItemsOpen}
-                                onOpenChange={handleActionItemsOpenChange}
+                                onOpenChange={(open) =>
+                                  handleActionItemsOpenChange(
+                                    open,
+                                    hasUnseenActionItems,
+                                    latestActionItemAt
+                                  )
+                                }
                               >
                                 <section className="border border-black/6 px-4 py-3">
                                   <CollapsibleTrigger asChild>
@@ -2091,20 +1652,6 @@ export function InboxWorkspace({
                               </section>
                             ) : null}
 
-                            {draft ? (
-                              <section className="border border-black/8 px-5 py-4">
-                                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                                  Draft reply
-                                </p>
-                                <p className="mt-3 text-[12px] font-semibold text-foreground">
-                                  {draft.subject}
-                                </p>
-                                <pre className="mt-3 whitespace-pre-wrap text-[12px] leading-6 text-foreground">
-                                  {draft.body}
-                                </pre>
-                              </section>
-                            ) : null}
-
                             {earlierMessages.length > 0 ? (
                               <section className="space-y-3">
                                 {earlierMessages.map((message) => (
@@ -2174,17 +1721,10 @@ export function InboxWorkspace({
                                   rows={1}
                                   value={replyBody}
                                   onChange={(event) => {
-                                    const nextValue = event.currentTarget.value;
-                                    event.currentTarget.style.height = "0px";
-                                    event.currentTarget.style.height = `${Math.max(24, event.currentTarget.scrollHeight)}px`;
-                                    setReplyBody(nextValue);
-                                    if (replyJourney === "ai_set") {
-                                      setDraftInstructions(nextValue);
-                                    } else if (replyJourney === "idle" || replyJourney === "user_set") {
-                                      setReplyJourney(
-                                        nextValue.trim().length > 0 ? "user_set" : "idle"
-                                      );
-                                    }
+                                    handleReplyBodyChange(
+                                      event.currentTarget.value,
+                                      event.currentTarget
+                                    );
                                   }}
                                   placeholder={
                                     replyJourney === "ai_set"
@@ -2243,7 +1783,7 @@ export function InboxWorkspace({
                                     className="rounded-none border-black/10 p-0"
                                   >
                                     <DropdownMenuItem
-                                      onSelect={() => setIsPromptCommandOpen(true)}
+                                      onSelect={() => setPromptCommandOpen(true)}
                                       className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
                                     >
                                       Add prompt
@@ -2396,7 +1936,7 @@ export function InboxWorkspace({
 
       <CommandDialog
         open={isPromptCommandOpen}
-        onOpenChange={setIsPromptCommandOpen}
+        onOpenChange={setPromptCommandOpen}
         title="Add draft prompt"
         description="Add guidance for the AI draft reply."
       >
@@ -2436,14 +1976,7 @@ export function InboxWorkspace({
           <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setDraftInstructions("");
-                  if (replyJourney === "ai_set") {
-                    setReplyBody("");
-                    setReplyJourney("idle");
-                  }
-                  setIsPromptCommandOpen(false);
-                }}
+                onClick={clearPromptDialog}
               className="inline-flex h-8 items-center px-3 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
             >
               Clear
@@ -2480,12 +2013,7 @@ export function InboxWorkspace({
                   className="rounded-none border-black/10 p-0"
                 >
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setDraft(null);
-                      setReplySubject("");
-                      setReplyBody("");
-                      void draftReply();
-                    }}
+                    onSelect={() => void usePromptForDraft()}
                     className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
                   >
                     Use prompt
@@ -2497,7 +2025,7 @@ export function InboxWorkspace({
         </div>
       </CommandDialog>
 
-      <Dialog open={isSummaryDialogOpen} onOpenChange={setIsSummaryDialogOpen}>
+      <Dialog open={isSummaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>AI Summary</DialogTitle>
@@ -2527,7 +2055,7 @@ export function InboxWorkspace({
               </div>
               <button
                 type="button"
-                onClick={() => setIsCandidateModalOpen(false)}
+                onClick={closeCandidateModal}
                 className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition hover:text-foreground"
                 aria-label="Close"
               >
@@ -2543,7 +2071,7 @@ export function InboxWorkspace({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setIsCandidateModalOpen(false)}
+                    onClick={closeCandidateModal}
                     className="mt-4 h-10 border border-black/10 px-5 text-sm font-medium text-foreground transition hover:border-black/20"
                   >
                     Keep checking
@@ -2621,7 +2149,7 @@ export function InboxWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => setIsCandidateModalOpen(false)}
+                onClick={closeCandidateModal}
                 className="h-9 border border-black/10 px-4 text-[13px] font-medium text-foreground transition hover:border-black/20"
               >
                 Keep checking
@@ -2676,7 +2204,7 @@ export function InboxWorkspace({
               </div>
               <button
                 type="button"
-                onClick={() => setIsLinkModalOpen(false)}
+                onClick={() => setLinkModalOpen(false)}
                 className="inline-flex h-9 w-9 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
                 aria-label="Close link partnership modal"
               >
@@ -2710,7 +2238,7 @@ export function InboxWorkspace({
               <div className="flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsLinkModalOpen(false)}
+                  onClick={() => setLinkModalOpen(false)}
                   className="h-11 border border-black/10 px-4 text-sm font-semibold text-foreground transition hover:border-black/20"
                 >
                   Cancel

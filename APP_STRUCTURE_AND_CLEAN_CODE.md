@@ -14,6 +14,7 @@ The goal is not just style. The goal is to make the codebase easy to read, easy 
 6. Prefer explicit data flow over hidden side effects.
 7. Prefer shared helpers over copied logic.
 8. Prefer stable, typed boundaries over ad hoc JSON shape handling.
+9. Give every piece of state one clear owner.
 
 ## High-Level App Structure
 
@@ -54,6 +55,8 @@ Rules:
 
 - Components should stay focused on rendering and UI state.
 - Shared behavior should move into helper modules or hooks.
+- If a component owns several related state transitions, extract a feature hook or move to `useReducer` before reaching for global state.
+- Shared, cross-tree browser state should be rare and explicit.
 - Large form editors should be split into smaller subcomponents when they start carrying business rules.
 - `components/ui/` should remain the home for low-level UI primitives.
 - Route-specific composition components are acceptable here if they are still UI-first and do not own domain rules.
@@ -75,6 +78,7 @@ Responsibilities:
 - Billing plan metadata, Stripe checkout orchestration, portal flows, and webhook reconciliation
 - Cached read models that sit between routes and domain services
 - External-service adapters such as Prisma, Supabase, and Inngest
+- Client-to-server draft mappers and normalization helpers for forms
 
 Rules:
 
@@ -82,6 +86,9 @@ Rules:
 - Keep side-effectful code separated from data transforms.
 - Keep repository mapping in dedicated mapper helpers.
 - Keep domain-specific logic out of UI components.
+- Treat Prisma/Postgres as the canonical source of durable app state unless there is a strong reason not to.
+- Keep Clerk metadata minimal and convenience-oriented.
+- Use Supabase for storage or infrastructure capabilities, not as a second canonical app-state database.
 
 ### `prisma/`
 
@@ -113,6 +120,8 @@ These boundaries reflect the repo as it exists today and should be treated as th
 - `lib/browser/` and `lib/stores/`: browser-only queue/state helpers
 - `components/ui/`: primitive UI building blocks
 - `components/figma/`: Figma-specific rendering or integration helpers
+- `components/use-*.ts`: feature-local client orchestration hooks for complex UI flows
+- `lib/*-draft.ts` and `lib/*-profile.ts`: shared normalization and payload-shaping helpers
 
 ## Recommended Layering
 
@@ -297,6 +306,106 @@ Examples:
 
 The app should move toward stable internal records rather than passing loose JSON through many layers.
 
+## Client State Ownership Rules
+
+State should live in the narrowest layer that can own it correctly.
+
+### Keep local component state when the data is purely presentational
+
+Use local `useState` for:
+
+- open/closed UI controls
+- hover, focus, popover, and tooltip visibility
+- one-off text input that is not shared
+- local loading indicators
+
+### Move to `useReducer` or a feature hook when transitions are coupled
+
+If a feature has:
+
+- multiple fields that reset together
+- optimistic UI plus request lifecycle
+- step transitions
+- derived flags that depend on the same underlying state
+
+then keep it local, but pull it into a dedicated hook or reducer.
+
+Current repo examples:
+
+- `components/use-inbox-thread-selection.ts`
+- `components/use-inbox-reply-composer.ts`
+- `components/use-inbox-candidate-discovery.ts`
+- `components/use-inbox-thread-detail-state.ts`
+- `components/onboarding/profile-onboarding-modal.tsx` using a reducer-backed flow
+
+### Use URL state for shareable and navigable UI state
+
+If state should survive refreshes, support links, or be navigable with browser history, prefer URL search params over in-memory stores.
+
+Current examples:
+
+- inbox filters
+- selected inbox thread
+- route-level tabs and filters
+
+### Use Zustand only for cross-tree, client-only state
+
+Zustand is appropriate when all of these are true:
+
+- the state is needed by multiple distant client components
+- it is not the canonical server record
+- it does not naturally belong in the URL
+- it is still useful before or between saves
+
+Good fit in this repo:
+
+- intake draft/session UI state in `lib/stores/`
+
+Poor fit in this repo:
+
+- inbox thread details
+- profile records
+- onboarding completion state
+- notification records
+- billing entitlements
+
+### Put durable app state in Prisma/Postgres
+
+Use the database as the source of truth for:
+
+- profiles and settings
+- onboarding completion
+- notifications
+- linked inbox threads
+- billing and entitlement state
+
+### Keep Clerk metadata tiny
+
+Clerk is identity and session-adjacent metadata, not the main profile store.
+
+Good Clerk metadata candidates:
+
+- display name
+- small onboarding flags
+- other tiny identity conveniences needed in session claims
+
+Do not treat Clerk metadata as the durable home for:
+
+- full profile settings
+- notification preferences
+- tax, payout, or billing data
+- large mirrored JSON blobs
+
+### Keep Supabase in its infrastructure role
+
+In this repo, Supabase is currently best treated as:
+
+- file storage
+- supporting infrastructure
+- possible future realtime transport if we intentionally add that need
+
+It should not become a second source of truth for ordinary product state without an explicit architectural reason.
+
 ## Testing Rules
 
 ### Test the seam, not everything twice
@@ -330,6 +439,7 @@ Whenever a shared helper is introduced, add a test that proves:
 
 - `app/`: route-level orchestration only
 - `components/`: rendering and interaction only
+- `components/use-*.ts`: complex client-side feature orchestration only
 - `lib/analysis/`: extraction, scoring, merging, summary logic
 - `lib/deals.ts` and `lib/intake.ts`: domain orchestration
 - `lib/email/`: inbox linking, email AI, and email-domain coordination
@@ -337,6 +447,7 @@ Whenever a shared helper is introduced, add a test that proves:
 - `lib/assistant/`: assistant prompt/runtime/tool layers
 - `lib/repository/`: persistence adapters and mapping
 - `lib/cached-data.ts`: cached read-model composition for pages
+- `lib/*-draft.ts`: shared form normalization and request payload builders
 - `prisma/`: schema and migrations only
 - `lib/*-metadata.ts`: shared config and lookup data
 
@@ -361,6 +472,7 @@ Billing is now a first-class domain slice and should follow these boundaries.
 - Clerk remains identity/auth, not the billing source of truth.
 - Stripe is the external billing system of record for checkout, subscriptions, invoices, and the customer portal.
 - Clerk metadata may mirror billing state later, but only as a read-only convenience layer.
+- Supabase is not part of the billing state model.
 
 ### Billing layer map
 
@@ -408,7 +520,8 @@ The following files are beyond the "easy to understand in one pass" bar and shou
 - `lib/billing/service.ts`
 - `lib/analysis/llm.ts`
 - `app/app/page.tsx`
-- `components/profile-editor.tsx`
+- `components/custom-auth-screen.tsx`
+- `components/notifications-center.tsx`
 - `components/terms-editor.tsx`
 
 For these files, the default expectation is:
@@ -417,6 +530,13 @@ For these files, the default expectation is:
 - separate read-model composition from write commands
 - move repeated form section logic into smaller helpers or subcomponents
 - keep route pages focused on composition instead of accumulating dashboard business rules
+
+Recent examples of the preferred direction in this repo:
+
+- inbox state was split out of `components/inbox-workspace.tsx` into feature hooks for thread selection, reply composition, candidate discovery, and thread-detail state
+- profile and settings payload shaping moved into `lib/profile-draft.ts`
+- onboarding normalization moved into `lib/onboarding-draft.ts`
+- Clerk profile sync was reduced to a minimal mirrored projection instead of broad metadata duplication
 
 For `lib/billing/service.ts` specifically, the next split should move toward:
 

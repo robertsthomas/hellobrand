@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useReducer, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Hand, X } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  buildProfileOnboardingSubmission,
+  type ProfileOnboardingDraft
+} from "@/lib/onboarding-draft";
 import type { ProfilePlatform } from "@/lib/profile-metadata";
 import {
   AlertDialog,
@@ -23,6 +27,63 @@ import { OnboardingStepProfile } from "@/components/onboarding/onboarding-step-p
 import { OnboardingStepSuccess } from "@/components/onboarding/onboarding-step-success";
 
 const TOTAL_STEPS = 3;
+
+type OnboardingStep = 1 | 2 | 3 | "success";
+
+type OnboardingState = ProfileOnboardingDraft & {
+  step: OnboardingStep;
+  showExitDialog: boolean;
+};
+
+type OnboardingAction =
+  | { type: "set_step"; step: OnboardingStep }
+  | { type: "complete" }
+  | { type: "set_show_exit_dialog"; value: boolean }
+  | {
+      type: "set_field";
+      field: keyof ProfileOnboardingDraft;
+      value: ProfileOnboardingDraft[keyof ProfileOnboardingDraft];
+    };
+
+const initialState: OnboardingState = {
+  step: 1,
+  displayName: "",
+  contactEmail: "",
+  primaryHandle: "",
+  selectedPlatforms: [],
+  platformHandles: {},
+  contentCategory: "",
+  bio: "",
+  accentColor: "",
+  showExitDialog: false
+};
+
+function reducer(state: OnboardingState, action: OnboardingAction): OnboardingState {
+  switch (action.type) {
+    case "set_step":
+      return {
+        ...state,
+        step: action.step
+      };
+    case "complete":
+      return {
+        ...state,
+        step: "success"
+      };
+    case "set_show_exit_dialog":
+      return {
+        ...state,
+        showExitDialog: action.value
+      };
+    case "set_field":
+      return {
+        ...state,
+        [action.field]: action.value
+      };
+    default:
+      return state;
+  }
+}
 
 function hexToRgbTriplet(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -96,38 +157,62 @@ export function ProfileOnboardingModal({
   const { signOut } = useClerk();
   const [isPending, startTransition] = useTransition();
 
-  const [step, setStep] = useState<1 | 2 | 3 | "success">(1);
-  const [displayName, setDisplayName] = useState("");
-  const [primaryHandle, setPrimaryHandle] = useState("");
-  const [selectedPlatforms, setSelectedPlatforms] = useState<ProfilePlatform[]>(
-    []
-  );
-  const [platformHandles, setPlatformHandles] = useState<
-    Record<string, string>
-  >({});
-  const [contentCategory, setContentCategory] = useState("");
-  const [bio, setBio] = useState("");
-  const [accentColor, setAccentColor] = useState("");
-  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [state, dispatch] = useReducer(reducer, {
+    ...initialState,
+    contactEmail: viewer.email
+  });
+  const {
+    step,
+    displayName,
+    contactEmail,
+    primaryHandle,
+    selectedPlatforms,
+    platformHandles,
+    contentCategory,
+    bio,
+    accentColor,
+    showExitDialog
+  } = state;
 
   useAccentPreview(accentColor);
+
+  const setDisplayName = (value: string) =>
+    dispatch({ type: "set_field", field: "displayName", value });
+  const setPrimaryHandle = (value: string) =>
+    dispatch({ type: "set_field", field: "primaryHandle", value });
+  const setSelectedPlatforms = (value: ProfilePlatform[]) =>
+    dispatch({ type: "set_field", field: "selectedPlatforms", value });
+  const setPlatformHandles = (value: Record<string, string>) =>
+    dispatch({ type: "set_field", field: "platformHandles", value });
+  const setContentCategory = (value: string) =>
+    dispatch({ type: "set_field", field: "contentCategory", value });
+  const setBio = (value: string) =>
+    dispatch({ type: "set_field", field: "bio", value });
+  const setAccentColor = (value: string) =>
+    dispatch({ type: "set_field", field: "accentColor", value });
+  const setStep = (nextStep: OnboardingStep) =>
+    dispatch({ type: "set_step", step: nextStep });
+  const setShowExitDialog = (value: boolean) =>
+    dispatch({ type: "set_show_exit_dialog", value });
 
   const handleComplete = () => {
     startTransition(async () => {
       try {
+        const payload = buildProfileOnboardingSubmission({
+          displayName,
+          contactEmail,
+          primaryHandle,
+          selectedPlatforms,
+          platformHandles,
+          contentCategory,
+          bio,
+          accentColor
+        });
+
         const response = await fetch("/api/onboarding", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            displayName,
-            contactEmail: viewer.email,
-            primaryHandle,
-            selectedPlatforms,
-            platformHandles,
-            contentCategory,
-            bio: bio.trim() || null,
-            accentColor: accentColor || null
-          })
+          body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -136,7 +221,7 @@ export function ProfileOnboardingModal({
           return;
         }
 
-        setStep("success");
+        dispatch({ type: "complete" });
       } catch {
         toast.error("Something went wrong. Please try again.");
       }
@@ -199,7 +284,7 @@ export function ProfileOnboardingModal({
             <OnboardingStepIdentity
               displayName={displayName}
               setDisplayName={setDisplayName}
-              contactEmail={viewer.email}
+              contactEmail={contactEmail}
               primaryHandle={primaryHandle}
               setPrimaryHandle={setPrimaryHandle}
               accentColor={accentColor}

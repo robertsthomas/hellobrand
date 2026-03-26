@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
 import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
@@ -68,8 +69,7 @@ async function upsertViewerFromSession() {
   }
 
   // Read display name from Clerk public metadata if synced from profile
-  const publicMeta = (claims?.publicMetadata ?? claims?.public_metadata) as Record<string, unknown> | undefined;
-  const metaDisplayName = firstString(publicMeta?.displayName);
+  const metaDisplayName = getClerkMetadataDisplayName(claims);
 
   if (!process.env.DATABASE_URL) {
     return {

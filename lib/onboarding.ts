@@ -1,9 +1,9 @@
+import { buildProfileOnboardingSubmission } from "@/lib/onboarding-draft";
 import { prisma } from "@/lib/prisma";
 import {
   parseProfileMetadata,
   serializeProfileMetadata,
-  type ProfilePlatform,
-  PROFILE_PLATFORM_OPTIONS
+  type ProfilePlatform
 } from "@/lib/profile-metadata";
 import { updateProfileForViewer } from "@/lib/profile";
 import type {
@@ -115,16 +115,6 @@ export function isProfileOnboardingComplete(
 /*  Complete profile onboarding                                        */
 /* ------------------------------------------------------------------ */
 
-function normalizeHandle(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
-}
-
-function isValidPlatform(value: string): value is ProfilePlatform {
-  return PROFILE_PLATFORM_OPTIONS.includes(value as ProfilePlatform);
-}
-
 export async function completeProfileOnboarding(
   viewer: Viewer,
   input: {
@@ -138,8 +128,20 @@ export async function completeProfileOnboarding(
     accentColor?: string | null;
   }
 ) {
-  const normalizedPrimaryHandle = normalizeHandle(input.primaryHandle);
-  const validPlatforms = input.selectedPlatforms.filter(isValidPlatform);
+  const submission = buildProfileOnboardingSubmission({
+    displayName: input.displayName,
+    contactEmail: input.contactEmail,
+    primaryHandle: input.primaryHandle,
+    selectedPlatforms: input.selectedPlatforms.filter(
+      (platform): platform is ProfilePlatform => typeof platform === "string"
+    ),
+    platformHandles: input.platformHandles,
+    contentCategory: input.contentCategory,
+    bio: input.bio ?? "",
+    accentColor: input.accentColor ?? ""
+  });
+  const normalizedPrimaryHandle = submission.primaryHandle;
+  const validPlatforms = submission.selectedPlatforms;
 
   if (validPlatforms.length === 0) {
     throw new Error("At least one valid platform is required.");
@@ -147,10 +149,7 @@ export async function completeProfileOnboarding(
 
   // Build social handles from platform selections
   const socialHandles = validPlatforms.map((platform, index) => {
-    const customHandle = input.platformHandles[platform];
-    const handle = customHandle?.trim()
-      ? normalizeHandle(customHandle)
-      : normalizedPrimaryHandle;
+    const handle = submission.platformHandles[platform] ?? normalizedPrimaryHandle;
 
     return {
       id: `social-${platform}-${index + 1}`,
@@ -171,8 +170,8 @@ export async function completeProfileOnboarding(
   const updatedMetadata = {
     ...existingMetadata,
     primaryPlatform: validPlatforms[0],
-    contentCategory: input.contentCategory.trim() || null,
-    bio: input.bio?.trim() || null,
+    contentCategory: submission.contentCategory || null,
+    bio: submission.bio,
     socialHandles
   };
 
@@ -180,13 +179,13 @@ export async function completeProfileOnboarding(
 
   // Update profile
   const profile = await updateProfileForViewer(viewer, {
-    displayName: input.displayName.trim(),
+    displayName: submission.displayName,
     creatorLegalName: existingProfile.creatorLegalName,
     businessName: normalizedPrimaryHandle,
-    contactEmail: input.contactEmail.trim(),
+    contactEmail: submission.contactEmail,
     preferredSignature: existingProfile.preferredSignature,
     payoutDetails: serializedMetadata,
-    accentColor: input.accentColor || null
+    accentColor: submission.accentColor
   });
 
   // Mark onboarding as complete

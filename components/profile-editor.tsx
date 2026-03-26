@@ -21,13 +21,15 @@ import {
 import {
   PROFILE_CATEGORY_OPTIONS,
   PROFILE_PLATFORM_OPTIONS,
-  parseProfileMetadata,
-  serializeProfileMetadata,
-  splitSocialHandles,
   type ProfilePlatform,
   type SocialHandleEntry
 } from "@/lib/profile-metadata";
-import { createClientRowId } from "@/lib/row-identity";
+import {
+  buildProfileEditorDraft,
+  buildProfileEditorPatch,
+  emptyDealHandle,
+  type ProfileEditorDraft
+} from "@/lib/profile-draft";
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import type { ProfileAuditRecord, ProfileRecord } from "@/lib/types";
 
@@ -62,41 +64,6 @@ function deriveInitials(value: string) {
 
 function iconForPlatform(platform: ProfilePlatform) {
   return <SocialPlatformIcon platform={platform} />;
-}
-
-function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
-  const platforms: ProfilePlatform[] = [
-    "instagram",
-    "youtube",
-    "tiktok",
-    "twitter"
-  ];
-
-  return platforms.map((platform) => {
-    const existing = initialHandles.find(
-      (entry) => entry.platform === platform && !entry.partnershipContext
-    );
-
-    return (
-      existing ?? {
-        id: createClientRowId(platform),
-        platform,
-        handle: "",
-        audienceLabel: "",
-        partnershipContext: null
-      }
-    );
-  });
-}
-
-function emptyDealHandle(): SocialHandleEntry {
-  return {
-    id: createClientRowId("deal"),
-    platform: "instagram",
-    handle: "",
-    audienceLabel: "",
-    partnershipContext: ""
-  };
 }
 
 function SectionHeader({
@@ -182,32 +149,9 @@ export function ProfileEditor({
   initialAudit: ProfileAuditRecord[];
 }) {
   const router = useRouter();
-  const { metadata } = parseProfileMetadata(initialProfile.payoutDetails);
-  const splitHandles = splitSocialHandles(metadata.socialHandles);
-
-  const [form, setForm] = useState({
-    displayName: initialProfile.displayName ?? "",
-    creatorLegalName: initialProfile.creatorLegalName ?? "",
-    businessName: initialProfile.businessName ?? "",
-    contactEmail: initialProfile.contactEmail ?? initialEmail,
-    preferredSignature: initialProfile.preferredSignature ?? "",
-    bio: metadata.bio ?? "",
-    location: metadata.location ?? "",
-    primaryPlatform: metadata.primaryPlatform ?? "instagram",
-    contentCategory: metadata.contentCategory ?? PROFILE_CATEGORY_OPTIONS[0],
-    taxId: metadata.taxId ?? "",
-    rateCardUrl: metadata.rateCardUrl ?? "",
-    payoutNotes: metadata.payoutNotes ?? "",
-    generalHandles: buildGeneralHandles(splitHandles.generalHandles),
-    dealHandles:
-      splitHandles.dealSpecificHandles.length > 0
-        ? splitHandles.dealSpecificHandles.map((entry) => ({
-            ...entry,
-            audienceLabel: entry.audienceLabel ?? "",
-            partnershipContext: entry.partnershipContext ?? ""
-          }))
-        : [emptyDealHandle()]
-  });
+  const [form, setForm] = useState<ProfileEditorDraft>(() =>
+    buildProfileEditorDraft(initialProfile, initialEmail)
+  );
   const [audit, setAudit] = useState(initialAudit);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -273,44 +217,12 @@ export function ProfileEditor({
     setSuccessMessage(null);
 
     try {
-      const socialHandles = [
-        ...form.generalHandles.map((entry) => ({
-          ...entry,
-          audienceLabel: entry.audienceLabel?.trim() || null
-        })),
-        ...form.dealHandles.map((entry) => ({
-          ...entry,
-          audienceLabel: entry.audienceLabel?.trim() || null,
-          partnershipContext: entry.partnershipContext?.trim() || null
-        }))
-      ];
-
       const response = await fetch("/api/profile", {
         method: "PATCH",
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify({
-          displayName: form.displayName.trim() || null,
-          creatorLegalName: form.creatorLegalName.trim() || null,
-          businessName: form.businessName.trim() || null,
-          contactEmail: form.contactEmail.trim() || null,
-          preferredSignature: form.preferredSignature.trim() || null,
-          payoutDetails: serializeProfileMetadata({
-            bio: form.bio.trim() || null,
-            location: form.location.trim() || null,
-            primaryPlatform: form.primaryPlatform as ProfilePlatform,
-            contentCategory: form.contentCategory.trim() || null,
-            taxId: form.taxId.trim() || null,
-            rateCardUrl: form.rateCardUrl.trim() || null,
-            payoutNotes: form.payoutNotes.trim() || null,
-            socialHandles
-          }),
-          defaultCurrency: initialProfile.defaultCurrency ?? "USD",
-          reminderLeadDays: initialProfile.reminderLeadDays ?? 3,
-          conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
-          paymentRemindersEnabled: initialProfile.paymentRemindersEnabled
-        })
+        body: JSON.stringify(buildProfileEditorPatch(form, initialProfile))
       });
 
       const payload = await response.json();

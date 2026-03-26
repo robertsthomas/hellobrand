@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - link "HelloBrand Creator partnership operating system" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img [ref=e9]
+          - generic [ref=e14]:
+            - paragraph [ref=e15]: HelloBrand
+            - paragraph [ref=e16]: Creator partnership operating system
+        - paragraph [ref=e18]:
+          - text: Need an account?
+          - button "Sign up" [ref=e19] [cursor=pointer]
+      - generic [ref=e20]:
+        - paragraph [ref=e21]: Log in to your account
+        - heading "Welcome back" [level=1] [ref=e22]
+        - paragraph [ref=e23]: Sign in with your email or username and password.
+        - generic [ref=e24]:
+          - generic [ref=e25]:
+            - generic [ref=e26]: Email or username
+            - generic [ref=e27]:
+              - img
+              - textbox "Email or username" [ref=e28]:
+                - /placeholder: Enter your email or username
+          - generic [ref=e29]:
+            - generic [ref=e30]: Password
+            - generic [ref=e31]:
+              - img
+              - textbox "Password" [ref=e32]:
+                - /placeholder: Enter your password
+          - button "Log in" [disabled]:
+            - text: Log in
+            - img
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - paragraph [ref=e39]: Your partnerships, organized
+        - heading "Stop digging through emails for deal details." [level=2] [ref=e40]
+        - paragraph [ref=e41]: Upload a contract or connect your inbox. HelloBrand pulls out the terms, deadlines, and payments so you don't have to.
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - img [ref=e44]
+            - paragraph [ref=e47]: Contracts broken down into plain English
+          - generic [ref=e48]:
+            - img [ref=e49]
+            - paragraph [ref=e52]: Emails matched to the right partnership
+          - generic [ref=e53]:
+            - img [ref=e54]
+            - paragraph [ref=e57]: Every deal organized in one workspace
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - paragraph [ref=e60]: Glossier · Spring campaign
+          - paragraph [ref=e61]: $4,200 · Net 30
+          - paragraph [ref=e62]: "3 Instagram Reels, 1 TikTok. Exclusivity: 60 days, skincare only."
+        - generic [ref=e63]:
+          - paragraph [ref=e64]: Flagged
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - paragraph [ref=e67]: Perpetual usage
+              - paragraph [ref=e68]: Contract says "in perpetuity," brief says 6 months.
+            - generic [ref=e69]:
+              - paragraph [ref=e70]: Late payment
+              - paragraph [ref=e71]: Invoice is 12 days past due.
+        - generic [ref=e72]:
+          - paragraph [ref=e73]: Next up
+          - generic [ref=e74]:
+            - generic [ref=e75]:
+              - paragraph [ref=e76]: Reels draft due Mar 28
+              - paragraph [ref=e77]: First cut for Glossier spring campaign.
+            - generic [ref=e78]:
+              - paragraph [ref=e79]: Reply to Nike by Thu
+              - paragraph [ref=e80]: Marcus asked about the revised exclusivity window.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e86] [cursor=pointer]:
+    - img [ref=e87]
+  - alert [ref=e90]

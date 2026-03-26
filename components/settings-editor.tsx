@@ -4,7 +4,11 @@ import type { FormEvent, InputHTMLAttributes } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { parseProfileMetadata, serializeProfileMetadata } from "@/lib/profile-metadata";
+import {
+  buildProfileSettingsDraft,
+  buildProfileSettingsPatch,
+  type ProfileSettingsDraft
+} from "@/lib/profile-draft";
 import type { ProfileRecord } from "@/lib/types";
 
 const ACCENT_PRESETS = [
@@ -87,28 +91,16 @@ export function SettingsEditor({
   initialEmail: string;
 }) {
   const router = useRouter();
-  const { metadata } = parseProfileMetadata(initialProfile.payoutDetails);
-  const [form, setForm] = useState({
-    displayName: initialProfile.displayName ?? "",
-    creatorLegalName: initialProfile.creatorLegalName ?? "",
-    businessName: initialProfile.businessName ?? "",
-    contactEmail: initialProfile.contactEmail ?? initialEmail,
-    preferredSignature: initialProfile.preferredSignature ?? "",
-    defaultCurrency: initialProfile.defaultCurrency ?? "USD",
-    reminderLeadDays: String(initialProfile.reminderLeadDays ?? 3),
-    conflictAlertsEnabled: initialProfile.conflictAlertsEnabled,
-    paymentRemindersEnabled: initialProfile.paymentRemindersEnabled,
-    emailNotificationsEnabled: initialProfile.emailNotificationsEnabled,
-    accentColor: initialProfile.accentColor ?? ""
-  });
-  type SettingsForm = typeof form;
+  const [form, setForm] = useState<ProfileSettingsDraft>(() =>
+    buildProfileSettingsDraft(initialProfile, initialEmail)
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  function updateFormField<Key extends keyof SettingsForm>(
+  function updateFormField<Key extends keyof ProfileSettingsDraft>(
     key: Key,
-    value: SettingsForm[Key]
+    value: ProfileSettingsDraft[Key]
   ) {
     setForm((current) => ({
       ...current,
@@ -128,23 +120,7 @@ export function SettingsEditor({
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify({
-          displayName: form.displayName.trim() || null,
-          creatorLegalName: form.creatorLegalName.trim() || null,
-          businessName: form.businessName.trim() || null,
-          contactEmail: form.contactEmail.trim() || null,
-          preferredSignature: form.preferredSignature.trim() || null,
-          payoutDetails: serializeProfileMetadata(metadata),
-          defaultCurrency: form.defaultCurrency.trim() || "USD",
-          reminderLeadDays:
-            form.reminderLeadDays.trim().length > 0
-              ? Number(form.reminderLeadDays)
-              : 3,
-          conflictAlertsEnabled: form.conflictAlertsEnabled,
-          paymentRemindersEnabled: form.paymentRemindersEnabled,
-          emailNotificationsEnabled: form.emailNotificationsEnabled,
-          accentColor: form.accentColor || null
-        })
+        body: JSON.stringify(buildProfileSettingsPatch(form, initialProfile))
       });
 
       const payload = await response.json();

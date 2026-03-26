@@ -1,7 +1,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 
+import { buildClerkProfileSyncPayload } from "@/lib/clerk-profile";
 import { prisma } from "@/lib/prisma";
-import { parseProfileMetadata, type ProfileMetadata } from "@/lib/profile-metadata";
 import type { ProfileAuditRecord, ProfileRecord, Viewer } from "@/lib/types";
 
 function buildFileBackedProfile(viewer: Viewer): ProfileRecord {
@@ -284,44 +284,5 @@ export async function listProfileAuditForViewer(viewer: Viewer, limit = 8) {
 
 async function syncProfileToClerk(userId: string, profile: ProfileRecord) {
   const client = await clerkClient();
-  const metadata = parseProfileMetadata(profile.payoutDetails).metadata;
-
-  const generalHandles = metadata.socialHandles
-    .filter((h) => !h.partnershipContext && h.handle.trim())
-    .map((h) => ({ platform: h.platform, handle: h.handle, audience: h.audienceLabel }));
-
-  // Public metadata: visible from frontend, used for display
-  const publicMetadata: Record<string, unknown> = {
-    displayName: profile.displayName,
-    businessName: profile.businessName,
-    bio: metadata.bio,
-    location: metadata.location,
-    primaryPlatform: metadata.primaryPlatform,
-    contentCategory: metadata.contentCategory,
-    socialHandles: generalHandles,
-    defaultCurrency: profile.defaultCurrency,
-    profileUpdatedAt: profile.updatedAt
-  };
-
-  // Private metadata: server-only, never exposed to browser
-  const privateMetadata: Record<string, unknown> = {
-    creatorLegalName: profile.creatorLegalName,
-    contactEmail: profile.contactEmail,
-    preferredSignature: profile.preferredSignature,
-    taxId: metadata.taxId,
-    rateCardUrl: metadata.rateCardUrl,
-    payoutNotes: metadata.payoutNotes,
-    reminderLeadDays: profile.reminderLeadDays,
-    conflictAlertsEnabled: profile.conflictAlertsEnabled,
-    paymentRemindersEnabled: profile.paymentRemindersEnabled,
-    emailNotificationsEnabled: profile.emailNotificationsEnabled
-  };
-
-  // Update Clerk user profile + metadata
-  await client.users.updateUser(userId, {
-    firstName: profile.displayName?.split(/\s+/)[0] ?? undefined,
-    lastName: profile.displayName?.split(/\s+/).slice(1).join(" ") || undefined,
-    publicMetadata,
-    privateMetadata
-  });
+  await client.users.updateUser(userId, buildClerkProfileSyncPayload(profile));
 }
