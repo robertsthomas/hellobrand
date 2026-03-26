@@ -15,7 +15,7 @@ import {
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-import { formatCurrency, humanizeToken } from "@/lib/utils";
+import { formatCurrency, humanizeToken, stripHtmlTags } from "@/lib/utils";
 
 function presentText(value: string | null | undefined) {
   if (!value) {
@@ -633,9 +633,9 @@ async function IntakeReviewContent({
                                 {group.snippets.map((snippet, index) => (
                                   <div
                                     key={`${group.id}-${index}`}
-                                    className="text-sm text-black/70 dark:text-white/70"
+                                    className="whitespace-pre-wrap text-sm text-black/70 dark:text-white/70"
                                   >
-                                    {snippet}
+                                    {stripHtmlTags(snippet) || "Excerpt unavailable."}
                                   </div>
                                 ))}
                               </div>

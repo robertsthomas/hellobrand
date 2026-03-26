@@ -1,14 +1,23 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { Pencil, X, Check } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { Check, LoaderCircle, Pencil, X } from "lucide-react";
 
-import { saveTermsAction } from "@/app/actions";
+import { confirmTermsReviewAction, saveTermsAction } from "@/app/actions";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import {
   EditableStringListField,
   TermsArrayFieldsEditor
 } from "@/components/terms-array-fields-editor";
+import { SubmitButton } from "@/components/submit-button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import type {
   DealCategory,
   DealTermsRecord,
@@ -16,7 +25,7 @@ import type {
   ExtractionEvidenceRecord,
   ExtractionResultRecord
 } from "@/lib/types";
-import { humanizeToken } from "@/lib/utils";
+import { humanizeToken, stripHtmlTags } from "@/lib/utils";
 
 const DEAL_CATEGORY_OPTIONS: DealCategory[] = [
   "beauty_personal_care",
@@ -47,31 +56,102 @@ const SELECT_CLASS = INPUT_CLASS;
 const TEXTAREA_CLASS =
   "w-full resize-none border border-black/10 bg-white px-4 py-3 text-[15px] text-foreground shadow-none outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20";
 
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'");
-}
+const SECTION_FIELDS = {
+  partnership: ["brandName", "campaignName", "creatorName", "agencyName", "brandCategory"],
+  payment: ["paymentAmount", "paymentTerms"],
+  deliverables: ["deliverables"],
+  usage: ["usageRights"],
+  exclusivity: ["exclusivity", "exclusivityRestrictions"],
+  termination: ["termination", "governingLaw"]
+} as const;
 
-function stripHtmlTags(value: string) {
-  return decodeHtmlEntities(value)
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|tr|li|table)>/gi, "\n")
-    .replace(/<(td|th)[^>]*>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-}
+const FIELD_LABELS: Record<string, string> = {
+  brandName: "Brand name",
+  campaignName: "Campaign name",
+  creatorName: "Creator name",
+  agencyName: "Agency name",
+  brandCategory: "Brand category",
+  paymentAmount: "Payment amount",
+  paymentTerms: "Payment terms",
+  deliverables: "Deliverables",
+  usageRights: "Usage rights summary",
+  exclusivity: "Exclusivity summary",
+  exclusivityRestrictions: "Restricted categories",
+  termination: "Termination summary",
+  governingLaw: "Governing law"
+};
 
 function fieldValue(value: string | null | undefined) {
   if (!value) return "";
   return stripHtmlTags(value);
+}
+
+function formatReviewValue(
+  terms: DealTermsRecord | null,
+  fieldPath: string
+) {
+  switch (fieldPath) {
+    case "brandCategory":
+      return terms?.brandCategory ? dealCategoryLabel(terms.brandCategory) : "Not set";
+    case "paymentAmount":
+      return terms?.paymentAmount != null ? `${terms.paymentAmount} ${terms?.currency ?? "USD"}` : "Not set";
+    case "deliverables":
+      return terms?.deliverables?.length
+        ? `${terms.deliverables.length} deliverable${terms.deliverables.length === 1 ? "" : "s"}`
+        : "No deliverables";
+    case "exclusivityRestrictions":
+      return (terms?.restrictedCategories ?? []).length > 0
+        ? (terms?.restrictedCategories ?? []).join(", ")
+        : fieldValue(terms?.exclusivityRestrictions);
+    default: {
+      const value = terms?.[fieldPath as keyof DealTermsRecord];
+      if (typeof value === "boolean") return value ? "Yes" : "No";
+      if (typeof value === "number") return String(value);
+      if (typeof value === "string") return fieldValue(value);
+      if (Array.isArray(value)) {
+        if (value.length === 0) return "None";
+        return value.join(", ");
+      }
+      return "Not set";
+    }
+  }
+}
+
+function reviewBadgeLabel(count: number) {
+  return `${count} review item${count === 1 ? "" : "s"}`;
+}
+
+function structuredReadOnlyRows(value: string) {
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return null;
+  }
+
+  const rows: Array<{ label: string; value: string }> = [];
+
+  for (const line of lines) {
+    const match = line.match(/^([^:]{2,48}):\s*(.*)$/);
+    if (match) {
+      rows.push({
+        label: match[1].trim(),
+        value: match[2].trim() || "Not set"
+      });
+      continue;
+    }
+
+    if (rows.length === 0) {
+      return null;
+    }
+
+    const previous = rows[rows.length - 1];
+    previous.value = `${previous.value} ${line}`.trim();
+  }
+
+  return rows.length >= 2 ? rows : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -82,13 +162,17 @@ function Section({
   title,
   description,
   editing,
+  reviewCount = 0,
   onToggleEdit,
+  onOpenReview,
   children
 }: {
   title: string;
   description?: string;
   editing: boolean;
+  reviewCount?: number;
   onToggleEdit: () => void;
+  onOpenReview?: () => void;
   children: ReactNode;
 }) {
   return (
@@ -100,17 +184,28 @@ function Section({
             <p className="text-sm text-muted-foreground">{description}</p>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
-            editing
-              ? "border-primary/20 bg-primary/5 text-primary"
-              : "border-black/8 text-black/40 hover:border-black/15 hover:text-black/60 dark:border-white/10 dark:text-white/40 dark:hover:border-white/20 dark:hover:text-white/60"
-          }`}
-        >
-          {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          {reviewCount > 0 && onOpenReview ? (
+            <button
+              type="button"
+              onClick={onOpenReview}
+              className="inline-flex h-8 items-center justify-center border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
+            >
+              {reviewBadgeLabel(reviewCount)}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onToggleEdit}
+            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
+              editing
+                ? "border-primary/20 bg-primary/5 text-primary"
+                : "border-black/8 text-black/40 hover:border-black/15 hover:text-black/60 dark:border-white/10 dark:text-white/40 dark:hover:border-white/20 dark:hover:text-white/60"
+            }`}
+          >
+            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+          </button>
+        </div>
       </div>
       {children}
     </section>
@@ -126,6 +221,26 @@ function ReadOnlyValue({ value, placeholder }: { value: string; placeholder?: st
   if (!display) {
     return <span className="text-[15px] leading-7 text-black/30 dark:text-white/30">{placeholder ?? "Not set"}</span>;
   }
+
+  const rows = structuredReadOnlyRows(display);
+  if (rows) {
+    return (
+      <dl className="grid gap-3">
+        {rows.map((row, index) => (
+          <div
+            key={`${row.label}-${index}`}
+            className="grid gap-1 border-b border-black/6 pb-3 last:border-b-0 last:pb-0 dark:border-white/10"
+          >
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/45">
+              {row.label}
+            </dt>
+            <dd className="text-[15px] leading-7 text-foreground">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+
   return <span className="whitespace-pre-wrap text-[15px] leading-7 text-foreground">{display}</span>;
 }
 
@@ -190,7 +305,9 @@ function EvidenceList({
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
               {sections.find((s) => s.id === entry.sectionId)?.title ?? "Detected in document"}
             </p>
-            <p className="mt-1 text-xs leading-5 text-black/60 dark:text-white/65">{entry.snippet}</p>
+            <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-black/60 dark:text-white/65">
+              {fieldValue(entry.snippet) || "Excerpt unavailable."}
+            </p>
           </div>
         ))}
       </div>
@@ -198,47 +315,85 @@ function EvidenceList({
   );
 }
 
-function ConflictCallout({ fieldPath, extractionResults }: { fieldPath: string; extractionResults: ExtractionResultRecord[] }) {
-  const matches = extractionResults.filter((r) => r.conflicts.includes(fieldPath));
-  if (matches.length === 0) return null;
-  return (
-    <div className="border-l-2 border-clay/60 bg-clay/5 px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-clay">Needs review</p>
-      <p className="mt-1 text-xs leading-5 text-black/65 dark:text-white/70">
-        Conflicting extracted values were detected for {humanizeToken(fieldPath)}.
-        Confirm this field before relying on it in outreach or tracking.
-      </p>
-    </div>
-  );
-}
-
 function Signals({
   fields,
   evidence,
-  sections,
-  extractionResults
+  sections
 }: {
   fields: string[];
   evidence: ExtractionEvidenceRecord[];
   sections: DocumentSectionRecord[];
-  extractionResults: ExtractionResultRecord[];
 }) {
-  const hasAny = fields.some(
-    (f) =>
-      evidence.some((e) => e.fieldPath === f) ||
-      extractionResults.some((r) => r.conflicts.includes(f))
-  );
+  const hasAny = fields.some((f) => evidence.some((e) => e.fieldPath === f));
   if (!hasAny) return null;
 
   return (
     <div className="space-y-2">
       {fields.map((f) => (
         <div key={f} className="space-y-2">
-          <ConflictCallout fieldPath={f} extractionResults={extractionResults} />
           <EvidenceList fieldPath={f} evidence={evidence} sections={sections} />
         </div>
       ))}
     </div>
+  );
+}
+
+function ReviewDialog({
+  open,
+  title,
+  items,
+  onOpenChange,
+  onConfirm,
+  confirmingField
+}: {
+  open: boolean;
+  title: string;
+  items: Array<{ fieldPath: string; label: string; value: string }>;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: (fieldPath: string) => Promise<void>;
+  confirmingField: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{title} review</DialogTitle>
+          <DialogDescription>
+            Confirm the current value for any field that still needs review. This saves immediately.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3">
+          {items.map((item) => (
+            <div
+              key={item.fieldPath}
+              className="flex flex-col gap-4 border border-black/8 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-black/65 dark:text-white/70">
+                  {item.value || "Not set"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void onConfirm(item.fieldPath)}
+                disabled={confirmingField === item.fieldPath}
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 border border-black/10 bg-white px-4 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+              >
+                {confirmingField === item.fieldPath ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Confirming...
+                  </>
+                ) : (
+                  "Confirm value"
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -281,13 +436,67 @@ export function TermsEditor({
   sections: DocumentSectionRecord[];
   extractionResults: ExtractionResultRecord[];
 }) {
-  const conflictCount = new Set(extractionResults.flatMap((r) => r.conflicts)).size;
+  const router = useRouter();
   const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
+  const [openReviewSection, setOpenReviewSection] = useState<keyof typeof SECTION_FIELDS | null>(
+    null
+  );
+  const [confirmingField, setConfirmingField] = useState<string | null>(null);
   function toggle(key: string) { setEditingSections((p) => ({ ...p, [key]: !p[key] })); }
   function ed(key: string) { return editingSections[key] ?? false; }
 
   const catOpts = DEAL_CATEGORY_OPTIONS.map((c) => ({ value: c, label: dealCategoryLabel(c) ?? c }));
-  const curOpts = CURRENCY_OPTIONS.map((c) => ({ value: c, label: c }));
+  const manuallyReviewedFields = useMemo(
+    () => new Set(terms?.manuallyEditedFields ?? []),
+    [terms?.manuallyEditedFields]
+  );
+  const activeConflictFields = useMemo(
+    () =>
+      new Set(
+        extractionResults
+          .flatMap((result) => result.conflicts)
+          .filter((fieldPath) => !manuallyReviewedFields.has(fieldPath))
+      ),
+    [extractionResults, manuallyReviewedFields]
+  );
+  const conflictCount = activeConflictFields.size;
+
+  const sectionReviewItems = useMemo(() => {
+    const entries = Object.entries(SECTION_FIELDS).map(([sectionKey, fieldPaths]) => [
+      sectionKey,
+      fieldPaths
+        .filter((fieldPath) => activeConflictFields.has(fieldPath))
+        .map((fieldPath) => ({
+          fieldPath,
+          label: FIELD_LABELS[fieldPath] ?? humanizeToken(fieldPath),
+          value: formatReviewValue(terms, fieldPath)
+        }))
+    ]);
+
+    return Object.fromEntries(entries) as Record<
+      keyof typeof SECTION_FIELDS,
+      Array<{ fieldPath: string; label: string; value: string }>
+    >;
+  }, [activeConflictFields, terms]);
+
+  useEffect(() => {
+    if (openReviewSection && sectionReviewItems[openReviewSection].length === 0) {
+      setOpenReviewSection(null);
+    }
+  }, [openReviewSection, sectionReviewItems]);
+
+  async function handleConfirmReview(fieldPath: string) {
+    setConfirmingField(fieldPath);
+    try {
+      const formData = new FormData();
+      formData.set("dealId", dealId);
+      formData.set("fieldPath", fieldPath);
+      await confirmTermsReviewAction(formData);
+      router.refresh();
+    } finally {
+      setConfirmingField(null);
+    }
+  }
 
   return (
     <form
@@ -301,7 +510,7 @@ export function TermsEditor({
         </p>
         {conflictCount > 0 ? (
           <div className="mt-4 border-l-2 border-clay/60 bg-clay/5 px-4 py-3 text-sm text-black/70 dark:text-white/75">
-            {conflictCount} field{conflictCount === 1 ? "" : "s"} have conflicting extracted values. Review them before using these terms.
+            {conflictCount} field{conflictCount === 1 ? "" : "s"} still need review. Use the section badges to confirm them quickly.
           </div>
         ) : null}
       </div>
@@ -309,7 +518,14 @@ export function TermsEditor({
       <input type="hidden" name="dealId" value={dealId} />
 
       {/* ───── Partnership ───── */}
-      <Section title="Partnership" description="Core identifying details for the partnership and the external team." editing={ed("partnership")} onToggleEdit={() => toggle("partnership")}>
+      <Section
+        title="Partnership"
+        description="Core identifying details for the partnership and the external team."
+        editing={ed("partnership")}
+        reviewCount={sectionReviewItems.partnership.length}
+        onOpenReview={() => setOpenReviewSection("partnership")}
+        onToggleEdit={() => toggle("partnership")}
+      >
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Brand name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.brandName)} />}
@@ -337,7 +553,7 @@ export function TermsEditor({
             }
           />
         </div>
-        <Signals fields={["brandName", "campaignName", "creatorName", "agencyName", "brandCategory"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["brandName", "campaignName", "creatorName", "agencyName", "brandCategory"]} evidence={evidence} sections={sections} />
         {!ed("partnership") ? (
           <>
             {textHidden("brandName", fieldValue(terms?.brandName))}
@@ -350,7 +566,14 @@ export function TermsEditor({
       </Section>
 
       {/* ───── Payment ───── */}
-      <Section title="Payment" description="Commercial terms used for invoicing and revenue tracking." editing={ed("payment")} onToggleEdit={() => toggle("payment")}>
+      <Section
+        title="Payment"
+        description="Commercial terms used for invoicing and revenue tracking."
+        editing={ed("payment")}
+        reviewCount={sectionReviewItems.payment.length}
+        onOpenReview={() => setOpenReviewSection("payment")}
+        onToggleEdit={() => toggle("payment")}
+      >
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Payment amount" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={terms?.paymentAmount != null ? String(terms.paymentAmount) : ""} placeholder="No amount set" />}
@@ -381,7 +604,7 @@ export function TermsEditor({
             editControl={<textarea className={`${TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTrigger" defaultValue={fieldValue(terms?.paymentTrigger)} />}
           />
         </div>
-        <Signals fields={["paymentAmount", "paymentTerms"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["paymentAmount", "paymentTerms"]} evidence={evidence} sections={sections} />
         {!ed("payment") ? (
           <>
             {textHidden("paymentAmount", String(terms?.paymentAmount ?? ""))}
@@ -396,9 +619,20 @@ export function TermsEditor({
 
       {/* ───── Deliverables (always editable) ───── */}
       <section className="grid gap-5 border-t border-black/8 pt-6 dark:border-white/10">
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold text-foreground">Deliverables</h3>
-          <p className="text-sm text-muted-foreground">Use editable rows instead of raw JSON for deliverables and channel permissions.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">Deliverables</h3>
+            <p className="text-sm text-muted-foreground">Use editable rows instead of raw JSON for deliverables and channel permissions.</p>
+          </div>
+          {sectionReviewItems.deliverables.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setOpenReviewSection("deliverables")}
+              className="inline-flex h-8 items-center justify-center border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
+            >
+              {reviewBadgeLabel(sectionReviewItems.deliverables.length)}
+            </button>
+          ) : null}
         </div>
         <TermsArrayFieldsEditor
           deliverables={terms?.deliverables ?? []}
@@ -406,11 +640,18 @@ export function TermsEditor({
           inputClassName={INPUT_CLASS}
           textareaClassName={TEXTAREA_CLASS}
         />
-        <Signals fields={["deliverables"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["deliverables"]} evidence={evidence} sections={sections} />
       </section>
 
       {/* ───── Usage rights ───── */}
-      <Section title="Usage rights" description="Usage, paid amplification, whitelisting, and territory settings." editing={ed("usage")} onToggleEdit={() => toggle("usage")}>
+      <Section
+        title="Usage rights"
+        description="Usage, paid amplification, whitelisting, and territory settings."
+        editing={ed("usage")}
+        reviewCount={sectionReviewItems.usage.length}
+        onOpenReview={() => setOpenReviewSection("usage")}
+        onToggleEdit={() => toggle("usage")}
+      >
         <Field label="Usage rights summary" editing={ed("usage")}
           readOnly={<ReadOnlyValue value={fieldValue(terms?.usageRights)} />}
           editControl={<textarea className={`${TEXTAREA_CLASS} min-h-24`} name="usageRights" defaultValue={fieldValue(terms?.usageRights)} />}
@@ -439,7 +680,7 @@ export function TermsEditor({
             editControl={<input className={INPUT_CLASS} name="usageTerritory" type="text" defaultValue={fieldValue(terms?.usageTerritory)} />}
           />
         </div>
-        <Signals fields={["usageRights"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["usageRights"]} evidence={evidence} sections={sections} />
         {!ed("usage") ? (
           <>
             {textHidden("usageRights", fieldValue(terms?.usageRights))}
@@ -453,7 +694,14 @@ export function TermsEditor({
       </Section>
 
       {/* ───── Exclusivity ───── */}
-      <Section title="Exclusivity" description="Restrictions on competitors, timing, and category overlap." editing={ed("exclusivity")} onToggleEdit={() => toggle("exclusivity")}>
+      <Section
+        title="Exclusivity"
+        description="Restrictions on competitors, timing, and category overlap."
+        editing={ed("exclusivity")}
+        reviewCount={sectionReviewItems.exclusivity.length}
+        onOpenReview={() => setOpenReviewSection("exclusivity")}
+        onToggleEdit={() => toggle("exclusivity")}
+      >
         <Field label="Exclusivity summary" editing={ed("exclusivity")}
           readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivity)} />}
           editControl={<textarea className={`${TEXTAREA_CLASS} min-h-20`} name="exclusivity" defaultValue={fieldValue(terms?.exclusivity)} />}
@@ -511,7 +759,7 @@ export function TermsEditor({
             editControl={<input className={INPUT_CLASS} name="exclusivityDuration" type="text" defaultValue={fieldValue(terms?.exclusivityDuration)} />}
           />
         </div>
-        <Signals fields={["exclusivity", "exclusivityRestrictions"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["exclusivity", "exclusivityRestrictions"]} evidence={evidence} sections={sections} />
         {!ed("exclusivity") ? (
           <>
             {textHidden("exclusivity", fieldValue(terms?.exclusivity))}
@@ -526,7 +774,14 @@ export function TermsEditor({
       </Section>
 
       {/* ───── Revisions & termination ───── */}
-      <Section title="Revisions and termination" description="Revision limits, termination rights, and governing terms." editing={ed("termination")} onToggleEdit={() => toggle("termination")}>
+      <Section
+        title="Revisions and termination"
+        description="Revision limits, termination rights, and governing terms."
+        editing={ed("termination")}
+        reviewCount={sectionReviewItems.termination.length}
+        onOpenReview={() => setOpenReviewSection("termination")}
+        onToggleEdit={() => toggle("termination")}
+      >
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Revisions" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.revisions)} />}
@@ -561,7 +816,7 @@ export function TermsEditor({
             editControl={<input className={INPUT_CLASS} name="governingLaw" type="text" defaultValue={fieldValue(terms?.governingLaw)} />}
           />
         </div>
-        <Signals fields={["termination", "governingLaw"]} evidence={evidence} sections={sections} extractionResults={extractionResults} />
+        <Signals fields={["termination", "governingLaw"]} evidence={evidence} sections={sections} />
         {!ed("termination") ? (
           <>
             {textHidden("revisions", fieldValue(terms?.revisions))}
@@ -587,11 +842,36 @@ export function TermsEditor({
         )}
       </Section>
 
+      {openReviewSection ? (
+        <ReviewDialog
+          open
+          title={
+            openReviewSection === "usage"
+              ? "Usage rights"
+              : openReviewSection === "termination"
+                ? "Revisions and termination"
+                : openReviewSection.charAt(0).toUpperCase() + openReviewSection.slice(1)
+          }
+          items={sectionReviewItems[openReviewSection]}
+          confirmingField={confirmingField}
+          onOpenChange={(open) => {
+            if (!open) {
+              setOpenReviewSection(null);
+            }
+          }}
+          onConfirm={handleConfirmReview}
+        />
+      ) : null}
+
       <div className="sticky bottom-6 z-10 flex justify-end">
-        <button className="inline-flex items-center gap-2 bg-ocean px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+        <SubmitButton
+          pendingLabel="Saving key terms..."
+          showSpinner
+          className="inline-flex items-center gap-2 bg-ocean px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <Check className="h-4 w-4" />
           Save key terms
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );

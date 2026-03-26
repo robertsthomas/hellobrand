@@ -105,6 +105,78 @@ function createEmptyTerms(
   };
 }
 
+async function getPreferredCreatorNameForViewer(viewer: Viewer) {
+  const profile = process.env.DATABASE_URL
+    ? await getProfileForViewer(viewer).catch(() => null)
+    : null;
+
+  return (
+    profile?.creatorLegalName?.trim() ||
+    profile?.displayName?.trim() ||
+    viewer.displayName
+  );
+}
+
+function withPreferredCreatorName<
+  T extends Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>
+>(terms: T, creatorName: string) {
+  if (terms.creatorName === creatorName) {
+    return terms;
+  }
+
+  return {
+    ...terms,
+    creatorName
+  };
+}
+
+function sanitizeCreatorExtractionResult(
+  extraction: ExtractionPipelineResult,
+  creatorName: string
+): ExtractionPipelineResult {
+  return {
+    ...extraction,
+    data: withPreferredCreatorName(extraction.data, creatorName),
+    evidence: (Array.isArray(extraction.evidence) ? extraction.evidence : []).filter(
+      (entry) => entry.fieldPath !== "creatorName"
+    ),
+    conflicts: (Array.isArray(extraction.conflicts) ? extraction.conflicts : []).filter(
+      (fieldPath) => fieldPath !== "creatorName"
+    )
+  };
+}
+
+async function hydrateProfileBackedCreatorName(
+  viewer: Viewer,
+  aggregate: DealAggregate
+) {
+  const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
+  const nextTerms = withPreferredCreatorName(
+    aggregate.terms ?? createEmptyTerms(aggregate.deal),
+    preferredCreatorName
+  );
+
+  const persistedTerms =
+    aggregate.terms?.creatorName === preferredCreatorName
+      ? aggregate.terms
+      : await getRepository().upsertTerms(aggregate.deal.id, nextTerms);
+
+  return {
+    ...aggregate,
+    terms: persistedTerms,
+    extractionResults: aggregate.extractionResults.map((result) => ({
+      ...result,
+      data: withPreferredCreatorName(result.data, preferredCreatorName),
+      conflicts: (Array.isArray(result.conflicts) ? result.conflicts : []).filter(
+        (fieldPath) => fieldPath !== "creatorName"
+      )
+    })),
+    extractionEvidence: aggregate.extractionEvidence.filter(
+      (entry) => entry.fieldPath !== "creatorName"
+    )
+  };
+}
+
 function detectChangedFields(
   base: Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">,
   patch: Partial<Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">>
@@ -636,20 +708,30 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       "merge_results",
       async () => mergeExtractionResults(partialExtractions as ExtractionPipelineResult[])
     );
+    const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
+    const sanitizedExtraction = sanitizeCreatorExtractionResult(
+      extraction,
+      preferredCreatorName
+    );
 
     const intelligence = buildConflictIntelligencePatch({
       text: extractionSource.normalizedText,
       sectionKey: null,
-      fallbackTerms: extraction.data
+      fallbackTerms: sanitizedExtraction.data
     });
-    extraction.data = {
-      ...extraction.data,
-      ...mergeConflictIntelligence(extraction.data, intelligence.patch)
+    sanitizedExtraction.data = {
+      ...sanitizedExtraction.data,
+      ...mergeConflictIntelligence(sanitizedExtraction.data, intelligence.patch)
     };
-    extraction.evidence = [...extraction.evidence, ...intelligence.evidence];
-    const extractionEvidence = Array.isArray(extraction.evidence) ? extraction.evidence : [];
-    const extractionDeliverables = Array.isArray(extraction.data.deliverables)
-      ? extraction.data.deliverables
+    sanitizedExtraction.evidence = [
+      ...sanitizedExtraction.evidence,
+      ...intelligence.evidence
+    ];
+    const extractionEvidence = Array.isArray(sanitizedExtraction.evidence)
+      ? sanitizedExtraction.evidence
+      : [];
+    const extractionDeliverables = Array.isArray(sanitizedExtraction.data.deliverables)
+      ? sanitizedExtraction.data.deliverables
       : [];
 
     logDocumentPipeline("info", "merge_complete", {
@@ -657,9 +739,9 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       documentId: document.id,
       evidenceCount: extractionEvidence.length,
       deliverablesCount: extractionDeliverables.length,
-      hasPaymentAmount: extraction.data.paymentAmount !== null,
-      hasBrandName: Boolean(extraction.data.brandName),
-      hasCampaignName: Boolean(extraction.data.campaignName)
+      hasPaymentAmount: sanitizedExtraction.data.paymentAmount !== null,
+      hasBrandName: Boolean(sanitizedExtraction.data.brandName),
+      hasCampaignName: Boolean(sanitizedExtraction.data.campaignName)
     });
 
     if (
@@ -685,19 +767,19 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
             // keep fallback
           }
         }
-        extraction.data.briefData = briefData;
+        sanitizedExtraction.data.briefData = briefData;
       }
     }
 
     const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
-      extraction.data.brandName
+      sanitizedExtraction.data.brandName
     );
 
     if (categoryEnrichment?.category) {
-      const previousCategory = extraction.data.brandCategory;
-      extraction.data.brandCategory = categoryEnrichment.category;
-      extraction.evidence = [
-        ...extraction.evidence,
+      const previousCategory = sanitizedExtraction.data.brandCategory;
+      sanitizedExtraction.data.brandCategory = categoryEnrichment.category;
+      sanitizedExtraction.evidence = [
+        ...sanitizedExtraction.evidence,
         {
           fieldPath: "brandCategory",
           snippet:
@@ -714,7 +796,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         previousCategory &&
         previousCategory !== categoryEnrichment.category
       ) {
-        extraction.evidence.push({
+        sanitizedExtraction.evidence.push({
           fieldPath: "brandCategory",
           snippet: `${categoryEnrichment.brandName} company enrichment suggests ${dealCategoryLabel(
             categoryEnrichment.category
@@ -735,7 +817,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       });
     }
 
-    await repository.upsertExtractionResult(document.id, extraction);
+    await repository.upsertExtractionResult(document.id, sanitizedExtraction);
 
     await repository.replaceExtractionEvidence(
       document.id,
@@ -748,7 +830,10 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         confidence: entry.confidence
       }))
     );
-    logStageDebug("merge_results ✓", { evidenceCount: extractionEvidence.length, brand: extraction.data.brandName });
+    logStageDebug("merge_results ✓", {
+      evidenceCount: extractionEvidence.length,
+      brand: sanitizedExtraction.data.brandName
+    });
 
     checkPipelineTimeout();
     const risks = await runStage(
@@ -759,7 +844,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         const fallbackRisks = analyzeCreatorRisks(
           extractionSource.normalizedText,
           document.id,
-          extraction
+          sanitizedExtraction
         );
 
         if (!hasLlmKey()) {
@@ -770,7 +855,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
           return await analyzeRisksWithLlm(
             extractionSource.normalizedText,
             classification.documentKind,
-            extraction,
+            sanitizedExtraction,
             fallbackRisks,
             document.id
           );
@@ -789,14 +874,18 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       document.id,
       "generate_summary",
       async () => {
-        const fallbackSummary = buildCreatorSummary(extraction, risks);
+        const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
 
         if (!hasLlmKey()) {
           return fallbackSummary;
         }
 
         try {
-          return await generateSummaryWithLlm(extraction, risks, fallbackSummary);
+          return await generateSummaryWithLlm(
+            sanitizedExtraction,
+            risks,
+            fallbackSummary
+          );
         } catch {
           return fallbackSummary;
         }
@@ -1116,6 +1205,31 @@ export async function updateTermsForViewer(
 
   void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
 
+  return terms;
+}
+
+export async function confirmTermsFieldForViewer(
+  viewer: Viewer,
+  dealId: string,
+  fieldPath: string
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate) {
+    return null;
+  }
+
+  const existing = aggregate.terms ?? createEmptyTerms(aggregate.deal);
+  const nextManualEdits = Array.from(
+    new Set([...(existing.manuallyEditedFields ?? []), fieldPath])
+  );
+
+  const nextTerms = {
+    ...existing,
+    manuallyEditedFields: nextManualEdits
+  };
+
+  const terms = await getRepository().upsertTerms(dealId, nextTerms);
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
   return terms;
 }
 

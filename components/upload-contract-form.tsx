@@ -6,7 +6,7 @@ import { FileText, MessageSquareText, Plus } from "lucide-react";
 import { uploadDocumentsAction } from "@/app/actions";
 import type { DocumentRecord } from "@/lib/types";
 import { cn, humanizeToken } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 
 type UploadMode = "upload" | "paste";
@@ -118,9 +118,13 @@ export function UploadContractForm({
                 >
                   Choose files
                 </button>
-                <Button type="submit" size="sm">
+                <SubmitButton
+                  pendingLabel="Adding to workspace..."
+                  showSpinner
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+                >
                   Add to workspace
-                </Button>
+                </SubmitButton>
               </div>
             </div>
           </div>
@@ -135,9 +139,13 @@ export function UploadContractForm({
               <p className="text-xs text-black/45 dark:text-white/45">
                 Plain text works best here. The content will be attached to this workspace only.
               </p>
-              <Button type="submit" size="sm">
+              <SubmitButton
+                pendingLabel="Adding to workspace..."
+                showSpinner
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
+              >
                 Add to workspace
-              </Button>
+              </SubmitButton>
             </div>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { generateDraftAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 import type { DraftIntent, EmailDraftRecord } from "@/lib/types";
 
 const intents: Array<{ value: DraftIntent; label: string }> = [
@@ -44,9 +45,13 @@ export function EmailDrafts({
               </option>
             ))}
           </select>
-          <button className="bg-ocean px-5 py-3 text-sm font-semibold text-white">
+          <SubmitButton
+            pendingLabel="Generating draft..."
+            showSpinner
+            className="inline-flex items-center justify-center bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
             Generate draft
-          </button>
+          </SubmitButton>
         </form>
       </div>
       <div className="mt-6 grid gap-4">

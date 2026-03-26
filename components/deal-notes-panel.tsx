@@ -1,4 +1,5 @@
 import { saveDealNotesAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export function DealNotesPanel({
   dealId,
@@ -29,9 +30,13 @@ export function DealNotesPanel({
         placeholder="Add creator-side notes, open questions, negotiated updates, or payment reminders."
       />
 
-      <button className="inline-flex w-fit border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20">
+      <SubmitButton
+        pendingLabel="Saving notes..."
+        showSpinner
+        className="inline-flex w-fit border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+      >
         Save notes
-      </button>
+      </SubmitButton>
     </form>
   );
 }

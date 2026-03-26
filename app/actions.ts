@@ -3,6 +3,7 @@ export { uploadDocumentsAction } from "@/app/server-actions/deal-actions";
 export { reprocessDocumentAction } from "@/app/server-actions/deal-actions";
 export { saveDealMetaAction } from "@/app/server-actions/deal-actions";
 export { saveTermsAction } from "@/app/server-actions/deal-actions";
+export { confirmTermsReviewAction } from "@/app/server-actions/deal-actions";
 export { saveDealNotesAction } from "@/app/server-actions/deal-actions";
 export { generateDraftAction } from "@/app/server-actions/deal-actions";
 export { deleteWorkspaceAction } from "@/app/server-actions/deal-actions";

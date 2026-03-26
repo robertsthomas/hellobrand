@@ -32,7 +32,7 @@ import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
-import { listEmailAccountsForViewer, listInboxThreadsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
+import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -95,13 +95,12 @@ async function DealDetailContent({
 
   const hasPremiumInbox = entitlements.features.premium_inbox;
   const hasBriefGeneration = entitlements.features.brief_generation;
-  const [linkedEmailThreads, recentEmailThreads, emailAccounts] = hasPremiumInbox
+  const [linkedEmailThreads, emailAccounts] = hasPremiumInbox
     ? await Promise.all([
         listLinkedEmailThreadsForViewerDeal(viewer, dealId),
-        listInboxThreadsForViewer(viewer, { limit: 12 }),
         listEmailAccountsForViewer(viewer)
       ])
-    : [[], [], []];
+    : [[], []];
 
   const {
     deal,
@@ -354,7 +353,12 @@ async function DealDetailContent({
           </TabsContent>
 
           <TabsContent value="brief" className="mt-0 space-y-6">
-            <BriefOverview briefData={terms?.briefData} documents={documents} />
+            <BriefOverview
+              dealId={deal.id}
+              briefData={terms?.briefData}
+              documents={documents}
+              hasPremiumInbox={hasPremiumInbox}
+            />
             {hasBriefGeneration ? (
               <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} documents={documents} />
             ) : (
@@ -375,7 +379,6 @@ async function DealDetailContent({
               <DealEmailPanel
                 dealId={deal.id}
                 linkedThreads={linkedEmailThreads}
-                recentThreads={recentEmailThreads}
                 hasConnectedAccounts={emailAccounts.some((account) => account.status !== "disconnected")}
               />
             ) : (

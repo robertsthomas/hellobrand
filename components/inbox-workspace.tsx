@@ -444,9 +444,6 @@ function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[]
                     {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
                     {attachment.mimeType.split("/")[1] || "file"}
                   </p>
-                  <p className="mt-2 text-[11px] font-medium text-[#31513b] dark:text-white/80">
-                    Click to preview
-                  </p>
                 </div>
               </div>
             </button>

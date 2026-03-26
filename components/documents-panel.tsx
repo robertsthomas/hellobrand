@@ -7,6 +7,7 @@ import { reprocessDocumentAction } from "@/app/actions";
 import type { DocumentRecord } from "@/lib/types";
 import { humanizeToken } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
 import { Button } from "@/components/ui/button";
 
 function supportsInlinePreview(document: DocumentRecord) {
@@ -20,10 +21,6 @@ function supportsInlinePreview(document: DocumentRecord) {
 
 function documentPreviewUrl(documentId: string) {
   return `/api/documents/${documentId}/content`;
-}
-
-function plainPreviewText(document: DocumentRecord) {
-  return document.normalizedText ?? document.rawText ?? "No preview available.";
 }
 
 export function DocumentsPanel({
@@ -43,9 +40,9 @@ export function DocumentsPanel({
   );
 
   return (
-    <section className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
-        <div className="border-b border-black/8 px-5 py-4 dark:border-white/10">
+    <section className="grid gap-6 xl:h-[min(78vh,820px)] xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+        <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
           <h2 className="text-lg font-semibold text-foreground">Documents</h2>
           <p className="mt-1 text-sm text-black/55 dark:text-white/60">
             Select a source to preview it.
@@ -53,7 +50,7 @@ export function DocumentsPanel({
         </div>
 
         {documents.length > 0 ? (
-          <div className="divide-y divide-black/8 dark:divide-white/10">
+          <div className="min-h-0 overflow-y-auto divide-y divide-black/8 dark:divide-white/10">
             {documents.map((document) => {
               const isSelected = selectedDocument?.id === document.id;
               return (
@@ -91,8 +88,8 @@ export function DocumentsPanel({
         )}
       </div>
 
-      <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
-        <div className="flex flex-col gap-3 border-b border-black/8 px-5 py-4 dark:border-white/10 md:flex-row md:items-start md:justify-between">
+      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+        <div className="shrink-0 flex flex-col gap-3 border-b border-black/8 px-5 py-4 dark:border-white/10 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-foreground">
               {selectedDocument?.fileName ?? "Preview"}
@@ -135,7 +132,7 @@ export function DocumentsPanel({
           ) : null}
         </div>
 
-        <div className="min-h-[540px] bg-black/[0.015] dark:bg-black/10">
+        <div className="min-h-[540px] flex-1 overflow-hidden bg-black/[0.015] dark:bg-black/10 xl:min-h-0">
           {!selectedDocument ? (
             <div className="flex min-h-[540px] items-center justify-center px-6 text-sm text-black/50 dark:text-white/55">
               Upload or paste a source to preview it here.
@@ -146,12 +143,6 @@ export function DocumentsPanel({
                 {selectedDocument.errorMessage}
               </div>
             </div>
-          ) : selectedDocument.sourceType === "pasted_text" ? (
-            <div className="h-[540px] overflow-auto px-6 py-5">
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-black/72 dark:text-white/72">
-                {plainPreviewText(selectedDocument)}
-              </pre>
-            </div>
           ) : selectedDocument.mimeType.startsWith("image/") ? (
             <div className="flex h-[540px] items-center justify-center p-6">
               <img
@@ -160,17 +151,23 @@ export function DocumentsPanel({
                 className="max-h-full max-w-full object-contain"
               />
             </div>
+          ) : selectedDocument.sourceType === "pasted_text" ? (
+            <AttachmentDocumentPreview
+              kind="text"
+              previewUrl={documentPreviewUrl(selectedDocument.id)}
+              downloadUrl={documentPreviewUrl(selectedDocument.id)}
+            />
           ) : selectedDocument.mimeType === "application/pdf" ? (
-            <iframe
-              title={selectedDocument.fileName}
-              src={documentPreviewUrl(selectedDocument.id)}
-              className="h-[540px] w-full border-0"
+            <AttachmentDocumentPreview
+              kind="pdf"
+              previewUrl={documentPreviewUrl(selectedDocument.id)}
+              downloadUrl={documentPreviewUrl(selectedDocument.id)}
             />
           ) : selectedDocument.mimeType.startsWith("text/") ? (
-            <iframe
-              title={selectedDocument.fileName}
-              src={documentPreviewUrl(selectedDocument.id)}
-              className="h-[540px] w-full border-0 bg-white"
+            <AttachmentDocumentPreview
+              kind="text"
+              previewUrl={documentPreviewUrl(selectedDocument.id)}
+              downloadUrl={documentPreviewUrl(selectedDocument.id)}
             />
           ) : supportsInlinePreview(selectedDocument) ? (
             <iframe

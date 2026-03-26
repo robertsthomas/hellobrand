@@ -8,6 +8,7 @@ import { requireViewer } from "@/lib/auth";
 import {
   applyPendingChangesForViewer,
   createDealForViewer as createDealFromDeals,
+  confirmTermsFieldForViewer,
   deleteDealForViewer as deleteDealFromDeals,
   dismissPendingChangesForViewer,
   generateDraftForViewer as generateDraftFromDeals,
@@ -184,6 +185,18 @@ export async function saveDealNotesAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
 
   await updateDealNotesFromDeals(viewer, dealId, parseNullableString(formData.get("notes")));
+
+  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
+}
+
+export async function confirmTermsReviewAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+  const fieldPath = String(formData.get("fieldPath") ?? "");
+
+  await confirmTermsFieldForViewer(viewer, dealId, fieldPath);
 
   revalidatePath(`/app/deals/${dealId}`);
   revalidatePath("/app");

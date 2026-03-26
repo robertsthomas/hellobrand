@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ShieldAlert } from "lucide-react";
+import { LoaderCircle, ShieldAlert } from "lucide-react";
 
 import {
   applyPendingChangesAction,
@@ -26,10 +26,12 @@ function formatValue(value: unknown): string {
 function DiffRow({
   entry,
   checked,
+  disabled,
   onToggle
 }: {
   entry: TermsDiffEntry;
   checked: boolean;
+  disabled: boolean;
   onToggle: (field: string) => void;
 }) {
   return (
@@ -41,6 +43,7 @@ function DiffRow({
         id={`field-${entry.field}`}
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={() => onToggle(entry.field)}
         className="mt-1 h-4 w-4 accent-emerald-600"
       />
@@ -85,7 +88,7 @@ export function PendingChangesPanel({
     }
     return initial;
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"apply" | "dismiss" | null>(null);
 
   const onToggle = useCallback((field: string) => {
     setCheckedFields((prev) => {
@@ -104,21 +107,29 @@ export function PendingChangesPanel({
   }, [diff.entries]);
 
   const handleApply = useCallback(async () => {
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.set("dealId", dealId);
-    formData.set("acceptedFieldsJson", JSON.stringify([...checkedFields]));
-    await applyPendingChangesAction(formData);
-    setIsSubmitting(false);
+    setPendingAction("apply");
+    try {
+      const formData = new FormData();
+      formData.set("dealId", dealId);
+      formData.set("acceptedFieldsJson", JSON.stringify([...checkedFields]));
+      await applyPendingChangesAction(formData);
+    } finally {
+      setPendingAction(null);
+    }
   }, [dealId, checkedFields]);
 
   const handleDismiss = useCallback(async () => {
-    setIsSubmitting(true);
-    const formData = new FormData();
-    formData.set("dealId", dealId);
-    await dismissPendingChangesAction(formData);
-    setIsSubmitting(false);
+    setPendingAction("dismiss");
+    try {
+      const formData = new FormData();
+      formData.set("dealId", dealId);
+      await dismissPendingChangesAction(formData);
+    } finally {
+      setPendingAction(null);
+    }
   }, [dealId]);
+
+  const isSubmitting = pendingAction !== null;
 
   return (
     <section className="border border-amber-500/18 bg-amber-50/28 px-5 py-4 dark:border-amber-300/12 dark:bg-amber-300/[0.03]">
@@ -145,20 +156,39 @@ export function PendingChangesPanel({
                 key={entry.field}
                 entry={entry}
                 checked={checkedFields.has(entry.field)}
+                disabled={isSubmitting}
                 onToggle={onToggle}
               />
             ))}
           </div>
+
+          {isSubmitting ? (
+            <div className="mt-4 inline-flex items-center gap-2 text-sm text-black/55 dark:text-white/60">
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              {pendingAction === "apply"
+                ? `Applying ${checkedFields.size} selected change${checkedFields.size === 1 ? "" : "s"}...`
+                : "Dismissing detected changes..."}
+            </div>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleApply}
               disabled={isSubmitting || checkedFields.size === 0}
-              className="min-h-[44px] border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-2 border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Apply {checkedFields.size} change
-              {checkedFields.size === 1 ? "" : "s"}
+              {pendingAction === "apply" ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Applying...
+                </>
+              ) : (
+                <>
+                  Apply {checkedFields.size} change
+                  {checkedFields.size === 1 ? "" : "s"}
+                </>
+              )}
             </button>
             <button
               type="button"
@@ -172,9 +202,16 @@ export function PendingChangesPanel({
               type="button"
               onClick={handleDismiss}
               disabled={isSubmitting}
-              className="min-h-[44px] px-4 py-2 text-sm font-medium text-black/45 transition hover:text-black/70 dark:text-white/45 dark:hover:text-white/70"
+              className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-medium text-black/45 transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-50 dark:text-white/45 dark:hover:text-white/70"
             >
-              Dismiss all
+              {pendingAction === "dismiss" ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Dismissing...
+                </>
+              ) : (
+                "Dismiss all"
+              )}
             </button>
           </div>
         </div>

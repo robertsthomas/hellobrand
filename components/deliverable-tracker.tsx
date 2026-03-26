@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useTransition } from "react";
-import { CheckCircle2, Clock, AlertTriangle, Circle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Clock, LoaderCircle } from "lucide-react";
 
 import { updateDeliverablesAction } from "@/app/actions";
 import type { DeliverableItem } from "@/lib/types";
@@ -71,6 +71,7 @@ function StatusBadge({ status }: { status: DeliverableStatus }) {
 
 export function DeliverableTracker({ dealId, deliverables: initial }: DeliverableTrackerProps) {
   const [deliverables, setDeliverables] = useState(initial);
+  const [pendingDeliverableId, setPendingDeliverableId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const progress = computeDeliverableProgress(deliverables);
@@ -81,9 +82,14 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
         d.id === id ? { ...d, status: newStatus } : d
       );
       setDeliverables(updated);
+      setPendingDeliverableId(id);
 
       startTransition(async () => {
-        await updateDeliverablesAction(dealId, updated);
+        try {
+          await updateDeliverablesAction(dealId, updated);
+        } finally {
+          setPendingDeliverableId(null);
+        }
       });
     },
     [dealId, deliverables]
@@ -113,6 +119,12 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
           <p className="mt-2 text-sm text-black/60 dark:text-white/65">
             Track progress on your deliverables. Click a status to update it.
           </p>
+          {isPending ? (
+            <div className="mt-3 inline-flex items-center gap-2 text-sm text-black/55 dark:text-white/60">
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              Saving deliverable update...
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-3">
@@ -146,7 +158,9 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
             return (
               <div
                 key={item.id}
-                className="flex flex-wrap items-center gap-4 border border-black/8 p-4 dark:border-white/10"
+                className={`flex flex-wrap items-center gap-4 border border-black/8 p-4 transition-opacity dark:border-white/10 ${
+                  pendingDeliverableId === item.id ? "opacity-70" : ""
+                }`}
               >
                 <div className="min-w-0 flex-1">
                   <h3 className="font-semibold text-black/80 dark:text-white/85">

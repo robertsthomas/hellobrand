@@ -1,10 +1,15 @@
 "use client";
 
+import Link from "next/link";
+import { Info } from "lucide-react";
+
 import type { BriefData, DocumentRecord } from "@/lib/types";
 
 interface BriefOverviewProps {
+  dealId: string;
   briefData: BriefData | null | undefined;
   documents: DocumentRecord[];
+  hasPremiumInbox: boolean;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -31,17 +36,48 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
-export function BriefOverview({ briefData, documents }: BriefOverviewProps) {
+export function BriefOverview({
+  dealId,
+  briefData,
+  documents,
+  hasPremiumInbox
+}: BriefOverviewProps) {
   if (!briefData) {
     return (
       <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
         <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
           Brief
         </h2>
-        <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-          No campaign brief uploaded yet. Upload a campaign brief, deliverables
-          brief, or pitch deck to populate this panel.
-        </p>
+        <div className="mt-4 border border-black/8 bg-[#faf8f3] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 text-black/45 dark:text-white/45">
+              <Info className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+                Brief Missing
+              </p>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-black/65 dark:text-white/70">
+                No brand brief uploaded yet. You should usually have one by now.
+                Generate a working brief from your workspace for now, then upload
+                the real brief later so HelloBrand can compare and update it.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Link
+            href={`/app/deals/${dealId}?tab=emails`}
+            className="inline-flex items-center justify-center border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+          >
+            Search inbox
+          </Link>
+          {!hasPremiumInbox ? (
+            <span className="text-xs text-black/45 dark:text-white/45">
+              Premium feature
+            </span>
+          ) : null}
+        </div>
       </section>
     );
   }

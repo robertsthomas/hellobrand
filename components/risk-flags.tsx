@@ -1,5 +1,5 @@
 import type { RiskFlagRecord } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, stripHtmlTags } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -61,21 +61,26 @@ export function RiskFlags({ flags }: { flags: RiskFlagRecord[] }) {
                     </p>
                   ) : null}
                   {flag.evidence.length > 0 ? (
-                    <div className="border border-black/8 px-4 py-3 dark:border-white/10">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45 dark:text-white/45">
-                        Evidence
-                      </p>
-                      <div className="mt-2 space-y-2">
-                        {flag.evidence.slice(0, 2).map((snippet) => (
-                          <p
+                    <details className="border border-black/8 px-4 py-3 dark:border-white/10">
+                      <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45 dark:text-white/45">
+                        Evidence ({Math.min(flag.evidence.length, 2)})
+                      </summary>
+                      <div className="mt-3 divide-y divide-black/8 border border-black/8 dark:divide-white/10 dark:border-white/10">
+                        {flag.evidence.slice(0, 2).map((snippet, index) => (
+                          <div
                             key={snippet}
-                            className="text-xs leading-5 text-black/60 dark:text-white/65"
+                            className="px-3 py-3"
                           >
-                            {snippet}
-                          </p>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
+                              Evidence {index + 1}
+                            </p>
+                            <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60 dark:text-white/65">
+                              {stripHtmlTags(snippet) || "Excerpt unavailable."}
+                            </p>
+                          </div>
                         ))}
                       </div>
-                    </div>
+                    </details>
                   ) : null}
                 </div>
               </AccordionContent>

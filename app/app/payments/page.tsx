@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { requireViewer } from "@/lib/auth";
 import { getCachedPayments } from "@/lib/cached-data";
+import { summarizePaymentRows, type PaymentSummaryAmount } from "@/lib/payment-summary";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 
@@ -26,6 +27,29 @@ function paymentBadgeClass(status: string) {
   return "border-black/8 bg-[#f5f6f8] text-[#667085] hover:bg-[#f5f6f8]";
 }
 
+function SummaryValue({ summary }: { summary: PaymentSummaryAmount }) {
+  if (!summary.hasMixedCurrencies) {
+    return (
+      <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+        {formatCurrency(summary.total, summary.currency ?? "USD")}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-[24px] font-semibold tracking-[-0.05em] text-foreground">
+        Mixed
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {summary.breakdown
+          .map((entry) => formatCurrency(entry.amount, entry.currency))
+          .join(" · ")}
+      </p>
+    </div>
+  );
+}
+
 export default function PaymentsPage() {
   return (
     <Suspense fallback={<PaymentsSkeleton />}>
@@ -37,24 +61,7 @@ export default function PaymentsPage() {
 async function PaymentsContent() {
   const viewer = await requireViewer();
   const rows = await getCachedPayments(viewer);
-
-  const totals = rows.reduce(
-    (accumulator, row) => {
-      const amount = row.payment.amount ?? 0;
-      accumulator.total += amount;
-
-      if (["invoiced", "awaiting_payment", "late"].includes(row.payment.status)) {
-        accumulator.outstanding += amount;
-      }
-
-      if (row.payment.status === "late") {
-        accumulator.late += amount;
-      }
-
-      return accumulator;
-    },
-    { total: 0, outstanding: 0, late: 0 }
-  );
+  const summary = summarizePaymentRows(rows);
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
@@ -78,25 +85,19 @@ async function PaymentsContent() {
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Tracked
               </p>
-              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
-                {formatCurrency(totals.total)}
-              </p>
+              <SummaryValue summary={summary.tracked} />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Outstanding
               </p>
-              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
-                {formatCurrency(totals.outstanding)}
-              </p>
+              <SummaryValue summary={summary.outstanding} />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Late
               </p>
-              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
-                {formatCurrency(totals.late)}
-              </p>
+              <SummaryValue summary={summary.late} />
             </div>
           </div>
         </section>
@@ -191,6 +192,9 @@ async function PaymentsContent() {
                     <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                       Update invoice details
                     </h3>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Late status is calculated from the due date until a payment is marked paid.
+                    </p>
                   </div>
 
                   <div className="grid gap-4 border-t border-black/8 pt-4 md:grid-cols-2">
@@ -255,7 +259,9 @@ async function PaymentsContent() {
                         <option value="invoiced">Invoiced</option>
                         <option value="awaiting_payment">Awaiting payment</option>
                         <option value="paid">Paid</option>
-                        <option value="late">Late</option>
+                        <option value="late" disabled>
+                          Late (calculated)
+                        </option>
                       </select>
                     </label>
 

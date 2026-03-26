@@ -1,6 +1,7 @@
 "use client";
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { LoaderCircle } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
 export function SubmitButton({
@@ -8,6 +9,7 @@ export function SubmitButton({
   pendingLabel,
   className,
   disabled,
+  showSpinner = false,
   type = "submit",
   ...props
 }: {
@@ -15,6 +17,7 @@ export function SubmitButton({
   pendingLabel: string;
   className?: string;
   disabled?: boolean;
+  showSpinner?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   const { pending } = useFormStatus();
 
@@ -25,7 +28,18 @@ export function SubmitButton({
       disabled={disabled || pending}
       type={type}
     >
-      {pending ? pendingLabel : children}
+      {pending ? (
+        showSpinner ? (
+          <span className="inline-flex items-center gap-2">
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+            {pendingLabel}
+          </span>
+        ) : (
+          pendingLabel
+        )
+      ) : (
+        children
+      )}
     </button>
   );
 }
