@@ -7,6 +7,7 @@ import { Download, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
 
 import { deleteWorkspaceAction } from "@/app/actions";
 import { AppTooltip } from "@/components/app-tooltip";
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -245,13 +246,15 @@ export function DealHistoryTable({
             View and manage all your brand partnerships
           </p>
         </div>
-        <Link
+        <PostHogActionLink
           href="/app/intake/new"
+          eventName="workspace_entry_cta_clicked"
+          payload={{ source: "deal_history_header" }}
           className={cn(buttonVariants({ className: "gap-2 rounded-full px-5" }))}
         >
           <Plus className="h-4 w-4" />
           New Workspace
-        </Link>
+        </PostHogActionLink>
       </section>
 
       <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">

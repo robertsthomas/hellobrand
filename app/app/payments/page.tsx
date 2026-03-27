@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { PaymentsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealAggregates } from "@/lib/cached-data";
@@ -111,9 +112,14 @@ async function PaymentsContent() {
               Upload documents from the intake flow and confirm a workspace to
               start tracking payout details here.
             </p>
-            <Link href="/app/intake/new" className="mt-6 inline-flex bg-primary px-5 py-3 text-sm font-semibold text-white">
+            <PostHogActionLink
+              href="/app/intake/new"
+              eventName="workspace_entry_cta_clicked"
+              payload={{ source: "payments_empty_state" }}
+              className="mt-6 inline-flex bg-primary px-5 py-3 text-sm font-semibold text-white"
+            >
               Start a workspace
-            </Link>
+            </PostHogActionLink>
           </div>
         ) : (
           <div className="space-y-5">

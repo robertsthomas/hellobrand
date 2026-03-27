@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Hand, LockKeyhole, Mail } from "lucide-react";
 import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { usePostHog } from "posthog-js/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { captureAppEvent } from "@/lib/posthog/events";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 
 type AuthMode = "sign-in" | "sign-up";
@@ -69,6 +71,7 @@ function getErrorMessages(error: unknown): string[] {
 export function CustomAuthScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const posthog = usePostHog();
   const { setActive } = useClerk();
   const { isLoaded: isSignInLoaded, signIn } = useSignIn();
   const { isLoaded: isSignUpLoaded, signUp } = useSignUp();
@@ -114,6 +117,10 @@ export function CustomAuthScreen() {
   }, [mode, verificationStep]);
 
   function updateMode(nextMode: AuthMode) {
+    captureAppEvent(posthog, "auth_mode_switched", {
+      mode: nextMode,
+      redirectTarget
+    });
     setMode(nextMode);
     setVerificationStep("details");
     setVerificationCode("");
@@ -260,6 +267,9 @@ export function CustomAuthScreen() {
 
     setIsSubmitting(true);
     setErrorMessages([]);
+    captureAppEvent(posthog, "auth_sign_in_submitted", {
+      redirectTarget
+    });
 
     try {
       const result = await signIn.create({
@@ -301,6 +311,9 @@ export function CustomAuthScreen() {
     setIsSubmitting(true);
     setErrorMessages([]);
     setVerificationNotice(null);
+    captureAppEvent(posthog, "auth_sign_up_submitted", {
+      redirectTarget
+    });
 
     try {
       const result = await signUp.create({
@@ -332,6 +345,9 @@ export function CustomAuthScreen() {
 
     setIsSubmitting(true);
     setErrorMessages([]);
+    captureAppEvent(posthog, "auth_verification_submitted", {
+      flow: "sign_up_email_code"
+    });
 
     try {
       const result = await signUp.attemptEmailAddressVerification({
@@ -362,6 +378,9 @@ export function CustomAuthScreen() {
 
     setIsSubmitting(true);
     setErrorMessages([]);
+    captureAppEvent(posthog, "auth_verification_submitted", {
+      flow: signInSecondFactor.strategy
+    });
 
     try {
       const normalizedCode =
@@ -407,6 +426,9 @@ export function CustomAuthScreen() {
 
     setIsSubmitting(true);
     setErrorMessages([]);
+    captureAppEvent(posthog, "auth_verification_resent", {
+      flow: "sign_up_email_code"
+    });
 
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -435,6 +457,9 @@ export function CustomAuthScreen() {
 
     setIsSubmitting(true);
     setErrorMessages([]);
+    captureAppEvent(posthog, "auth_verification_resent", {
+      flow: signInSecondFactor.strategy
+    });
 
     try {
       if (signInSecondFactor.strategy === "email_code") {

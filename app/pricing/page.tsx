@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { MarketingNav } from "@/components/marketing-nav";
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { buildMarketingPlanAvailability } from "@/lib/billing/plans";
 
 export default async function PricingPage() {
@@ -53,8 +54,10 @@ export default async function PricingPage() {
                     <li key={feature}>{feature}</li>
                   ))}
                 </ul>
-                <Link
+                <PostHogActionLink
                   href="/waitlist"
+                  eventName="public_pricing_cta_clicked"
+                  payload={{ plan: plan.name.toLowerCase(), location: "pricing_card" }}
                   className={`mt-8 inline-flex rounded-full px-5 py-3 text-sm font-semibold ${
                     plan.popular
                       ? "bg-white text-ocean dark:bg-white/90 dark:text-[#18201d]"
@@ -62,7 +65,7 @@ export default async function PricingPage() {
                   }`}
                 >
                   Get started
-                </Link>
+                </PostHogActionLink>
               </article>
             ))}
           </div>

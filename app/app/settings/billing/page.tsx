@@ -1,14 +1,41 @@
+import type { ReactNode } from "react";
 import { BillingInterval, PlanTier } from "@prisma/client";
 import { Check } from "lucide-react";
 
 import { cancelSubscriptionAction, openBillingPortalAction, startCheckoutAction } from "@/app/actions";
 import { InfoTooltip } from "@/components/app-tooltip";
 import { BillingUpgradePanel } from "@/components/billing-upgrade-panel";
-import { SubmitButton } from "@/components/submit-button";
+import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements, type UsageLimitKey } from "@/lib/billing/entitlements";
 import { getBillingOverviewForViewer } from "@/lib/billing/service";
 import { formatDate, humanizeToken } from "@/lib/utils";
+
+function StatusBanner({
+  tone,
+  children
+}: {
+  tone: "critical" | "neutral" | "notice" | "success" | "warning";
+  children: ReactNode;
+}) {
+  const toneClassName = {
+    critical: "border-red-200 bg-red-50 text-red-700",
+    neutral: "border-black/[0.06] bg-[#f5f6f8] text-[#667085]",
+    notice: "border-sky-200 bg-sky-50 text-sky-700",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-800"
+  }[tone];
+
+  return (
+    <div
+      role={tone === "critical" ? "alert" : "status"}
+      aria-live="polite"
+      className={`rounded-lg border px-4 py-3 text-sm ${toneClassName}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 function statusTone(status: string | null) {
   if (status === "active") return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -95,29 +122,30 @@ export default async function BillingSettingsPage({
     <div className="space-y-6">
       {/* Status banners */}
       {billingError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <StatusBanner tone="critical">
           {billingError}
-        </div>
+        </StatusBanner>
       )}
       {checkoutState === "success" && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <StatusBanner tone="success">
           Checkout complete. Your plan details should update momentarily.
-        </div>
+        </StatusBanner>
       )}
       {checkoutState === "canceled" && (
-        <div className="rounded-lg border border-black/[0.06] bg-[#f5f6f8] px-4 py-3 text-sm text-[#667085]">
+        <StatusBanner tone="neutral">
           Checkout was canceled.
-        </div>
+        </StatusBanner>
       )}
       {billingNotice && (
-        <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+        <StatusBanner tone="notice">
           {billingNotice}
-        </div>
+        </StatusBanner>
       )}
       {!overview.stripeConfigured && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Billing setup is still being finished.
-        </div>
+        <StatusBanner tone="warning">
+          Billing setup is still being finished. Add your Stripe secret, webhook secret,
+          and plan price IDs before testing paid flows.
+        </StatusBanner>
       )}
 
       {/* Current plan + usage */}
@@ -152,21 +180,25 @@ export default async function BillingSettingsPage({
             {overview.hasActiveSubscription && (
               <div className="flex items-center gap-2">
                 <form action={openBillingPortalAction}>
-                  <SubmitButton
+                  <PostHogSubmitButton
+                    eventName="billing_portal_clicked"
+                    payload={{ source: "billing_overview" }}
                     pendingLabel="Opening…"
                     className="inline-flex items-center justify-center rounded-lg border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[#f7f5f1]"
                   >
                     Manage in Stripe
-                  </SubmitButton>
+                  </PostHogSubmitButton>
                 </form>
                 {!overview.cancelAtPeriodEnd && (
                   <form action={cancelSubscriptionAction}>
-                    <SubmitButton
+                    <PostHogSubmitButton
+                      eventName="billing_cancel_clicked"
+                      payload={{ source: "billing_overview" }}
                       pendingLabel="Canceling…"
                       className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                     >
                       Cancel plan
-                    </SubmitButton>
+                    </PostHogSubmitButton>
                   </form>
                 )}
               </div>
@@ -238,6 +270,11 @@ export default async function BillingSettingsPage({
                 </div>
                 <div className="mt-2.5 h-1.5 rounded-full bg-black/[0.04]">
                   <div
+                    role="progressbar"
+                    aria-label={`${label} usage`}
+                    aria-valuemin={0}
+                    aria-valuemax={usage.limit ?? usage.current}
+                    aria-valuenow={usage.current}
                     className={`h-full rounded-full transition-all ${
                       isOver ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-foreground/70"
                     }`}
@@ -474,7 +511,10 @@ export default async function BillingSettingsPage({
 
                     return (
                       <li key={feature} className="flex items-start gap-2 text-sm">
-                        <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isHighlighted ? "text-foreground" : "text-muted-foreground/50"}`} />
+                        <Check
+                          aria-hidden="true"
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isHighlighted ? "text-foreground" : "text-muted-foreground/50"}`}
+                        />
                         <span className={isHighlighted ? "font-medium text-foreground" : "text-muted-foreground"}>
                           {feature}
                         </span>
@@ -487,26 +527,38 @@ export default async function BillingSettingsPage({
                   <form action={startCheckoutAction}>
                     <input type="hidden" name="planTier" value={plan.tier} />
                     <input type="hidden" name="interval" value={BillingInterval.month} />
-                    <SubmitButton
+                    <PostHogSubmitButton
+                      eventName="billing_checkout_started"
+                      payload={{
+                        source: "billing_plan_grid",
+                        targetTier: plan.tier,
+                        interval: BillingInterval.month
+                      }}
                       pendingLabel="Redirecting…"
                       disabled={disablePlanActions || !plan.monthlyAvailable}
                       className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {isCurrentPlan ? "Current plan" : "Start monthly"}
-                    </SubmitButton>
+                    </PostHogSubmitButton>
                   </form>
 
                   {plan.yearlyAvailable && (
                     <form action={startCheckoutAction}>
                       <input type="hidden" name="planTier" value={plan.tier} />
                       <input type="hidden" name="interval" value={BillingInterval.year} />
-                      <SubmitButton
+                      <PostHogSubmitButton
+                        eventName="billing_checkout_started"
+                        payload={{
+                          source: "billing_plan_grid",
+                          targetTier: plan.tier,
+                          interval: BillingInterval.year
+                        }}
                         pendingLabel="Redirecting…"
                         disabled={disablePlanActions}
                         className="w-full rounded-lg border border-black/10 bg-white px-4 py-2.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Start annual
-                      </SubmitButton>
+                      </PostHogSubmitButton>
                     </form>
                   )}
                 </div>

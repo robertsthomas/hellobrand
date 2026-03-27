@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
+import { PublicFunnelLink } from "@/components/public-funnel-link";
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
 import { ANONYMOUS_ANALYSIS_TOKEN_STORAGE_KEY } from "@/lib/public-upload-session";
 
@@ -57,12 +57,14 @@ export function PublicClaimLoader() {
             </h1>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">{errorMessage}</p>
             <div className="mt-6">
-              <Link
+              <PublicFunnelLink
                 href="/upload"
+                eventName="landing_upload_cta_clicked"
+                payload={{ location: "claim_error" }}
                 className="inline-flex h-11 items-center justify-center bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/92"
               >
                 Upload another contract
-              </Link>
+              </PublicFunnelLink>
             </div>
           </>
         ) : (

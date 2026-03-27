@@ -66,6 +66,7 @@
   --warning: #e07a5f;
   --error: #dc2626;
   --border: #e0e4e9;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html.dark {
@@ -131,6 +132,10 @@ html.dark {
   --border: #363d45;
 }
 
+html {
+  min-height: 100%;
+}
+
 body {
   @apply bg-background text-foreground antialiased;
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -142,6 +147,29 @@ body {
     background-color 180ms ease,
     color 180ms ease,
     border-color 180ms ease;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  z-index: 50;
+  border-radius: 9999px;
+  background: rgb(var(--foreground-rgb));
+  color: rgb(var(--background-rgb));
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transform: translateY(-160%);
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  box-shadow: 0 0 0 4px rgba(var(--ring-rgb), 0.2);
+  outline: none;
 }
 
 a {
@@ -157,6 +185,7 @@ h2,
 h3,
 h4 {
   letter-spacing: -0.03em;
+  text-wrap: balance;
 }
 
 .editorial-display {
@@ -224,6 +253,7 @@ a,
 input,
 textarea,
 select {
+  touch-action: manipulation;
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -238,6 +268,17 @@ select {
 
 html.dark ::selection {
   background: rgba(127, 188, 165, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @keyframes intake-loader-pan {

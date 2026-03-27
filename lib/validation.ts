@@ -348,7 +348,9 @@ export const publicFunnelEventNames = [
 
 export const publicFunnelEventSchema = z.object({
   name: z.enum(publicFunnelEventNames),
-  payload: z.record(z.string(), z.unknown()).optional().default({})
+  payload: z.record(z.string(), z.unknown()).optional().default({}),
+  distinctId: z.string().min(1).max(200).nullable().optional(),
+  currentUrl: z.string().url().nullable().optional()
 });
 
 export const publicAnonymousClaimSchema = z.object({

@@ -1,6 +1,13 @@
+import { isPostHogConfigured } from "@/lib/posthog/config";
 import { publicFunnelEventNames, publicFunnelEventSchema } from "@/lib/validation";
 
 export type PublicFunnelEventName = (typeof publicFunnelEventNames)[number];
+type PostHogWindow = Window &
+  typeof globalThis & {
+    posthog?: {
+      get_distinct_id?: () => string;
+    };
+  };
 
 export async function logPublicFunnelEvent(
   name: PublicFunnelEventName,
@@ -21,10 +28,18 @@ export function trackPublicFunnelEvent(
     return;
   }
 
+  const posthog = (window as PostHogWindow).posthog;
+  const distinctId =
+    isPostHogConfigured() && typeof posthog?.get_distinct_id === "function"
+      ? posthog.get_distinct_id()
+      : null;
+
   const body = JSON.stringify(
     publicFunnelEventSchema.parse({
       name,
-      payload
+      payload,
+      distinctId,
+      currentUrl: window.location.href
     })
   );
 

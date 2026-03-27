@@ -3,6 +3,7 @@ import { FolderPlus, Trash2 } from "lucide-react";
 
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { EmptyState } from "@/components/patterns/empty-state";
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealRecord } from "@/lib/types";
@@ -49,9 +50,14 @@ export function DealList({
         description="Start a new partnership workspace by uploading the first contract or brand documents."
         action={(
           <Button asChild aria-label="Upload documents for a new partnership workspace">
-            <Link href="/app/intake/new" title="Start a new partnership workspace">
+            <PostHogActionLink
+              href="/app/intake/new"
+              title="Start a new partnership workspace"
+              eventName="workspace_entry_cta_clicked"
+              payload={{ source: "deal_list_empty_state" }}
+            >
               New workspace
-            </Link>
+            </PostHogActionLink>
           </Button>
         )}
       />

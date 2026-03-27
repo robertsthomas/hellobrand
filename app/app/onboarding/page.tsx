@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Check, FileText, Sparkles, Upload } from "lucide-react";
 
+import { PostHogActionLink } from "@/components/posthog-action-link";
+
 const steps = [
   {
     number: 1,
@@ -64,18 +66,22 @@ export default function OnboardingPage() {
             })}
           </div>
           <div className="mt-10 flex flex-wrap gap-3">
-            <Link
+            <PostHogActionLink
               href="/app/intake/new"
+              eventName="workspace_entry_cta_clicked"
+              payload={{ source: "onboarding_upload" }}
               className="inline-flex rounded-full bg-ocean px-6 py-3 text-sm font-semibold text-white"
             >
               Upload your first documents
-            </Link>
-            <Link
+            </PostHogActionLink>
+            <PostHogActionLink
               href="/app"
+              eventName="onboarding_skip_cta_clicked"
+              payload={{ source: "onboarding" }}
               className="inline-flex rounded-full border border-black/10 dark:border-white/12 bg-white dark:bg-white/10 dark:text-white px-6 py-3 text-sm font-semibold text-ink"
             >
               Skip and explore
-            </Link>
+            </PostHogActionLink>
           </div>
         </section>
       </div>

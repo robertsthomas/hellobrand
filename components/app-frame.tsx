@@ -6,7 +6,9 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Hand, Menu, Plus, Search } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
 
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { buttonVariants } from "@/components/ui/button";
 import { MobileFab } from "@/components/mobile-fab";
 import { AssistantProvider } from "@/components/assistant-provider";
@@ -30,6 +32,7 @@ import {
   primaryAppNavItems,
   secondaryAppNavItems
 } from "@/lib/app-shell";
+import { captureAppEvent } from "@/lib/posthog/events";
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
 
@@ -62,6 +65,7 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const posthog = usePostHog();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -335,8 +339,10 @@ export function AppFrame({
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
             <div className="space-y-3">
-              <Link
+              <PostHogActionLink
                 href="/app/intake/new"
+                eventName="workspace_entry_cta_clicked"
+                payload={{ source: "sidebar_desktop" }}
                 data-guide="sidebar-new-workspace"
                 className={cn(
                   buttonVariants({ size: "sm" }),
@@ -344,7 +350,7 @@ export function AppFrame({
                 )}
               >
                 <span>New workspace</span>
-              </Link>
+              </PostHogActionLink>
               <SignOutButton redirectUrl="/login">
                 <button
                   type="button"
@@ -431,14 +437,16 @@ export function AppFrame({
 
               <div className="border-t border-border px-5 py-5 dark:border-white/8">
                 <div className="space-y-3">
-                  <Link
+                  <PostHogActionLink
                     href="/app/intake/new"
+                    eventName="workspace_entry_cta_clicked"
+                    payload={{ source: "sidebar_mobile" }}
                     data-guide="sidebar-new-workspace"
                     onClick={() => handleMobileMenuOpenChange(false)}
                     className={cn(buttonVariants({ size: "sm" }), "h-11 w-full justify-between px-4")}
                   >
                     <span>New workspace</span>
-                  </Link>
+                  </PostHogActionLink>
                   <SignOutButton redirectUrl="/login">
                     <button
                       type="button"
@@ -497,7 +505,12 @@ export function AppFrame({
               buttonVariants({ size: "icon" }),
               "shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
             )}
-            onClick={() => router.push("/app/intake/new")}
+            onClick={() => {
+              captureAppEvent(posthog, "workspace_entry_cta_clicked", {
+                source: "mobile_fab"
+              });
+              router.push("/app/intake/new");
+            }}
           >
             <Plus className="h-5 w-5" />
           </MobileFab>

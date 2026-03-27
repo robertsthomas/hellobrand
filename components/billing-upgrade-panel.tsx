@@ -1,7 +1,7 @@
 import { BillingInterval, PlanTier } from "@prisma/client";
 
 import { openBillingPortalAction, startCheckoutAction } from "@/app/actions";
-import { SubmitButton } from "@/components/submit-button";
+import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { humanizeToken } from "@/lib/utils";
 
 export function BillingUpgradePanel({
@@ -38,25 +38,33 @@ export function BillingUpgradePanel({
 
       {hasActiveSubscription ? (
         <form action={openBillingPortalAction} className="mt-6">
-          <SubmitButton
-            pendingLabel="Opening portal..."
+          <PostHogSubmitButton
+            eventName="billing_portal_clicked"
+            payload={{ source: "recommended_upgrade_panel", targetTier: recommendedTier }}
+            pendingLabel="Opening…"
             disabled={!billingReady || !stripeConfigured}
             className="inline-flex items-center justify-center bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-50"
           >
             Upgrade in Stripe
-          </SubmitButton>
+          </PostHogSubmitButton>
         </form>
       ) : (
         <form action={startCheckoutAction} className="mt-6">
           <input type="hidden" name="planTier" value={recommendedTier} />
           <input type="hidden" name="interval" value={BillingInterval.month} />
-          <SubmitButton
-            pendingLabel="Redirecting..."
+          <PostHogSubmitButton
+            eventName="billing_checkout_started"
+            payload={{
+              source: "recommended_upgrade_panel",
+              targetTier: recommendedTier,
+              interval: BillingInterval.month
+            }}
+            pendingLabel="Redirecting…"
             disabled={!billingReady || !stripeConfigured || !monthlyAvailable}
             className="inline-flex items-center justify-center bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-50"
           >
             Start {humanizeToken(recommendedTier)}
-          </SubmitButton>
+          </PostHogSubmitButton>
         </form>
       )}
     </aside>

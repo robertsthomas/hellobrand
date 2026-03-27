@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Play, Plus, Trash2 } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
 
 import { InfoTooltip } from "@/components/app-tooltip";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { captureAppEvent } from "@/lib/posthog/events";
 import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
 import {
   deleteLocalWorkspace,
@@ -136,6 +138,7 @@ export function EmptyDashboardUpload({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
+  const posthog = usePostHog();
   const [localWorkspaces, setLocalWorkspaces] = useState<LocalWorkspaceManifestItem[]>([]);
   const [serverQueuedWorkspaces, setServerQueuedWorkspaces] = useState<ServerQueuedWorkspaceItem[]>(
     initialQueuedWorkspaces.map(toServerQueuedWorkspaceItem)
@@ -227,6 +230,11 @@ export function EmptyDashboardUpload({
 
     try {
       await persistWorkspaceLocally();
+      captureAppEvent(posthog, "workspace_saved", {
+        sourceMode: mode,
+        fileCount: pendingFiles.length,
+        hasPastedText: Boolean(pastedText.trim())
+      });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not save this workspace."
@@ -319,6 +327,11 @@ export function EmptyDashboardUpload({
       WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY,
       "1"
     );
+    captureAppEvent(posthog, "workspace_analysis_started", {
+      queuedCount,
+      localWorkspaceCount: localWorkspaces.length,
+      serverQueuedCount: serverQueuedWorkspaces.length
+    });
     router.push("/app");
     void startAnalysisInBackground();
   }
@@ -333,6 +346,10 @@ export function EmptyDashboardUpload({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => {
+                  captureAppEvent(posthog, "workspace_source_mode_selected", {
+                    mode: "upload",
+                    surface: "empty_dashboard_upload"
+                  });
                   setMode("upload");
                   setErrorMessage(null);
                 }}
@@ -349,6 +366,10 @@ export function EmptyDashboardUpload({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => {
+                  captureAppEvent(posthog, "workspace_source_mode_selected", {
+                    mode: "paste",
+                    surface: "empty_dashboard_upload"
+                  });
                   setMode("paste");
                   setErrorMessage(null);
                 }}
@@ -400,7 +421,13 @@ export function EmptyDashboardUpload({
                   <button
                     type="button"
                     disabled={isSubmitting}
-                    onClick={() => inputRef.current?.click()}
+                    onClick={() => {
+                      captureAppEvent(posthog, "workspace_file_picker_clicked", {
+                        surface: "empty_dashboard_upload",
+                        mode
+                      });
+                      inputRef.current?.click();
+                    }}
                     data-guide="add-documents"
                     className={cn(
                       buttonVariants({
@@ -545,6 +572,9 @@ export function EmptyDashboardUpload({
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => {
+                      captureAppEvent(posthog, "workspace_add_another_clicked", {
+                        surface: "queued_workspaces"
+                      });
                       reset(initialMode);
                       setErrorMessage(null);
                       setIsComposerVisible(true);
@@ -571,12 +601,15 @@ export function EmptyDashboardUpload({
               </button>
               {!isComposerVisible ? (
                 <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    reset(initialMode);
-                    setErrorMessage(null);
-                    setIsComposerVisible(true);
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => {
+                      captureAppEvent(posthog, "workspace_add_another_clicked", {
+                        surface: "server_queued_workspaces"
+                      });
+                      reset(initialMode);
+                      setErrorMessage(null);
+                      setIsComposerVisible(true);
                   }}
                   className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
                 >

@@ -9,6 +9,7 @@ import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { IntakeDuplicateWarning } from "@/components/intake-duplicate-warning";
 import { IntakePendingUpload } from "@/components/intake-pending-upload";
 import { IntakeProcessingState } from "@/components/intake-processing-state";
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { StartQueuedAnalysisButton } from "@/components/start-queued-analysis-button";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
@@ -95,12 +96,14 @@ async function IntakeProcessingContent({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <StartQueuedAnalysisButton sessionIds={[session.id]} />
-              <Link
+              <PostHogActionLink
                 href="/app/intake/new"
+                eventName="workspace_entry_cta_clicked"
+                payload={{ source: "queued_intake_state" }}
                 className="text-sm font-medium text-black/60 transition hover:text-black dark:text-white/60 dark:hover:text-white"
               >
                 Create another workspace
-              </Link>
+              </PostHogActionLink>
             </div>
           </div>
         </div>

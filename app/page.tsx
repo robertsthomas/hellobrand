@@ -71,7 +71,7 @@ export default async function LandingPage() {
 
           <div className="relative mx-auto max-w-[1200px] px-5 pb-16 pt-12 text-center sm:px-6 md:pb-20 md:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
 
-            <h1 className="mx-auto mt-5 max-w-[13ch] text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
+            <h1 className="mx-auto mt-5 max-w-[13ch] text-balance text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
               Understand your brand deals in seconds.
             </h1>
 
@@ -117,7 +117,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="mx-auto max-w-[620px] text-center">
               <Eyebrow>What HelloBrand pulls out</Eyebrow>
-              <h2 className="mt-4 text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
+              <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
                 Enough value to know whether the deal needs a closer look.
               </h2>
               <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
@@ -171,7 +171,7 @@ export default async function LandingPage() {
             <div className="grid items-center gap-8 md:gap-12 lg:grid-cols-[1fr_1.15fr]">
               <div>
                 <Eyebrow>Sample breakdown</Eyebrow>
-                <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
+                <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
                   See the kind of output you get before you upload your own deal.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
@@ -214,7 +214,7 @@ export default async function LandingPage() {
               </div>
               <div className="order-1 lg:order-2">
                 <Eyebrow>Save and track after</Eyebrow>
-                <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
+                <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
                   Once the contract looks real, turn it into a workspace.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">

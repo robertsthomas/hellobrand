@@ -31,6 +31,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
 import {
+  STRIPE_API_VERSION,
   getBillingBaseUrl,
   getDevBillingIntervalOverride,
   getDevBillingStatusOverride,
@@ -63,7 +64,9 @@ function getStripeClient() {
     throw new Error("Missing STRIPE_SECRET_KEY.");
   }
 
-  stripeClient = new Stripe(secretKey);
+  stripeClient = new Stripe(secretKey, {
+    apiVersion: STRIPE_API_VERSION
+  });
   return stripeClient;
 }
 
@@ -72,6 +75,10 @@ export async function getStripeSubscriptionById(subscriptionId: string) {
 }
 
 export async function createBillingPortalSessionForViewer(viewer: Viewer) {
+  if (!isStripeConfigured()) {
+    throw new Error("Stripe billing is not fully configured yet.");
+  }
+
   const billingAccount = await ensureBillingAccount(viewer);
   const stripeCustomerId = await ensureStripeCustomer(viewer, billingAccount);
   const baseUrl = getBillingBaseUrl();
@@ -457,6 +464,10 @@ export async function createCheckoutSessionForViewer(
     interval: BillingInterval;
   }
 ) {
+  if (!isStripeConfigured()) {
+    throw new Error("Stripe billing is not fully configured yet.");
+  }
+
   const billingAccount = await ensureBillingAccount(viewer);
   const billingAccountWithHistory = await findBillingAccountWithHistory(viewer.id);
   assertPlanSelection(billingAccountWithHistory, input.planTier);
@@ -471,6 +482,7 @@ export async function createCheckoutSessionForViewer(
     mode: "subscription",
     customer: stripeCustomerId,
     client_reference_id: viewer.id,
+    billing_address_collection: "auto",
     line_items: [
       {
         price: priceId,

@@ -4,7 +4,7 @@ import { Suspense, type ReactNode } from "react";
 
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
-import { SubmitButton } from "@/components/submit-button";
+import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
 import { WorkspaceCreationOverlay } from "@/components/workspace-creation-overlay";
@@ -659,13 +659,15 @@ async function IntakeReviewContent({
                     <span className="hidden text-sm text-black/55 dark:text-white/55 md:inline">
                       Review complete?
                     </span>
-                    <SubmitButton
+                    <PostHogSubmitButton
+                      eventName="intake_confirmation_submitted"
+                      payload={{ source: "intake_review" }}
                       pendingLabel="Generating workspace..."
                       className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={!showConfirmation}
                     >
                       Generate partnership workspace
-                    </SubmitButton>
+                    </PostHogSubmitButton>
                   </div>
                 </div>
               </form>

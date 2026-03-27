@@ -131,11 +131,11 @@ export function InfoTooltip({
           setOpen((current) => !current);
         }}
         className={cn(
-          "inline-flex h-8 w-8 items-center justify-center text-[#98a2b3] transition hover:text-foreground dark:text-[#8f98a6]",
+          "inline-flex h-8 w-8 items-center justify-center text-[#98a2b3] outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-[#8f98a6]",
           className
         )}
       >
-        <Info className="h-4 w-4" />
+        <Info aria-hidden="true" className="h-4 w-4" />
       </button>
     </AppTooltip>
   );

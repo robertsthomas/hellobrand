@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, FileUp, Loader2, LockKeyhole, ShieldAlert, Sparkles } from "lucide-react";
 
+import { PostHogActionLink } from "@/components/posthog-action-link";
 import { PublicContractBreakdown } from "@/components/public-contract-breakdown";
 import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config";
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
@@ -241,19 +242,23 @@ export function PublicUploadWorkspace() {
                 </p>
 
                 <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-                  <Link
+                  <PostHogActionLink
                     href={uploadLimitGate.signUpHref}
+                    eventName="public_upload_gate_signup_clicked"
+                    payload={{ location: "upload_limit_gate" }}
                     className="inline-flex h-12 items-center justify-center gap-2 bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary/92"
                   >
                     Create an account
                     <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
+                  </PostHogActionLink>
+                  <PostHogActionLink
                     href={uploadLimitGate.signInHref}
+                    eventName="public_upload_gate_signin_clicked"
+                    payload={{ location: "upload_limit_gate" }}
                     className="inline-flex h-12 items-center justify-center border border-black/8 bg-white px-6 text-sm font-semibold text-foreground transition hover:bg-secondary dark:border-white/10 dark:bg-white/[0.03]"
                   >
                     Sign in
-                  </Link>
+                  </PostHogActionLink>
                 </div>
 
                 <div className="mt-6 text-sm text-muted-foreground">

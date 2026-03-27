@@ -2,10 +2,12 @@
 
 import { useMemo, useRef, useState } from "react";
 import { FileText, MessageSquareText, Plus } from "lucide-react";
+import { usePostHog } from "posthog-js/react";
 
 import { uploadDocumentsAction } from "@/app/actions";
 import type { DocumentRecord } from "@/lib/types";
 import { cn, humanizeToken } from "@/lib/utils";
+import { captureAppEvent } from "@/lib/posthog/events";
 import { SubmitButton } from "@/components/submit-button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -19,6 +21,7 @@ export function UploadContractForm({
   documents: DocumentRecord[];
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const posthog = usePostHog();
   const [mode, setMode] = useState<UploadMode>("upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const latestDocument = documents[0] ?? null;
@@ -38,6 +41,19 @@ export function UploadContractForm({
   return (
     <form
       action={uploadDocumentsAction}
+      onSubmit={() => {
+        captureAppEvent(
+          posthog,
+          mode === "upload"
+            ? "workspace_documents_submitted"
+            : "workspace_pasted_context_submitted",
+          {
+            surface: "deal_upload_form",
+            dealId,
+            fileCount: selectedFiles.length
+          }
+        );
+      }}
       className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
     >
       <input type="hidden" name="dealId" value={dealId} />
@@ -55,7 +71,13 @@ export function UploadContractForm({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setMode("upload")}
+            onClick={() => {
+              captureAppEvent(posthog, "workspace_source_mode_selected", {
+                mode: "upload",
+                surface: "deal_upload_form"
+              });
+              setMode("upload");
+            }}
             className={cn(
               "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
               mode === "upload"
@@ -68,7 +90,13 @@ export function UploadContractForm({
           </button>
           <button
             type="button"
-            onClick={() => setMode("paste")}
+            onClick={() => {
+              captureAppEvent(posthog, "workspace_source_mode_selected", {
+                mode: "paste",
+                surface: "deal_upload_form"
+              });
+              setMode("paste");
+            }}
             className={cn(
               "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
               mode === "paste"
@@ -113,7 +141,13 @@ export function UploadContractForm({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    captureAppEvent(posthog, "workspace_file_picker_clicked", {
+                      surface: "deal_upload_form",
+                      mode
+                    });
+                    fileInputRef.current?.click();
+                  }}
                   className="text-sm font-medium text-foreground underline underline-offset-4"
                 >
                   Choose files

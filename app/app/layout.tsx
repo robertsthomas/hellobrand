@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
+import { PostHogUserIdentify } from "@/components/posthog-user-identify";
 import { ProfileOnboardingBanner } from "@/components/profile-onboarding-banner";
 import { requireViewer } from "@/lib/auth";
 import {
@@ -32,6 +33,11 @@ export default async function WorkspaceLayout({
   return (
     <>
       <AccentColorProvider accentColor={profile.accentColor} />
+      <PostHogUserIdentify
+        userId={viewer.id}
+        email={viewer.email}
+        displayName={viewer.displayName}
+      />
       <AppFrame
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}

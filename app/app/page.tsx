@@ -173,30 +173,35 @@ async function DashboardContent() {
     const days = daysUntil(item.dueDate);
     return days !== null && days < 0;
   });
+  const firstLateDeal = dealRows.find((deal) => deal.paymentStatus === "late");
+  const firstHighRiskDeal = dealRows.find((deal) =>
+    deal.riskFlags.some((flag) => flag.severity === "high")
+  );
+  const nextActionDeliverable = dueSoonDeliverables[0] ?? allDeliverables[0] ?? null;
 
   const actionItems = [
-    dealRows.find((deal) => deal.paymentStatus === "late")
+    firstLateDeal
       ? {
           tone: "warning" as const,
           title: "Payment follow-up",
-          body: `${dealRows.find((deal) => deal.paymentStatus === "late")?.campaignName} has an overdue invoice that needs a check-in.`,
-          href: `/app/deals/${dealRows.find((deal) => deal.paymentStatus === "late")?.id}`
+          body: `${firstLateDeal.campaignName} has an overdue invoice that needs a check-in.`,
+          href: `/app/deals/${firstLateDeal.id}`
         }
       : null,
-    dealRows.find((deal) => deal.riskFlags.some((flag) => flag.severity === "high"))
+    firstHighRiskDeal
       ? {
           tone: "accent" as const,
           title: "Review contract watchouts",
-          body: `${dealRows.find((deal) => deal.riskFlags.some((flag) => flag.severity === "high"))?.campaignName} still has high-severity items before signature.`,
-          href: `/app/deals/${dealRows.find((deal) => deal.riskFlags.some((flag) => flag.severity === "high"))?.id}`
+          body: `${firstHighRiskDeal.campaignName} still has high-severity items before signature.`,
+          href: `/app/deals/${firstHighRiskDeal.id}`
         }
       : null,
-    allDeliverables[0]
+    nextActionDeliverable
       ? {
           tone: "success" as const,
           title: "Upcoming deliverable",
-          body: `${allDeliverables[0].title} for ${allDeliverables[0].campaignName} is due ${formatDate(allDeliverables[0].dueDate)}.`,
-          href: `/app/deals/${allDeliverables[0].dealId}`
+          body: `${nextActionDeliverable.title} for ${nextActionDeliverable.campaignName} is due ${formatDate(nextActionDeliverable.dueDate)}.`,
+          href: `/app/deals/${nextActionDeliverable.dealId}`
         }
       : null
   ].filter(Boolean) as Array<{

@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 
+import { captureAppEvent } from "@/lib/posthog/events";
 import type { ConnectedEmailAccountRecord } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -90,6 +92,7 @@ export function EmailConnectionsPanel({
   errorMessage?: string | null;
 }) {
   const router = useRouter();
+  const posthog = usePostHog();
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
 
@@ -103,8 +106,14 @@ export function EmailConnectionsPanel({
   );
 
   async function disconnectAccount(accountId: string) {
+    const account = accounts.find((item) => item.id === accountId);
     setPendingAccountId(accountId);
     setPanelError(null);
+    captureAppEvent(posthog, "email_disconnect_clicked", {
+      accountId,
+      provider: account?.provider ?? "unknown",
+      status: account?.status ?? "unknown"
+    });
 
     try {
       const response = await fetch(`/api/email/accounts/${accountId}/disconnect`, {
@@ -173,6 +182,13 @@ export function EmailConnectionsPanel({
 
                 <a
                   href={providerConnectPath(provider)}
+                  onClick={() =>
+                    captureAppEvent(posthog, "email_connection_started", {
+                      provider,
+                      hasExistingAccount: records.length > 0,
+                      surface: "settings_email_connections"
+                    })
+                  }
                   className="border border-black/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20"
                 >
                   {records.some((record) => ["connected", "syncing", "error", "reconnect_required"].includes(record.status))

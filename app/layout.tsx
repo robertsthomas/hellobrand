@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import {
   ClerkProvider,
   SignInButton,
@@ -10,7 +10,9 @@ import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 
 import "@/app/globals.css";
+import { PostHogProvider } from "@/app/providers";
 import { Show } from "@/components/clerk-show";
+import { PostHogPageView } from "@/components/posthog-pageview";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { getSiteUrl, siteConfig } from "@/lib/site";
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
     default: "HelloBrand",
-    template: "%s"
+    template: "%s | HelloBrand"
   },
   applicationName: siteConfig.name,
   description: siteConfig.description,
@@ -50,6 +52,14 @@ export const metadata: Metadata = {
   }
 };
 
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#121518" }
+  ]
+};
+
 async function AppProviders({ children }: { children: ReactNode }) {
   await cookies();
 
@@ -71,10 +81,15 @@ async function AppProviders({ children }: { children: ReactNode }) {
           <UserButton />
         </Show>
       </header>
-      <ThemeProvider>
-        {children}
-        <Toaster position="bottom-right" richColors closeButton />
-      </ThemeProvider>
+      <PostHogProvider>
+        <ThemeProvider>
+          <Suspense fallback={null}>
+            <PostHogPageView />
+          </Suspense>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton />
+        </ThemeProvider>
+      </PostHogProvider>
     </ClerkProvider>
   );
 }
@@ -85,10 +100,15 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.variable}>
+    <html lang="en" suppressHydrationWarning className="h-full">
+      <body className={`${inter.variable} min-h-dvh bg-background`}>
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
         <Suspense>
-          <AppProviders>{children}</AppProviders>
+          <div id="main-content">
+            <AppProviders>{children}</AppProviders>
+          </div>
         </Suspense>
       </body>
     </html>

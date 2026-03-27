@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { usePostHog } from "posthog-js/react";
 import {
   AlertTriangle,
   Check,
@@ -28,6 +29,7 @@ import {
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
+import { captureAppEvent } from "@/lib/posthog/events";
 import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
 import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
 import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
@@ -684,6 +686,7 @@ export function InboxWorkspace({
   };
 }) {
   const router = useRouter();
+  const posthog = usePostHog();
   const actionMenuRef = useRef<HTMLDivElement | null>(null);
   const aiReplyControlRef = useRef<HTMLDivElement | null>(null);
   const promptActionControlRef = useRef<HTMLDivElement | null>(null);
@@ -1165,6 +1168,11 @@ export function InboxWorkspace({
             </p>
             <Link
               href="/app/intake/new"
+              onClick={() =>
+                captureAppEvent(posthog, "workspace_entry_cta_clicked", {
+                  source: "inbox_empty_state"
+                })
+              }
               className="mt-5 inline-flex h-10 items-center gap-2 bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
@@ -1261,6 +1269,11 @@ export function InboxWorkspace({
                   ) : (
                     <a
                       href="/app/settings"
+                      onClick={() =>
+                        captureAppEvent(posthog, "inbox_connect_email_clicked", {
+                          source: "inbox_empty_state"
+                        })
+                      }
                       className="inline-flex h-12 items-center border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20"
                     >
                       Connect email accounts

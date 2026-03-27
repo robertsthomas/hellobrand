@@ -1,6 +1,8 @@
 import { BillingInterval, PlanTier } from "@prisma/client";
 import { BillingSubscriptionStatus } from "@prisma/client";
 
+export const STRIPE_API_VERSION = "2026-02-25.clover";
+
 function isNonProduction() {
   return process.env.NODE_ENV !== "production";
 }
@@ -99,5 +101,5 @@ export function hasStripePriceId(planTier: PlanTier, interval: BillingInterval) 
 }
 
 export function isStripeConfigured() {
-  return Boolean(getStripeSecretKey());
+  return Boolean(getStripeSecretKey() && getStripeWebhookSecret());
 }

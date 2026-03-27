@@ -3,7 +3,7 @@
 import { Hand, Sun, Moon, Menu } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore, useEffect } from "react";
 
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,11 @@ function hasRecentAccount(): boolean {
 
 function ThemeButton({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const isDark = mounted && resolvedTheme === "dark";
 
@@ -36,7 +39,7 @@ function ThemeButton({ className }: { className?: string }) {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground dark:text-[#1a2634] dark:hover:bg-black/[0.06] dark:hover:text-[#1a2634]",
+        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-black/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-[#1a2634] dark:hover:bg-black/[0.06] dark:hover:text-[#1a2634]",
         className
       )}
     >
@@ -46,11 +49,11 @@ function ThemeButton({ className }: { className?: string }) {
 }
 
 export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean }) {
-  const [returning, setReturning] = useState(false);
-
-  useEffect(() => {
-    setReturning(hasRecentAccount());
-  }, []);
+  const returning = useSyncExternalStore(
+    () => () => {},
+    hasRecentAccount,
+    () => false
+  );
 
   return (
     <nav className="sticky top-0 z-40 border-b border-black/5 bg-[#fefcfa]/95 backdrop-blur dark:border-white/10 dark:bg-[#101318]/92">

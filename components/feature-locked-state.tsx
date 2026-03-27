@@ -4,42 +4,61 @@ import { PlanTier } from "@prisma/client";
 import { ArrowRight, Lock } from "lucide-react";
 
 import { openBillingPortalAction } from "@/app/actions";
-import { SubmitButton } from "@/components/submit-button";
+import { PostHogActionLink } from "@/components/posthog-action-link";
+import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { humanizeToken } from "@/lib/utils";
 
 function UpgradeButton({
   requiredTier,
+  currentTier,
   hasActiveSubscription,
   actionLabel,
+  title
 }: {
   requiredTier: PlanTier;
+  currentTier: PlanTier;
   hasActiveSubscription: boolean;
   actionLabel?: string;
+  title: string;
 }) {
   const label = actionLabel ?? `Upgrade to ${humanizeToken(requiredTier)}`;
 
   if (hasActiveSubscription) {
     return (
       <form action={openBillingPortalAction}>
-        <SubmitButton
+        <PostHogSubmitButton
+          eventName="billing_portal_clicked"
+          payload={{
+            source: "feature_upgrade_card",
+            requiredTier,
+            currentTier,
+            title
+          }}
           pendingLabel="Opening portal..."
           className="group inline-flex items-center justify-center gap-2 bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
         >
           {label}
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-        </SubmitButton>
+        </PostHogSubmitButton>
       </form>
     );
   }
 
   return (
-    <Link
+    <PostHogActionLink
       href="/app/settings/billing"
+      eventName="billing_checkout_started"
+      payload={{
+        source: "feature_upgrade_card",
+        requiredTier,
+        currentTier,
+        title
+      }}
       className="group inline-flex items-center justify-center gap-2 bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
     >
       {label}
       <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-    </Link>
+    </PostHogActionLink>
   );
 }
 
@@ -84,8 +103,10 @@ export function FeatureUpgradeCard({
       <div className="mt-5 flex items-center justify-center gap-4">
         <UpgradeButton
           requiredTier={requiredTier}
+          currentTier={currentTier}
           hasActiveSubscription={hasActiveSubscription}
           actionLabel={actionLabel}
+          title={title}
         />
       </div>
     </div>
@@ -137,8 +158,10 @@ export function FeatureLockedState({
         <div className="mt-6 flex items-center justify-center gap-4">
           <UpgradeButton
             requiredTier={requiredTier}
+            currentTier={currentTier}
             hasActiveSubscription={hasActiveSubscription}
             actionLabel={actionLabel}
+            title={title}
           />
         </div>
         <Link
