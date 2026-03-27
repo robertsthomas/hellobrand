@@ -7,12 +7,14 @@ import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import { requireViewer } from "@/lib/auth";
 import {
   applyPendingChangesForViewer,
+  activateSummaryVariantForViewer,
   createDealForViewer as createDealFromDeals,
   confirmTermsFieldForViewer,
   deleteDealForViewer as deleteDealFromDeals,
   dismissPendingChangesForViewer,
   generateDraftForViewer as generateDraftFromDeals,
   reprocessDocumentForViewer as reprocessDocumentFromDeals,
+  restoreSummaryForViewer,
   updateDealNotesForViewer as updateDealNotesFromDeals,
   updateDealForViewer as updateDealFromDeals,
   updateTermsForViewer as updateTermsFromDeals,
@@ -31,7 +33,12 @@ import {
   invoiceRecordInputSchema,
   updateDealSchema
 } from "@/lib/validation";
-import type { DraftIntent, InvoiceLineItem, InvoiceParty } from "@/lib/types";
+import type {
+  DraftIntent,
+  InvoiceLineItem,
+  InvoiceParty,
+  SummaryType
+} from "@/lib/types";
 import {
   parseNullableBoolean,
   parseNullableNumber,
@@ -217,6 +224,55 @@ export async function generateDraftAction(formData: FormData) {
   await generateDraftFromDeals(viewer, dealId, intent);
   revalidatePath(`/app/deals/${dealId}`);
   invalidateDeals(viewer.id, dealId);
+}
+
+const SUMMARY_TYPES = ["legal", "plain_language", "short"] as const;
+
+export async function activateSummaryVariantAction(
+  dealId: string,
+  summaryType: SummaryType
+) {
+  const viewer = await requireViewer();
+
+  if (!SUMMARY_TYPES.includes(summaryType)) {
+    return {
+      error: "Unknown summary type."
+    };
+  }
+
+  try {
+    await activateSummaryVariantForViewer(viewer, dealId, summaryType);
+    revalidatePath(`/app/deals/${dealId}`);
+    revalidatePath("/app");
+    invalidateDeals(viewer.id, dealId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not switch summary versions right now."
+    };
+  }
+}
+
+export async function restoreSummaryVersionAction(dealId: string, summaryId: string) {
+  const viewer = await requireViewer();
+
+  try {
+    await restoreSummaryForViewer(viewer, dealId, summaryId);
+    revalidatePath(`/app/deals/${dealId}`);
+    revalidatePath("/app");
+    invalidateDeals(viewer.id, dealId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not restore that summary version."
+    };
+  }
 }
 
 export async function deleteWorkspaceAction(formData: FormData) {

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { Fragment, Suspense } from "react";
+import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
@@ -9,6 +9,7 @@ import { BriefGenerator } from "@/components/brief-generator";
 import { BriefOverview } from "@/components/brief-overview";
 import { DealContextPanel } from "@/components/deal-context-panel";
 import { DealEmailPanel } from "@/components/deal-email-panel";
+import { DealSummaryPanel } from "@/components/deal-summary-panel";
 import { DeliverableTracker } from "@/components/deliverable-tracker";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
@@ -22,12 +23,6 @@ import { RiskFlags } from "@/components/risk-flags";
 import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from "@/components/ui/accordion";
 import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
@@ -35,33 +30,8 @@ import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
-import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
-
-
-function renderSummaryParagraph(paragraph: string) {
-  const pattern =
-    /(\$[0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|\bNet\s+\d+\b|\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}\b|\bTikTok\b|\bInstagram\b|\bYouTube\b|\b#ad\b|\bpaid partnership\b)/gi;
-  const parts = paragraph.split(pattern);
-
-  return parts.map((part, index) => {
-    if (!part) {
-      return null;
-    }
-
-    const isEmphasis = pattern.test(part);
-    pattern.lastIndex = 0;
-
-    return isEmphasis ? (
-      <strong key={`${part}-${index}`} className="font-semibold text-ink">
-        {part}
-      </strong>
-    ) : (
-      <Fragment key={`${part}-${index}`}>{part}</Fragment>
-    );
-  });
-}
 
 export default function WorkspaceDealDetailPage({
   params,
@@ -114,12 +84,6 @@ async function DealDetailContent({
     documentSections,
     extractionResults
   } = aggregate;
-  const summaryBody =
-    aggregate.currentSummary?.body ??
-    deal.summary ??
-    "Upload documents to generate a plain-English summary, extracted creator terms, and negotiation watchouts.";
-  const summarySections = parseDealSummarySections(summaryBody);
-  const plainSummary = toPlainDealSummary(summaryBody) ?? summaryBody;
   const normalized = buildNormalizedIntakeRecord(aggregate);
   const displayCampaignName = normalized?.contractTitle ?? deal.campaignName;
   const uploadedDate = formatDate(deal.createdAt);
@@ -258,48 +222,11 @@ async function DealDetailContent({
               <DisclosureObligations obligations={terms?.disclosureObligations ?? []} />
             ) : null}
             <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
-              {summarySections.length > 0 ? (
-                <Accordion
-                  type="single"
-                  collapsible
-                  defaultValue={summarySections[0]?.id}
-                  className="w-full"
-                >
-                  {summarySections.map((section) => (
-                    <AccordionItem
-                      key={section.id}
-                      value={section.id}
-                      className="border-black/8 dark:border-white/10"
-                    >
-                      <AccordionTrigger className="py-5 hover:no-underline">
-                        <div className="pr-6 text-left">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
-                            {section.title}
-                          </p>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-5">
-                        <div className="max-w-4xl space-y-3">
-                          {section.paragraphs.map((paragraph, index) => (
-                            <p
-                              key={`${section.id}-${index}`}
-                              className="text-[15px] leading-8 text-black/72 dark:text-white/72"
-                            >
-                              {renderSummaryParagraph(paragraph)}
-                            </p>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              ) : (
-                <div className="max-w-4xl">
-                  <p className="text-[15px] leading-8 text-black/72 dark:text-white/72">
-                    {plainSummary}
-                  </p>
-                </div>
-              )}
+              <DealSummaryPanel
+                dealId={deal.id}
+                summaries={aggregate.summaries}
+                currentSummary={aggregate.currentSummary}
+              />
 
               <div className="grid gap-6 border-t border-black/8 pt-6 md:grid-cols-2 dark:border-white/10">
                 <div className="space-y-3">

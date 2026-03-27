@@ -40,25 +40,32 @@ export function MobileFab({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleTap}
+    <div
       className={cn(
-        "fixed bottom-6 z-40 flex h-12 w-12 items-center justify-center rounded-full transition-transform duration-300 ease-out lg:hidden",
-        side === "left" ? "left-0" : "right-0",
-        className
+        "fixed bottom-6 z-40 lg:hidden",
+        side === "left" ? "left-0" : "right-0"
       )}
       style={{
         transform: revealed
           ? side === "left"
-            ? "translateX(16px)"
-            : "translateX(-16px)"
+            ? "translateX(12px)"
+            : "translateX(-12px)"
           : side === "left"
-            ? "translateX(-50%)"
-            : "translateX(50%)"
+            ? "translateX(-46%)"
+            : "translateX(46%)",
+        transition: "transform 300ms cubic-bezier(0.4, 0, 0.2, 1)"
       }}
     >
-      {children}
-    </button>
+      <button
+        type="button"
+        onClick={handleTap}
+        className={cn(
+          "flex h-12 w-12 items-center justify-center rounded-full",
+          className
+        )}
+      >
+        {children}
+      </button>
+    </div>
   );
 }

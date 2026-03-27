@@ -299,6 +299,10 @@ export function createSeedStore(): AppStore {
         body:
           "This deal appears to pay $2,000 for one Instagram Reel and two Story frames. Payment is Net 45 after invoice, and the brand receives six months of paid social usage with a 30-day footwear exclusivity period.",
         version: "v1",
+        summaryType: "legal",
+        source: "analysis",
+        parentSummaryId: null,
+        isCurrent: true,
         createdAt: now
       }
     ]

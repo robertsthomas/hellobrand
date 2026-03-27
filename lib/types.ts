@@ -30,6 +30,9 @@ export type DocumentKind =
   | "email_thread"
   | "unknown";
 
+export type SummaryType = "legal" | "plain_language" | "short";
+export type SummarySource = "analysis" | "simplification";
+
 export type JobType =
   | "extract_text"
   | "classify_document"
@@ -638,7 +641,20 @@ export interface SummaryRecord {
   documentId: string | null;
   body: string;
   version: string;
+  summaryType: SummaryType | null;
+  source: SummarySource | null;
+  parentSummaryId: string | null;
+  isCurrent: boolean;
   createdAt: string;
+}
+
+export interface SummaryRecordInput {
+  body: string;
+  version: string;
+  summaryType?: SummaryType | null;
+  source?: SummarySource | null;
+  parentSummaryId?: string | null;
+  isCurrent?: boolean;
 }
 
 export type AssistantScope = "user" | "deal";
@@ -1030,6 +1046,10 @@ export interface ExtractionPipelineResult {
 export interface DocumentSummaryResult {
   body: string;
   version: string;
+  summaryType?: SummaryType | null;
+  source?: SummarySource | null;
+  parentSummaryId?: string | null;
+  isCurrent?: boolean;
 }
 
 export interface DocumentAnalysisResult {

@@ -34,7 +34,11 @@ import {
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
+import { buildGeneratedSummaryVariant } from "@/lib/summary-variants";
 import { readStoredBytes, storeUploadedBytes } from "@/lib/storage";
+import {
+  getLatestSummaryByType
+} from "@/lib/summaries";
 import {
   buildAppliedTerms,
   coalesceExtractions,
@@ -51,6 +55,7 @@ import type {
   ExtractionPipelineResult,
   JobType,
   PendingExtractionData,
+  SummaryType,
   Viewer
 } from "@/lib/types";
 
@@ -1392,6 +1397,96 @@ export async function reprocessDocumentForViewer(
   void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
 
   return getRepository().getDealAggregate(viewer.id, document.dealId);
+}
+
+export async function activateSummaryVariantForViewer(
+  viewer: Viewer,
+  dealId: string,
+  summaryType: SummaryType
+) {
+  const repository = getRepository();
+  const aggregate = await repository.getDealAggregate(viewer.id, dealId);
+
+  if (!aggregate) {
+    throw new Error("Deal not found.");
+  }
+
+  const latestLegal = getLatestSummaryByType(aggregate.summaries, "legal");
+  if (!latestLegal) {
+    throw new Error("No legal summary is available for this workspace yet.");
+  }
+
+  if (summaryType === "legal") {
+    const restored = await repository.restoreSummary(dealId, latestLegal.id);
+
+    if (!restored) {
+      throw new Error("Could not restore the legal summary.");
+    }
+
+    await repository.updateDeal(viewer.id, dealId, {
+      summary: restored.body
+    });
+    void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+    return restored;
+  }
+
+  const latestVariant = getLatestSummaryByType(aggregate.summaries, summaryType);
+  if (latestVariant?.parentSummaryId === latestLegal.id) {
+    const restored = await repository.restoreSummary(dealId, latestVariant.id);
+
+    if (!restored) {
+      throw new Error("Could not restore the saved summary variant.");
+    }
+
+    await repository.updateDeal(viewer.id, dealId, {
+      summary: restored.body
+    });
+    void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+    return restored;
+  }
+
+  const generated = await buildGeneratedSummaryVariant({
+    aggregate,
+    baseSummary: latestLegal,
+    targetType: summaryType
+  });
+  const saved = await repository.saveSummary(dealId, latestLegal.documentId, generated);
+
+  await repository.updateDeal(viewer.id, dealId, {
+    summary: saved.body
+  });
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+  return saved;
+}
+
+export async function restoreSummaryForViewer(
+  viewer: Viewer,
+  dealId: string,
+  summaryId: string
+) {
+  const repository = getRepository();
+  const aggregate = await repository.getDealAggregate(viewer.id, dealId);
+
+  if (!aggregate) {
+    throw new Error("Deal not found.");
+  }
+
+  const summary = aggregate.summaries.find((entry) => entry.id === summaryId);
+  if (!summary || summary.summaryType === null) {
+    throw new Error("Summary version not found.");
+  }
+
+  const restored = await repository.restoreSummary(dealId, summaryId);
+
+  if (!restored) {
+    throw new Error("Could not restore that summary version.");
+  }
+
+  await repository.updateDeal(viewer.id, dealId, {
+    summary: restored.body
+  });
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+  return restored;
 }
 
 export async function generateDraftForViewer(

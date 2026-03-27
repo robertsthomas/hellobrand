@@ -13,7 +13,8 @@ import type {
   FieldEvidence,
   GeneratedBrief,
   GeneratedBriefSection,
-  RiskFlagRecord
+  RiskFlagRecord,
+  SummaryType
 } from "@/lib/types";
 import {
   serializeDealSummarySections,
@@ -695,6 +696,76 @@ export async function generateSummaryWithLlm(
         ? serializeDealSummarySections(sections)
         : toPlainDealSummary(asString(payload.body) ?? fallback.body)) ?? fallback.body,
     version: `llm:${getLlmModel("generate_summary")}`
+  };
+}
+
+export async function generateSimplifiedSummaryWithLlm(input: {
+  targetType: SummaryType;
+  baseSummary: string;
+  grounding: Record<string, unknown>;
+  fallback: DocumentSummaryResult;
+}) {
+  const styleInstruction =
+    input.targetType === "plain_language"
+      ? "Rewrite the legal summary in simpler creator-friendly language. Keep all material obligations, payment details, rights limits, exclusivity, and watchouts explicit."
+      : "Compress the summary into a quick-reference version. Use one short paragraph per section, but still keep payment details, deliverables, rights limits, exclusivity, and watchouts explicit.";
+
+  const payload = await requestJson(
+    "generate_summary",
+    "You rewrite creator contract summaries without changing their meaning. You must preserve material obligations, restrictions, payment facts, and risks.",
+    `Target summary type: ${input.targetType}\n\n${styleInstruction}\n\nUse these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nCurrent legal summary:\n${input.baseSummary}\n\nGrounding facts:\n${JSON.stringify(
+      input.grounding,
+      null,
+      2
+    )}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this partnership is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
+    {
+      requestType: "generate_summary",
+      purpose: `summary_variant:${input.targetType}`,
+      targetType: input.targetType,
+      fallbackSummaryChars: input.fallback.body.length
+    }
+  );
+
+  const sections = Array.isArray(payload.sections)
+    ? payload.sections
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") {
+            return null;
+          }
+
+          const record = entry as { title?: unknown; paragraphs?: unknown };
+          const title = stripInlineMarkdown(asString(record.title) ?? "");
+          const paragraphs = Array.isArray(record.paragraphs)
+            ? record.paragraphs
+                .map((paragraph) => toPlainDealSummary(asString(paragraph) ?? ""))
+                .filter((paragraph): paragraph is string => Boolean(paragraph))
+            : [];
+
+          if (!title || paragraphs.length === 0) {
+            return null;
+          }
+
+          return {
+            id: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+            title,
+            paragraphs
+          };
+        })
+        .filter(
+          (
+            entry
+          ): entry is { id: string; title: string; paragraphs: string[] } =>
+            Boolean(entry)
+        )
+    : [];
+
+  return {
+    body:
+      (sections.length > 0
+        ? serializeDealSummarySections(sections)
+        : toPlainDealSummary(asString(payload.body) ?? input.fallback.body)) ??
+      input.fallback.body,
+    version: `llm:${input.targetType}:${getLlmModel("generate_summary")}`
   };
 }
 

@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",
-    "@clerk/nextjs": "^6.0.0",
+    "@clerk/nextjs": "^7.0.7",
     "@llamaindex/llama-cloud": "^1.8.0",
     "@openrouter/ai-sdk-provider": "^2.3.3",
     "@prisma/client": "^6.5.0",

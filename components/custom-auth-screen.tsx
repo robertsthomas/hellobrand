@@ -574,7 +574,7 @@ export function CustomAuthScreen() {
         <div>
           <div className="flex items-start justify-between gap-4">
             <Link href="/" className="group flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ocean text-white">
+              <div className="flex h-10 w-10 items-center justify-center bg-ocean text-white">
                 <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
               <div>
@@ -944,57 +944,27 @@ export function CustomAuthScreen() {
             </div>
           </div>
 
-          <div className="relative h-[260px]">
-            <div className="absolute left-4 top-8 w-[240px] rounded-lg border border-white/10 bg-[#f7f3ee] p-4 text-[#233127] shadow-[0_20px_60px_rgba(7,21,16,0.30)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5b695f]">
-                Glossier · Spring campaign
+          <div className="grid grid-cols-3 gap-3 pt-10">
+            <div className="rounded-lg border border-white/[0.08] bg-white/[0.05] p-4 backdrop-blur-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                Extracted
               </p>
-              <p className="mt-3 text-base font-semibold text-[#16261f]">
-                $4,200 · Net 30
-              </p>
-              <p className="mt-1.5 text-xs leading-5 text-[#5b695f]">
-                3 Instagram Reels, 1 TikTok. Exclusivity: 60 days, skincare only.
-              </p>
+              <p className="mt-3 text-[17px] font-semibold text-white">$4,200</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">Net 30, 60-day exclusivity, skincare only</p>
             </div>
-
-            <div className="absolute bottom-4 left-[35%] w-[220px] rounded-lg border border-white/10 bg-[#efe8dc] p-4 text-[#233127] shadow-[0_18px_52px_rgba(7,21,16,0.28)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6a7468]">
+            <div className="rounded-lg border border-white/[0.08] bg-white/[0.05] p-4 backdrop-blur-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
                 Flagged
               </p>
-              <div className="mt-3 grid gap-2">
-                <div className="rounded border border-black/[0.05] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold text-amber-700">Perpetual usage</p>
-                  <p className="mt-0.5 text-[11px] text-[#6a7468]">
-                    Contract says &quot;in perpetuity,&quot; brief says 6 months.
-                  </p>
-                </div>
-                <div className="rounded border border-black/[0.05] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Late payment</p>
-                  <p className="mt-0.5 text-[11px] text-[#6a7468]">
-                    Invoice is 12 days past due.
-                  </p>
-                </div>
-              </div>
+              <p className="mt-3 text-[17px] font-semibold text-[#E5A87B]">2 risks</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">Perpetual usage clause, invoice 12 days overdue</p>
             </div>
-
-            <div className="absolute bottom-0 right-0 w-[260px] rounded-lg border border-white/10 bg-white/95 p-4 text-[#1d2430] shadow-[0_24px_70px_rgba(7,21,16,0.35)]">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#69707d]">
+            <div className="rounded-lg border border-white/[0.08] bg-white/[0.05] p-4 backdrop-blur-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
                 Next up
               </p>
-              <div className="mt-3 grid gap-2">
-                <div className="rounded border border-black/[0.04] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Reels draft due Mar 28</p>
-                  <p className="mt-0.5 text-[11px] text-[#69707d]">
-                    First cut for Glossier spring campaign.
-                  </p>
-                </div>
-                <div className="rounded border border-black/[0.04] px-3 py-2.5">
-                  <p className="text-[13px] font-semibold">Reply to Nike by Thu</p>
-                  <p className="mt-0.5 text-[11px] text-[#69707d]">
-                    Marcus asked about the revised exclusivity window.
-                  </p>
-                </div>
-              </div>
+              <p className="mt-3 text-[17px] font-semibold text-white">Mar 28</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">Reels draft due, Glossier spring campaign</p>
             </div>
           </div>
         </div>

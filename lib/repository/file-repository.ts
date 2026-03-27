@@ -3,6 +3,13 @@ import { randomUUID } from "node:crypto";
 
 import { getRuntimeDir, getRuntimePath } from "@/lib/runtime-path";
 import { createSeedStore } from "@/lib/repository/seed";
+import {
+  getCurrentWorkspaceSummary,
+  getLatestSummaryByType,
+  getWorkspaceSummaries,
+  normalizeSummaryInput,
+  normalizeSummaryRecord
+} from "@/lib/summaries";
 import { deleteStoredBytes } from "@/lib/storage";
 import type {
   AssistantContextSnapshotRecord,
@@ -24,7 +31,9 @@ import type {
   InvoiceReminderTouchpointRecord,
   JobRecord,
   RiskFlagRecord,
-  SummaryRecord
+  SummaryRecord,
+  SummaryRecordInput,
+  SummaryType
 } from "@/lib/types";
 
 const runtimeDir = getRuntimeDir();
@@ -145,7 +154,7 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
     documentSections: store.documentSections ?? [],
     extractionResults: store.extractionResults ?? [],
     extractionEvidence: store.extractionEvidence ?? [],
-    summaries: store.summaries ?? []
+    summaries: (store.summaries ?? []).map((summary) => normalizeSummaryRecord(summary))
   };
 }
 
@@ -176,10 +185,6 @@ function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(i
   );
 }
 
-function isPrimarySummaryVersion(version: string) {
-  return !version.startsWith("intake-normalized:");
-}
-
 function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
   const documents = sortNewestFirst(
     store.documents.filter((document) => document.dealId === deal.id)
@@ -187,9 +192,6 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
   const latestDocument = documents[0] ?? null;
   const summaries = sortNewestFirst(
     store.summaries.filter((summary) => summary.dealId === deal.id)
-  );
-  const primarySummaries = summaries.filter((summary) =>
-    isPrimarySummaryVersion(summary.version)
   );
 
   return {
@@ -221,7 +223,7 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
       )
     ),
     summaries,
-    currentSummary: primarySummaries[0] ?? null,
+    currentSummary: getCurrentWorkspaceSummary(summaries),
     intakeSession: null
   };
 }
@@ -588,12 +590,27 @@ export class FileRepository {
   async saveSummary(
     dealId: string,
     documentId: string | null,
-    summary: Omit<SummaryRecord, "id" | "dealId" | "documentId" | "createdAt">
+    summary: SummaryRecordInput
   ) {
     const store = await ensureStore();
     const now = new Date().toISOString();
+    const normalized = normalizeSummaryInput(summary);
+
+    if (normalized.isCurrent) {
+      store.summaries = store.summaries.map((entry) =>
+        entry.dealId === dealId && entry.summaryType !== null
+          ? { ...entry, isCurrent: false }
+          : entry
+      );
+    }
+
     const next: SummaryRecord = {
-      ...summary,
+      body: normalized.body,
+      version: normalized.version,
+      summaryType: normalized.summaryType ?? null,
+      source: normalized.source ?? null,
+      parentSummaryId: normalized.parentSummaryId ?? null,
+      isCurrent: normalized.isCurrent ?? false,
       id: randomUUID(),
       dealId,
       documentId,
@@ -603,6 +620,46 @@ export class FileRepository {
     store.summaries.unshift(next);
     await saveStore(store);
     return next;
+  }
+
+  async listSummaryHistory(dealId: string) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      getWorkspaceSummaries(store.summaries.filter((summary) => summary.dealId === dealId))
+    );
+  }
+
+  async getLatestSummaryByType(dealId: string, summaryType: SummaryType) {
+    const history = await this.listSummaryHistory(dealId);
+    return getLatestSummaryByType(history, summaryType);
+  }
+
+  async restoreSummary(dealId: string, summaryId: string) {
+    const store = await ensureStore();
+    let restored: SummaryRecord | null = null;
+
+    store.summaries = store.summaries.map((summary) => {
+      if (summary.dealId !== dealId || summary.summaryType === null) {
+        return summary;
+      }
+
+      if (summary.id === summaryId) {
+        restored = { ...summary, isCurrent: true };
+        return restored;
+      }
+
+      return {
+        ...summary,
+        isCurrent: false
+      };
+    });
+
+    if (!restored) {
+      return null;
+    }
+
+    await saveStore(store);
+    return restored;
   }
 
   async createJob(job: Omit<JobRecord, "id" | "createdAt" | "updatedAt">) {

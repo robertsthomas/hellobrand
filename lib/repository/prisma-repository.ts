@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma } from "@prisma/client";
+import { Prisma, SummarySource as PrismaSummarySource, SummaryType as PrismaSummaryType } from "@prisma/client";
 
 import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import { prisma } from "@/lib/prisma";
+import {
+  getCurrentWorkspaceSummary,
+  getLatestSummaryByType as getLatestSummaryByTypeFromHistory,
+  getWorkspaceSummaries,
+  normalizeSummaryInput,
+  normalizeSummaryRecord
+} from "@/lib/summaries";
 import { deleteStoredBytes } from "@/lib/storage";
 import type {
   AssistantContextSnapshotRecord,
@@ -27,7 +34,9 @@ import type {
   InvoiceReminderTouchpointRecord,
   PaymentRecord,
   RiskFlagRecord,
-  SummaryRecord
+  SummaryRecord,
+  SummaryRecordInput,
+  SummaryType
 } from "@/lib/types";
 
 function iso(value: Date | string | null | undefined) {
@@ -298,12 +307,16 @@ function toSummaryRecord(summary: {
   documentId: string | null;
   body: string;
   version: string;
+  summaryType?: PrismaSummaryType | null;
+  source?: PrismaSummarySource | null;
+  parentSummaryId?: string | null;
+  isCurrent?: boolean | null;
   createdAt: Date;
 }): SummaryRecord {
-  return {
+  return normalizeSummaryRecord({
     ...summary,
     createdAt: iso(summary.createdAt) ?? new Date().toISOString()
-  };
+  });
 }
 
 function toInvoiceParty(value: unknown): InvoiceParty {
@@ -549,10 +562,6 @@ function toBatchRecord(
   };
 }
 
-function isPrimarySummaryVersion(version: string) {
-  return !version.startsWith("intake-normalized:");
-}
-
 function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(items: T[]) {
   return [...items].sort((left, right) =>
     (right.updatedAt ?? right.createdAt ?? "").localeCompare(
@@ -627,9 +636,6 @@ export class PrismaRepository {
 
     const documents = deal.documents.map(toDocumentRecord);
     const summaries = deal.summaries.map(toSummaryRecord);
-    const primarySummaries = summaries.filter((summary) =>
-      isPrimarySummaryVersion(summary.version)
-    );
 
     return {
       deal: toDealRecord(deal),
@@ -656,7 +662,7 @@ export class PrismaRepository {
       extractionResults: extractionResults.map(toExtractionResultRecord),
       extractionEvidence: extractionEvidence.map(toEvidenceRecord),
       summaries,
-      currentSummary: primarySummaries[0] ?? null,
+      currentSummary: getCurrentWorkspaceSummary(summaries),
       intakeSession: deal.intakeSession
         ? {
             id: deal.intakeSession.id,
@@ -1060,18 +1066,92 @@ export class PrismaRepository {
   async saveSummary(
     dealId: string,
     documentId: string | null,
-    summary: Omit<SummaryRecord, "id" | "dealId" | "documentId" | "createdAt">
+    summary: SummaryRecordInput
   ) {
-    const saved = await prisma.summary.create({
-      data: {
-        dealId,
-        documentId,
-        body: summary.body,
-        version: summary.version
+    const normalized = normalizeSummaryInput(summary);
+    const saved = await prisma.$transaction(async (tx) => {
+      if (normalized.isCurrent) {
+        await tx.summary.updateMany({
+          where: {
+            dealId,
+            summaryType: { not: null }
+          },
+          data: {
+            isCurrent: false
+          }
+        });
       }
+
+      return tx.summary.create({
+        data: {
+          dealId,
+          documentId,
+          body: normalized.body,
+          version: normalized.version,
+          summaryType: normalized.summaryType ?? undefined,
+          source: normalized.source ?? undefined,
+          parentSummaryId: normalized.parentSummaryId ?? null,
+          isCurrent: normalized.isCurrent ?? false
+        }
+      });
     });
 
     return toSummaryRecord(saved);
+  }
+
+  async listSummaryHistory(dealId: string) {
+    const summaries = await prisma.summary.findMany({
+      where: {
+        dealId
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+
+    return getWorkspaceSummaries(summaries.map(toSummaryRecord));
+  }
+
+  async getLatestSummaryByType(dealId: string, summaryType: SummaryType) {
+    const history = await this.listSummaryHistory(dealId);
+    return getLatestSummaryByTypeFromHistory(history, summaryType);
+  }
+
+  async restoreSummary(dealId: string, summaryId: string) {
+    const restored = await prisma.$transaction(async (tx) => {
+      const existing = await tx.summary.findFirst({
+        where: {
+          id: summaryId,
+          dealId,
+          summaryType: { not: null }
+        }
+      });
+
+      if (!existing) {
+        return null;
+      }
+
+      await tx.summary.updateMany({
+        where: {
+          dealId,
+          summaryType: { not: null }
+        },
+        data: {
+          isCurrent: false
+        }
+      });
+
+      return tx.summary.update({
+        where: {
+          id: summaryId
+        },
+        data: {
+          isCurrent: true
+        }
+      });
+    });
+
+    return restored ? toSummaryRecord(restored) : null;
   }
 
   async createJob(job: Omit<JobRecord, "id" | "createdAt" | "updatedAt">) {

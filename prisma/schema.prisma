@@ -50,6 +50,17 @@ enum BillingWebhookEventStatus {
   failed
 }
 
+enum SummaryType {
+  legal
+  plain_language
+  short
+}
+
+enum SummarySource {
+  analysis
+  simplification
+}
+
 model User {
   id          String   @id
   email       String   @unique
@@ -230,17 +241,23 @@ model ExtractionEvidence {
 }
 
 model Summary {
-  id         String   @id @default(uuid())
-  dealId     String
-  documentId String?
-  body       String
-  version    String
-  createdAt  DateTime @default(now())
+  id              String        @id @default(uuid())
+  dealId          String
+  documentId      String?
+  body            String
+  version         String
+  summaryType     SummaryType?
+  source          SummarySource?
+  parentSummaryId String?
+  isCurrent       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
 
   deal     Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
   document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   @@index([dealId])
+  @@index([dealId, isCurrent])
+  @@index([dealId, summaryType, createdAt])
 }
 
 model AssistantThread {
