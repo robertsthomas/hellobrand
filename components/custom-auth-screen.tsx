@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Hand, LockKeyhole, Mail } from "lucide-react";
-import { useClerk, useSignIn, useSignUp } from "@clerk/nextjs";
+import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { usePostHog } from "posthog-js/react";
 
 import { Button } from "@/components/ui/button";
@@ -17,18 +17,11 @@ type VerificationStep = "details" | "sign-up-code" | "sign-in-second-factor";
 type SignInSecondFactorState =
   | {
       strategy: "email_code";
-      safeIdentifier: string;
-      emailAddressId: string;
-    }
-  | {
-      strategy: "email_link";
-      safeIdentifier: string;
-      emailAddressId: string;
+      safeIdentifier: string | null;
     }
   | {
       strategy: "phone_code";
-      safeIdentifier: string;
-      phoneNumberId?: string;
+      safeIdentifier: string | null;
     }
   | {
       strategy: "totp" | "backup_code";
@@ -68,13 +61,25 @@ function getErrorMessages(error: unknown): string[] {
   return ["Something went wrong. Please try again."];
 }
 
+function factorSafeIdentifier(factor: unknown) {
+  if (
+    typeof factor === "object" &&
+    factor !== null &&
+    "safeIdentifier" in factor &&
+    typeof (factor as { safeIdentifier?: unknown }).safeIdentifier === "string"
+  ) {
+    return (factor as { safeIdentifier: string }).safeIdentifier;
+  }
+
+  return null;
+}
+
 export function CustomAuthScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const posthog = usePostHog();
-  const { setActive } = useClerk();
-  const { isLoaded: isSignInLoaded, signIn } = useSignIn();
-  const { isLoaded: isSignUpLoaded, signUp } = useSignUp();
+  const { signIn, fetchStatus: signInFetchStatus } = useSignIn();
+  const { signUp, fetchStatus: signUpFetchStatus } = useSignUp();
 
   const queryMode = useMemo(() => deriveMode(searchParams.get("mode")), [searchParams]);
   const redirectTarget = useMemo(
@@ -101,20 +106,52 @@ export function CustomAuthScreen() {
   }, [queryMode]);
 
   useEffect(() => {
-    if (
-      verificationStep === "sign-in-second-factor" &&
-      isSignInLoaded &&
-      signIn?.status === "complete" &&
-      signIn.createdSessionId
-    ) {
-      void activateSession(signIn.createdSessionId);
-    }
-  }, [isSignInLoaded, signIn, verificationStep]);
-
-  useEffect(() => {
     setErrorMessages([]);
     setIsSubmitting(false);
   }, [mode, verificationStep]);
+
+  function navigateAfterAuth(decorateUrl: (path: string) => string) {
+    const url = decorateUrl(redirectTarget);
+    if (url.startsWith("http")) {
+      window.location.href = url;
+      return;
+    }
+
+    router.push(url);
+    router.refresh();
+  }
+
+  async function finalizeSignIn() {
+    const { error } = await signIn.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        if (session?.currentTask) {
+          return;
+        }
+
+        navigateAfterAuth(decorateUrl);
+      }
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  async function finalizeSignUp() {
+    const { error } = await signUp.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        if (session?.currentTask) {
+          return;
+        }
+
+        navigateAfterAuth(decorateUrl);
+      }
+    });
+
+    if (error) {
+      throw error;
+    }
+  }
 
   function updateMode(nextMode: AuthMode) {
     captureAppEvent(posthog, "auth_mode_switched", {
@@ -146,18 +183,11 @@ export function CustomAuthScreen() {
     setVerificationNotice(null);
   }
 
-  async function activateSession(sessionId: string) {
-    await setActive({ session: sessionId });
-    router.push(redirectTarget);
-    router.refresh();
-  }
-
-  async function moveToSignInSecondFactor(result: NonNullable<typeof signIn>) {
-    const supportedSecondFactors = result.supportedSecondFactors ?? [];
+  async function moveToSignInSecondFactor() {
+    const supportedSecondFactors = signIn.supportedSecondFactors ?? [];
     const preferredSecondFactor =
       supportedSecondFactors.find((factor) => factor.strategy === "totp") ??
       supportedSecondFactors.find((factor) => factor.strategy === "email_code") ??
-      supportedSecondFactors.find((factor) => factor.strategy === "email_link") ??
       supportedSecondFactors.find((factor) => factor.strategy === "phone_code") ??
       supportedSecondFactors.find((factor) => factor.strategy === "backup_code");
 
@@ -183,87 +213,41 @@ export function CustomAuthScreen() {
     }
 
     if (preferredSecondFactor.strategy === "email_code") {
-      if (!preferredSecondFactor.emailAddressId) {
-        setErrorMessages([
-          "Your account requires email verification, but the email destination could not be loaded."
-        ]);
-        return;
+      const { error } = await signIn.mfa.sendEmailCode();
+      if (error) {
+        throw error;
       }
 
-      await result.prepareSecondFactor({
-        strategy: "email_code",
-        emailAddressId: preferredSecondFactor.emailAddressId
-      });
+      const safeIdentifier = factorSafeIdentifier(preferredSecondFactor);
       setSignInSecondFactor({
         strategy: "email_code",
-        safeIdentifier: preferredSecondFactor.safeIdentifier,
-        emailAddressId: preferredSecondFactor.emailAddressId
+        safeIdentifier
       });
       setVerificationStep("sign-in-second-factor");
       setVerificationNotice(
-        `We sent a verification code to ${preferredSecondFactor.safeIdentifier}.`
+        `We sent a verification code to ${safeIdentifier ?? "your email"}.`
       );
       return;
     }
 
-    if (preferredSecondFactor.strategy === "email_link") {
-      if (!preferredSecondFactor.emailAddressId) {
-        setErrorMessages([
-          "Your account requires email verification, but the email destination could not be loaded."
-        ]);
-        return;
-      }
-
-        await result.prepareSecondFactor({
-          strategy: "email_link",
-          redirectUrl:
-            typeof window === "undefined"
-              ? `/login?mode=sign-in&redirect=${encodeURIComponent(redirectTarget)}`
-              : `${window.location.origin}/login?mode=sign-in&redirect=${encodeURIComponent(
-                  redirectTarget
-                )}`,
-          emailAddressId: preferredSecondFactor.emailAddressId
-        });
-      setSignInSecondFactor({
-        strategy: "email_link",
-        safeIdentifier: preferredSecondFactor.safeIdentifier,
-        emailAddressId: preferredSecondFactor.emailAddressId
-      });
-      setVerificationStep("sign-in-second-factor");
-      setVerificationNotice(
-        `We sent a secure sign-in link to ${preferredSecondFactor.safeIdentifier}. Open that email to finish signing in.`
-      );
-      return;
+    const { error } = await signIn.mfa.sendPhoneCode();
+    if (error) {
+      throw error;
     }
 
-    if (!preferredSecondFactor.phoneNumberId) {
-      setErrorMessages([
-        "Your account requires SMS verification, but the phone destination could not be loaded."
-      ]);
-      return;
-    }
-
-    await result.prepareSecondFactor({
-      strategy: "phone_code",
-      phoneNumberId: preferredSecondFactor.phoneNumberId
-    });
+    const safeIdentifier = factorSafeIdentifier(preferredSecondFactor);
     setSignInSecondFactor({
       strategy: "phone_code",
-      safeIdentifier: preferredSecondFactor.safeIdentifier,
-      phoneNumberId: preferredSecondFactor.phoneNumberId
+      safeIdentifier
     });
     setVerificationStep("sign-in-second-factor");
     setVerificationNotice(
-      `We sent a verification code to ${preferredSecondFactor.safeIdentifier}.`
+      `We sent a verification code to ${safeIdentifier ?? "your phone"}.`
     );
   }
 
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!isSignInLoaded || !signIn) {
-      return;
-    }
 
     setIsSubmitting(true);
     setErrorMessages([]);
@@ -272,19 +256,23 @@ export function CustomAuthScreen() {
     });
 
     try {
-      const result = await signIn.create({
+      const { error } = await signIn.password({
         identifier: signInEmail.trim(),
         password: signInPassword
       });
 
-      if (result.status === "complete" && result.createdSessionId) {
-        await activateSession(result.createdSessionId);
+      if (error) {
+        throw error;
+      }
+
+      if (signIn.status === "complete") {
+        await finalizeSignIn();
         return;
       }
 
-      if (result.status === "needs_second_factor") {
+      if (signIn.status === "needs_second_factor" || signIn.status === "needs_client_trust") {
         setVerificationCode("");
-        await moveToSignInSecondFactor(result);
+        await moveToSignInSecondFactor();
         return;
       }
 
@@ -299,10 +287,6 @@ export function CustomAuthScreen() {
   async function handleSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!isSignUpLoaded || !signUp) {
-      return;
-    }
-
     if (signUpPassword !== confirmPassword) {
       setErrorMessages(["Passwords do not match."]);
       return;
@@ -316,17 +300,25 @@ export function CustomAuthScreen() {
     });
 
     try {
-      const result = await signUp.create({
+      const { error } = await signUp.password({
         emailAddress: signUpEmail.trim(),
         password: signUpPassword
       });
 
-      if (result.status === "complete" && result.createdSessionId) {
-        await activateSession(result.createdSessionId);
+      if (error) {
+        throw error;
+      }
+
+      if (signUp.status === "complete") {
+        await finalizeSignUp();
         return;
       }
 
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      const verificationResult = await signUp.verifications.sendEmailCode();
+      if (verificationResult.error) {
+        throw verificationResult.error;
+      }
+
       setVerificationStep("sign-up-code");
       setVerificationNotice(`We sent a verification code to ${signUpEmail.trim()}.`);
     } catch (error) {
@@ -339,10 +331,6 @@ export function CustomAuthScreen() {
   async function handleSignUpVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!isSignUpLoaded || !signUp) {
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessages([]);
     captureAppEvent(posthog, "auth_verification_submitted", {
@@ -350,12 +338,16 @@ export function CustomAuthScreen() {
     });
 
     try {
-      const result = await signUp.attemptEmailAddressVerification({
+      const { error } = await signUp.verifications.verifyEmailCode({
         code: verificationCode.trim()
       });
 
-      if (result.status === "complete" && result.createdSessionId) {
-        await activateSession(result.createdSessionId);
+      if (error) {
+        throw error;
+      }
+
+      if (signUp.status === "complete") {
+        await finalizeSignUp();
         return;
       }
 
@@ -372,7 +364,7 @@ export function CustomAuthScreen() {
   async function handleSignInVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!isSignInLoaded || !signIn || !signInSecondFactor) {
+    if (!signInSecondFactor) {
       return;
     }
 
@@ -388,26 +380,21 @@ export function CustomAuthScreen() {
           ? verificationCode.trim()
           : verificationCode.replace(/\D/g, "").trim();
 
-      const result =
+      const { error } =
         signInSecondFactor.strategy === "totp"
-          ? await signIn.attemptSecondFactor({ strategy: "totp", code: normalizedCode })
+          ? await signIn.mfa.verifyTOTP({ code: normalizedCode })
           : signInSecondFactor.strategy === "backup_code"
-            ? await signIn.attemptSecondFactor({
-                strategy: "backup_code",
-                code: normalizedCode
-              })
+            ? await signIn.mfa.verifyBackupCode({ code: normalizedCode })
             : signInSecondFactor.strategy === "email_code"
-              ? await signIn.attemptSecondFactor({
-                  strategy: "email_code",
-                  code: normalizedCode
-                })
-              : await signIn.attemptSecondFactor({
-                  strategy: "phone_code",
-                  code: normalizedCode
-                });
+              ? await signIn.mfa.verifyEmailCode({ code: normalizedCode })
+              : await signIn.mfa.verifyPhoneCode({ code: normalizedCode });
 
-      if (result.status === "complete" && result.createdSessionId) {
-        await activateSession(result.createdSessionId);
+      if (error) {
+        throw error;
+      }
+
+      if (signIn.status === "complete") {
+        await finalizeSignIn();
         return;
       }
 
@@ -420,10 +407,6 @@ export function CustomAuthScreen() {
   }
 
   async function resendVerificationCode() {
-    if (!isSignUpLoaded || !signUp) {
-      return;
-    }
-
     setIsSubmitting(true);
     setErrorMessages([]);
     captureAppEvent(posthog, "auth_verification_resent", {
@@ -431,7 +414,11 @@ export function CustomAuthScreen() {
     });
 
     try {
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      const { error } = await signUp.verifications.sendEmailCode();
+      if (error) {
+        throw error;
+      }
+
       setVerificationNotice(`A fresh verification code was sent to ${signUpEmail.trim()}.`);
     } catch (error) {
       setErrorMessages(getErrorMessages(error));
@@ -441,7 +428,7 @@ export function CustomAuthScreen() {
   }
 
   async function resendSignInVerificationCode() {
-    if (!isSignInLoaded || !signIn || !signInSecondFactor) {
+    if (!signInSecondFactor) {
       return;
     }
 
@@ -462,65 +449,17 @@ export function CustomAuthScreen() {
     });
 
     try {
-      if (signInSecondFactor.strategy === "email_code") {
-        await signIn.prepareSecondFactor({
-          strategy: "email_code",
-          emailAddressId: signInSecondFactor.emailAddressId
-        });
-      } else if (signInSecondFactor.strategy === "email_link") {
-        await signIn.prepareSecondFactor({
-          strategy: "email_link",
-          redirectUrl:
-            typeof window === "undefined"
-              ? `/login?mode=sign-in&redirect=${encodeURIComponent(redirectTarget)}`
-              : `${window.location.origin}/login?mode=sign-in&redirect=${encodeURIComponent(
-                  redirectTarget
-                )}`,
-          emailAddressId: signInSecondFactor.emailAddressId
-        });
-      } else if (signInSecondFactor.strategy === "phone_code") {
-        if (!signInSecondFactor.phoneNumberId) {
-          throw new Error(
-            "Your account requires SMS verification, but the phone destination could not be loaded."
-          );
-        }
+      const { error } =
+        signInSecondFactor.strategy === "email_code"
+          ? await signIn.mfa.sendEmailCode()
+          : await signIn.mfa.sendPhoneCode();
 
-        await signIn.prepareSecondFactor({
-          strategy: "phone_code",
-          phoneNumberId: signInSecondFactor.phoneNumberId
-        });
+      if (error) {
+        throw error;
       }
 
       setVerificationNotice(
-        signInSecondFactor.strategy === "email_link"
-          ? `A fresh sign-in link was sent to ${signInSecondFactor.safeIdentifier}.`
-          : `A fresh verification code was sent to ${signInSecondFactor.safeIdentifier}.`
-      );
-    } catch (error) {
-      setErrorMessages(getErrorMessages(error));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function checkSignInEmailLinkVerification() {
-    if (!isSignInLoaded || !signIn || signInSecondFactor?.strategy !== "email_link") {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessages([]);
-
-    try {
-      const refreshed = await signIn.reload();
-
-      if (refreshed.status === "complete" && refreshed.createdSessionId) {
-        await activateSession(refreshed.createdSessionId);
-        return;
-      }
-
-      setVerificationNotice(
-        `We still need you to open the sign-in link sent to ${signInSecondFactor.safeIdentifier}.`
+        `A fresh verification code was sent to ${signInSecondFactor.safeIdentifier ?? "your device"}.`
       );
     } catch (error) {
       setErrorMessages(getErrorMessages(error));
@@ -536,36 +475,23 @@ export function CustomAuthScreen() {
   const verificationLabel =
     signInSecondFactor?.strategy === "totp"
       ? "Authenticator code"
-      : signInSecondFactor?.strategy === "email_link"
-        ? "Email verification link"
       : signInSecondFactor?.strategy === "backup_code"
         ? "Backup code"
         : "Verification code";
   const verificationPlaceholder =
-    signInSecondFactor?.strategy === "email_link"
-      ? "Check your inbox for the sign-in link"
-      : signInSecondFactor?.strategy === "backup_code"
+    signInSecondFactor?.strategy === "backup_code"
       ? "Enter a backup code"
       : "Enter the 6-digit code";
-  const verificationButtonLabel =
-    isSignInVerificationMode && signInSecondFactor?.strategy === "email_link"
-      ? "I've clicked the email link"
-      : isSignInVerificationMode
-        ? "Verify and log in"
-        : "Verify email";
+  const verificationButtonLabel = isSignInVerificationMode ? "Verify and log in" : "Verify email";
   const verificationBody = isSignInVerificationMode
     ? signInSecondFactor?.strategy === "totp"
       ? "Enter the latest code from your authenticator app to finish signing in."
-      : signInSecondFactor?.strategy === "email_link"
-        ? "Open the secure sign-in link from your email to finish signing in."
       : signInSecondFactor?.strategy === "backup_code"
         ? "Use one of your recovery codes to finish signing in."
         : "Enter the latest verification code to finish signing in."
     : "Check your inbox and enter the latest code to finish creating your account.";
   const canAutoSubmitVerification =
-    (signInSecondFactor?.strategy !== "backup_code" &&
-      signInSecondFactor?.strategy !== "email_link") ||
-    isSignUpVerificationMode;
+    signInSecondFactor?.strategy !== "backup_code" || isSignUpVerificationMode;
 
   return (
     <div className="fixed inset-0 grid h-screen overflow-hidden bg-white dark:bg-[#171b1f] lg:grid-cols-[1fr_1fr]">
@@ -698,10 +624,10 @@ export function CustomAuthScreen() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={!isSignInLoaded || isSubmitting}
+                  disabled={isSubmitting || signInFetchStatus === "fetching"}
                   className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting ? "Signing in..." : "Log in"}
+                  {isSubmitting || signInFetchStatus === "fetching" ? "Signing in..." : "Log in"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </form>
@@ -767,10 +693,12 @@ export function CustomAuthScreen() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={!isSignUpLoaded || isSubmitting}
+                  disabled={isSubmitting || signUpFetchStatus === "fetching"}
                   className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting ? "Creating account..." : "Create account"}
+                  {isSubmitting || signUpFetchStatus === "fetching"
+                    ? "Creating account..."
+                    : "Create account"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
 
@@ -780,70 +708,52 @@ export function CustomAuthScreen() {
               <form
                 className="mt-8 grid gap-5"
                 ref={verificationFormRef}
-                onSubmit={(event) => {
-                  if (
-                    isSignInVerificationMode &&
-                    signInSecondFactor?.strategy === "email_link"
-                  ) {
-                    event.preventDefault();
-                    void checkSignInEmailLinkVerification();
-                    return;
-                  }
-
-                  return isSignInVerificationMode
+                onSubmit={(event) =>
+                  isSignInVerificationMode
                     ? handleSignInVerification(event)
-                    : handleSignUpVerification(event);
-                }}
+                    : handleSignUpVerification(event)
+                }
               >
-                {signInSecondFactor?.strategy === "email_link" && isSignInVerificationMode ? (
-                  <div className="border border-black/10 bg-black/[0.02] px-4 py-4 text-sm text-muted-foreground dark:border-white/12 dark:bg-white/[0.03]">
-                    We emailed a secure sign-in link to{" "}
-                    <span className="font-medium text-foreground">
-                      {signInSecondFactor.safeIdentifier}
-                    </span>
-                    . Open it in this browser, then come back here if you still need to continue.
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
-                      {verificationLabel}
-                    </label>
-                    <div className="relative">
-                      <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="verification-code"
-                        type="text"
-                        inputMode={signInSecondFactor?.strategy === "backup_code" ? "text" : "numeric"}
-                        autoComplete={
-                          signInSecondFactor?.strategy === "backup_code" ? "off" : "one-time-code"
+                <div className="grid gap-2">
+                  <label htmlFor="verification-code" className="text-sm font-medium text-foreground">
+                    {verificationLabel}
+                  </label>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="verification-code"
+                      type="text"
+                      inputMode={signInSecondFactor?.strategy === "backup_code" ? "text" : "numeric"}
+                      autoComplete={
+                        signInSecondFactor?.strategy === "backup_code" ? "off" : "one-time-code"
+                      }
+                      maxLength={signInSecondFactor?.strategy === "backup_code" ? undefined : 6}
+                      value={verificationCode}
+                      onChange={(event) => {
+                        const value =
+                          signInSecondFactor?.strategy === "backup_code"
+                            ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
+                            : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
+                        setVerificationCode(value);
+                        if (canAutoSubmitVerification && value.length === 6) {
+                          setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
                         }
-                        maxLength={signInSecondFactor?.strategy === "backup_code" ? undefined : 6}
-                        value={verificationCode}
-                        onChange={(event) => {
-                          const value =
-                            signInSecondFactor?.strategy === "backup_code"
-                              ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
-                              : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
-                          setVerificationCode(value);
-                          if (canAutoSubmitVerification && value.length === 6) {
-                            // Auto-submit after a tick so React state is committed
-                            setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
-                          }
-                        }}
-                        className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
-                        placeholder={verificationPlaceholder}
-                        required
-                      />
-                    </div>
+                      }}
+                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      placeholder={verificationPlaceholder}
+                      required
+                    />
                   </div>
-                )}
+                </div>
 
                 <Button
                   type="submit"
                   size="lg"
                   disabled={
                     isSubmitting ||
-                    (isSignInVerificationMode ? !isSignInLoaded : !isSignUpLoaded)
+                    (isSignInVerificationMode
+                      ? signInFetchStatus === "fetching"
+                      : signUpFetchStatus === "fetching")
                   }
                   className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
                 >
@@ -928,7 +838,8 @@ export function CustomAuthScreen() {
               Stop digging through emails for deal details.
             </h2>
             <p className="mt-4 max-w-[380px] text-[15px] leading-7 text-white/65">
-              Upload a contract or connect your inbox. HelloBrand pulls out the terms, deadlines, and payments so you don&apos;t have to.
+              Upload a contract or connect your inbox. HelloBrand pulls out the terms, deadlines, and
+              payments so you don&apos;t have to.
             </p>
 
             <div className="mt-7 grid gap-2.5">
@@ -950,21 +861,27 @@ export function CustomAuthScreen() {
                 Extracted
               </p>
               <p className="mt-3 text-[17px] font-semibold text-white">$4,200</p>
-              <p className="mt-1 text-[11px] leading-4 text-white/45">Net 30, 60-day exclusivity, skincare only</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">
+                Net 30, 60-day exclusivity, skincare only
+              </p>
             </div>
             <div className="rounded-lg border border-white/[0.08] bg-white/[0.05] p-4 backdrop-blur-sm">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
                 Flagged
               </p>
               <p className="mt-3 text-[17px] font-semibold text-[#E5A87B]">2 risks</p>
-              <p className="mt-1 text-[11px] leading-4 text-white/45">Perpetual usage clause, invoice 12 days overdue</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">
+                Perpetual usage clause, invoice 12 days overdue
+              </p>
             </div>
             <div className="rounded-lg border border-white/[0.08] bg-white/[0.05] p-4 backdrop-blur-sm">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">
                 Next up
               </p>
               <p className="mt-3 text-[17px] font-semibold text-white">Mar 28</p>
-              <p className="mt-1 text-[11px] leading-4 text-white/45">Reels draft due, Glossier spring campaign</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/45">
+                Reels draft due, Glossier spring campaign
+              </p>
             </div>
           </div>
         </div>
