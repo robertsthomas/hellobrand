@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight, Hand, Menu, Plus, Search } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { MobileFab } from "@/components/mobile-fab";
 import { AssistantProvider } from "@/components/assistant-provider";
 import { GuideProvider } from "@/components/guide-provider";
 import { GuideMobileModal } from "@/components/guide-mobile-modal";
@@ -45,13 +46,19 @@ export function AppFrame({
   guideState,
   hasActiveWorkspace,
   notifications,
-  onboardingComplete
+  onboardingComplete,
+  workspaceNavItems = []
 }: {
   children: ReactNode;
   guideState?: ProductGuideState;
   hasActiveWorkspace?: boolean;
   notifications?: NotificationItem[];
   onboardingComplete?: boolean;
+  workspaceNavItems?: Array<{
+    dealId: string;
+    label: string;
+    brandName: string;
+  }>;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -66,6 +73,48 @@ export function AppFrame({
   const hasWorkspaceNotification = (notifications ?? []).some(
     (notification) => notification.category === "workspace" && notification.status === "active"
   );
+  const sidebarSubItem = useMemo(() => {
+    const paymentsMatch = pathname.match(/^\/app\/payments\/([^/]+)$/);
+
+    if (paymentsMatch) {
+      const workspace = workspaceNavItems.find((item) => item.dealId === paymentsMatch[1]);
+      return workspace
+        ? {
+            parentHref: "/app/payments",
+            href: `/app/payments/${workspace.dealId}`,
+            label: workspace.label
+          }
+        : null;
+    }
+
+    const historyMatch = pathname.match(/^\/app\/deals\/history\/([^/]+)$/);
+
+    if (historyMatch) {
+      const workspace = workspaceNavItems.find((item) => item.dealId === historyMatch[1]);
+      return workspace
+        ? {
+            parentHref: "/app/deals/history",
+            href: `/app/deals/history/${workspace.dealId}`,
+            label: workspace.label
+          }
+        : null;
+    }
+
+    const workspaceMatch = pathname.match(/^\/app\/deals\/([^/]+)$/);
+
+    if (workspaceMatch && workspaceMatch[1] !== "history") {
+      const workspace = workspaceNavItems.find((item) => item.dealId === workspaceMatch[1]);
+      return workspace
+        ? {
+            parentHref: "/app/deals/history",
+            href: `/app/deals/${workspace.dealId}`,
+            label: workspace.label
+          }
+        : null;
+    }
+
+    return null;
+  }, [pathname, workspaceNavItems]);
 
   useEffect(() => {
     if (!guideOpenedMobileMenu) {
@@ -173,32 +222,46 @@ export function AppFrame({
     }
   }, [guideOpenedMobileMenu]);
 
-  const renderNavItem = (item: (typeof primaryAppNavItems)[number]) => {
+  const renderNavItem = (
+    item: (typeof primaryAppNavItems)[number],
+    options?: { onClick?: () => void }
+  ) => {
     const Icon = item.icon;
     const active = isAppNavItemActive(pathname, item.href);
 
     const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
 
     return (
-      <Link
-        key={item.href}
-        href={item.href}
-        data-guide={guideId}
-        className={cn(
-          "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
-          active
-            ? "bg-secondary/55 text-foreground"
-            : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
-        )}
-      >
-        <Icon
+      <div key={item.href}>
+        <Link
+          href={item.href}
+          data-guide={guideId}
+          onClick={options?.onClick}
           className={cn(
-            "h-4.5 w-4.5 shrink-0",
-            active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+            "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+            active
+              ? "bg-secondary/55 text-foreground"
+              : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
           )}
-        />
-        <span className="truncate">{item.label}</span>
-      </Link>
+        >
+          <Icon
+            className={cn(
+              "h-4.5 w-4.5 shrink-0",
+              active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+            )}
+          />
+          <span className="truncate">{item.label}</span>
+        </Link>
+        {active && sidebarSubItem?.parentHref === item.href ? (
+          <Link
+            href={sidebarSubItem.href}
+            onClick={options?.onClick}
+            className="ml-9 mt-1 flex h-9 items-center border-l border-black/10 pl-3 text-[13px] font-medium text-foreground dark:border-white/10"
+          >
+            <span className="truncate">{sidebarSubItem.label}</span>
+          </Link>
+        ) : null}
+      </div>
     );
   };
 
@@ -259,7 +322,7 @@ export function AppFrame({
                 Workspace
               </p>
             </div>
-            <nav className="space-y-1">{primaryAppNavItems.map(renderNavItem)}</nav>
+            <nav className="space-y-1">{primaryAppNavItems.map((item) => renderNavItem(item))}</nav>
 
             <div className="mb-4 mt-8 px-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -267,7 +330,7 @@ export function AppFrame({
               </p>
             </div>
 
-            <div className="space-y-1">{secondaryAppNavItems.map(renderNavItem)}</div>
+            <div className="space-y-1">{secondaryAppNavItems.map((item) => renderNavItem(item))}</div>
           </div>
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
@@ -345,28 +408,11 @@ export function AppFrame({
                   </p>
                 </div>
                 <nav className="space-y-1">
-                  {primaryAppNavItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = isAppNavItemActive(pathname, item.href);
-                    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        data-guide={guideId}
-                        onClick={() => handleMobileMenuOpenChange(false)}
-                        className={cn(
-                          "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none",
-                          active
-                            ? "bg-secondary/55 text-foreground"
-                            : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
-                        )}
-                      >
-                        <Icon className={cn("h-4.5 w-4.5 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
+                  {primaryAppNavItems.map((item) =>
+                    renderNavItem(item, {
+                      onClick: () => handleMobileMenuOpenChange(false)
+                    })
+                  )}
                 </nav>
 
                 <div className="mb-4 mt-8 px-2">
@@ -375,28 +421,11 @@ export function AppFrame({
                   </p>
                 </div>
                 <div className="space-y-1">
-                  {secondaryAppNavItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = isAppNavItemActive(pathname, item.href);
-                    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        data-guide={guideId}
-                        onClick={() => handleMobileMenuOpenChange(false)}
-                        className={cn(
-                          "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none",
-                          active
-                            ? "bg-secondary/55 text-foreground"
-                            : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
-                        )}
-                      >
-                        <Icon className={cn("h-4.5 w-4.5 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
+                  {secondaryAppNavItems.map((item) =>
+                    renderNavItem(item, {
+                      onClick: () => handleMobileMenuOpenChange(false)
+                    })
+                  )}
                 </div>
               </div>
 
@@ -462,17 +491,16 @@ export function AppFrame({
             <div className="flex h-full min-h-0 flex-col">{children}</div>
           </main>
 
-          <Link
-            href="/app/intake/new"
-            data-guide="mobile-new-workspace-fab"
+          <MobileFab
+            side="left"
             className={cn(
               buttonVariants({ size: "icon" }),
-              "fixed bottom-6 left-6 z-40 h-12 w-12 rounded-full shadow-[0_18px_40px_rgba(15,23,42,0.18)] lg:hidden"
+              "shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
             )}
-            aria-label="Start new workspace"
+            onClick={() => router.push("/app/intake/new")}
           >
             <Plus className="h-5 w-5" />
-          </Link>
+          </MobileFab>
         </div>
       </div>
       </div>

@@ -21,6 +21,10 @@ import type {
   IntakeBatchGroupRecord,
   IntakeBatchRecord,
   JobRecord,
+  InvoiceLineItem,
+  InvoiceParty,
+  InvoiceRecord,
+  InvoiceReminderTouchpointRecord,
   PaymentRecord,
   RiskFlagRecord,
   SummaryRecord
@@ -302,6 +306,127 @@ function toSummaryRecord(summary: {
   };
 }
 
+function toInvoiceParty(value: unknown): InvoiceParty {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+  return {
+    name: typeof record.name === "string" ? record.name : "",
+    email: typeof record.email === "string" ? record.email : null,
+    companyName: typeof record.companyName === "string" ? record.companyName : null,
+    address: typeof record.address === "string" ? record.address : null,
+    taxId: typeof record.taxId === "string" ? record.taxId : null,
+    payoutDetails:
+      typeof record.payoutDetails === "string" ? record.payoutDetails : null
+  };
+}
+
+function toInvoiceLineItems(value: unknown): InvoiceLineItem[] {
+  return Array.isArray(value)
+    ? value
+        .map((entry, index) => {
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            return null;
+          }
+
+          const record = entry as Record<string, unknown>;
+          return {
+            id: typeof record.id === "string" ? record.id : `line-${index + 1}`,
+            deliverableId:
+              typeof record.deliverableId === "string" ? record.deliverableId : null,
+            title: typeof record.title === "string" ? record.title : "",
+            description:
+              typeof record.description === "string" ? record.description : null,
+            channel: typeof record.channel === "string" ? record.channel : null,
+            quantity:
+              typeof record.quantity === "number" && record.quantity > 0
+                ? record.quantity
+                : 1,
+            unitRate:
+              typeof record.unitRate === "number" && record.unitRate >= 0
+                ? record.unitRate
+                : 0,
+            amount:
+              typeof record.amount === "number" && record.amount >= 0
+                ? record.amount
+                : 0
+          } satisfies InvoiceLineItem;
+        })
+        .filter((entry): entry is InvoiceLineItem => entry !== null)
+    : [];
+}
+
+function toInvoiceRecord(record: {
+  id: string;
+  dealId: string;
+  userId: string;
+  invoiceNumber: string;
+  status: string;
+  draftSavedAt: Date | null;
+  finalizedAt: Date | null;
+  invoiceDate: Date | null;
+  dueDate: Date | null;
+  currency: string | null;
+  subtotal: number | null;
+  notes: string | null;
+  billToJson: unknown;
+  issuerJson: unknown;
+  lineItemsJson: unknown;
+  pdfDocumentId: string | null;
+  manualNumberOverride: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): InvoiceRecord {
+  return {
+    id: record.id,
+    dealId: record.dealId,
+    userId: record.userId,
+    invoiceNumber: record.invoiceNumber,
+    status: record.status as InvoiceRecord["status"],
+    draftSavedAt: iso(record.draftSavedAt),
+    finalizedAt: iso(record.finalizedAt),
+    invoiceDate: iso(record.invoiceDate),
+    dueDate: iso(record.dueDate),
+    currency: record.currency,
+    subtotal: record.subtotal,
+    notes: record.notes,
+    billTo: toInvoiceParty(record.billToJson),
+    issuer: toInvoiceParty(record.issuerJson),
+    lineItems: toInvoiceLineItems(record.lineItemsJson),
+    pdfDocumentId: record.pdfDocumentId,
+    manualNumberOverride: record.manualNumberOverride,
+    createdAt: iso(record.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(record.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toInvoiceReminderTouchpointRecord(record: {
+  id: string;
+  dealId: string;
+  userId: string;
+  anchorDate: Date;
+  offsetDays: number;
+  sendOn: Date;
+  status: string;
+  notificationId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): InvoiceReminderTouchpointRecord {
+  return {
+    id: record.id,
+    dealId: record.dealId,
+    userId: record.userId,
+    anchorDate: iso(record.anchorDate) ?? new Date().toISOString(),
+    offsetDays: record.offsetDays as InvoiceReminderTouchpointRecord["offsetDays"],
+    sendOn: iso(record.sendOn) ?? new Date().toISOString(),
+    status: record.status as InvoiceReminderTouchpointRecord["status"],
+    notificationId: record.notificationId,
+    createdAt: iso(record.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(record.updatedAt) ?? new Date().toISOString()
+  };
+}
+
 function toAssistantThreadRecord(thread: {
   id: string;
   userId: string;
@@ -472,23 +597,33 @@ export class PrismaRepository {
     }
 
     const documentIds = deal.documents.map((document) => document.id);
-    const [sections, extractionResults, extractionEvidence] =
-      documentIds.length > 0
-        ? await prisma.$transaction([
-            prisma.documentSection.findMany({
-              where: { documentId: { in: documentIds } },
-              orderBy: [{ chunkIndex: "asc" }]
-            }),
-            prisma.extractionResult.findMany({
-              where: { documentId: { in: documentIds } },
-              orderBy: { createdAt: "desc" }
-            }),
-            prisma.extractionEvidence.findMany({
-              where: { documentId: { in: documentIds } },
-              orderBy: { createdAt: "desc" }
-            })
-          ])
-        : [[], [], []];
+    let sections: Awaited<ReturnType<typeof prisma.documentSection.findMany>> = [];
+    let extractionResults: Awaited<ReturnType<typeof prisma.extractionResult.findMany>> = [];
+    let extractionEvidence: Awaited<ReturnType<typeof prisma.extractionEvidence.findMany>> = [];
+
+    if (documentIds.length > 0) {
+      [sections, extractionResults, extractionEvidence] = await prisma.$transaction([
+        prisma.documentSection.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: [{ chunkIndex: "asc" }]
+        }),
+        prisma.extractionResult.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
+        }),
+        prisma.extractionEvidence.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
+        })
+      ]);
+    }
+
+    const invoiceRecord = await prisma.invoiceRecord.findFirst({
+      where: {
+        dealId,
+        userId
+      }
+    });
 
     const documents = deal.documents.map(toDocumentRecord);
     const summaries = deal.summaries.map(toSummaryRecord);
@@ -513,6 +648,7 @@ export class PrismaRepository {
             updatedAt: iso(deal.paymentRecord.updatedAt) ?? new Date().toISOString()
           }
         : null,
+      invoiceRecord: invoiceRecord ? toInvoiceRecord(invoiceRecord) : null,
       riskFlags: deal.riskFlags.map(toRiskFlagRecord),
       emailDrafts: deal.emailDrafts.map(toEmailDraftRecord),
       jobs: deal.jobs.map(toJobRecord),
@@ -692,6 +828,137 @@ export class PrismaRepository {
     });
 
     return toDocumentRecord(next);
+  }
+
+  async listInvoiceRecords(userId: string) {
+    const records = await prisma.invoiceRecord.findMany({
+      where: { userId },
+      orderBy: [{ updatedAt: "desc" }]
+    });
+
+    return records.map(toInvoiceRecord);
+  }
+
+  async getInvoiceRecord(userId: string, dealId: string) {
+    const record = await prisma.invoiceRecord.findFirst({
+      where: { userId, dealId }
+    });
+
+    return record ? toInvoiceRecord(record) : null;
+  }
+
+  async upsertInvoiceRecord(
+    userId: string,
+    dealId: string,
+    patch: Omit<InvoiceRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+  ) {
+    const record = await prisma.invoiceRecord.upsert({
+      where: { dealId },
+      update: {
+        invoiceNumber: patch.invoiceNumber,
+        status: patch.status,
+        draftSavedAt: patch.draftSavedAt ? new Date(patch.draftSavedAt) : null,
+        finalizedAt: patch.finalizedAt ? new Date(patch.finalizedAt) : null,
+        invoiceDate: patch.invoiceDate ? new Date(patch.invoiceDate) : null,
+        dueDate: patch.dueDate ? new Date(patch.dueDate) : null,
+        currency: patch.currency,
+        subtotal: patch.subtotal,
+        notes: patch.notes,
+        billToJson: toJsonValue(patch.billTo),
+        issuerJson: toJsonValue(patch.issuer),
+        lineItemsJson: toJsonValue(patch.lineItems),
+        pdfDocumentId: patch.pdfDocumentId,
+        manualNumberOverride: patch.manualNumberOverride
+      },
+      create: {
+        dealId,
+        userId,
+        invoiceNumber: patch.invoiceNumber,
+        status: patch.status,
+        draftSavedAt: patch.draftSavedAt ? new Date(patch.draftSavedAt) : null,
+        finalizedAt: patch.finalizedAt ? new Date(patch.finalizedAt) : null,
+        invoiceDate: patch.invoiceDate ? new Date(patch.invoiceDate) : null,
+        dueDate: patch.dueDate ? new Date(patch.dueDate) : null,
+        currency: patch.currency,
+        subtotal: patch.subtotal,
+        notes: patch.notes,
+        billToJson: toJsonValue(patch.billTo),
+        issuerJson: toJsonValue(patch.issuer),
+        lineItemsJson: toJsonValue(patch.lineItems),
+        pdfDocumentId: patch.pdfDocumentId,
+        manualNumberOverride: patch.manualNumberOverride
+      }
+    });
+
+    return toInvoiceRecord(record);
+  }
+
+  async listInvoiceReminderTouchpoints(userId: string, options?: { dealId?: string }) {
+    const rows = await prisma.invoiceReminderTouchpoint.findMany({
+      where: {
+        userId,
+        ...(options?.dealId ? { dealId: options.dealId } : {})
+      },
+      orderBy: [{ sendOn: "asc" }]
+    });
+
+    return rows.map(toInvoiceReminderTouchpointRecord);
+  }
+
+  async upsertInvoiceReminderTouchpoints(
+    userId: string,
+    dealId: string,
+    touchpoints: Array<Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">>
+  ) {
+    const saved = await prisma.$transaction(
+      touchpoints.map((touchpoint) =>
+        prisma.invoiceReminderTouchpoint.upsert({
+          where: {
+            dealId_offsetDays: {
+              dealId,
+              offsetDays: touchpoint.offsetDays
+            }
+          },
+          update: {
+            anchorDate: new Date(touchpoint.anchorDate),
+            sendOn: new Date(touchpoint.sendOn),
+            status: touchpoint.status,
+            notificationId: touchpoint.notificationId
+          },
+          create: {
+            dealId,
+            userId,
+            anchorDate: new Date(touchpoint.anchorDate),
+            offsetDays: touchpoint.offsetDays,
+            sendOn: new Date(touchpoint.sendOn),
+            status: touchpoint.status,
+            notificationId: touchpoint.notificationId
+          }
+        })
+      )
+    );
+
+    return saved.map(toInvoiceReminderTouchpointRecord);
+  }
+
+  async updateInvoiceReminderTouchpoint(
+    id: string,
+    patch: Partial<
+      Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+    >
+  ) {
+    const row = await prisma.invoiceReminderTouchpoint.update({
+      where: { id },
+      data: {
+        anchorDate: patch.anchorDate ? new Date(patch.anchorDate) : undefined,
+        offsetDays: patch.offsetDays,
+        sendOn: patch.sendOn ? new Date(patch.sendOn) : undefined,
+        status: patch.status,
+        notificationId: patch.notificationId
+      }
+    });
+
+    return toInvoiceReminderTouchpointRecord(row);
   }
 
   async updateDocument(documentId: string, patch: Partial<DocumentRecord>) {

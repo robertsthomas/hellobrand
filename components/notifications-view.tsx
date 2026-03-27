@@ -40,6 +40,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   email_resync_required: RefreshCw,
   payment_overdue: Wallet,
+  invoice_generate_prompt: Wallet,
   upcoming_deadline: Clock3,
   contract_risk: Shield,
   deliverable_approved: Check,
@@ -57,6 +58,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
 const TYPE_ICON_STYLES: Record<NotificationType, string> = {
   email_resync_required: "text-[#8a8f98] dark:text-white/35",
   payment_overdue: "text-[#6b7280] dark:text-white/45",
+  invoice_generate_prompt: "text-[#6b7280] dark:text-white/45",
   upcoming_deadline: "text-[#6b7280] dark:text-white/45",
   contract_risk: "text-[#7a6a4f] dark:text-white/50",
   deliverable_approved: "text-[#5f6f64] dark:text-white/50",
@@ -262,7 +264,7 @@ export function NotificationsView({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-4xl">
             Notifications
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -275,6 +277,7 @@ export function NotificationsView({
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="inline-flex h-10 items-center gap-1 rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
           {FILTER_TABS.map((tab) => (
             <button
@@ -291,6 +294,7 @@ export function NotificationsView({
               <span className="text-xs opacity-60">{tabCounts[tab.key]}</span>
             </button>
           ))}
+        </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -330,44 +334,50 @@ export function NotificationsView({
             return (
               <div
                 key={item.id}
-                className="flex items-start gap-4 border-b border-black/8 px-5 py-4 transition-colors last:border-b-0 hover:bg-[#f6f7f8] dark:border-white/8 dark:hover:bg-white/[0.04]"
+                className="border-b border-black/8 px-4 py-4 transition-colors last:border-b-0 hover:bg-[#f6f7f8] dark:border-white/8 dark:hover:bg-white/[0.04] sm:px-5"
               >
-                <div
-                  className={cn(
-                    "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center",
-                    TYPE_ICON_STYLES[item.type]
-                  )}
-                >
-                  <Icon
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div
                     className={cn(
-                      "h-[18px] w-[18px] stroke-[1.7]",
-                      item.status === "active" &&
-                        (item.type === "workspace_generating" ||
-                          item.type === "workspace_checking_duplicates") &&
-                        "animate-spin"
+                      "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center",
+                      TYPE_ICON_STYLES[item.type]
                     )}
-                  />
-                </div>
+                  >
+                    <Icon
+                      className={cn(
+                        "h-[18px] w-[18px] stroke-[1.7]",
+                        item.status === "active" &&
+                          (item.type === "workspace_generating" ||
+                            item.type === "workspace_checking_duplicates") &&
+                          "animate-spin"
+                      )}
+                    />
+                  </div>
 
-                {isUnread ? (
-                  <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-red-500" />
-                ) : (
-                  <div className="mt-2 h-2 w-2 shrink-0" />
-                )}
+                  {isUnread ? (
+                    <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                  ) : (
+                    <div className="mt-2 h-2 w-2 shrink-0" />
+                  )}
 
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm ${isUnread ? "font-semibold" : "font-medium"} text-foreground`}>
-                    {item.title}
-                  </p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm ${isUnread ? "font-semibold" : "font-medium"} text-foreground`}>
+                      {item.title}
+                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
+                    <span className="mt-1 block text-xs text-muted-foreground sm:hidden">
+                      {formatNotificationRelativeTime(item.createdAt)}
+                    </span>
+                  </div>
 
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
                     {formatNotificationRelativeTime(item.createdAt)}
                   </span>
+                </div>
+
+                <div className="mt-3 flex items-center gap-3 pl-[44px] sm:mt-0 sm:justify-end sm:pl-0">
                   <Link
                     href={item.href}
                     onClick={() => {

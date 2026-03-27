@@ -17,6 +17,7 @@ import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { FeatureUpgradeCard } from "@/components/feature-locked-state";
+import { InvoiceEditorPanel } from "@/components/invoice-editor-panel";
 import { RiskFlags } from "@/components/risk-flags";
 import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
@@ -27,6 +28,7 @@ import {
   AccordionItem,
   AccordionTrigger
 } from "@/components/ui/accordion";
+import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
@@ -130,14 +132,15 @@ async function DealDetailContent({
   const riskCount = riskFlags.length;
   const currentTab =
     resolvedSearchParams?.tab &&
-    ["overview", "terms", "risks", "deliverables", "brief", "emails", "documents", "notes"].includes(
+    ["overview", "terms", "risks", "deliverables", "brief", "emails", "documents", "invoices", "notes"].includes(
       resolvedSearchParams.tab
     )
       ? resolvedSearchParams.tab
       : "overview";
+  const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
 
   return (
-    <div className="px-6 py-8 lg:px-10 lg:py-10">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
       <div className="mx-auto max-w-[1280px] space-y-8">
         <section className="space-y-6">
           <Link
@@ -151,7 +154,7 @@ async function DealDetailContent({
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/8 pb-8 dark:border-white/10">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground lg:text-[40px]">
+                <h1 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[34px] lg:text-[40px]">
                   {displayCampaignName}
                 </h1>
                 <div className="flex items-center gap-2">
@@ -210,8 +213,8 @@ async function DealDetailContent({
         ) : null}
 
         <Tabs defaultValue={currentTab} className="gap-6">
-          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max min-w-full flex-nowrap gap-1 rounded-lg border border-black/8 bg-white p-1 sm:w-auto sm:min-w-0 sm:flex-wrap dark:border-white/10 dark:bg-white/[0.03]">
+          <ScrollableTabsList>
+            <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent">
               <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Overview
               </TabsTrigger>
@@ -233,11 +236,14 @@ async function DealDetailContent({
               <TabsTrigger value="documents" data-guide="tab-documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Documents
               </TabsTrigger>
+              <TabsTrigger value="invoices" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                Invoices
+              </TabsTrigger>
               <TabsTrigger value="notes" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Notes
               </TabsTrigger>
             </TabsList>
-          </div>
+          </ScrollableTabsList>
 
           <TabsContent value="overview" className="mt-0 space-y-6">
             <DealContextPanel terms={terms} />
@@ -348,7 +354,9 @@ async function DealDetailContent({
           </TabsContent>
 
           <TabsContent value="deliverables" className="mt-0 space-y-6">
-            <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
+            {(terms?.deliverables?.length ?? 0) > 0 ? (
+              <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
+            ) : null}
             <DeliverablesList deliverables={terms?.deliverables ?? []} />
           </TabsContent>
 
@@ -399,6 +407,14 @@ async function DealDetailContent({
             <DocumentsPanel
               dealId={deal.id}
               documents={documents}
+            />
+          </TabsContent>
+
+          <TabsContent value="invoices" className="mt-0 space-y-6">
+            <InvoiceEditorPanel
+              dealId={deal.id}
+              invoice={aggregate.invoiceRecord ?? null}
+              invoiceDocuments={invoiceDocuments}
             />
           </TabsContent>
 

@@ -1,5 +1,6 @@
 import { inngest } from "@/lib/inngest/client";
 import { processDocumentById } from "@/lib/deals";
+import { runInvoiceReminderSweep } from "@/lib/invoices";
 import { sendNotificationEmailDelivery } from "@/lib/notification-email";
 
 export const processContractFunction = inngest.createFunction(
@@ -136,6 +137,21 @@ export const notificationEmailSendFunction = inngest.createFunction(
       ok: true,
       appNotificationId,
       status: delivery?.status ?? null
+    };
+  }
+);
+
+export const invoiceReminderSweepFunction = inngest.createFunction(
+  { id: "invoice-reminder-sweep" },
+  { cron: "0 9 * * *" },
+  async ({ step }) => {
+    const result = await step.run("run-invoice-reminder-sweep", async () =>
+      runInvoiceReminderSweep()
+    );
+
+    return {
+      ok: true,
+      ...result
     };
   }
 );

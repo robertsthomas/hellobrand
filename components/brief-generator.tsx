@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Sparkles, RefreshCw, Printer, ClipboardCopy, Pencil, Check, Loader2 } from "lucide-react";
 
+import { ProseText } from "@/components/prose-text";
 import type { BriefData, DocumentRecord, GeneratedBrief, GeneratedBriefSection } from "@/lib/types";
 
 interface BriefGeneratorProps {
@@ -64,12 +65,12 @@ function SectionCard({
         </div>
       ) : (
         <>
-          <p className="text-sm leading-relaxed text-foreground">{editedContent}</p>
+          <ProseText content={editedContent} className="text-sm leading-relaxed text-foreground" />
           {editedItems.length > 0 && (
             <ul className="list-disc space-y-1 pl-5">
               {editedItems.map((item, i) => (
                 <li key={i} className="text-sm text-foreground">
-                  {item}
+                  <ProseText content={item} className="inline text-sm text-foreground" />
                 </li>
               ))}
             </ul>
@@ -166,8 +167,8 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
 
   if (!brief) {
     return (
-      <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
-        <div className="flex items-center justify-between gap-4">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
               Generate Campaign Brief
@@ -180,14 +181,14 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
             type="button"
             onClick={generate}
             disabled={isGenerating}
-            className="inline-flex items-center gap-2 border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:opacity-50 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+            className="inline-flex w-full items-center justify-center gap-2 border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:opacity-50 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20 sm:w-auto"
           >
             {isGenerating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {isGenerating ? "Generating…" : "Generate Campaign Brief"}
+            {isGenerating ? "Generating..." : "Generate brief"}
           </button>
         </div>
         {errorMessage ? (

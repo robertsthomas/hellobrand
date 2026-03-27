@@ -202,6 +202,23 @@ async function emitWorkspaceNotificationSeed(userId: string, seed: NotificationS
   return row;
 }
 
+export async function emitNotificationSeedForUser(userId: string, seed: NotificationSeed) {
+  if (!ensureDatabase()) {
+    return null;
+  }
+
+  const row = await upsertNotificationSeed(userId, seed);
+  await refreshNotificationViews(userId);
+
+  try {
+    await enqueueNotificationEmailDelivery(row.id);
+  } catch (error) {
+    console.error("Failed to enqueue notification email.", error);
+  }
+
+  return row;
+}
+
 async function supersedeAccountNotifications(
   userId: string,
   accountId: string,

@@ -76,6 +76,8 @@ model User {
   onboardingState             UserOnboardingState?
   appNotifications            AppNotification[]
   notificationEmailDeliveries NotificationEmailDelivery[]
+  invoiceRecords               InvoiceRecord[]
+  invoiceReminderTouchpoints   InvoiceReminderTouchpoint[]
 }
 
 model AnonymousAnalysisSession {
@@ -137,6 +139,7 @@ model Deal {
   user                  User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   intakeSession         IntakeSession?
   paymentRecord         PaymentRecord?
+  invoiceRecord         InvoiceRecord?
   documents             Document[]
   terms                 DealTerms?
   riskFlags             RiskFlag[]
@@ -152,6 +155,7 @@ model Deal {
   emailActionItems      EmailActionItem[]
   brandContacts         BrandContact[]
   appNotifications      AppNotification[]
+  invoiceReminderTouchpoints InvoiceReminderTouchpoint[]
 }
 
 model Document {
@@ -809,6 +813,54 @@ model PaymentRecord {
   updatedAt   DateTime  @updatedAt
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceRecord {
+  id                   String    @id @default(uuid())
+  dealId               String    @unique
+  userId               String
+  invoiceNumber        String
+  status               String
+  draftSavedAt         DateTime?
+  finalizedAt          DateTime?
+  invoiceDate          DateTime?
+  dueDate              DateTime?
+  currency             String?
+  subtotal             Float?
+  notes                String?
+  billToJson           Json
+  issuerJson           Json
+  lineItemsJson        Json
+  pdfDocumentId        String?
+  manualNumberOverride Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, invoiceNumber])
+  @@index([userId, status, updatedAt])
+}
+
+model InvoiceReminderTouchpoint {
+  id           String   @id @default(uuid())
+  dealId        String
+  userId        String
+  anchorDate    DateTime
+  offsetDays    Int
+  sendOn        DateTime
+  status        String   @default("pending")
+  notificationId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, offsetDays])
+  @@index([userId, status, sendOn])
+  @@index([dealId, status, sendOn])
 }
 
 model BillingAccount {

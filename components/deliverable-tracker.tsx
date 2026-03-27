@@ -11,6 +11,7 @@ import {
   DELIVERABLE_STATUSES,
   type DeliverableStatus
 } from "@/lib/deliverables";
+import { ProseText } from "@/components/prose-text";
 import { formatDate, humanizeToken } from "@/lib/utils";
 
 interface DeliverableTrackerProps {
@@ -176,9 +177,9 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
                     )}
                   </div>
                   {item.description && (
-                    <p className="mt-2 text-sm text-black/50 dark:text-white/55">
-                      {item.description}
-                    </p>
+                    <div className="mt-2 line-clamp-3 text-sm text-black/50 dark:text-white/55">
+                      <ProseText content={item.description} className="text-sm text-black/50 dark:text-white/55" />
+                    </div>
                   )}
                 </div>
 

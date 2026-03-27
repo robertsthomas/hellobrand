@@ -185,6 +185,8 @@ export function createSeedStore(): AppStore {
     assistantThreads: [],
     assistantMessages: [],
     assistantContextSnapshots: [],
+    invoiceRecords: [],
+    invoiceReminderTouchpoints: [],
     jobs: [
       {
         id: "job-1",

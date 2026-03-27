@@ -4,6 +4,7 @@ import {
   buildConflictIntelligencePatch,
   mergeConflictIntelligence
 } from "@/lib/conflict-intelligence";
+import { normalizeEvidenceSnippet } from "@/lib/utils";
 import type {
   BriefData,
   DealAggregate,
@@ -90,13 +91,14 @@ function pushEvidence(
   sectionKey: string | null,
   confidence = 0.7
 ) {
-  if (!snippet) {
+  const normalizedSnippet = normalizeEvidenceSnippet(snippet);
+  if (!normalizedSnippet) {
     return;
   }
 
   evidence.push({
     fieldPath,
-    snippet,
+    snippet: normalizedSnippet,
     sectionKey,
     confidence
   });

@@ -305,6 +305,22 @@ describe("notification email queueing", () => {
     expect(deliveries.size).toBe(1);
     expect(inngestSend).toHaveBeenCalledTimes(1);
   });
+
+  it("queues email deliveries for invoice generation prompts", async () => {
+    seedWorkspaceNotification({
+      id: "notification-invoice",
+      category: "payments",
+      eventType: "invoice.generate_prompt",
+      title: "Generate the Nimbus invoice",
+      body: "Today is the final posting milestone. Generate the invoice now.",
+      href: "/app/deals/deal-1?tab=invoices"
+    });
+
+    const result = await enqueueNotificationEmailDelivery("notification-invoice");
+
+    expect(result?.status).toBe("pending");
+    expect(inngestSend).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("notification email sending", () => {

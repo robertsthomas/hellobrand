@@ -1,4 +1,5 @@
 import type { DealTermsRecord } from "@/lib/types";
+import { ProseText } from "@/components/prose-text";
 import { humanizeToken } from "@/lib/utils";
 
 interface DealContextPanelProps {
@@ -11,9 +12,11 @@ function ContextField({ label, value }: { label: string; value: string | null | 
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
         {label}
       </p>
-      <p className="text-sm text-foreground">
-        {value || <span className="text-black/35 dark:text-white/35">Not specified</span>}
-      </p>
+      {value ? (
+        <ProseText content={value} className="text-sm text-foreground" />
+      ) : (
+        <p className="text-sm text-black/35 dark:text-white/35">Not specified</p>
+      )}
     </div>
   );
 }

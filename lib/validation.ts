@@ -19,6 +19,8 @@ export const paymentStatusValues = [
   "late"
 ] as const;
 
+export const invoiceStatusValues = ["draft", "finalized"] as const;
+
 export const countersignStatusValues = ["unknown", "pending", "signed"] as const;
 export const dealCategoryValues = [
   "beauty_personal_care",
@@ -157,6 +159,7 @@ export const assistantDealTabValues = [
   "brief",
   "emails",
   "documents",
+  "invoices",
   "notes"
 ] as const;
 export const assistantTriggerKindValues = [
@@ -259,6 +262,41 @@ export const paymentRecordInputSchema = z.object({
   status: z.enum(paymentStatusValues),
   notes: z.string().max(5000).nullable(),
   source: z.string().max(120).nullable().optional()
+});
+
+export const invoicePartySchema = z.object({
+  name: z.string().max(160),
+  email: z.string().email().nullable(),
+  companyName: z.string().max(160).nullable(),
+  address: z.string().max(1000).nullable(),
+  taxId: z.string().max(80).nullable(),
+  payoutDetails: z.string().max(1000).nullable()
+});
+
+export const invoiceLineItemSchema = z.object({
+  id: z.string(),
+  deliverableId: z.string().nullable(),
+  title: z.string().min(1).max(160),
+  description: z.string().max(1000).nullable(),
+  channel: z.string().max(120).nullable(),
+  quantity: z.number().positive(),
+  unitRate: z.number().min(0),
+  amount: z.number().min(0)
+});
+
+export const invoiceRecordInputSchema = z.object({
+  invoiceNumber: z.string().min(1).max(80),
+  status: z.enum(invoiceStatusValues).optional(),
+  invoiceDate: z.string().nullable(),
+  dueDate: z.string().nullable(),
+  currency: z.string().max(12).nullable(),
+  subtotal: z.number().min(0).nullable(),
+  notes: z.string().max(5000).nullable(),
+  billTo: invoicePartySchema,
+  issuer: invoicePartySchema,
+  lineItems: z.array(invoiceLineItemSchema).min(1),
+  pdfDocumentId: z.string().nullable().optional(),
+  manualNumberOverride: z.boolean().optional()
 });
 
 export const onboardingProfileSubmitSchema = z.object({

@@ -1,3 +1,4 @@
+import { ProseText } from "@/components/prose-text";
 import type { DeliverableItem } from "@/lib/types";
 import { formatDate, humanizeToken } from "@/lib/utils";
 
@@ -8,8 +9,8 @@ export function DeliverablesList({
 }) {
   if (deliverables.length === 0) {
     return (
-      <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+        <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
           Deliverables
         </h2>
         <p className="mt-4 text-sm text-black/60 dark:text-white/65">
@@ -21,10 +22,10 @@ export function DeliverablesList({
   }
 
   return (
-    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
             Deliverables
           </h2>
           <p className="mt-2 text-sm text-black/60 dark:text-white/65">
@@ -45,9 +46,9 @@ export function DeliverablesList({
                 {item.channel ?? "Channel not specified"}
               </p>
               {item.description ? (
-                <p className="mt-2 text-sm leading-6 text-black/60 dark:text-white/65">
-                  {item.description}
-                </p>
+                <div className="mt-2 line-clamp-3 text-sm leading-6 text-black/60 dark:text-white/65">
+                  <ProseText content={item.description} className="text-sm text-black/60 dark:text-white/65" />
+                </div>
               ) : null}
             </div>
             <div className="text-sm text-black/60 dark:text-white/65">

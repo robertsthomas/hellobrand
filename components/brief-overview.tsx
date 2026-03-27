@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Info } from "lucide-react";
 
+import { ProseText } from "@/components/prose-text";
 import type { BriefData, DocumentRecord } from "@/lib/types";
 
 interface BriefOverviewProps {
@@ -29,7 +30,7 @@ function BulletList({ items }: { items: string[] }) {
     <ul className="list-disc space-y-1 pl-5">
       {items.map((item, i) => (
         <li key={i} className="text-sm text-foreground">
-          {item}
+          <ProseText content={item} className="inline text-sm text-foreground" />
         </li>
       ))}
     </ul>
@@ -44,8 +45,8 @@ export function BriefOverview({
 }: BriefOverviewProps) {
   if (!briefData) {
     return (
-      <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
-        <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+        <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
           Brief
         </h2>
         <div className="mt-4 border border-black/8 bg-[#faf8f3] px-4 py-4 dark:border-white/10 dark:bg-white/[0.03]">
@@ -87,10 +88,10 @@ export function BriefOverview({
     .filter(Boolean);
 
   return (
-    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
+          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
             Brief
           </h2>
           {sourceDocNames.length > 0 && (
@@ -104,7 +105,7 @@ export function BriefOverview({
           {briefData.campaignOverview && (
             <div className="md:col-span-2">
               <Section title="Campaign Overview">
-                <p className="text-sm text-foreground">{briefData.campaignOverview}</p>
+                <ProseText content={briefData.campaignOverview} className="text-sm text-foreground" />
               </Section>
             </div>
           )}
@@ -124,32 +125,32 @@ export function BriefOverview({
           {briefData.creativeConceptOverview && (
             <div className="md:col-span-2">
               <Section title="Creative Concept">
-                <p className="text-sm text-foreground">{briefData.creativeConceptOverview}</p>
+                <ProseText content={briefData.creativeConceptOverview} className="text-sm text-foreground" />
               </Section>
             </div>
           )}
 
           {briefData.brandGuidelines && (
             <Section title="Brand Guidelines">
-              <p className="text-sm text-foreground">{briefData.brandGuidelines}</p>
+              <ProseText content={briefData.brandGuidelines} className="text-sm text-foreground" />
             </Section>
           )}
 
           {briefData.approvalRequirements && (
             <Section title="Approval Requirements">
-              <p className="text-sm text-foreground">{briefData.approvalRequirements}</p>
+              <ProseText content={briefData.approvalRequirements} className="text-sm text-foreground" />
             </Section>
           )}
 
           {briefData.targetAudience && (
             <Section title="Target Audience">
-              <p className="text-sm text-foreground">{briefData.targetAudience}</p>
+              <ProseText content={briefData.targetAudience} className="text-sm text-foreground" />
             </Section>
           )}
 
           {briefData.toneAndStyle && (
             <Section title="Tone & Style">
-              <p className="text-sm text-foreground">{briefData.toneAndStyle}</p>
+              <ProseText content={briefData.toneAndStyle} className="text-sm text-foreground" />
             </Section>
           )}
 

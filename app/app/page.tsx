@@ -21,6 +21,7 @@ import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
 import { DashboardSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealAggregates } from "@/lib/cached-data";
@@ -245,9 +246,9 @@ async function DashboardContent() {
   ];
 
   return (
-    <div className="px-5 py-6 lg:px-8 lg:py-8">
+    <div className="px-4 py-6 sm:px-5 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-6">
-        <section className="border border-black/8 bg-white px-7 py-7 shadow-[0_20px_50px_rgba(15,23,42,0.05)] lg:px-8 dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
+        <section className="border border-black/8 bg-white px-4 py-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] sm:px-7 sm:py-7 lg:px-8 dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
           <div>
             <DashboardGreeting firstName={firstName} />
           </div>
@@ -276,7 +277,7 @@ async function DashboardContent() {
                     </div>
                     <Icon className="h-4.5 w-4.5 text-[#98a2b3] dark:text-[#8f98a6]" />
                   </div>
-                  <p className="mt-5 text-[34px] font-semibold tracking-[-0.06em] text-foreground">
+                  <p className="mt-5 text-2xl font-semibold tracking-[-0.06em] text-foreground sm:text-[34px]">
                     {metric.value}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{metric.note}</p>
@@ -288,12 +289,14 @@ async function DashboardContent() {
 
         <Tabs defaultValue="overview" className="w-full">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <TabsList>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="deals">Partnerships</TabsTrigger>
-              <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            </TabsList>
+            <ScrollableTabsList>
+              <TabsList className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="deals">Partnerships</TabsTrigger>
+                <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              </TabsList>
+            </ScrollableTabsList>
 
             <div className="flex items-center gap-3 rounded-md border border-black/8 bg-white px-4 py-3 text-sm text-muted-foreground dark:border-white/10 dark:bg-[#15191f]">
               <Clock3 className="h-4 w-4 text-[#98a2b3] dark:text-[#8f98a6]" />
@@ -311,15 +314,15 @@ async function DashboardContent() {
               />
             ) : null}
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_360px]">
-              <div className="space-y-6">
-                <section className="border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
-                  <div className="mb-6 flex items-center justify-between">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,360px)]">
+              <div className="min-w-0 space-y-6">
+                <section className="overflow-hidden border border-black/8 bg-white p-4 shadow-[0_20px_50px_rgba(15,23,42,0.05)] sm:p-6 dark:border-white/10 dark:bg-[#15191f] dark:shadow-none">
+                  <div className="mb-6 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
                         Recent workspaces
                       </p>
-                      <h2 className="mt-2 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[30px]">
                         Active partnership flow
                       </h2>
                     </div>
@@ -349,10 +352,10 @@ async function DashboardContent() {
                         {dealRows.slice(0, 6).map((deal) => (
                           <div
                             key={deal.id}
-                            className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 transition-colors hover:bg-[#f6f7f8] md:grid md:grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] md:items-center dark:border-white/8 dark:hover:bg-white/[0.04]"
+                            className="flex flex-col gap-2 border-b border-black/6 px-3 py-4 transition-colors hover:bg-[#f6f7f8] sm:px-5 md:grid md:grid-cols-[minmax(0,1.6fr)_140px_150px_140px_60px] md:items-center dark:border-white/8 dark:hover:bg-white/[0.04]"
                           >
                             <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
-                              <p className="truncate text-base font-semibold text-foreground">
+                              <p className="truncate text-sm font-semibold text-foreground sm:text-base">
                                 {deal.campaignName}
                               </p>
                               <p className="mt-1 truncate text-sm text-muted-foreground">
@@ -388,13 +391,13 @@ async function DashboardContent() {
                 </section>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                  <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#15191f]">
+                  <section className="overflow-hidden border border-black/8 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-[#15191f]">
                     <div className="mb-6 flex items-center justify-between">
                       <div>
                         <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
                           Deliverables
                         </p>
-                        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                        <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
                           Upcoming this week
                         </h2>
                       </div>
@@ -433,13 +436,13 @@ async function DashboardContent() {
                     </div>
                   </section>
 
-                  <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#15191f]">
+                  <section className="overflow-hidden border border-black/8 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-[#15191f]">
                     <div className="mb-6 flex items-center justify-between">
                       <div>
                         <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
                           Payments
                         </p>
-                        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
+                        <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-2xl">
                           Outstanding payouts
                         </h2>
                       </div>
@@ -496,10 +499,10 @@ async function DashboardContent() {
                 ) : null}
               </div>
 
-              <div className="space-y-6">
+              <div className="min-w-0 space-y-6">
                 <QuickActionsPanel items={actionItems} />
 
-              <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#15191f]">
+              <section className="overflow-hidden border border-black/8 bg-white p-4 sm:p-6 dark:border-white/10 dark:bg-[#15191f]">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">

@@ -21,6 +21,7 @@ export type NotificationEventType =
   | "workspace.cancelled"
   | "payment.overdue"
   | "payment.received"
+  | "invoice.generate_prompt"
   | "deadline.upcoming"
   | "risk.contract"
   | "document.ready"
@@ -29,6 +30,7 @@ export type NotificationEventType =
 export type NotificationType =
   | "email_resync_required"
   | "payment_overdue"
+  | "invoice_generate_prompt"
   | "upcoming_deadline"
   | "contract_risk"
   | "deliverable_approved"
@@ -122,6 +124,8 @@ export function notificationTypeForEventType(
       return "email_resync_required";
     case "payment.received":
       return "payment_received";
+    case "invoice.generate_prompt":
+      return "invoice_generate_prompt";
     case "deadline.upcoming":
       return "upcoming_deadline";
     case "risk.contract":

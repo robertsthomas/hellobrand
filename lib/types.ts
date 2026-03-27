@@ -15,6 +15,9 @@ export type PaymentStatus =
   | "paid"
   | "late";
 
+export type InvoiceStatus = "draft" | "finalized";
+export type InvoiceReminderTouchpointStatus = "pending" | "sent" | "cancelled";
+
 export type CountersignStatus = "unknown" | "pending" | "signed";
 export type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
 
@@ -648,6 +651,7 @@ export type AssistantDealTab =
   | "brief"
   | "emails"
   | "documents"
+  | "invoices"
   | "notes";
 
 export type AssistantTriggerKind =
@@ -869,6 +873,61 @@ export interface PaymentRecord {
   updatedAt: string;
 }
 
+export interface InvoiceParty {
+  name: string;
+  email: string | null;
+  companyName: string | null;
+  address: string | null;
+  taxId: string | null;
+  payoutDetails: string | null;
+}
+
+export interface InvoiceLineItem {
+  id: string;
+  deliverableId: string | null;
+  title: string;
+  description: string | null;
+  channel: string | null;
+  quantity: number;
+  unitRate: number;
+  amount: number;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  dealId: string;
+  userId: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  draftSavedAt: string | null;
+  finalizedAt: string | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  currency: string | null;
+  subtotal: number | null;
+  notes: string | null;
+  billTo: InvoiceParty;
+  issuer: InvoiceParty;
+  lineItems: InvoiceLineItem[];
+  pdfDocumentId: string | null;
+  manualNumberOverride: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InvoiceReminderTouchpointRecord {
+  id: string;
+  dealId: string;
+  userId: string;
+  anchorDate: string;
+  offsetDays: 0 | 1 | 3;
+  sendOn: string;
+  status: InvoiceReminderTouchpointStatus;
+  notificationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type IntakeBatchStatus = "clustering" | "review" | "confirmed" | "failed";
 export type IntakeBatchGroupStatus = "pending" | "confirmed" | "rejected";
 
@@ -899,6 +958,7 @@ export interface DealAggregate {
   terms: DealTermsRecord | null;
   conflictResults: ConflictResult[];
   paymentRecord: PaymentRecord | null;
+  invoiceRecord?: InvoiceRecord | null;
   riskFlags: RiskFlagRecord[];
   emailDrafts: EmailDraftRecord[];
   jobs: JobRecord[];
@@ -930,6 +990,8 @@ export interface AppStore {
   assistantThreads: AssistantThreadRecord[];
   assistantMessages: AssistantMessageRecord[];
   assistantContextSnapshots: AssistantContextSnapshotRecord[];
+  invoiceRecords: InvoiceRecord[];
+  invoiceReminderTouchpoints: InvoiceReminderTouchpointRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];
   extractionResults: ExtractionResultRecord[];

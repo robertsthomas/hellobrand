@@ -76,3 +76,46 @@ export function stripHtmlTags(value: string) {
     .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
+
+export function normalizeEvidenceSnippet(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const cleaned = stripHtmlTags(value)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  const compact = cleaned.replace(/\s+/g, " ").trim();
+
+  if (compact.length < 8) {
+    return null;
+  }
+
+  if (!/[a-z]/i.test(compact)) {
+    return null;
+  }
+
+  if (/^\(?\d+[.)]?\)?$/.test(compact)) {
+    return null;
+  }
+
+  if (/^[ivxlcdm]+[.)]?$/i.test(compact)) {
+    return null;
+  }
+
+  if (/^(page|pages?)\s+\d+(\s+of\s+\d+)?$/i.test(compact)) {
+    return null;
+  }
+
+  if (/^(section|clause|item|bullet)\s+\d+[a-z]?[.)-]?$/i.test(compact)) {
+    return null;
+  }
+
+  return cleaned;
+}

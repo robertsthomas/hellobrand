@@ -20,6 +20,7 @@ import {
   stripInlineMarkdown,
   toPlainDealSummary
 } from "@/lib/deal-summary";
+import { normalizeEvidenceSnippet } from "@/lib/utils";
 
 type TermsData = Omit<
   DealTermsRecord,
@@ -449,8 +450,22 @@ function normalizeEvidence(
   sectionKey: string | null,
   fallbackEvidence: FieldEvidence[]
 ) {
+  const sanitizedFallbackEvidence = fallbackEvidence
+    .map((entry) => {
+      const snippet = normalizeEvidenceSnippet(entry.snippet);
+      if (!snippet) {
+        return null;
+      }
+
+      return {
+        ...entry,
+        snippet
+      };
+    })
+    .filter((entry): entry is FieldEvidence => Boolean(entry));
+
   if (!Array.isArray(rawEvidence)) {
-    return fallbackEvidence;
+    return sanitizedFallbackEvidence;
   }
 
   const evidence = rawEvidence
@@ -461,7 +476,7 @@ function normalizeEvidence(
 
       const row = entry as Record<string, unknown>;
       const fieldPath = asString(row.fieldPath);
-      const snippet = asString(row.snippet);
+      const snippet = normalizeEvidenceSnippet(asString(row.snippet));
       if (!fieldPath || !snippet) {
         return null;
       }
@@ -475,7 +490,7 @@ function normalizeEvidence(
     })
     .filter((entry): entry is FieldEvidence => Boolean(entry));
 
-  return evidence.length > 0 ? evidence : fallbackEvidence;
+  return evidence.length > 0 ? evidence : sanitizedFallbackEvidence;
 }
 
 function normalizeRiskFlags(
@@ -483,8 +498,15 @@ function normalizeRiskFlags(
   fallback: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>,
   documentId: string
 ): Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">> {
+  const sanitizedFallback = fallback.map((flag) => ({
+    ...flag,
+    evidence: (Array.isArray(flag.evidence) ? flag.evidence : [])
+      .map((snippet) => normalizeEvidenceSnippet(snippet))
+      .filter((snippet): snippet is string => Boolean(snippet))
+  }));
+
   if (!Array.isArray(raw)) {
-    return fallback;
+    return sanitizedFallback;
   }
 
   const mapped: Array<
@@ -519,6 +541,10 @@ function normalizeRiskFlags(
         return null;
       }
 
+      const sanitizedEvidence = asStringArray(row.evidence)
+        .map((snippet) => normalizeEvidenceSnippet(snippet))
+        .filter((snippet): snippet is string => Boolean(snippet));
+
       return {
         category: category as Omit<
           RiskFlagRecord,
@@ -531,7 +557,7 @@ function normalizeRiskFlags(
           "id" | "dealId" | "createdAt"
         >["severity"],
         suggestedAction: asString(row.suggestedAction),
-        evidence: asStringArray(row.evidence),
+        evidence: sanitizedEvidence,
         sourceDocumentId: documentId
       };
     });
@@ -542,7 +568,7 @@ function normalizeRiskFlags(
     ): entry is Omit<RiskFlagRecord, "id" | "dealId" | "createdAt"> => entry !== null
   );
 
-  return next.length > 0 ? next : fallback;
+  return next.length > 0 ? next : sanitizedFallback;
 }
 
 export async function extractSectionWithLlm(
@@ -557,7 +583,7 @@ export async function extractSectionWithLlm(
       fallback.data,
       null,
       2
-    )}\n\nReturn JSON with this shape:\n{\n  "data": { ...creator_deal_terms_fields },\n  "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }],\n  "confidence": 0.0\n}\n\nOnly include evidence snippets taken directly from this section.`,
+    )}\n\nReturn JSON with this shape:\n{\n  "data": { ...creator_deal_terms_fields },\n  "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }],\n  "confidence": 0.0\n}\n\nOnly include evidence snippets taken directly from this section. Evidence must be a complete quoted phrase or sentence, not a list number, bullet, page marker, heading fragment, or standalone token like "3.".`,
     {
       requestType: "extract_section",
       documentKind,
@@ -595,7 +621,7 @@ export async function analyzeRisksWithLlm(
       extraction.data,
       null,
       2
-    )}\n\nFallback risks:\n${JSON.stringify(fallback, null, 2)}\n\nReturn JSON with this shape:\n{\n  "riskFlags": [\n    {\n      "category": "usage_rights",\n      "title": "Perpetual paid usage rights",\n      "detail": "plain-language explanation",\n      "severity": "high",\n      "suggestedAction": "practical negotiation step",\n      "evidence": ["quoted snippet"]\n    }\n  ]\n}`,
+    )}\n\nFallback risks:\n${JSON.stringify(fallback, null, 2)}\n\nReturn JSON with this shape:\n{\n  "riskFlags": [\n    {\n      "category": "usage_rights",\n      "title": "Perpetual paid usage rights",\n      "detail": "plain-language explanation",\n      "severity": "high",\n      "suggestedAction": "practical negotiation step",\n      "evidence": ["quoted snippet"]\n    }\n  ]\n}\n\nEvidence must be an actual supporting clause or sentence from the document. Never return numbering fragments, bullets, page labels, isolated references, or snippets shorter than a meaningful phrase.`,
     {
       requestType: "analyze_risks",
       documentKind,

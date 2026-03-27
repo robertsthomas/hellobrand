@@ -25,6 +25,7 @@ import type {
   ExtractionEvidenceRecord,
   ExtractionResultRecord
 } from "@/lib/types";
+import { ProseText } from "@/components/prose-text";
 import { humanizeToken, stripHtmlTags } from "@/lib/utils";
 
 const DEAL_CATEGORY_OPTIONS: DealCategory[] = [
@@ -189,7 +190,7 @@ function Section({
             <button
               type="button"
               onClick={onOpenReview}
-              className="inline-flex h-8 items-center justify-center border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
+              className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
             >
               {reviewBadgeLabel(reviewCount)}
             </button>
@@ -353,32 +354,55 @@ function ReviewDialog({
   onConfirm: (fieldPath: string) => Promise<void>;
   confirmingField: string | null;
 }) {
+  const [dismissedFields, setDismissedFields] = useState<Set<string>>(new Set());
+
+  const visibleItems = items.filter((item) => !dismissedFields.has(item.fieldPath));
+
+  const handleConfirm = async (fieldPath: string) => {
+    setDismissedFields((prev) => new Set([...prev, fieldPath]));
+    await onConfirm(fieldPath);
+  };
+
+  useEffect(() => {
+    if (open) {
+      setDismissedFields(new Set());
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (visibleItems.length === 0 && open && items.length > 0) {
+      onOpenChange(false);
+    }
+  }, [visibleItems.length, open, items.length, onOpenChange]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{title} review</DialogTitle>
+          <DialogTitle>Partnership review</DialogTitle>
           <DialogDescription>
             Confirm the current value for any field that still needs review. This saves immediately.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div
               key={item.fieldPath}
-              className="flex flex-col gap-4 border border-black/8 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-start sm:justify-between"
+              className="space-y-3 border border-black/8 px-4 py-4 dark:border-white/10"
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-black/65 dark:text-white/70">
-                  {item.value || "Not set"}
-                </p>
+                {item.value ? (
+                  <ProseText content={item.value} className="mt-2 text-sm leading-6 text-black/65 dark:text-white/70" />
+                ) : (
+                  <p className="mt-2 text-sm text-black/65 dark:text-white/70">Not set</p>
+                )}
               </div>
               <button
                 type="button"
-                onClick={() => void onConfirm(item.fieldPath)}
+                onClick={() => void handleConfirm(item.fieldPath)}
                 disabled={confirmingField === item.fieldPath}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 border border-black/10 bg-white px-4 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 border border-black/10 bg-white text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
               >
                 {confirmingField === item.fieldPath ? (
                   <>
@@ -501,7 +525,7 @@ export function TermsEditor({
   return (
     <form
       action={saveTermsAction}
-      className="grid gap-8 border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
+      className="grid gap-8 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6"
     >
       <div>
         <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">Key terms</h2>
@@ -628,7 +652,7 @@ export function TermsEditor({
             <button
               type="button"
               onClick={() => setOpenReviewSection("deliverables")}
-              className="inline-flex h-8 items-center justify-center border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
+              className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
             >
               {reviewBadgeLabel(sectionReviewItems.deliverables.length)}
             </button>

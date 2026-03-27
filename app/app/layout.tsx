@@ -37,6 +37,11 @@ export default async function WorkspaceLayout({
         hasActiveWorkspace={hasActiveWorkspace}
         notifications={notifications}
         onboardingComplete={isOnboardingComplete}
+        workspaceNavItems={dealAggregates.map((aggregate) => ({
+          dealId: aggregate.deal.id,
+          label: aggregate.deal.campaignName,
+          brandName: aggregate.deal.brandName
+        }))}
       >
         {!isOnboardingComplete ? (
           <ProfileOnboardingBanner

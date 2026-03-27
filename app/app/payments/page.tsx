@@ -1,36 +1,16 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { savePaymentAction } from "@/app/actions";
 import { PaymentsSkeleton } from "@/components/skeletons";
-import { SubmitButton } from "@/components/submit-button";
-import { Badge } from "@/components/ui/badge";
 import { requireViewer } from "@/lib/auth";
-import { getCachedPayments } from "@/lib/cached-data";
+import { getCachedDealAggregates } from "@/lib/cached-data";
 import { summarizePaymentRows, type PaymentSummaryAmount } from "@/lib/payment-summary";
-import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
-
-
-function paymentBadgeClass(status: string) {
-  if (status === "paid") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50";
-  }
-
-  if (status === "late") {
-    return "border-red-200 bg-red-50 text-red-700 hover:bg-red-50";
-  }
-
-  if (status === "awaiting_payment" || status === "invoiced") {
-    return "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50";
-  }
-
-  return "border-black/8 bg-[#f5f6f8] text-[#667085] hover:bg-[#f5f6f8]";
-}
+import { formatCurrency } from "@/lib/utils";
 
 function SummaryValue({ summary }: { summary: PaymentSummaryAmount }) {
   if (!summary.hasMixedCurrencies) {
     return (
-      <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+      <p className="mt-2 text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[32px]">
         {formatCurrency(summary.total, summary.currency ?? "USD")}
       </p>
     );
@@ -38,7 +18,7 @@ function SummaryValue({ summary }: { summary: PaymentSummaryAmount }) {
 
   return (
     <div className="mt-2 space-y-1">
-      <p className="text-[24px] font-semibold tracking-[-0.05em] text-foreground">
+      <p className="text-xl font-semibold tracking-[-0.05em] text-foreground sm:text-[24px]">
         Mixed
       </p>
       <p className="text-xs text-muted-foreground">
@@ -60,7 +40,27 @@ export default function PaymentsPage() {
 
 async function PaymentsContent() {
   const viewer = await requireViewer();
-  const rows = await getCachedPayments(viewer);
+  const aggregates = await getCachedDealAggregates(viewer);
+  const rows = aggregates.map((aggregate) => ({
+    deal: aggregate.deal,
+    invoice: aggregate.invoiceRecord ?? null,
+    invoiceDocuments: aggregate.documents.filter((document) => document.documentKind === "invoice"),
+    payment:
+      aggregate.paymentRecord ?? {
+        id: `payment-${aggregate.deal.id}`,
+        dealId: aggregate.deal.id,
+        amount: aggregate.terms?.paymentAmount ?? null,
+        currency: aggregate.terms?.currency ?? "USD",
+        invoiceDate: null,
+        dueDate: null,
+        paidDate: null,
+        status: aggregate.deal.paymentStatus,
+        notes: null,
+        source: null,
+        createdAt: aggregate.deal.createdAt,
+        updatedAt: aggregate.deal.updatedAt
+      }
+  }));
   const summary = summarizePaymentRows(rows);
 
   return (
@@ -71,12 +71,12 @@ async function PaymentsContent() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
               Payments
             </p>
-            <h1 className="mt-3 text-[44px] font-semibold tracking-[-0.06em] text-foreground">
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.06em] text-foreground sm:text-[44px]">
               Payments
             </h1>
-            <p className="mt-4 text-lg leading-8 text-muted-foreground">
-              Track payout status, update due dates, and keep invoice notes in
-              one cleaner finance view for each partnership workspace.
+            <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              Track every workspace payment in one place, see whether an invoice exists,
+              and open each workspace for the full payment split and attachment details.
             </p>
           </div>
 
@@ -104,7 +104,7 @@ async function PaymentsContent() {
 
         {rows.length === 0 ? (
           <div className="border-t border-dashed border-black/10 py-16 text-center">
-            <h2 className="text-[34px] font-semibold tracking-[-0.05em] text-foreground">
+            <h2 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[34px]">
               No payments tracked yet
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-muted-foreground">
@@ -116,176 +116,56 @@ async function PaymentsContent() {
             </Link>
           </div>
         ) : (
-          <div className="border-t border-black/8">
-            {rows.map(({ payment, deal }) => (
-              <form
-                key={payment.id}
-                action={savePaymentAction}
-                className="grid gap-0 border-b border-black/8 bg-white xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.95fr)]"
-              >
-                <input type="hidden" name="dealId" value={deal.id} />
+          <div className="space-y-5">
+            <div className="hidden gap-4 border border-black/8 bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]">
+              <span>Workspace</span>
+              <span>Payment status</span>
+              <span>Invoice</span>
+              <span>Due</span>
+              <span>Total</span>
+            </div>
 
-                <div className="border-b border-black/8 px-0 py-6 xl:border-r xl:border-b-0 xl:pr-8">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
+            <div className="border-t border-black/8">
+              {rows.map(({ deal, payment, invoice, invoiceDocuments }) => {
+                const invoiceState =
+                  invoiceDocuments.length > 0
+                    ? "Invoice attached"
+                    : invoice
+                      ? "Draft invoice"
+                      : "No invoice";
+
+                return (
+                  <Link
+                    key={deal.id}
+                    href={`/app/payments/${deal.id}`}
+                    className="grid gap-4 border-b border-black/8 bg-white px-4 py-6 transition hover:bg-[#fbfbfa] md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]"
+                  >
+                    <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">
                         {deal.brandName}
                       </p>
-                      <h2 className="mt-2 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
+                      <h2 className="mt-2 truncate text-[24px] font-semibold tracking-[-0.04em] text-foreground">
                         {deal.campaignName}
                       </h2>
-                      <div className="mt-4 flex flex-wrap items-center gap-3">
-                        <Badge className={paymentBadgeClass(payment.status)}>
-                          {humanizeToken(payment.status)}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          Due {formatDate(payment.dueDate)}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          Paid {formatDate(payment.paidDate)}
-                        </span>
-                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {invoice?.invoiceNumber ?? "Open workspace payment"}
+                      </p>
                     </div>
 
-                    <Link
-                      href={`/app/deals/${deal.id}`}
-                      className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
-                    >
-                      Open partnership workspace
-                    </Link>
-                  </div>
-
-                  <div className="mt-8 border-t border-black/8 pt-4">
-                    <div className="mb-4 flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
-                          Payment preview
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Current invoice timing and payout state for this partnership workspace.
-                        </p>
-                      </div>
+                    <div className="text-sm text-foreground">
+                      {payment.status.replaceAll("_", " ")}
                     </div>
-
-                    <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr] border-y border-black/8 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
-                      <span>Invoice</span>
-                      <span>Issued</span>
-                      <span>Due</span>
-                      <span>Amount</span>
+                    <div className="text-sm text-foreground">{invoiceState}</div>
+                    <div className="text-sm text-foreground">
+                      {payment.dueDate ? payment.dueDate.slice(0, 10) : "Not set"}
                     </div>
-                    <div className="grid grid-cols-[1.2fr_1fr_1fr_1fr] py-4 text-sm text-foreground">
-                      <span>{payment.invoiceDate ? `Issued invoice` : "Not invoiced yet"}</span>
-                      <span>{formatDate(payment.invoiceDate)}</span>
-                      <span>{formatDate(payment.dueDate)}</span>
-                      <span className="font-semibold">
-                        {formatCurrency(payment.amount, payment.currency ?? "USD")}
-                      </span>
+                    <div className="text-sm font-semibold text-foreground">
+                      {formatCurrency(payment.amount, payment.currency ?? "USD")}
                     </div>
-                  </div>
-                </div>
-
-                <div className="px-0 py-6 xl:pl-8">
-                  <div className="mb-5">
-                    <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">
-                      Payment editor
-                    </p>
-                    <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                      Update invoice details
-                    </h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Late status is calculated from the due date until a payment is marked paid.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4 border-t border-black/8 pt-4 md:grid-cols-2">
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Amount
-                      <input
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        type="number"
-                        step="0.01"
-                        name="amount"
-                        defaultValue={payment.amount ?? ""}
-                      />
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Currency
-                      <input
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        name="currency"
-                        defaultValue={payment.currency ?? "USD"}
-                      />
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Invoice date
-                      <input
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        type="date"
-                        name="invoiceDate"
-                        defaultValue={payment.invoiceDate?.slice(0, 10) ?? ""}
-                      />
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Due date
-                      <input
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        type="date"
-                        name="dueDate"
-                        defaultValue={payment.dueDate?.slice(0, 10) ?? ""}
-                      />
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Paid date
-                      <input
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        type="date"
-                        name="paidDate"
-                        defaultValue={payment.paidDate?.slice(0, 10) ?? ""}
-                      />
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground">
-                      Status
-                      <select
-                        className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        name="status"
-                        defaultValue={payment.status}
-                      >
-                        <option value="not_invoiced">Not invoiced</option>
-                        <option value="invoiced">Invoiced</option>
-                        <option value="awaiting_payment">Awaiting payment</option>
-                        <option value="paid">Paid</option>
-                        <option value="late" disabled>
-                          Late (calculated)
-                        </option>
-                      </select>
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
-                      Notes
-                      <textarea
-                        className="min-h-28 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
-                        name="notes"
-                        defaultValue={payment.notes ?? ""}
-                      />
-                    </label>
-
-                    <div className="md:col-span-2 flex justify-end">
-                      <SubmitButton
-                        pendingLabel="Saving payment..."
-                        className="bg-primary px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Save payment
-                      </SubmitButton>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            ))}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

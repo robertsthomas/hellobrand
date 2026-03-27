@@ -41,6 +41,10 @@ function sanitizeText(value: string | null | undefined) {
     .replace(/<\/(p|div|tr|li|table)>/gi, "\n")
     .replace(/<(td|th)[^>]*>/gi, " ")
     .replace(/<[^>]+>/g, " ")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
     .replace(/\s+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")
@@ -279,7 +283,7 @@ export function TermsArrayFieldsEditor({
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline-offset-4 hover:underline dark:text-white/65"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm font-medium text-black/65 underline-offset-4 hover:underline dark:text-white/65"
             onClick={() =>
               setEditableDeliverables((current) => [
                 ...current,
@@ -296,7 +300,7 @@ export function TermsArrayFieldsEditor({
             }
           >
             <Plus className="h-4 w-4" />
-            Add deliverable
+            Add
           </button>
         </div>
 

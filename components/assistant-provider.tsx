@@ -14,6 +14,7 @@ import { Bot, Loader2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { AssistantPanel } from "@/components/assistant-panel";
+import { MobileFab } from "@/components/mobile-fab";
 import { assistantPageTitle, isValidAssistantTab } from "@/lib/assistant/app-manual";
 import { assistantRecordToUIMessage } from "@/lib/assistant/messages";
 import type {
@@ -185,11 +186,19 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     <AssistantContext.Provider value={{ open, openAssistant, closeAssistant }}>
       {children}
 
+      <MobileFab
+        side="right"
+        className="border border-black/10 bg-ocean text-white shadow-[0_18px_40px_rgba(14,116,144,0.35)] dark:border-white/10"
+        onClick={() => openAssistant()}
+      >
+        <Bot className="h-5 w-5" />
+      </MobileFab>
+
       <button
         type="button"
         onClick={() => openAssistant()}
         data-guide="assistant-fab"
-        className="group fixed bottom-6 right-6 z-40 inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-ocean text-sm font-semibold text-white shadow-[0_18px_40px_rgba(14,116,144,0.35)] transition-[width,transform] duration-300 ease-out hover:w-[132px] hover:translate-y-[-1px] dark:border-white/10"
+        className="group fixed bottom-6 right-6 z-40 hidden h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black/10 bg-ocean text-sm font-semibold text-white shadow-[0_18px_40px_rgba(14,116,144,0.35)] transition-[width,transform] duration-300 ease-out hover:w-[132px] hover:translate-y-[-1px] lg:inline-flex dark:border-white/10"
         aria-label="Open assistant"
       >
         <span className="shrink-0">

@@ -159,6 +159,10 @@ function shouldSendNotificationEmail(notification: NotificationWithEmailContext)
     return notification.eventType === "email.resync_required";
   }
 
+  if (notification.category === "payments") {
+    return notification.eventType === "invoice.generate_prompt";
+  }
+
   return false;
 }
 

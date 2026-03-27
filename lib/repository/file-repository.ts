@@ -20,6 +20,8 @@ import type {
   ExtractionResultRecord,
   IntakeBatchGroupRecord,
   IntakeBatchRecord,
+  InvoiceRecord,
+  InvoiceReminderTouchpointRecord,
   JobRecord,
   RiskFlagRecord,
   SummaryRecord
@@ -134,6 +136,8 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
     assistantThreads: store.assistantThreads ?? [],
     assistantMessages: store.assistantMessages ?? [],
     assistantContextSnapshots: store.assistantContextSnapshots ?? [],
+    invoiceRecords: store.invoiceRecords ?? [],
+    invoiceReminderTouchpoints: store.invoiceReminderTouchpoints ?? [],
     jobs: (store.jobs ?? []).map((job) => ({
       ...job,
       type: job.type ?? "generate_summary"
@@ -195,6 +199,7 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
     terms: store.dealTerms.find((record) => record.dealId === deal.id) ?? null,
     conflictResults: [],
     paymentRecord: null,
+    invoiceRecord: store.invoiceRecords.find((record) => record.dealId === deal.id) ?? null,
     riskFlags: sortNewestFirst(
       store.riskFlags.filter((flag) => flag.dealId === deal.id)
     ),
@@ -334,6 +339,10 @@ export class FileRepository {
     store.assistantContextSnapshots = store.assistantContextSnapshots.filter(
       (entry) => entry.dealId !== dealId
     );
+    store.invoiceRecords = store.invoiceRecords.filter((entry) => entry.dealId !== dealId);
+    store.invoiceReminderTouchpoints = store.invoiceReminderTouchpoints.filter(
+      (entry) => entry.dealId !== dealId
+    );
     store.jobs = store.jobs.filter((entry) => entry.dealId !== dealId);
     store.summaries = store.summaries.filter((entry) => entry.dealId !== dealId);
     store.documentSections = store.documentSections.filter(
@@ -384,6 +393,124 @@ export class FileRepository {
 
     await saveStore(store);
     return store.documents[index];
+  }
+
+  async listInvoiceRecords(userId: string) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.invoiceRecords.filter((record) => record.userId === userId)
+    );
+  }
+
+  async getInvoiceRecord(userId: string, dealId: string) {
+    const store = await ensureStore();
+    return (
+      store.invoiceRecords.find(
+        (record) => record.userId === userId && record.dealId === dealId
+      ) ?? null
+    );
+  }
+
+  async upsertInvoiceRecord(
+    userId: string,
+    dealId: string,
+    patch: Omit<InvoiceRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    const index = store.invoiceRecords.findIndex((record) => record.dealId === dealId);
+    const next: InvoiceRecord = {
+      id: index >= 0 ? store.invoiceRecords[index]!.id : randomUUID(),
+      dealId,
+      userId,
+      createdAt: index >= 0 ? store.invoiceRecords[index]!.createdAt : now,
+      updatedAt: now,
+      ...patch
+    };
+
+    if (index >= 0) {
+      store.invoiceRecords[index] = next;
+    } else {
+      store.invoiceRecords.unshift(next);
+    }
+
+    await saveStore(store);
+    return next;
+  }
+
+  async listInvoiceReminderTouchpoints(userId: string, options?: { dealId?: string }) {
+    const store = await ensureStore();
+    return store.invoiceReminderTouchpoints
+      .filter((touchpoint) => {
+        if (touchpoint.userId !== userId) {
+          return false;
+        }
+
+        if (options?.dealId && touchpoint.dealId !== options.dealId) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((left, right) => left.sendOn.localeCompare(right.sendOn));
+  }
+
+  async upsertInvoiceReminderTouchpoints(
+    userId: string,
+    dealId: string,
+    touchpoints: Array<Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">>
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+
+    for (const touchpoint of touchpoints) {
+      const index = store.invoiceReminderTouchpoints.findIndex(
+        (entry) => entry.dealId === dealId && entry.offsetDays === touchpoint.offsetDays
+      );
+      const next: InvoiceReminderTouchpointRecord = {
+        id: index >= 0 ? store.invoiceReminderTouchpoints[index]!.id : randomUUID(),
+        dealId,
+        userId,
+        createdAt: index >= 0 ? store.invoiceReminderTouchpoints[index]!.createdAt : now,
+        updatedAt: now,
+        ...touchpoint
+      };
+
+      if (index >= 0) {
+        store.invoiceReminderTouchpoints[index] = next;
+      } else {
+        store.invoiceReminderTouchpoints.push(next);
+      }
+    }
+
+    await saveStore(store);
+    return store.invoiceReminderTouchpoints
+      .filter((entry) => entry.dealId === dealId && entry.userId === userId)
+      .sort((left, right) => left.sendOn.localeCompare(right.sendOn));
+  }
+
+  async updateInvoiceReminderTouchpoint(
+    id: string,
+    patch: Partial<
+      Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+    >
+  ) {
+    const store = await ensureStore();
+    const index = store.invoiceReminderTouchpoints.findIndex((entry) => entry.id === id);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const next = {
+      ...store.invoiceReminderTouchpoints[index],
+      ...patch,
+      updatedAt: new Date().toISOString()
+    };
+
+    store.invoiceReminderTouchpoints[index] = next;
+    await saveStore(store);
+    return next;
   }
 
   async replaceDocumentSections(

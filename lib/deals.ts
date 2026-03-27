@@ -133,10 +133,15 @@ function withPreferredCreatorName<
 function sanitizeCreatorExtractionResult(
   extraction: ExtractionPipelineResult,
   creatorName: string
-): ExtractionPipelineResult {
+): ReturnType<typeof mergeExtractionResults> {
   return {
     ...extraction,
-    data: withPreferredCreatorName(extraction.data, creatorName),
+    confidence: extraction.confidence ?? 0.68,
+    data: {
+      ...extraction.data,
+      creatorName,
+      pendingExtraction: null
+    },
     evidence: (Array.isArray(extraction.evidence) ? extraction.evidence : []).filter(
       (entry) => entry.fieldPath !== "creatorName"
     ),
@@ -900,9 +905,13 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     const existingTerms = latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal);
 
     if (isFirstDocument) {
-      const nextTerms = mergeTerms(existingTerms, extraction.data, {
-        manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-      });
+      const nextTerms = mergeTerms(
+        withPreferredCreatorName(existingTerms, preferredCreatorName),
+        sanitizedExtraction.data,
+        {
+          manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
+        }
+      );
       await repository.upsertTerms(document.dealId, nextTerms);
       if (process.env.DATABASE_URL) {
         await syncPaymentRecordForDeal(document.dealId, nextTerms);
@@ -925,7 +934,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     } else {
       const mergedFull = mergeTerms(
         createEmptyTerms(latestAggregate.deal),
-        extraction.data
+        sanitizedExtraction.data
       );
       const { pendingExtraction: _pe, ...mergedExtraction } = mergedFull;
       const pendingCandidate = mergedExtraction as PendingExtractionData;
@@ -936,9 +945,13 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
           pendingCandidate
         )
       ) {
-        const nextTerms = mergeTerms(existingTerms, extraction.data, {
-          manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-        });
+        const nextTerms = mergeTerms(
+          withPreferredCreatorName(existingTerms, preferredCreatorName),
+          sanitizedExtraction.data,
+          {
+            manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
+          }
+        );
         await repository.upsertTerms(document.dealId, nextTerms);
         if (process.env.DATABASE_URL) {
           await syncPaymentRecordForDeal(document.dealId, nextTerms);
@@ -963,7 +976,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
           .pendingExtraction as PendingExtractionData | null;
 
         const pendingData = existingPending
-          ? coalesceExtractions(existingPending, extraction.data, (base, patch) => {
+          ? coalesceExtractions(existingPending, sanitizedExtraction.data, (base, patch) => {
               const full = { ...base, pendingExtraction: null };
               const merged = mergeTerms(full, patch);
               const { pendingExtraction: _, ...rest } = merged;
@@ -1002,7 +1015,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       durationMs: totalDurationMs,
       riskCount: risks.length,
       summaryLength: summary.body.length,
-      deliverablesCount: extraction.data.deliverables?.length ?? 0
+      deliverablesCount: sanitizedExtraction.data.deliverables?.length ?? 0
     });
 
     void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
@@ -1122,15 +1135,16 @@ export async function getDealForViewer(viewer: Viewer, dealId: string) {
   if (!target) {
     return null;
   }
+  const normalizedTarget = await hydrateProfileBackedCreatorName(viewer, target);
 
   const aggregates = await loadRawDealAggregatesForViewer(viewer);
   const comparisonSet = aggregates.some((aggregate) => aggregate.deal.id === dealId)
     ? aggregates
-    : [target, ...aggregates];
+    : [normalizedTarget, ...aggregates];
 
   return {
-    ...target,
-    conflictResults: buildConflictResults(target, comparisonSet)
+    ...normalizedTarget,
+    conflictResults: buildConflictResults(normalizedTarget, comparisonSet)
   };
 }
 
@@ -1180,7 +1194,11 @@ export async function updateTermsForViewer(
     return null;
   }
 
-  const existing = aggregate.terms ?? createEmptyTerms(aggregate.deal);
+  const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
+  const existing = withPreferredCreatorName(
+    aggregate.terms ?? createEmptyTerms(aggregate.deal),
+    preferredCreatorName
+  );
   const changedFields = detectChangedFields(existing, patch);
   const nextManualEdits = Array.from(new Set([
     ...(aggregate.terms?.manuallyEditedFields ?? []),
@@ -1218,7 +1236,11 @@ export async function confirmTermsFieldForViewer(
     return null;
   }
 
-  const existing = aggregate.terms ?? createEmptyTerms(aggregate.deal);
+  const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
+  const existing = withPreferredCreatorName(
+    aggregate.terms ?? createEmptyTerms(aggregate.deal),
+    preferredCreatorName
+  );
   const nextManualEdits = Array.from(
     new Set([...(existing.manuallyEditedFields ?? []), fieldPath])
   );
@@ -1244,7 +1266,10 @@ export async function updateDealNotesForViewer(
   }
 
   const nextTerms = mergeTerms(
-    aggregate.terms ?? createEmptyTerms(aggregate.deal),
+    withPreferredCreatorName(
+      aggregate.terms ?? createEmptyTerms(aggregate.deal),
+      await getPreferredCreatorNameForViewer(viewer)
+    ),
     { notes }
   );
   const terms = await getRepository().upsertTerms(dealId, nextTerms);

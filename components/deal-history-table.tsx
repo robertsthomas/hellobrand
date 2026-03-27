@@ -7,6 +7,7 @@ import { Download, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
 
 import { deleteWorkspaceAction } from "@/app/actions";
 import { AppTooltip } from "@/components/app-tooltip";
+import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -337,38 +338,40 @@ export function DealHistoryTable({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-black/8 pb-3 dark:border-white/10">
-          {[
-            { key: "all", label: "All Partnerships" },
-            { key: "active", label: "Active" },
-            { key: "under_review", label: "Under Review" },
-            { key: "completed", label: "Completed" },
-            { key: "archived", label: "Archived" }
-          ].map((tab) => {
-            const isActive = stageFilter === tab.key;
-            const count = stageCounts[tab.key as keyof typeof stageCounts];
+        <ScrollableTabsList>
+          <div className="inline-flex w-max flex-nowrap gap-1 p-1">
+            {[
+              { key: "all", label: "All Partnerships" },
+              { key: "active", label: "Active" },
+              { key: "under_review", label: "Under Review" },
+              { key: "completed", label: "Completed" },
+              { key: "archived", label: "Archived" }
+            ].map((tab) => {
+              const isActive = stageFilter === tab.key;
+              const count = stageCounts[tab.key as keyof typeof stageCounts];
 
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => {
-                  setStageFilter(tab.key as HistoryStageFilter);
-                  setPage(1);
-                }}
-                className={cn(
-                  "inline-flex items-center gap-2 px-3 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-secondary text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <span>{tab.label}</span>
-                <span className="text-xs text-[#98a2b3]">{count}</span>
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => {
+                    setStageFilter(tab.key as HistoryStageFilter);
+                    setPage(1);
+                  }}
+                  className={cn(
+                    "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-[#111827] text-white shadow-sm dark:bg-white dark:text-[#111827]"
+                      : "text-[#667085] hover:text-foreground"
+                  )}
+                >
+                  <span>{tab.label}</span>
+                  <span className={cn("text-xs", isActive ? "opacity-60" : "text-[#98a2b3]")}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </ScrollableTabsList>
 
         <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
         <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
@@ -397,7 +400,7 @@ export function DealHistoryTable({
                   <TableRow
                     key={row.id}
                     className="cursor-pointer border-black/8 hover:bg-secondary/20 dark:border-white/10 dark:hover:bg-white/[0.03]"
-                    onClick={() => router.push(`/app/deals/${row.id}`)}
+                    onClick={() => router.push(`/app/deals/history/${row.id}`)}
                   >
                     <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
                       <ValueTooltip content="Brand associated with this partnership.">
@@ -451,7 +454,7 @@ export function DealHistoryTable({
                     >
                       <div className="flex items-center justify-end gap-3">
                         <Link
-                          href={`/app/deals/${row.id}`}
+                          href={`/app/deals/history/${row.id}`}
                           className="text-sm font-medium text-foreground transition hover:text-primary"
                           onClick={(event) => event.stopPropagation()}
                         >
