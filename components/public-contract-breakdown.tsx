@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CalendarRange } from "lucide-react";
+import { CalendarRange, FileText, X } from "lucide-react";
 
 import type { AnonymousDealBreakdown } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
@@ -28,7 +28,8 @@ export function PublicContractBreakdown({
   title,
   description,
   actions,
-  stickyAction
+  stickyAction,
+  sourceDocument
 }: {
   breakdown: AnonymousDealBreakdown;
   eyebrow: string;
@@ -36,8 +37,16 @@ export function PublicContractBreakdown({
   description: string;
   actions?: ReactNode;
   stickyAction?: ReactNode;
+  sourceDocument?: {
+    statusLabel?: string;
+    fileName: string;
+    description?: string;
+    previewUrl: string;
+    buttonLabel?: string;
+  };
 }) {
   const [visible, setVisible] = useState(false);
+  const [documentOpen, setDocumentOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setVisible(true), 80);
@@ -68,7 +77,11 @@ export function PublicContractBreakdown({
   );
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl px-5 pb-32 pt-10 sm:px-6 lg:px-8">
+    <div
+      className={`relative mx-auto w-full max-w-3xl px-5 pt-10 sm:px-6 lg:px-8 ${
+        stickyAction ? "pb-44 sm:pb-36" : "pb-32"
+      }`}
+    >
       {/* Header */}
       <header className="text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/70">
@@ -86,6 +99,53 @@ export function PublicContractBreakdown({
           </div>
         ) : null}
       </header>
+
+      {sourceDocument ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setDocumentOpen(true)}
+            className="mt-8 flex w-full items-center gap-3 border border-black/8 bg-white px-4 py-4 text-left transition hover:bg-[#f9f8f6] dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.05]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary/10 text-primary">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {sourceDocument.fileName}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Tap to view source contract
+              </p>
+            </div>
+          </button>
+
+          {documentOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-8">
+              <div className="relative flex h-full max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-[#161a1f]">
+                <div className="flex items-center justify-between border-b border-black/8 px-5 py-3 dark:border-white/10">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {sourceDocument.fileName}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setDocumentOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-black/5 hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <iframe
+                  src={sourceDocument.previewUrl}
+                  className="flex-1 border-0"
+                  title={sourceDocument.fileName}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      ) : null}
 
       {/* Breakdown body */}
       <div

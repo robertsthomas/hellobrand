@@ -28,10 +28,10 @@ export function MaintenancePage() {
   }
 
   return (
-    <div className="min-h-screen bg-primary text-[#1a2634]">
-      <main className="flex min-h-screen items-center justify-center px-5 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-          <div className="px-8 pb-10 pt-8 sm:px-12 sm:pb-14 sm:pt-10">
+    <div className="min-h-[100dvh] bg-primary text-[#1a2634]">
+      <main className="flex min-h-[100dvh] items-stretch sm:items-center sm:justify-center sm:px-6 sm:py-12 lg:px-8">
+        <div className="flex w-full flex-1 flex-col justify-center bg-white sm:max-w-3xl sm:flex-initial sm:overflow-hidden sm:rounded-2xl sm:shadow-2xl">
+          <div className="px-6 pb-10 pt-8 sm:px-12 sm:pb-14 sm:pt-10">
             {/* Logo */}
             <div className="group flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center bg-primary text-white">

@@ -7,6 +7,9 @@ import { PublicFunnelLink } from "@/components/public-funnel-link";
 import { SAMPLE_CONTRACT_BREAKDOWN } from "@/lib/public-sample-contract";
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
 
+const SAMPLE_CONTRACT_PREVIEW_URL =
+  "/sample-documents/northstar-skin-spring-glow-campaign-contract.pdf";
+
 export function PublicSampleExperience() {
   const trackedDepthRef = useRef(false);
 
@@ -43,6 +46,14 @@ export function PublicSampleExperience() {
         eyebrow="Sample contract"
         title="See the contract breakdown before you upload your own."
         description="This is the exact kind of plain-English output HelloBrand should give a creator before anything gets signed."
+        sourceDocument={{
+          statusLabel: "Current document being analyzed",
+          fileName: SAMPLE_CONTRACT_BREAKDOWN.sourceFileName,
+          description:
+            "This is the full Northstar Skin Spring Glow campaign agreement hosted directly in the app for side-by-side review.",
+          previewUrl: SAMPLE_CONTRACT_PREVIEW_URL,
+          buttonLabel: "Open source contract"
+        }}
         actions={
           <>
             <PublicFunnelLink
@@ -66,19 +77,19 @@ export function PublicSampleExperience() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Want this for your own deal?
+                Try it with your own contract
               </p>
               <p className="text-sm text-muted-foreground">
-                Upload one contract and see the real breakdown without creating an account first.
+                Upload a contract or brief and get the full breakdown instantly.
               </p>
             </div>
             <PublicFunnelLink
               href="/upload"
               eventName="sample_upload_cta_clicked"
               payload={{ location: "sample_sticky" }}
-              className="inline-flex h-11 items-center justify-center bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/92"
+              className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/92"
             >
-              Upload My Contract
+              Upload contract
             </PublicFunnelLink>
           </div>
         }

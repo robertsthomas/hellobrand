@@ -44,6 +44,16 @@ export function PublicUploadWorkspace() {
   const canSubmit = Boolean(selectedFile) && uploadState !== "uploading";
   const processingLabel = uploadState === "uploading" ? PROCESSING_STEPS : null;
 
+  function clearSelectedFile() {
+    setSelectedFile(null);
+    setErrorMessage(null);
+    inputRef.current?.focus();
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }
+
   async function handleUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -272,12 +282,21 @@ export function PublicUploadWorkspace() {
           ) : (
             <form onSubmit={handleUploadSubmit} className="mx-auto mt-10 w-full max-w-3xl">
               <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="group flex w-full flex-col items-center justify-center border border-dashed border-black/15 bg-white px-8 py-16 text-center transition hover:border-primary/50 hover:bg-primary/[0.02] dark:border-white/12 dark:bg-white/[0.03] dark:hover:bg-white/[0.05]"
+                type={selectedFile ? "submit" : "button"}
+                onClick={() => {
+                  if (!selectedFile) {
+                    inputRef.current?.click();
+                  }
+                }}
+                disabled={!canSubmit && Boolean(selectedFile)}
+                className="group flex w-full flex-col items-center justify-center border border-dashed border-black/15 bg-white px-8 py-16 text-center transition hover:border-primary/50 hover:bg-primary/[0.02] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/12 dark:bg-white/[0.03] dark:hover:bg-white/[0.05]"
               >
                 <div className="flex h-14 w-14 items-center justify-center bg-primary/10 text-primary">
-                  <FileUp className="h-6 w-6" />
+                  {uploadState === "uploading" ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <FileUp className="h-6 w-6" />
+                  )}
                 </div>
                 <h2 className="mt-5 text-xl font-semibold text-foreground">
                   {selectedFile ? selectedFile.name : "Drop your document here"}
@@ -286,7 +305,11 @@ export function PublicUploadWorkspace() {
                   PDF, DOCX, DOC, TXT up to 10 MB. Contracts, briefs, and concept documents.
                 </p>
                 <div className="mt-6 inline-flex h-11 items-center justify-center border border-black/8 bg-white px-5 text-sm font-semibold text-foreground transition group-hover:bg-secondary dark:border-white/10 dark:bg-white/[0.03]">
-                  Choose file
+                  {uploadState === "uploading"
+                    ? "Analyzing..."
+                    : selectedFile
+                      ? "Analyze document"
+                      : "Choose file"}
                 </div>
               </button>
 
@@ -332,15 +355,18 @@ export function PublicUploadWorkspace() {
                 </div>
               ) : null}
 
-              <div className="mt-6">
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className="inline-flex h-12 items-center justify-center gap-2 bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary/92 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {uploadState === "uploading" ? "Analyzing..." : "Analyze document"}
-                </button>
-              </div>
+              {selectedFile ? (
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={clearSelectedFile}
+                    disabled={uploadState === "uploading"}
+                    className="inline-flex h-11 items-center justify-center border border-black/8 bg-white px-5 text-sm font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.03]"
+                  >
+                    Clear document
+                  </button>
+                </div>
+              ) : null}
             </form>
           )}
         </div>
