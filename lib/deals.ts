@@ -386,7 +386,7 @@ function llmSectionLimits() {
 
   return usingFreeModel
     ? { maxSections: 6, concurrency: 2, usingFreeModel: true }
-    : { maxSections: 12, concurrency: 4, usingFreeModel: false };
+    : { maxSections: 14, concurrency: 6, usingFreeModel: false };
 }
 
 function scoreSectionForLlm(

@@ -148,7 +148,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     routeClass: "speed",
     primary: "google/gemini-3-flash-preview",
     fallbacks: ["openai/gpt-5-mini"],
-    maxTokens: 900,
+    maxTokens: 2000,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "extract.v1",
     routeVersion: "extract.route.v2",
@@ -160,7 +160,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     routeClass: "speed",
     primary: "google/gemini-3-flash-preview",
     fallbacks: ["openai/gpt-5-mini"],
-    maxTokens: 700,
+    maxTokens: 1200,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "risks.v1",
     routeVersion: "risks.route.v2",
@@ -172,7 +172,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     routeClass: "speed",
     primary: "google/gemini-3-flash-preview",
     fallbacks: ["openai/gpt-5-mini"],
-    maxTokens: 500,
+    maxTokens: 1000,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "summary.v1",
     routeVersion: "summary.route.v2",
@@ -804,6 +804,59 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
   }
 
   if (prepared.budgetDecision === "blocked") {
+    // If the primary model is budget-blocked but fallbacks exist in the policy,
+    // try the cheapest fallback at reduced tokens before giving up entirely.
+    const basePolicy = TASK_POLICIES[input.context.taskKey];
+    const cheapFallback = basePolicy.fallbacks[basePolicy.fallbacks.length - 1];
+
+    if (!cheapFallback || cheapFallback === prepared.requestedModel) {
+      return null;
+    }
+
+    console.warn("[ai-gateway] Budget blocked for", prepared.requestedModel, ", attempting fallback:", cheapFallback);
+
+    try {
+      const fallbackResponse = await api.chat.completions.create({
+        model: cheapFallback,
+        temperature: input.temperature,
+        max_completion_tokens: prepared.maxTokens,
+        messages: [
+          { role: "system", content: input.systemPrompt },
+          { role: "user", content: input.userPrompt }
+        ],
+        ...(input.responseFormat ? { response_format: input.responseFormat } : {})
+      } as never);
+
+      const fallbackContent = extractTextContent(fallbackResponse.choices?.[0]?.message?.content);
+      if (fallbackContent) {
+        const usage = usageFromCompletion(fallbackResponse);
+        const resolvedModel = fallbackResponse.model ?? cheapFallback;
+        const data = input.parse(fallbackContent);
+
+        await recordAiUsageEvent({
+          ...input.context,
+          requestedModel: cheapFallback,
+          resolvedModel,
+          status: "success",
+          cacheStatus: "miss",
+          usage,
+          inputHash,
+          requestKey: randomUUID()
+        });
+
+        return {
+          data,
+          usage,
+          resolvedModel,
+          requestedModel: cheapFallback,
+          cacheHit: false,
+          budgetDecision: "blocked"
+        };
+      }
+    } catch {
+      // Fallback also failed, return null
+    }
+
     return null;
   }
 
@@ -826,13 +879,22 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
   } as never);
 
   let content = extractTextContent(response.choices?.[0]?.message?.content);
+  const finishReason = response.choices?.[0]?.finish_reason;
+
   if (!content) {
-    console.error("[ai-gateway] Empty response from model:", prepared.requestedModel, "finish_reason:", response.choices?.[0]?.finish_reason, "status:", response);
-    // Retry once on empty response before giving up
+    // If the model hit the token limit, retry with 50% more tokens.
+    // If it failed for any other reason, retry once with the same params.
+    const hitTokenLimit = finishReason === "length" || (finishReason as string) === "max_output_tokens";
+    const retryTokens = hitTokenLimit
+      ? Math.floor(prepared.maxTokens * 1.5)
+      : prepared.maxTokens;
+
+    console.error("[ai-gateway] Empty response from model:", prepared.requestedModel, "finish_reason:", finishReason, hitTokenLimit ? `(bumping tokens from ${prepared.maxTokens} to ${retryTokens})` : "(retrying with same params)");
+
     const retry = await api.chat.completions.create({
       model: prepared.requestedModel,
       temperature: input.temperature,
-      max_completion_tokens: prepared.maxTokens,
+      max_completion_tokens: retryTokens,
       messages: [
         { role: "system", content: input.systemPrompt },
         { role: "user", content: input.userPrompt }
