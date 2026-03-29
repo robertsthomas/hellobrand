@@ -112,45 +112,43 @@ async function IntakeProcessingContent({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8">
-      <div className="relative w-full max-w-3xl">
-        <div className="absolute right-0 top-0">
+    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-5 py-8">
+      <div className="w-full max-w-md">
+        <IntakeProcessingState
+          documentsCount={documents.length}
+          sessionId={session.id}
+          status={session.status}
+          initialProcessing={processing}
+        />
+        <IntakeDuplicateWarning
+          sessionId={session.id}
+          dealId={session.dealId}
+          status={session.status}
+        />
+        {session.errorMessage ? (
+          <p className="mt-4 text-center text-sm text-destructive">{session.errorMessage}</p>
+        ) : null}
+
+        <div className="mt-6 text-center">
           <form action={deleteIntakeDraftAction}>
             <input type="hidden" name="sessionId" value={session.id} />
             <input type="hidden" name="redirectTo" value="/app" />
             <DeleteDraftButton
-              className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
+              className="text-sm text-muted-foreground transition hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4" />
-              Cancel intake
+              Cancel
             </DeleteDraftButton>
           </form>
         </div>
+      </div>
 
-        <div className="flex min-h-[60vh] flex-col items-center justify-center">
-          <IntakeProcessingState
-            documentsCount={documents.length}
-            sessionId={session.id}
-            status={session.status}
-            initialProcessing={processing}
-          />
-          <IntakeDuplicateWarning
-            sessionId={session.id}
-            dealId={session.dealId}
-            status={session.status}
-          />
-          <div className="sr-only">
-            <IntakePendingUpload sessionId={session.id} status={session.status} />
-            <IntakeAutoRefresh
-              sessionId={session.id}
-              status={session.status}
-              readyHref={`/app/intake/${session.id}/review`}
-            />
-          </div>
-          {session.errorMessage ? (
-            <p className="mt-4 text-center text-sm text-clay">{session.errorMessage}</p>
-          ) : null}
-        </div>
+      <div className="sr-only">
+        <IntakePendingUpload sessionId={session.id} status={session.status} />
+        <IntakeAutoRefresh
+          sessionId={session.id}
+          status={session.status}
+          readyHref={`/app/intake/${session.id}/review`}
+        />
       </div>
     </div>
   );

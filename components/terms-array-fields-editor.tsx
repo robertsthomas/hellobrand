@@ -7,7 +7,7 @@ import { createClientRowId } from "@/lib/row-identity";
 import type { DeliverableItem } from "@/lib/types";
 
 const ADD_BUTTON_CLASS =
-  "inline-flex h-8 shrink-0 items-center gap-1.5 border border-black/8 px-2.5 text-sm font-medium text-black/65 transition hover:border-black/15 hover:text-black/80 dark:border-white/10 dark:text-white/65 dark:hover:border-white/20 dark:hover:text-white/80";
+  "inline-flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-sm font-medium text-black/65 underline underline-offset-4 transition hover:text-black/80 dark:text-white/65 dark:hover:text-white/80";
 
 type EditableDeliverable = {
   id: string;
@@ -420,7 +420,7 @@ export function TermsArrayFieldsEditor({
         initialValues={usageChannels}
         inputClassName={inputClassName}
         emptyLabel="No usage channels added yet."
-        addLabel="Add channel"
+        addLabel="Add"
         placeholder="TikTok paid usage"
       />
     </div>

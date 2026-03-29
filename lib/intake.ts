@@ -645,10 +645,11 @@ export async function listIntakeDraftsForViewer(
     where: {
       userId: viewer.id,
       status: {
-        in: ["draft", "queued", "uploading", "processing", "ready_for_confirmation", "failed"]
+        in: ["draft", "queued", "uploading", "processing", "ready_for_confirmation"]
       },
       deal: {
-        confirmedAt: null
+        confirmedAt: null,
+        status: { not: "archived" }
       }
     },
     include: {

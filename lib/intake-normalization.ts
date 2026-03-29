@@ -14,6 +14,7 @@ import type {
   SummaryRecord
 } from "@/lib/types";
 import { stripInlineMarkdown, toPlainDealSummary } from "@/lib/deal-summary";
+import { sanitizePartyName } from "@/lib/party-labels";
 import {
   cleanWorkspaceFileName,
   deriveWorkspaceTitleFromFileNames,
@@ -208,6 +209,54 @@ function scoreContactLine(line: string) {
   return score;
 }
 
+function sanitizeContactName(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+){1,3}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function sanitizeContactTitle(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const lower = normalized.toLowerCase();
+
+  if (
+    /^[•*#\-\d(]/.test(normalized) ||
+    normalized.length > 80 ||
+    /[.!?]/.test(normalized) ||
+    /\b(children?|device|devices|marketing|campaign manager for clarity|alexa|amazon kids\+|under 13|you will|please|should|must|will be|if for any reason|ensure|show|content|story|device name)\b/i.test(
+      normalized
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    !/\b(manager|director|partnership|campaign|media|marketing|talent|agent|coordinator|producer|lead|specialist|executive|strategist)\b/i.test(
+      lower
+    )
+  ) {
+    return null;
+  }
+
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < 2 || words.length > 8) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function extractPrimaryContact(
   aggregate: DealAggregate,
   agencyName: string | null,
@@ -240,28 +289,34 @@ function extractPrimaryContact(
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
-    const emailIndex = emails.length
-      ? lines.findIndex((line) => line.includes(emails[0]))
-      : -1;
-    const windowStart = emailIndex === -1 ? Math.max(lines.length - 8, 0) : Math.max(0, emailIndex - 4);
-    const windowEnd = emailIndex === -1 ? lines.length : Math.min(lines.length, emailIndex + 4);
+    const emailIndex = emails.length ? lines.findIndex((line) => line.includes(emails[0])) : -1;
+    const phoneIndex = phones.length ? lines.findIndex((line) => line.includes(phones[0])) : -1;
+    const anchorIndex = emailIndex !== -1 ? emailIndex : phoneIndex;
+
+    if (anchorIndex === -1 && document.documentKind !== "email_thread") {
+      continue;
+    }
+
+    const windowStart =
+      anchorIndex === -1 ? Math.max(lines.length - 8, 0) : Math.max(0, anchorIndex - 4);
+    const windowEnd =
+      anchorIndex === -1 ? lines.length : Math.min(lines.length, anchorIndex + 4);
     const windowLines = lines.slice(windowStart, windowEnd);
     const nameLine =
       [...windowLines]
         .sort((left, right) => scoreContactLine(right) - scoreContactLine(left))
-        .find((line) => /^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+){1,3}$/.test(line)) ?? null;
+        .map((line) => sanitizeContactName(line))
+        .find((line): line is string => Boolean(line)) ?? null;
     const titleLine =
-      windowLines.find((line) =>
-        /manager|director|partnership|campaign|media|marketing|talent|agent|coordinator/i.test(
-          line
-        )
-      ) ?? null;
+      windowLines
+        .map((line) => sanitizeContactTitle(line))
+        .find((line): line is string => Boolean(line)) ?? null;
 
-    if (emails[0] || phones[0] || nameLine || titleLine) {
+    if (emails[0] || phones[0] || nameLine) {
       return {
         organizationType: agencyName ? "agency" : brandName ? "brand" : null,
-        name: presentText(nameLine),
-        title: presentText(titleLine),
+        name: sanitizeContactName(nameLine),
+        title: sanitizeContactTitle(titleLine),
         email: presentText(emails[0] ?? null),
         phone: presentText(phones[0] ?? null)
       };
@@ -279,9 +334,35 @@ function extractPrimaryContact(
 
 function extractLikelyBrandFromFileNames(fileNames: string[]) {
   for (const fileName of fileNames) {
+    const rawName = presentText(fileName.replace(/\.[a-z0-9]+$/i, ""));
+    const rawBriefBrand = sanitizePartyName(
+      rawName
+        ?.split(/[_:]+/g)[0]
+        ?.replace(/[-]+/g, " ")
+        .replace(/\b(influencer|campaign|creative|content)\s+brief\b/gi, "")
+        .replace(/\bbrief\b/gi, "")
+        .trim() ?? null,
+      "brand"
+    );
+    if (rawBriefBrand) {
+      return rawBriefBrand;
+    }
+
     const cleaned = cleanFileName(fileName);
     if (!cleaned || isGenericIntakeLabel(cleaned)) {
       continue;
+    }
+
+    const briefBrand = sanitizePartyName(
+      cleaned
+        .split(/\s+[_-]\s+|:\s+/g)[0]
+        ?.replace(/\b(influencer|campaign|creative|content)\s+brief\b/gi, "")
+        .replace(/\bbrief\b/gi, "")
+        .trim() ?? null,
+      "brand"
+    );
+    if (briefBrand) {
+      return briefBrand;
     }
 
     const beforeHandle = cleaned.split(/\s+@\w+/i)[0]?.trim();
@@ -298,6 +379,21 @@ function extractLikelyBrandFromFileNames(fileNames: string[]) {
 }
 
 function extractBrandFromText(text: string) {
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)[0];
+  const briefHeader = sanitizePartyName(
+    firstLine
+      ?.replace(/\b(influencer|campaign|creative|content)\s+brief\b/gi, "")
+      .replace(/\bbrief\b/gi, "")
+      .trim() ?? null,
+    "brand"
+  );
+  if (briefHeader) {
+    return briefHeader;
+  }
+
   const directPatterns = [
     /on behalf of our client\s+[–-]\s*([A-Z][A-Za-z0-9&+.' -]+)/i,
     /for\s+([A-Z][A-Za-z0-9&+.' -]{2,40})\s+at\s+[A-Z]/i,
@@ -308,7 +404,7 @@ function extractBrandFromText(text: string) {
 
   for (const pattern of directPatterns) {
     const match = text.match(pattern);
-    const candidate = cleanExtractedLabel(match?.[1] ?? null);
+    const candidate = sanitizePartyName(match?.[1] ?? null, "brand");
     if (candidate) {
       return candidate;
     }
@@ -318,12 +414,15 @@ function extractBrandFromText(text: string) {
 }
 
 function inferBrandName(aggregate: DealAggregate) {
-  const persisted = getPersistedIntakeRecord(aggregate.summaries)?.brandName;
+  const persisted = sanitizePartyName(
+    getPersistedIntakeRecord(aggregate.summaries)?.brandName,
+    "brand"
+  );
   if (persisted && !isGenericIntakeLabel(persisted)) {
-    return splitLabelSegments(persisted)[0] ?? presentText(persisted);
+    return persisted;
   }
 
-  const termsBrand = cleanExtractedLabel(aggregate.terms?.brandName);
+  const termsBrand = sanitizePartyName(aggregate.terms?.brandName, "brand");
   if (termsBrand && !/^client\b/i.test(termsBrand)) {
     return termsBrand;
   }
@@ -360,23 +459,26 @@ function inferBrandName(aggregate: DealAggregate) {
     "campaignName"
   ]);
   if (evidenceSnippet) {
-    const cleaned = cleanExtractedLabel(evidenceSnippet);
+    const cleaned = sanitizePartyName(evidenceSnippet, "brand");
     if (cleaned && !isGenericIntakeLabel(cleaned)) {
       return cleaned;
     }
   }
 
-  const dealBrand = presentText(aggregate.deal.brandName);
+  const dealBrand = sanitizePartyName(aggregate.deal.brandName, "brand");
   return dealBrand && !isGenericIntakeLabel(dealBrand) ? dealBrand : null;
 }
 
 function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
-  const persisted = getPersistedIntakeRecord(aggregate.summaries)?.agencyName;
+  const persisted = sanitizePartyName(
+    getPersistedIntakeRecord(aggregate.summaries)?.agencyName,
+    "agency"
+  );
   if (persisted) {
-    return presentText(persisted);
+    return persisted !== brandName ? persisted : null;
   }
 
-  const direct = cleanExtractedLabel(aggregate.terms?.agencyName);
+  const direct = sanitizePartyName(aggregate.terms?.agencyName, "agency");
   if (direct && direct !== brandName) {
     return direct;
   }
@@ -395,7 +497,7 @@ function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
           !/manager|director|coordinator|partnership|activation/i.test(line)
       ) ??
       lines.find((line) => /technologies|dynamic|intelligence|agency/i.test(line));
-    const candidate = cleanExtractedLabel(signatureMatch);
+    const candidate = sanitizePartyName(signatureMatch, "agency");
     if (candidate && candidate !== brandName) {
       return candidate;
     }

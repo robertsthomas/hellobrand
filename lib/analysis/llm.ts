@@ -21,6 +21,7 @@ import {
   stripInlineMarkdown,
   toPlainDealSummary
 } from "@/lib/deal-summary";
+import { sanitizePartyName } from "@/lib/party-labels";
 import { normalizeEvidenceSnippet } from "@/lib/utils";
 
 type TermsData = Omit<
@@ -391,11 +392,13 @@ function normalizeTerms(
     disclosureObligations: asDisclosureObligations(input.disclosureObligations),
     campaignDateWindow: asDateWindow(input.campaignDateWindow)
   });
+  const llmBrandName = sanitizePartyName(asString(input.brandName), "brand");
+  const llmAgencyName = sanitizePartyName(asString(input.agencyName), "agency");
 
   return {
     ...fallbackData,
-    brandName: asString(input.brandName) ?? fallbackData.brandName,
-    agencyName: asString(input.agencyName) ?? fallbackData.agencyName,
+    brandName: llmBrandName ?? fallbackData.brandName,
+    agencyName: llmAgencyName ?? fallbackData.agencyName,
     creatorName: asString(input.creatorName) ?? fallbackData.creatorName,
     campaignName: asString(input.campaignName) ?? fallbackData.campaignName,
     paymentAmount: asNumber(input.paymentAmount) ?? fallbackData.paymentAmount,

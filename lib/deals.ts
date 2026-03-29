@@ -31,6 +31,7 @@ import {
   assertViewerWithinUsageLimit,
   recordViewerUsage
 } from "@/lib/billing/entitlements";
+import { sanitizePartyName } from "@/lib/party-labels";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
@@ -139,11 +140,20 @@ function sanitizeCreatorExtractionResult(
   extraction: ExtractionPipelineResult,
   creatorName: string
 ): ReturnType<typeof mergeExtractionResults> {
+  const brandName = sanitizePartyName(extraction.data.brandName, "brand");
+  const agencyName = sanitizePartyName(extraction.data.agencyName, "agency");
+
   return {
     ...extraction,
     confidence: extraction.confidence ?? 0.68,
     data: {
       ...extraction.data,
+      brandName,
+      agencyName:
+        agencyName &&
+        (!brandName || agencyName.toLowerCase() !== brandName.toLowerCase())
+          ? agencyName
+          : null,
       creatorName,
       pendingExtraction: null
     },

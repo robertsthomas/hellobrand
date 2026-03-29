@@ -1,7 +1,10 @@
 import { inngest } from "@/lib/inngest/client";
 import { processDocumentById } from "@/lib/deals";
 import { runInvoiceReminderSweep } from "@/lib/invoices";
-import { sendNotificationEmailDelivery } from "@/lib/notification-email";
+import {
+  sendNotificationEmailDelivery,
+  sendPendingWorkspaceReminders
+} from "@/lib/notification-email";
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document" },
@@ -124,9 +127,36 @@ export const notificationEmailSendFunction = inngest.createFunction(
   { event: "notification/email.send.requested" },
   async ({ event, step }) => {
     const appNotificationId = String(event.data.appNotificationId ?? "");
+    const eventType = String(event.data.eventType ?? "");
 
     if (!appNotificationId) {
       throw new Error("Missing appNotificationId.");
+    }
+
+    // Delay workspace-ready emails by 3 minutes so the user has a chance
+    // to confirm on their own before we nudge them via email.
+    if (eventType === "workspace.ready_for_review") {
+      await step.sleep("wait-before-workspace-ready-email", "3m");
+
+      // Check if the notification is still active (user hasn't confirmed yet).
+      // If the session was confirmed, the notification gets superseded to "resolved".
+      const { isStillActive } = await step.run("check-still-pending", async () => {
+        const { PrismaClient } = await import("@prisma/client");
+        const prisma = new PrismaClient();
+        try {
+          const notification = await prisma.appNotification.findUnique({
+            where: { id: appNotificationId },
+            select: { status: true }
+          });
+          return { isStillActive: notification?.status === "active" };
+        } finally {
+          await prisma.$disconnect();
+        }
+      });
+
+      if (!isStillActive) {
+        return { ok: true, appNotificationId, status: "skipped_confirmed" };
+      }
     }
 
     const delivery = await step.run("send-notification-email", async () =>
@@ -138,6 +168,18 @@ export const notificationEmailSendFunction = inngest.createFunction(
       appNotificationId,
       status: delivery?.status ?? null
     };
+  }
+);
+
+export const workspaceReminderSweepFunction = inngest.createFunction(
+  { id: "workspace-reminder-sweep" },
+  { cron: "0 10 * * *" },
+  async ({ step }) => {
+    const result = await step.run("send-pending-workspace-reminders", async () =>
+      sendPendingWorkspaceReminders()
+    );
+
+    return { ok: true, ...result };
   }
 );
 

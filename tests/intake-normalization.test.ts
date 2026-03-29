@@ -152,6 +152,78 @@ describe("intake normalization", () => {
     expect(normalized?.contractTitle).toBe("Amazon Kids - Stories with Alexa");
   });
 
+  test("drops invalid extracted brand and agency placeholders and falls back to the brief header", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Workspace";
+    aggregate.deal.campaignName = "New workspace";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "Amazon Kids Influencer Brief_ Stories with Alexa.docx",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Amazon Kids Influencer Brief
+          Stories with Alexa
+          Overview: We’re partnering with creators like you to highlight the exciting features of Alexa+ on kids Echo devices.
+        `,
+        rawText: `
+          Amazon Kids Influencer Brief
+          Stories with Alexa
+          Overview: We’re partnering with creators like you to highlight the exciting features of Alexa+ on kids Echo devices.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Workspace",
+      agencyName: "Agency or management company",
+      campaignName: "Stories with Alexa"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("Amazon Kids");
+    expect(normalized?.agencyName).toBeNull();
+    expect(normalized?.contractTitle).toBe("Amazon Kids - Stories with Alexa");
+  });
+
+  test("does not treat campaign brief bullets as a primary contact title", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "Amazon Kids Influencer Brief_ Stories with Alexa.docx",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Amazon Kids Influencer Brief
+          Stories with Alexa
+          If for any reason you are unsure of the device name, please reach out to the campaign manager for clarity.
+          Children under 13 can be shown interacting with the device so long as the marketing is clear that (1) the device is in Amazon Kids+ on Alexa mode when the child is interacting with it, and (2) the children depicted are no younger than 3.
+        `,
+        rawText: `
+          Amazon Kids Influencer Brief
+          Stories with Alexa
+          If for any reason you are unsure of the device name, please reach out to the campaign manager for clarity.
+          Children under 13 can be shown interacting with the device so long as the marketing is clear that (1) the device is in Amazon Kids+ on Alexa mode when the child is interacting with it, and (2) the children depicted are no younger than 3.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Amazon Kids",
+      agencyName: null,
+      campaignName: "Stories with Alexa"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.primaryContact.name).toBeNull();
+    expect(normalized?.primaryContact.title).toBeNull();
+    expect(normalized?.primaryContact.email).toBeNull();
+  });
+
   test("filters boilerplate contract delivery clauses out of timeline items", () => {
     const aggregate = createAggregate();
     aggregate.documents = [

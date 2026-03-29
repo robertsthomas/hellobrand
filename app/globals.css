@@ -279,6 +279,17 @@ html.dark ::selection {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Keep loading spinners functional even with reduced motion */
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .intake-loader-spinner {
+    animation-duration: 0.9s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 @keyframes intake-loader-pan {

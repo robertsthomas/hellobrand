@@ -359,7 +359,7 @@ export function IntakeGeneratedFieldsEditor({
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline-offset-4 hover:underline dark:text-white/65"
+            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline underline-offset-4 dark:text-white/65"
             onClick={() =>
               setDisclosureObligations((current) => [
                 ...current,
@@ -373,7 +373,7 @@ export function IntakeGeneratedFieldsEditor({
             }
           >
             <Plus className="h-4 w-4" />
-            Add obligation
+            Add
           </button>
         </div>
         {disclosureObligations.length > 0 ? (
@@ -451,7 +451,7 @@ export function IntakeGeneratedFieldsEditor({
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline-offset-4 hover:underline dark:text-white/65"
+            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline underline-offset-4 dark:text-white/65"
             onClick={() =>
               setDeliverables((current) => [
                 ...current,
@@ -469,7 +469,7 @@ export function IntakeGeneratedFieldsEditor({
             }
           >
             <Plus className="h-4 w-4" />
-            Add deliverable
+            Add
           </button>
         </div>
         <div className={`grid gap-3 ${(conflictMessagesByField.deliverables ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}>
@@ -581,7 +581,7 @@ export function IntakeGeneratedFieldsEditor({
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline-offset-4 hover:underline dark:text-white/65"
+            className="inline-flex items-center gap-2 text-sm font-medium text-black/65 underline underline-offset-4 dark:text-white/65"
             onClick={() =>
               setTimelineItems((current) => [
                 ...current,
@@ -596,7 +596,7 @@ export function IntakeGeneratedFieldsEditor({
             }
           >
             <Plus className="h-4 w-4" />
-            Add timeline item
+            Add
           </button>
         </div>
         <div className={`grid gap-3 ${(conflictMessagesByField.timelineItems ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}>

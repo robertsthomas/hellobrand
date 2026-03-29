@@ -315,16 +315,29 @@ async function DashboardContent() {
         }
       : null,
     firstDraft
-      ? {
-          tone: "neutral",
-          title: "Resume an in-progress workspace",
-          body: `${firstDraft.deal.campaignName} still has a saved draft waiting for you.`,
-          href:
-            firstDraft.session.status === "draft"
-              ? `/app/intake/new?draft=${firstDraft.session.id}`
-              : `/app/intake/${firstDraft.session.id}`,
-          ctaLabel: "Resume draft"
-        }
+      ? firstDraft.session.status === "ready_for_confirmation"
+        ? {
+            tone: "accent",
+            title: "Workspace ready to confirm",
+            body: `${firstDraft.deal.campaignName} has finished processing and is ready for your review.`,
+            href: `/app/intake/${firstDraft.session.id}/review`,
+            ctaLabel: "Review and confirm"
+          }
+        : firstDraft.session.status === "draft"
+          ? {
+              tone: "neutral",
+              title: "Resume your draft",
+              body: `${firstDraft.deal.campaignName} has a saved draft waiting for you.`,
+              href: `/app/intake/new?draft=${firstDraft.session.id}`,
+              ctaLabel: "Resume draft"
+            }
+          : {
+              tone: "neutral",
+              title: "Workspace is processing",
+              body: `${firstDraft.deal.campaignName} is being analyzed. You'll be notified when it's ready.`,
+              href: `/app/intake/${firstDraft.session.id}`,
+              ctaLabel: "View progress"
+            }
       : null
   ].filter(Boolean) as QuickActionItem[];
 

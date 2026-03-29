@@ -262,7 +262,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   if (hasInngestEventKey()) {
     await inngest.send({
       name: "notification/email.send.requested",
-      data: { appNotificationId }
+      data: { appNotificationId, eventType: notification.eventType }
     });
     return delivery;
   }
@@ -370,4 +370,65 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     providerMessageId: response.data?.id ?? null,
     sentAt: new Date()
   });
+}
+
+/**
+ * Daily sweep: finds workspace-ready notifications that are still active
+ * (user hasn't confirmed) and re-sends the reminder email. Only sends
+ * if the last email for this notification was sent more than 20 hours ago
+ * to avoid double-sends on the same day.
+ */
+export async function sendPendingWorkspaceReminders() {
+  if (!process.env.DATABASE_URL) {
+    return { sent: 0, skipped: 0 };
+  }
+
+  const pendingNotifications = await prisma.appNotification.findMany({
+    where: {
+      eventType: "workspace.ready_for_review",
+      status: "active"
+    },
+    select: {
+      id: true,
+      userId: true
+    }
+  });
+
+  let sent = 0;
+  let skipped = 0;
+  const twentyHoursAgo = new Date(Date.now() - 20 * 60 * 60 * 1000);
+
+  for (const notification of pendingNotifications) {
+    const existingDelivery = await prisma.notificationEmailDelivery.findUnique({
+      where: { appNotificationId: notification.id },
+      select: { status: true, sentAt: true }
+    });
+
+    // Skip if we already sent an email less than 20 hours ago
+    if (
+      existingDelivery?.status === "sent" &&
+      existingDelivery.sentAt &&
+      existingDelivery.sentAt > twentyHoursAgo
+    ) {
+      skipped++;
+      continue;
+    }
+
+    // Reset the delivery status so it can be re-sent
+    if (existingDelivery) {
+      await prisma.notificationEmailDelivery.update({
+        where: { appNotificationId: notification.id },
+        data: { status: "pending", errorMessage: null, sentAt: null }
+      });
+    }
+
+    try {
+      await enqueueNotificationEmailDelivery(notification.id);
+      sent++;
+    } catch {
+      skipped++;
+    }
+  }
+
+  return { sent, skipped, total: pendingNotifications.length };
 }
