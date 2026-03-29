@@ -76,7 +76,7 @@ export function IntakeDuplicateWarning({
       try {
         const formData = new FormData();
         formData.append("sessionId", sessionId);
-        formData.append("redirectTo", `/app/deals/${targetDealId}`);
+        formData.append("redirectTo", `/app/p/${targetDealId}`);
         await deleteIntakeDraftAction(formData);
       } catch {
         // The server action redirects, so we only reach here on error
@@ -98,7 +98,7 @@ export function IntakeDuplicateWarning({
         });
 
         if (response.ok) {
-          router.push(`/app/deals/${targetDealId}`);
+          router.push(`/app/p/${targetDealId}`);
           router.refresh();
         } else {
           setIsActing(false);

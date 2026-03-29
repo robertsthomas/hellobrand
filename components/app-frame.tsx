@@ -91,27 +91,27 @@ export function AppFrame({
         : null;
     }
 
-    const historyMatch = pathname.match(/^\/app\/deals\/history\/([^/]+)$/);
+    const historyMatch = pathname.match(/^\/app\/p\/history\/([^/]+)$/);
 
     if (historyMatch) {
       const workspace = workspaceNavItems.find((item) => item.dealId === historyMatch[1]);
       return workspace
         ? {
-            parentHref: "/app/deals/history",
-            href: `/app/deals/history/${workspace.dealId}`,
+            parentHref: "/app/p/history",
+            href: `/app/p/${workspace.dealId}`,
             label: workspace.label
           }
         : null;
     }
 
-    const workspaceMatch = pathname.match(/^\/app\/deals\/([^/]+)$/);
+    const workspaceMatch = pathname.match(/^\/app\/p\/([^/]+)$/);
 
     if (workspaceMatch && workspaceMatch[1] !== "history") {
       const workspace = workspaceNavItems.find((item) => item.dealId === workspaceMatch[1]);
       return workspace
         ? {
-            parentHref: "/app/deals/history",
-            href: `/app/deals/${workspace.dealId}`,
+            parentHref: "/app/p/history",
+            href: `/app/p/${workspace.dealId}`,
             label: workspace.label
           }
         : null;
@@ -269,7 +269,7 @@ export function AppFrame({
     );
   };
 
-  const guideWrapper = onboardingComplete && guideState
+  const guideWrapper = guideState
     ? (content: ReactNode) => (
         <GuideProvider
           initialGuideState={guideState}

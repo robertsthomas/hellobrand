@@ -29,9 +29,11 @@ import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 
 export default function WorkspaceDealDetailPage({
   params,
@@ -85,7 +87,15 @@ async function DealDetailContent({
     extractionResults
   } = aggregate;
   const normalized = buildNormalizedIntakeRecord(aggregate);
-  const displayCampaignName = normalized?.contractTitle ?? deal.campaignName;
+  const displayLabels = getDisplayDealLabels({
+    brandName: normalized?.brandName ?? deal.brandName,
+    campaignName: normalized?.contractTitle ?? deal.campaignName
+  });
+  const displayCampaignName =
+    displayLabels.campaignName ??
+    normalized?.contractTitle ??
+    deriveWorkspaceTitleFromFileNames(documents.map((document) => document.fileName)) ??
+    deal.campaignName;
   const uploadedDate = formatDate(deal.createdAt);
   const nextDeliverableValue = formatDate(deal.nextDeliverableDate);
   const documentLabel = latestDocument
@@ -108,7 +118,7 @@ async function DealDetailContent({
       <div className="mx-auto max-w-[1280px] space-y-8">
         <section className="space-y-6">
           <Link
-            href="/app/deals/history"
+            href="/app/p/history"
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -182,22 +192,22 @@ async function DealDetailContent({
               <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="terms" data-guide="tab-terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Key Terms
               </TabsTrigger>
-              <TabsTrigger value="risks" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="risks" data-guide="tab-risks" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Risks
               </TabsTrigger>
-              <TabsTrigger value="deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="deliverables" data-guide="tab-deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Deliverables
               </TabsTrigger>
-              <TabsTrigger value="brief" data-guide="tab-brief" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="brief" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Brief
               </TabsTrigger>
-              <TabsTrigger value="emails" data-guide="tab-emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Emails
               </TabsTrigger>
-              <TabsTrigger value="documents" data-guide="tab-documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger value="documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Documents
               </TabsTrigger>
               <TabsTrigger value="invoices" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
@@ -353,10 +363,10 @@ async function DealDetailContent({
         <div className="border-t border-black/6 pt-6 dark:border-white/8">
           <DeleteDealDialog
             dealId={deal.id}
-            dealName={deal.campaignName}
-            redirectTo="/app/deals/history"
+            dealName={displayLabels.campaignName ?? displayCampaignName}
+            redirectTo="/app/p/history"
             className="inline-flex items-center gap-2 text-sm font-medium text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
-            triggerLabel={`Delete ${deal.campaignName}`}
+            triggerLabel={`Delete ${displayLabels.campaignName ?? displayCampaignName}`}
           >
             <Trash2 className="h-4 w-4" />
             Delete this partnership

@@ -9,6 +9,7 @@ import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealAggregates, getCachedProfile } from "@/lib/cached-data";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { parseProfileMetadata, type ProfilePlatform } from "@/lib/profile-metadata";
 import type { DealAggregate } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -439,32 +440,36 @@ async function AnalyticsContent() {
                     No workspaces available yet.
                   </div>
                 ) : (
-                  topContent.map((aggregate) => (
-                    <div
-                      key={aggregate.deal.id}
-                      className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_110px_110px_96px]"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium text-foreground">
-                          {aggregate.deal.campaignName}
+                  topContent.map((aggregate) => {
+                    const labels = getDisplayDealLabels(aggregate.deal);
+
+                    return (
+                      <div
+                        key={aggregate.deal.id}
+                        className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_110px_110px_96px]"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground">
+                            {labels.campaignName ?? aggregate.deal.campaignName}
+                          </div>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            {labels.brandName ?? aggregate.deal.brandName} · {humanizeToken(aggregate.deal.status)}
+                          </div>
                         </div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          {aggregate.deal.brandName} · {humanizeToken(aggregate.deal.status)}
+                        <div className="text-sm text-muted-foreground">
+                          {metadata.primaryPlatform
+                            ? humanizeToken(metadata.primaryPlatform)
+                            : "Platform"}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDate(aggregate.deal.nextDeliverableDate)}
+                        </div>
+                        <div className="text-right text-sm font-medium text-foreground">
+                          {formatCurrency(aggregate.terms?.paymentAmount ?? 0)}
                         </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {metadata.primaryPlatform
-                          ? humanizeToken(metadata.primaryPlatform)
-                          : "Platform"}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDate(aggregate.deal.nextDeliverableDate)}
-                      </div>
-                      <div className="text-right text-sm font-medium text-foreground">
-                        {formatCurrency(aggregate.terms?.paymentAmount ?? 0)}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </section>

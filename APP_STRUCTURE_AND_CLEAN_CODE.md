@@ -36,7 +36,7 @@ Rules:
 - Route files should not contain large chunks of business logic.
 - Route aliases are acceptable when they preserve stable URLs while the real page lives elsewhere.
   Current examples:
-  - `app/deals/[dealId]/page.tsx` re-exporting from `app/app/deals/[dealId]/page.tsx`
+  - `app/deals/[dealId]/page.tsx` re-exporting from `app/app/p/[dealId]/page.tsx`
   - `app/deals/new/page.tsx` re-exporting or redirecting into the intake flow
   - `app/app/dashboard/page.tsx` re-exporting from `app/app/page.tsx`
 

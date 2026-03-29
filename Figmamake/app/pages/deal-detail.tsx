@@ -20,7 +20,7 @@ export function DealDetailPage() {
         <div className="p-8">
           <div className="max-w-6xl mx-auto">
             {/* Breadcrumb */}
-            <Link to="/app/deals/history" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
+            <Link to="/app/p/history" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
               <ArrowLeft className="w-4 h-4" />
               All Deals
             </Link>

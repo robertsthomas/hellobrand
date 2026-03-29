@@ -113,11 +113,11 @@ export function CustomAuthScreen() {
   function navigateAfterAuth(decorateUrl: (path: string) => string) {
     const url = decorateUrl(redirectTarget);
     if (url.startsWith("http")) {
-      window.location.href = url;
+      window.location.replace(url);
       return;
     }
 
-    router.push(url);
+    router.replace(url);
     router.refresh();
   }
 

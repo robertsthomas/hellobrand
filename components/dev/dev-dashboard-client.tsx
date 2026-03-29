@@ -65,7 +65,7 @@ export function DevDashboardClient({
   viewer,
   snapshot
 }: {
-  viewer: DevDashboardViewer;
+  viewer: DevDashboardViewer | null;
   snapshot: DevDashboardSnapshot;
 }) {
   const router = useRouter();
@@ -74,6 +74,7 @@ export function DevDashboardClient({
   const [confirmValue, setConfirmValue] = useState("");
 
   const destructiveActionsUnlocked = confirmed && confirmValue.trim() === "RESET";
+  const hasViewerSession = Boolean(viewer);
 
   async function runServerAction(action: ResetAction) {
     setPendingAction(action);
@@ -148,7 +149,9 @@ export function DevDashboardClient({
             Local-only reset utilities for the database, Clerk users, onboarding, and guide state.
           </p>
           <div className="text-sm text-muted-foreground">
-            Signed in as {viewer.displayName ?? viewer.email ?? viewer.id} on {snapshot.environment} / {snapshot.host ?? "unknown host"}
+            {hasViewerSession
+              ? `Signed in as ${viewer?.displayName ?? viewer?.email ?? viewer?.id} on ${snapshot.environment} / ${snapshot.host ?? "unknown host"}`
+              : `Not signed in, local access only, on ${snapshot.environment} / ${snapshot.host ?? "unknown host"}`}
           </div>
         </div>
 
@@ -159,6 +162,16 @@ export function DevDashboardClient({
             Database wipes remove all app rows. Clerk wipes delete every user in the connected Clerk instance.
           </AlertDescription>
         </Alert>
+
+        {!hasViewerSession ? (
+          <Alert>
+            <ShieldAlert className="h-4 w-4" />
+            <AlertTitle>Signed-out dev mode</AlertTitle>
+            <AlertDescription>
+              This page is visible without auth in local development, but reset actions still require a signed-in session.
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <SnapshotStat label="DB users" value={database?.users ?? null} />
@@ -188,7 +201,11 @@ export function DevDashboardClient({
                 <Button
                   className="mt-4"
                   variant="outline"
-                  disabled={pendingAction !== null || !snapshot.databaseConfigured}
+                  disabled={
+                    pendingAction !== null ||
+                    !snapshot.databaseConfigured ||
+                    !hasViewerSession
+                  }
                   onClick={() => void runServerAction("reset_onboarding")}
                 >
                   Reset onboarding
@@ -203,7 +220,11 @@ export function DevDashboardClient({
                 <Button
                   className="mt-4"
                   variant="outline"
-                  disabled={pendingAction !== null || !snapshot.databaseConfigured}
+                  disabled={
+                    pendingAction !== null ||
+                    !snapshot.databaseConfigured ||
+                    !hasViewerSession
+                  }
                   onClick={() => void runServerAction("reset_guide")}
                 >
                   Reset tooltips
@@ -269,7 +290,8 @@ export function DevDashboardClient({
                   disabled={
                     pendingAction !== null ||
                     !destructiveActionsUnlocked ||
-                    !snapshot.databaseConfigured
+                    !snapshot.databaseConfigured ||
+                    !hasViewerSession
                   }
                   onClick={() => void runServerAction("clear_database")}
                 >
@@ -282,7 +304,8 @@ export function DevDashboardClient({
                   disabled={
                     pendingAction !== null ||
                     !destructiveActionsUnlocked ||
-                    snapshot.clerkUserCount === null
+                    snapshot.clerkUserCount === null ||
+                    !hasViewerSession
                   }
                   onClick={() => void runServerAction("clear_users")}
                 >
@@ -296,7 +319,8 @@ export function DevDashboardClient({
                     pendingAction !== null ||
                     !destructiveActionsUnlocked ||
                     !snapshot.databaseConfigured ||
-                    snapshot.clerkUserCount === null
+                    snapshot.clerkUserCount === null ||
+                    !hasViewerSession
                   }
                   onClick={() => void runServerAction("clear_both")}
                 >

@@ -79,6 +79,10 @@ function buildFallbackState(viewer: Viewer): OnboardingStateRecord {
   };
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 /* ------------------------------------------------------------------ */
 /*  Read                                                               */
 /* ------------------------------------------------------------------ */
@@ -98,11 +102,27 @@ export async function getOnboardingStateForViewer(
     return toOnboardingStateRecord(existing);
   }
 
-  const created = await prisma.userOnboardingState.create({
-    data: { userId: viewer.id }
-  });
+  try {
+    const created = await prisma.userOnboardingState.create({
+      data: { userId: viewer.id }
+    });
 
-  return toOnboardingStateRecord(created);
+    return toOnboardingStateRecord(created);
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const concurrentState = await prisma.userOnboardingState.findUnique({
+      where: { userId: viewer.id }
+    });
+
+    if (!concurrentState) {
+      throw error;
+    }
+
+    return toOnboardingStateRecord(concurrentState);
+  }
 }
 
 export function isProfileOnboardingComplete(

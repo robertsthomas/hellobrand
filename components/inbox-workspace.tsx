@@ -29,6 +29,7 @@ import {
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
 import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
@@ -930,7 +931,7 @@ export function InboxWorkspace({
       title: suggestion.title,
       body: suggestion.summary,
       updatedAt: suggestion.updatedAt,
-      href: `/app/deals/${suggestion.dealId}?tab=terms`,
+      href: `/app/p/${suggestion.dealId}?tab=terms`,
       ctaLabel: "Review terms"
     }));
 
@@ -1313,11 +1314,15 @@ export function InboxWorkspace({
                       onChange={(value) => applyFilters({ dealId: value, thread: "" })}
                     >
                       <option value="">All partnerships</option>
-                      {deals.map((deal) => (
-                        <option key={deal.id} value={deal.id}>
-                          {deal.campaignName}
-                        </option>
-                      ))}
+                      {deals.map((deal) => {
+                        const labels = getDisplayDealLabels(deal);
+
+                        return (
+                          <option key={deal.id} value={deal.id}>
+                            {labels.campaignName ?? deal.campaignName}
+                          </option>
+                        );
+                      })}
                     </InboxSelect>
                   </form>
                 </div>
@@ -2089,61 +2094,65 @@ export function InboxWorkspace({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {candidateGroups.map((group) => (
-                    <section key={group.deal.id} className="border border-black/8">
-                      <div className="flex items-baseline justify-between border-b border-black/8 px-4 py-3">
-                        <p className="text-sm font-semibold text-foreground">
-                          {group.deal.campaignName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {group.deal.brandName}
-                        </p>
-                      </div>
+                  {candidateGroups.map((group) => {
+                    const labels = getDisplayDealLabels(group.deal);
 
-                      <div className="divide-y divide-black/6">
-                        {group.matches.map((match) => {
-                          const isSelected = selectedCandidateIds.includes(match.candidate.id);
+                    return (
+                      <section key={group.deal.id} className="border border-black/8">
+                        <div className="flex items-baseline justify-between border-b border-black/8 px-4 py-3">
+                          <p className="text-sm font-semibold text-foreground">
+                            {labels.campaignName ?? group.deal.campaignName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {labels.brandName ?? group.deal.brandName}
+                          </p>
+                        </div>
 
-                          return (
-                            <div key={match.candidate.id} className="flex items-start gap-3 px-4 py-3">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleCandidate(match.candidate.id)}
-                                className="mt-0.5 h-4 w-4 border border-border"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-2">
-                                  <p className="text-[13px] font-medium text-foreground">
-                                    {match.thread.subject}
+                        <div className="divide-y divide-black/6">
+                          {group.matches.map((match) => {
+                            const isSelected = selectedCandidateIds.includes(match.candidate.id);
+
+                            return (
+                              <div key={match.candidate.id} className="flex items-start gap-3 px-4 py-3">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleCandidate(match.candidate.id)}
+                                  className="mt-0.5 h-4 w-4 border border-border"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="text-[13px] font-medium text-foreground">
+                                      {match.thread.subject}
+                                    </p>
+                                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                                      {Math.round(match.candidate.confidence * 100)}%
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {providerLabel(match.account.provider)} · {match.account.emailAddress}
                                   </p>
-                                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                                    {Math.round(match.candidate.confidence * 100)}%
-                                  </span>
+                                  {match.thread.snippet ? (
+                                    <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground/70">
+                                      {match.thread.snippet}
+                                    </p>
+                                  ) : null}
                                 </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  {providerLabel(match.account.provider)} · {match.account.emailAddress}
-                                </p>
-                                {match.thread.snippet ? (
-                                  <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground/70">
-                                    {match.thread.snippet}
-                                  </p>
-                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => void dismissCandidate(match.candidate.id)}
+                                  disabled={isReviewingCandidates}
+                                  className="shrink-0 text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-60"
+                                >
+                                  Dismiss
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => void dismissCandidate(match.candidate.id)}
-                                disabled={isReviewingCandidates}
-                                className="shrink-0 text-xs text-muted-foreground transition hover:text-foreground disabled:opacity-60"
-                              >
-                                Dismiss
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  ))}
+                            );
+                          })}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2232,11 +2241,15 @@ export function InboxWorkspace({
                 onChange={setSelectedDealId}
               >
                 <option value="">Select a workspace</option>
-                {linkableDeals.map((deal) => (
-                  <option key={deal.id} value={deal.id}>
-                    {deal.campaignName}
-                  </option>
-                ))}
+                {linkableDeals.map((deal) => {
+                  const labels = getDisplayDealLabels(deal);
+
+                  return (
+                    <option key={deal.id} value={deal.id}>
+                      {labels.campaignName ?? deal.campaignName}
+                    </option>
+                  );
+                })}
               </InboxSelect>
 
               {linkableDeals.length === 0 ? (

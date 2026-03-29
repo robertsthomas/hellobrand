@@ -6,7 +6,8 @@ export type DealStatus =
   | "submitted"
   | "awaiting_payment"
   | "paid"
-  | "completed";
+  | "completed"
+  | "archived";
 
 export type PaymentStatus =
   | "not_invoiced"
@@ -109,6 +110,7 @@ export interface DealRecord {
   updatedAt: string;
   analyzedAt: string | null;
   confirmedAt: string | null;
+  statusBeforeArchive: string | null;
 }
 
 export interface DocumentRecord {

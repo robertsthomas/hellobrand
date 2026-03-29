@@ -12,7 +12,7 @@ export async function GET(
   const { dealId } = await params;
   const debug = startServerDebug("api_deal_documents_get", {
     method: _request.method,
-    path: `/api/deals/${dealId}/documents`,
+    path: `/api/p/${dealId}/documents`,
     dealId
   });
 
@@ -44,7 +44,7 @@ export async function POST(
   const { dealId } = await params;
   const debug = startServerDebug("api_deal_documents_upload", {
     method: request.method,
-    path: `/api/deals/${dealId}/documents`,
+    path: `/api/p/${dealId}/documents`,
     dealId
   });
 

@@ -87,7 +87,19 @@ function llamaParseVersion() {
   return process.env.LLAMA_PARSE_VERSION || "latest";
 }
 
-const LLAMA_PARSE_TIMEOUT_MS = 60_000;
+function parseTimeoutMs(value: string | undefined, fallbackMs: number) {
+  if (!value) {
+    return fallbackMs;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
+}
+
+const LLAMA_PARSE_TIMEOUT_MS = parseTimeoutMs(
+  process.env.LLAMA_PARSE_TIMEOUT_MS,
+  180_000
+);
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {

@@ -137,6 +137,7 @@ model Deal {
   brandName           String
   campaignName        String
   status              String
+  statusBeforeArchive String?
   paymentStatus       String
   countersignStatus   String
   summary             String?

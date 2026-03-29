@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("deal workspace", () => {
   test("deal history page responds without server crash", async ({ page }) => {
-    const response = await page.goto("/app/deals/history", {
+    const response = await page.goto("/app/p/history", {
       waitUntil: "domcontentloaded",
       timeout: 10000
     });
@@ -11,7 +11,7 @@ test.describe("deal workspace", () => {
   });
 
   test("non-existent deal returns 404 or error", async ({ page }) => {
-    const response = await page.goto("/app/deals/nonexistent-id", {
+    const response = await page.goto("/app/p/nonexistent-id", {
       waitUntil: "domcontentloaded",
       timeout: 10000
     });

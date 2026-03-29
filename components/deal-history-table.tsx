@@ -1,27 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Filter, MoreHorizontal, Plus, Search } from "lucide-react";
+import { Archive, ArchiveRestore, Download, Filter, MoreHorizontal, Search } from "lucide-react";
 
-import { deleteWorkspaceAction } from "@/app/actions";
+import { archiveDealAction, unarchiveDealAction } from "@/app/actions";
+
 import { AppTooltip } from "@/components/app-tooltip";
-import { PostHogActionLink } from "@/components/posthog-action-link";
+import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenuItem,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -30,6 +20,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
 type HistoryStageFilter = "all" | "active" | "under_review" | "completed" | "archived";
@@ -63,70 +54,66 @@ function ValueTooltip({
 
 function DealHistoryRowActions({
   dealId,
-  dealName
+  dealName,
+  isArchived
 }: {
   dealId: string;
   dealName: string;
+  isArchived: boolean;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 items-center justify-center text-black/45 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
-            aria-label={`Open actions for ${dealName}`}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-40 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center text-black/45 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+          aria-label={`Open actions for ${dealName}`}
+          disabled={isPending}
         >
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={(event) => {
-              event.preventDefault();
-              setDialogOpen(true);
-            }}
-          >
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <AlertDialogContent className="max-w-md rounded-md border-black/10 bg-background p-6 dark:border-white/10">
-          <AlertDialogHeader className="gap-3">
-            <AlertDialogTitle>Delete this partnership?</AlertDialogTitle>
-            <AlertDialogDescription className="leading-6">
-              This deletes <span className="font-medium text-foreground">{dealName}</span>,
-              all uploaded documents, extracted data, summaries, and related workspace
-              history. This action cannot be undone or recovered.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <form action={deleteWorkspaceAction}>
-              <input type="hidden" name="dealId" value={dealId} />
-              <input type="hidden" name="redirectTo" value="/app/deals/history" />
-              <AlertDialogAction asChild>
-                <button
-                  type="submit"
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-white transition hover:bg-destructive/90"
-                  onClick={() => setDialogOpen(false)}
-                >
-                  Delete
-                </button>
-              </AlertDialogAction>
-            </form>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+      >
+        <button
+          type="button"
+          disabled={isPending}
+          onClick={() => {
+            startTransition(async () => {
+              if (isArchived) {
+                await unarchiveDealAction(dealId);
+              } else {
+                await archiveDealAction(dealId);
+              }
+            });
+          }}
+          className="flex w-full items-center gap-2 px-2 py-1.5 text-sm text-foreground transition hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
+        >
+          {isArchived ? (
+            <>
+              <ArchiveRestore className="h-4 w-4" />
+              Unarchive
+            </>
+          ) : (
+            <>
+              <Archive className="h-4 w-4" />
+              Archive
+            </>
+          )}
+        </button>
+        <DeleteDealDialog
+          dealId={dealId}
+          dealName={dealName}
+          redirectTo="/app/p/history"
+          triggerMode="menu-item"
+          menuLabel="Delete"
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -202,11 +189,23 @@ export function DealHistoryTable({
   const [hasDeliverablesOnly, setHasDeliverablesOnly] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const displayRows = useMemo(
+    () =>
+      rows.map((row) => {
+        const labels = getDisplayDealLabels(row);
+        return {
+          ...row,
+          brandName: labels.brandName ?? row.brandName,
+          campaignName: labels.campaignName ?? row.campaignName
+        };
+      }),
+    [rows]
+  );
 
   const filteredRows = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return rows.filter((row) => {
+    return displayRows.filter((row) => {
       const matchesQuery =
         normalizedQuery.length === 0 ||
         row.brandName.toLowerCase().includes(normalizedQuery) ||
@@ -219,7 +218,7 @@ export function DealHistoryTable({
 
       return matchesQuery && matchesStage && matchesRisks && matchesDeliverables;
     });
-  }, [hasDeliverablesOnly, includeRisksOnly, query, rows, stageFilter]);
+  }, [displayRows, hasDeliverablesOnly, includeRisksOnly, query, stageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -227,13 +226,13 @@ export function DealHistoryTable({
 
   const stageCounts = useMemo(() => {
     return {
-      all: rows.length,
-      active: rows.filter((row) => row.stageGroup === "active").length,
-      under_review: rows.filter((row) => row.stageGroup === "under_review").length,
-      completed: rows.filter((row) => row.stageGroup === "completed").length,
-      archived: rows.filter((row) => row.stageGroup === "archived").length
+      all: displayRows.length,
+      active: displayRows.filter((row) => row.stageGroup === "active").length,
+      under_review: displayRows.filter((row) => row.stageGroup === "under_review").length,
+      completed: displayRows.filter((row) => row.stageGroup === "completed").length,
+      archived: displayRows.filter((row) => row.stageGroup === "archived").length
     };
-  }, [rows]);
+  }, [displayRows]);
 
   return (
     <div className="space-y-8">
@@ -246,15 +245,6 @@ export function DealHistoryTable({
             View and manage all your brand partnerships
           </p>
         </div>
-        <PostHogActionLink
-          href="/app/intake/new"
-          eventName="workspace_entry_cta_clicked"
-          payload={{ source: "deal_history_header" }}
-          className={cn(buttonVariants({ className: "gap-2 rounded-full px-5" }))}
-        >
-          <Plus className="h-4 w-4" />
-          New Workspace
-        </PostHogActionLink>
       </section>
 
       <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
@@ -403,7 +393,7 @@ export function DealHistoryTable({
                   <TableRow
                     key={row.id}
                     className="cursor-pointer border-black/8 hover:bg-secondary/20 dark:border-white/10 dark:hover:bg-white/[0.03]"
-                    onClick={() => router.push(`/app/deals/history/${row.id}`)}
+                    onClick={() => router.push(`/app/p/${row.id}`)}
                   >
                     <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
                       <ValueTooltip content="Brand associated with this partnership.">
@@ -457,7 +447,7 @@ export function DealHistoryTable({
                     >
                       <div className="flex items-center justify-end gap-3">
                         <Link
-                          href={`/app/deals/history/${row.id}`}
+                          href={`/app/p/${row.id}`}
                           className="text-sm font-medium text-foreground transition hover:text-primary"
                           onClick={(event) => event.stopPropagation()}
                         >
@@ -466,6 +456,7 @@ export function DealHistoryTable({
                         <DealHistoryRowActions
                           dealId={row.id}
                           dealName={row.campaignName}
+                          isArchived={row.stageGroup === "archived"}
                         />
                       </div>
                     </TableCell>

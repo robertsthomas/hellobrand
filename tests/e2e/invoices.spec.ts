@@ -4,7 +4,7 @@ import { gotoAuthed } from "./helpers";
 
 test.describe("workspace invoices", () => {
   test("workspace invoice tab can generate a draft invoice", async ({ page }) => {
-    await gotoAuthed(page, "/app/deals/demo-deal?tab=invoices");
+    await gotoAuthed(page, "/app/p/demo-deal?tab=invoices");
     await expect(page.getByRole("heading", { name: /generate a workspace invoice/i })).toBeVisible();
 
     await page.getByRole("button", { name: /generate invoice/i }).click();

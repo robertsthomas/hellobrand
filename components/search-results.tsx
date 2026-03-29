@@ -236,7 +236,7 @@ export function SearchResults({
           return (
             <Link
               key={result.id}
-              href={`/app/deals/${result.dealId}`}
+              href={`/app/p/${result.dealId}`}
               className="group block py-5 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]"
             >
               <div className="flex items-start gap-4">

@@ -6,6 +6,14 @@ import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth"
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+function isDevelopmentAuthBypassEnabled() {
+  return process.env.NODE_ENV !== "production";
+}
+
 function firstString(...values: unknown[]) {
   for (const value of values) {
     if (typeof value === "string" && value.trim().length > 0) {
@@ -38,6 +46,66 @@ function deriveViewerDefaults(
     email: email ?? `${userId}@clerk.local`,
     displayName: displayName ?? "Creator"
   };
+}
+
+async function ensureViewerRecord(viewer: Viewer): Promise<Viewer> {
+  if (!process.env.DATABASE_URL) {
+    return viewer;
+  }
+
+  try {
+    const user = await prisma.user.upsert({
+      where: { id: viewer.id },
+      update: {
+        email: viewer.email,
+        displayName: viewer.displayName
+      },
+      create: {
+        id: viewer.id,
+        email: viewer.email,
+        displayName: viewer.displayName
+      }
+    });
+
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      mode: viewer.mode
+    };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: viewer.id }
+    });
+
+    if (existing) {
+      return {
+        id: existing.id,
+        email: existing.email,
+        displayName: existing.displayName,
+        mode: viewer.mode
+      };
+    }
+
+    const reassigned = await prisma.user.update({
+      where: { email: viewer.email },
+      data: {
+        id: viewer.id,
+        displayName: viewer.displayName
+      }
+    });
+
+    return {
+      id: reassigned.id,
+      email: reassigned.email,
+      displayName: reassigned.displayName,
+      mode: viewer.mode
+    };
+  }
 }
 
 async function upsertViewerFromSession() {
@@ -103,12 +171,7 @@ async function upsertViewerFromSession() {
     // Handle unique constraint on email — another Clerk user ID owns this
     // email. Find the existing row and update it with the new session ID,
     // or just fetch by ID if the row was already created concurrently.
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code: string }).code === "P2002"
-    ) {
+    if (isUniqueConstraintError(error)) {
       user = await prisma.user.findUnique({ where: { id: session.userId } });
 
       if (!user) {
@@ -137,10 +200,19 @@ async function upsertViewerFromSession() {
 export async function getCurrentViewer(): Promise<Viewer | null> {
   const e2eViewer = await resolveE2EViewerFromCookies();
   if (e2eViewer) {
-    return e2eViewer;
+    return ensureViewerRecord(e2eViewer);
   }
 
-  return upsertViewerFromSession();
+  const sessionViewer = await upsertViewerFromSession();
+  if (sessionViewer) {
+    return sessionViewer;
+  }
+
+  if (isDevelopmentAuthBypassEnabled()) {
+    return ensureViewerRecord(DEFAULT_E2E_VIEWER);
+  }
+
+  return null;
 }
 
 export async function requireViewer() {

@@ -18,7 +18,8 @@ function makeDeal(): DealRecord {
     createdAt: "2026-03-01T00:00:00.000Z",
     updatedAt: "2026-03-01T00:00:00.000Z",
     analyzedAt: null,
-    confirmedAt: "2026-03-01T00:00:00.000Z"
+    confirmedAt: "2026-03-01T00:00:00.000Z",
+    statusBeforeArchive: null
   };
 }
 

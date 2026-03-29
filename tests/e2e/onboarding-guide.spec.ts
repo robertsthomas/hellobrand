@@ -92,7 +92,7 @@ test.describe("onboarding guide tooltips", () => {
     if (await isRateLimited(page)) return;
 
     // Navigate to a deal page (if any exist for the demo user)
-    const dealLink = page.locator('a[href*="/app/deals/"]').first();
+    const dealLink = page.locator('a[href*="/app/p/"]').first();
     const hasDeal = await dealLink.isVisible({ timeout: 2000 }).catch(() => false);
 
     if (hasDeal) {

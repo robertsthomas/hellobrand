@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/patterns/empty-state";
 import { PostHogActionLink } from "@/components/posthog-action-link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import type { DealRecord } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -42,7 +43,16 @@ export function DealList({
 }: {
   deals: Array<DealRecord & { paymentAmount?: number | null; currency?: string | null }>;
 }) {
-  if (deals.length === 0) {
+  const displayDeals = deals.map((deal) => {
+    const labels = getDisplayDealLabels(deal);
+    return {
+      ...deal,
+      brandName: labels.brandName ?? deal.brandName,
+      campaignName: labels.campaignName ?? deal.campaignName
+    };
+  });
+
+  if (displayDeals.length === 0) {
     return (
       <EmptyState
         icon={<FolderPlus className="h-5 w-5" />}
@@ -76,12 +86,12 @@ export function DealList({
           <span />
         </div>
 
-        {deals.map((deal) => (
+        {displayDeals.map((deal) => (
           <div
             key={deal.id}
             className="flex flex-col gap-2 border-b border-black/6 px-5 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] md:items-center"
           >
-            <Link href={`/app/deals/${deal.id}`} className="min-w-0 pr-4">
+            <Link href={`/app/p/${deal.id}`} className="min-w-0 pr-4">
               <p className="truncate text-base font-semibold text-foreground">
                 {deal.campaignName}
               </p>
@@ -120,7 +130,7 @@ export function DealList({
               <DeleteDealDialog
                 dealId={deal.id}
                 dealName={deal.campaignName}
-                redirectTo="/app/deals/history"
+                redirectTo="/app/p/history"
                 className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-black/8 text-[#667085] transition hover:border-accent/30 hover:text-accent"
                 triggerLabel={`Delete ${deal.campaignName}`}
               >

@@ -6,6 +6,7 @@ import { PaymentsWorkspaceDetail } from "@/components/payments-workspace-detail"
 import { PaymentsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealForViewer } from "@/lib/cached-data";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { buildInvoiceLineItems } from "@/lib/invoices";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -34,31 +35,38 @@ async function PaymentWorkspaceContent({
     notFound();
   }
 
+  const labels = getDisplayDealLabels(aggregate.deal);
+  const displayDeal = {
+    ...aggregate.deal,
+    brandName: labels.brandName ?? aggregate.deal.brandName,
+    campaignName: labels.campaignName ?? aggregate.deal.campaignName
+  };
+
   const payment =
     aggregate.paymentRecord ?? {
-      id: `payment-${aggregate.deal.id}`,
-      dealId: aggregate.deal.id,
+      id: `payment-${displayDeal.id}`,
+      dealId: displayDeal.id,
       amount: aggregate.terms?.paymentAmount ?? null,
       currency: aggregate.terms?.currency ?? "USD",
       invoiceDate: null,
       dueDate: null,
       paidDate: null,
-      status: aggregate.deal.paymentStatus,
+      status: displayDeal.paymentStatus,
       notes: null,
       source: null,
-      createdAt: aggregate.deal.createdAt,
-      updatedAt: aggregate.deal.updatedAt
+      createdAt: displayDeal.createdAt,
+      updatedAt: displayDeal.updatedAt
     };
   const invoice = aggregate.invoiceRecord ?? null;
   const invoiceDocuments = aggregate.documents.filter((document) => document.documentKind === "invoice");
   const breakdownItems =
     invoice?.lineItems.length
-      ? invoice.lineItems
-      : buildInvoiceLineItems({
-          deliverables: aggregate.terms?.deliverables ?? [],
-          amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? null,
-          fallbackTitle: aggregate.deal.campaignName
-        });
+        ? invoice.lineItems
+        : buildInvoiceLineItems({
+            deliverables: aggregate.terms?.deliverables ?? [],
+            amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? null,
+            fallbackTitle: displayDeal.campaignName
+          });
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
@@ -76,16 +84,16 @@ async function PaymentWorkspaceContent({
               Payments
             </p>
             <h1 className="mt-3 text-[40px] font-semibold tracking-[-0.06em] text-foreground">
-              {aggregate.deal.campaignName}
+              {displayDeal.campaignName}
             </h1>
             <p className="mt-2 text-base text-muted-foreground">
-              {aggregate.deal.brandName} · Total {formatCurrency(payment.amount, payment.currency ?? "USD")} · Due {formatDate(payment.dueDate)}
+              {displayDeal.brandName} · Total {formatCurrency(payment.amount, payment.currency ?? "USD")} · Due {formatDate(payment.dueDate)}
             </p>
           </div>
         </section>
 
         <PaymentsWorkspaceDetail
-          deal={aggregate.deal}
+          deal={displayDeal}
           payment={payment}
           invoice={invoice}
           invoiceDocuments={invoiceDocuments}

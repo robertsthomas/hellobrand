@@ -51,7 +51,7 @@ async function IntakeProcessingContent({
   const { session, aggregate, processing } = sessionData;
 
   if (session.status === "completed" && aggregate) {
-    redirect(`/app/deals/${aggregate.deal.id}`);
+    redirect(`/app/p/${aggregate.deal.id}`);
   }
 
   if (["ready_for_confirmation", "failed"].includes(session.status)) {

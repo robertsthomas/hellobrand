@@ -85,7 +85,7 @@ test.describe("tier matrix", () => {
       await expect(page.getByText("Tracked revenue").first()).toBeVisible();
     }
 
-    const briefResponse = await page.goto("/app/deals/demo-deal?tab=brief");
+    const briefResponse = await page.goto("/app/p/demo-deal?tab=brief");
     if (await isRateLimited(page)) return;
 
     const briefStatus = briefResponse?.status() ?? 0;
@@ -142,7 +142,7 @@ test.describe("tier matrix", () => {
       }
     }
 
-    const emailsResponse = await page.goto("/app/deals/demo-deal?tab=emails");
+    const emailsResponse = await page.goto("/app/p/demo-deal?tab=emails");
     if (await isRateLimited(page)) return;
 
     const emailsStatus = emailsResponse?.status() ?? 0;

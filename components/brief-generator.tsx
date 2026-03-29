@@ -110,7 +110,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
     setIsGenerating(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/deals/${dealId}/brief`, { method: "POST" });
+      const response = await fetch(`/api/p/${dealId}/brief`, { method: "POST" });
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error ?? "Failed to generate brief");

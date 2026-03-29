@@ -393,25 +393,27 @@ export async function buildGeneratedSummaryVariant(input: {
     return fallback satisfies SummaryRecordInput;
   }
 
-  const generated = await generateSimplifiedSummaryWithLlm({
-    targetType: input.targetType,
-    baseSummary: input.baseSummary.body,
-    grounding: buildGroundingPayload(input.aggregate, input.baseSummary),
-    fallback
-  });
-  const validationError = validateSummaryVariantBody(input.aggregate, generated.body);
+  try {
+    const generated = await generateSimplifiedSummaryWithLlm({
+      targetType: input.targetType,
+      baseSummary: input.baseSummary.body,
+      grounding: buildGroundingPayload(input.aggregate, input.baseSummary),
+      fallback
+    });
+    const validationError = validateSummaryVariantBody(input.aggregate, generated.body);
 
-  if (validationError) {
-    throw new Error(
-      `Couldn't create a safe simplified summary. ${validationError}`
-    );
+    if (validationError) {
+      return fallback satisfies SummaryRecordInput;
+    }
+
+    return {
+      ...generated,
+      summaryType: input.targetType,
+      source: "simplification",
+      parentSummaryId: input.baseSummary.id,
+      isCurrent: true
+    } satisfies SummaryRecordInput;
+  } catch {
+    return fallback satisfies SummaryRecordInput;
   }
-
-  return {
-    ...generated,
-    summaryType: input.targetType,
-    source: "simplification",
-    parentSummaryId: input.baseSummary.id,
-    isCurrent: true
-  } satisfies SummaryRecordInput;
 }

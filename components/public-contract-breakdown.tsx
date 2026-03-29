@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CalendarRange, FileText, X } from "lucide-react";
 
+import { cleanDisplayText } from "@/lib/display-text";
 import type { AnonymousDealBreakdown } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
@@ -11,9 +12,11 @@ function summarizeDeliverableLine(
   quantity: number | null,
   channel: string | null
 ) {
+  const cleanTitle = cleanDisplayText(title) ?? title;
+  const cleanChannel = cleanDisplayText(channel);
   const prefix =
-    typeof quantity === "number" && quantity > 1 ? `${quantity} ${title}s` : title;
-  return channel ? `${prefix} on ${channel}` : prefix;
+    typeof quantity === "number" && quantity > 1 ? `${quantity} ${cleanTitle}s` : cleanTitle;
+  return cleanChannel ? `${prefix} on ${cleanChannel}` : prefix;
 }
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -55,7 +58,7 @@ export function PublicContractBreakdown({
 
   const summaryText = useMemo(() => {
     return [
-      breakdown.contractSummary,
+      cleanDisplayText(breakdown.contractSummary) ?? breakdown.contractSummary,
       breakdown.deliverables.length > 0
         ? `Deliverables include ${breakdown.deliverables
             .slice(0, 2)
@@ -75,6 +78,11 @@ export function PublicContractBreakdown({
       ),
     [breakdown.deliverables]
   );
+  const displayTitle =
+    cleanDisplayText(breakdown.contractTitle) ??
+    cleanDisplayText(breakdown.sourceFileName) ??
+    breakdown.contractTitle ??
+    breakdown.sourceFileName;
 
   return (
     <div
@@ -156,7 +164,7 @@ export function PublicContractBreakdown({
         {/* Contract title + summary */}
         <section>
           <h2 className="text-[1.25rem] font-semibold tracking-[-0.02em] text-foreground sm:text-[1.4rem]">
-            {breakdown.contractTitle ?? breakdown.sourceFileName}
+            {displayTitle}
           </h2>
           <div className="mt-4 space-y-3 text-[15px] leading-[1.7] text-foreground/85">
             {summaryText.map((paragraph) => (
@@ -219,7 +227,7 @@ export function PublicContractBreakdown({
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-[15px] font-medium text-foreground">
-                      {flag.title}
+                      {cleanDisplayText(flag.title) ?? flag.title}
                     </p>
                     <span
                       className={`shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] ${
@@ -234,7 +242,7 @@ export function PublicContractBreakdown({
                     </span>
                   </div>
                   <p className="mt-1.5 text-[14px] leading-relaxed text-muted-foreground">
-                    {flag.detail}
+                    {cleanDisplayText(flag.detail) ?? flag.detail}
                   </p>
                 </div>
               ))}

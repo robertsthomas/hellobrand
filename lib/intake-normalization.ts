@@ -13,7 +13,12 @@ import type {
   NormalizedIntakeRecord,
   SummaryRecord
 } from "@/lib/types";
-import { toPlainDealSummary } from "@/lib/deal-summary";
+import { stripInlineMarkdown, toPlainDealSummary } from "@/lib/deal-summary";
+import {
+  cleanWorkspaceFileName,
+  deriveWorkspaceTitleFromFileNames,
+  isGenericWorkspaceLabel
+} from "@/lib/workspace-labels";
 
 export const INTAKE_NORMALIZED_VERSION = "intake-normalized:v2";
 
@@ -56,8 +61,8 @@ function presentText(value: string | null | undefined) {
   return trimmed;
 }
 
-function cleanExtractedLabel(value: string | null | undefined) {
-  const normalized = presentText(value);
+function normalizeLabelText(value: string | null | undefined) {
+  const normalized = presentText(stripInlineMarkdown(value ?? ""));
   if (!normalized) {
     return null;
   }
@@ -72,14 +77,28 @@ function cleanExtractedLabel(value: string | null | undefined) {
     .trim();
 }
 
+function splitLabelSegments(value: string | null | undefined) {
+  const raw = presentText(value);
+  if (!raw) {
+    return [] as string[];
+  }
+
+  return raw
+    .split(/\s+#{1,6}\s+|\n\s*#{1,6}\s*|\n{2,}/g)
+    .map((segment) => normalizeLabelText(segment))
+    .filter((segment): segment is string => Boolean(segment));
+}
+
+function cleanExtractedLabel(value: string | null | undefined) {
+  return splitLabelSegments(value)[0] ?? null;
+}
+
 function cleanFileName(fileName: string) {
-  return fileName
-    .replace(/\.[a-z0-9]+$/i, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+x\s+/gi, " x ")
-    .replace(/\b(agreement|contract|term sheet|msa|sow|scope of work)\b/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  return (
+    cleanWorkspaceFileName(fileName)
+      ?.replace(/\s+x\s+/gi, " x ")
+      .trim() ?? ""
+  );
 }
 
 function isGenericIntakeLabel(value: string | null | undefined) {
@@ -89,6 +108,7 @@ function isGenericIntakeLabel(value: string | null | undefined) {
   }
 
   return (
+    isGenericWorkspaceLabel(normalized) ||
     normalized === "pasted email thread" ||
     normalized === "pasted deliverables notes" ||
     normalized === "pasted invoice" ||
@@ -300,7 +320,7 @@ function extractBrandFromText(text: string) {
 function inferBrandName(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.brandName;
   if (persisted && !isGenericIntakeLabel(persisted)) {
-    return presentText(persisted);
+    return splitLabelSegments(persisted)[0] ?? presentText(persisted);
   }
 
   const termsBrand = cleanExtractedLabel(aggregate.terms?.brandName);
@@ -740,14 +760,18 @@ function inferContractTitle(
   }
 
   const campaign = cleanExtractedLabel(aggregate.terms?.campaignName);
+  const campaignSegments = splitLabelSegments(aggregate.terms?.campaignName);
+  const normalizedCampaign =
+    campaignSegments[campaignSegments.length - 1] ?? campaign;
   if (
-    campaign &&
+    normalizedCampaign &&
     !/\bname\b/i.test(aggregate.terms?.campaignName ?? "") &&
-    !isGenericIntakeLabel(campaign)
+    !isGenericIntakeLabel(normalizedCampaign)
   ) {
-    return brandName && !campaign.toLowerCase().includes(brandName.toLowerCase())
-      ? `${brandName} - ${campaign}`
-      : campaign;
+    return brandName &&
+      !normalizedCampaign.toLowerCase().includes(brandName.toLowerCase())
+      ? `${brandName} - ${normalizedCampaign}`
+      : normalizedCampaign;
   }
 
   const primaryText = aggregate.documents
@@ -780,12 +804,11 @@ function inferContractTitle(
     }
   }
 
-  const fileName = aggregate.documents[0]?.fileName;
-  if (fileName) {
-    const cleaned = cleanFileName(fileName);
-    if (cleaned && !isGenericIntakeLabel(cleaned)) {
-      return cleaned;
-    }
+  const derivedFileTitle = deriveWorkspaceTitleFromFileNames(
+    aggregate.documents.map((document) => document.fileName)
+  );
+  if (derivedFileTitle && !isGenericIntakeLabel(derivedFileTitle)) {
+    return derivedFileTitle;
   }
 
   const channels = Array.from(

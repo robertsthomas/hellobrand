@@ -5,6 +5,7 @@ import { PostHogActionLink } from "@/components/posthog-action-link";
 import { PaymentsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealAggregates } from "@/lib/cached-data";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { summarizePaymentRows, type PaymentSummaryAmount } from "@/lib/payment-summary";
 import { formatCurrency } from "@/lib/utils";
 
@@ -42,26 +43,34 @@ export default function PaymentsPage() {
 async function PaymentsContent() {
   const viewer = await requireViewer();
   const aggregates = await getCachedDealAggregates(viewer);
-  const rows = aggregates.map((aggregate) => ({
-    deal: aggregate.deal,
-    invoice: aggregate.invoiceRecord ?? null,
-    invoiceDocuments: aggregate.documents.filter((document) => document.documentKind === "invoice"),
-    payment:
-      aggregate.paymentRecord ?? {
-        id: `payment-${aggregate.deal.id}`,
-        dealId: aggregate.deal.id,
-        amount: aggregate.terms?.paymentAmount ?? null,
-        currency: aggregate.terms?.currency ?? "USD",
-        invoiceDate: null,
-        dueDate: null,
-        paidDate: null,
-        status: aggregate.deal.paymentStatus,
-        notes: null,
-        source: null,
-        createdAt: aggregate.deal.createdAt,
-        updatedAt: aggregate.deal.updatedAt
-      }
-  }));
+  const rows = aggregates.map((aggregate) => {
+    const labels = getDisplayDealLabels(aggregate.deal);
+
+    return {
+      deal: {
+        ...aggregate.deal,
+        brandName: labels.brandName ?? aggregate.deal.brandName,
+        campaignName: labels.campaignName ?? aggregate.deal.campaignName
+      },
+      invoice: aggregate.invoiceRecord ?? null,
+      invoiceDocuments: aggregate.documents.filter((document) => document.documentKind === "invoice"),
+      payment:
+        aggregate.paymentRecord ?? {
+          id: `payment-${aggregate.deal.id}`,
+          dealId: aggregate.deal.id,
+          amount: aggregate.terms?.paymentAmount ?? null,
+          currency: aggregate.terms?.currency ?? "USD",
+          invoiceDate: null,
+          dueDate: null,
+          paidDate: null,
+          status: aggregate.deal.paymentStatus,
+          notes: null,
+          source: null,
+          createdAt: aggregate.deal.createdAt,
+          updatedAt: aggregate.deal.updatedAt
+        }
+    };
+  });
   const summary = summarizePaymentRows(rows);
 
   return (
@@ -81,7 +90,7 @@ async function PaymentsContent() {
             </p>
           </div>
 
-          <div className="grid gap-6 border-t border-black/8 pt-5 sm:grid-cols-3">
+          <div data-guide="payments-summary" className="grid gap-6 border-t border-black/8 pt-5 sm:grid-cols-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Tracked

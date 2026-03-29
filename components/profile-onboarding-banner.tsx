@@ -27,9 +27,9 @@ export function ProfileOnboardingBanner({
   }
 
   return (
-    <div className="border-b border-black/8 bg-[#f7f4ed] px-5 py-4 dark:border-white/10 dark:bg-[#16181d]">
-      <div className="mx-auto flex max-w-[1520px] flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
+    <div className="border-b border-black/8 bg-[#f7f4ed] px-4 py-3 dark:border-white/10 dark:bg-[#16181d] sm:px-5 sm:py-4">
+      <div className="mx-auto flex max-w-[1520px] items-start justify-between gap-3 sm:items-center">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">
             Finish your creator profile when you&apos;re ready.
           </p>
@@ -39,7 +39,7 @@ export function ProfileOnboardingBanner({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <CreatorProfileSetupDialog
             email={email}
             initialName={initialName}

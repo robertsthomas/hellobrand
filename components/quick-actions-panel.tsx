@@ -1,126 +1,137 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
-import { AlertTriangle, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, CircleDot } from "lucide-react";
 
-import { InfoTooltip } from "@/components/app-tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export interface QuickActionItem {
-  tone: "accent" | "warning" | "success";
+  tone: "accent" | "warning" | "success" | "neutral";
   title: string;
   body: string;
   href: string;
+  ctaLabel?: string;
+}
+
+function toneClasses(tone: QuickActionItem["tone"]) {
+  if (tone === "warning") {
+    return {
+      card: "border-orange-200/80 bg-orange-50/70 dark:border-orange-500/20 dark:bg-orange-500/10",
+      icon: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+      label: "text-orange-700 dark:text-orange-300"
+    };
+  }
+
+  if (tone === "success") {
+    return {
+      card: "border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-500/10",
+      icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+      label: "text-emerald-700 dark:text-emerald-300"
+    };
+  }
+
+  if (tone === "accent") {
+    return {
+      card: "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]",
+      icon: "bg-[#dceae3] text-[#234b3c] dark:bg-[#1a3128] dark:text-[#9fd7bf]",
+      label: "text-[#2c5b49] dark:text-[#9fd7bf]"
+    };
+  }
+
+  return {
+    card: "border-black/8 bg-[#f7f8fa] dark:border-white/10 dark:bg-white/[0.03]",
+    icon: "bg-white text-[#667085] dark:bg-white/[0.06] dark:text-[#a3acb9]",
+    label: "text-[#667085] dark:text-[#a3acb9]"
+  };
+}
+
+function toneEyebrow(tone: QuickActionItem["tone"]) {
+  if (tone === "warning") {
+    return "Time-sensitive";
+  }
+
+  if (tone === "success") {
+    return "On track";
+  }
+
+  if (tone === "accent") {
+    return "Coming up";
+  }
+
+  return "Recommended";
 }
 
 function QuickActionRow({ item }: { item: QuickActionItem }) {
+  const tone = toneClasses(item.tone);
+
   return (
     <Link
       href={item.href}
       className={cn(
-        "block border-b border-black/8 py-5 transition-colors hover:bg-[#f6f7f8] dark:border-white/10 dark:hover:bg-white/[0.03]",
-        item.tone === "accent" && "border-l-2 border-l-accent",
-        item.tone === "warning" && "border-l-2 border-l-orange-300",
-        item.tone === "success" && "border-l-2 border-l-emerald-300"
+        "group block border p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(15,23,42,0.06)] dark:hover:shadow-none",
+        tone.card
       )}
     >
-      <div className="flex items-start justify-between gap-4 px-4">
-        <div className="flex items-start gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
-              "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-sm",
-              item.tone === "accent" && "text-accent",
-              item.tone === "warning" && "text-orange-700",
-              item.tone === "success" && "text-emerald-700"
+              "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center",
+              tone.icon
             )}
           >
-            {item.tone === "success" ? (
+            {item.tone === "warning" ? (
+              <AlertTriangle className="h-4.5 w-4.5" />
+            ) : item.tone === "success" ? (
               <CheckCircle2 className="h-4.5 w-4.5" />
             ) : (
-              <AlertTriangle className="h-4.5 w-4.5" />
+              <CircleDot className="h-4.5 w-4.5" />
             )}
           </div>
-          <div>
-            <p className="font-semibold text-foreground">{item.title}</p>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.body}</p>
+
+          <div className="min-w-0">
+            <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", tone.label)}>
+              {toneEyebrow(item.tone)}
+            </p>
+            <p className="mt-2 text-base font-semibold tracking-[-0.03em] text-foreground">
+              {item.title}
+            </p>
+            <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{item.body}</p>
           </div>
         </div>
-        <div className="shrink-0 pt-1 text-foreground">
+
+        <div className="shrink-0 pt-1 text-foreground/50 transition group-hover:text-foreground">
           <ArrowUpRight className="h-4 w-4" />
         </div>
+      </div>
+
+      <div className="mt-4 text-sm font-medium text-foreground">
+        {item.ctaLabel ?? "Open"}
       </div>
     </Link>
   );
 }
 
 export function QuickActionsPanel({ items }: { items: QuickActionItem[] }) {
-  const [open, setOpen] = useState(false);
-  const visibleItems = items.slice(0, 2);
-  const hiddenItems = items.slice(2);
+  if (items.length === 0) {
+    return null;
+  }
 
   return (
-    <section>
-      <div className="flex items-start justify-between gap-4">
-        <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
-          Quick review
+    <section className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085] dark:text-[#8f98a6]">
+          Next up
+        </p>
+        <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-foreground">
+          What to work on next
         </h2>
-        <InfoTooltip
-          label="About quick review"
-          content="Highest-priority items that still need attention before work continues."
-        />
+        <p className="mt-2 max-w-[48ch] text-sm leading-6 text-muted-foreground">
+          Start with the items most likely to unblock cash flow, approvals, or delivery.
+        </p>
       </div>
 
-      <div className="mt-4 border-t border-black/8 dark:border-white/10">
-        {visibleItems.map((item) => (
-          <QuickActionRow key={item.title} item={item} />
-        ))}
-
-        {items.length === 0 ? (
-          <div className="px-1 py-6 text-sm text-muted-foreground">
-            Nothing urgent right now.
-          </div>
-        ) : null}
+      <div className="mt-6 grid gap-3 lg:grid-cols-2">
+        {items.map((item) => <QuickActionRow key={`${item.title}:${item.href}`} item={item} />)}
       </div>
-
-      {hiddenItems.length > 0 ? (
-        <>
-          <div className="pt-4">
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="text-sm font-medium text-foreground transition-colors hover:text-primary"
-            >
-              View {hiddenItems.length} more
-            </button>
-          </div>
-
-          <Dialog open={open} onOpenChange={setOpen}>
-              <DialogContent className="max-w-2xl border-black/10 p-0 dark:border-white/10">
-              <DialogHeader className="border-b border-black/8 px-6 py-5 dark:border-white/10">
-                <DialogTitle>Quick review</DialogTitle>
-                <DialogDescription>
-                  Remaining actions that still need attention.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[70vh] overflow-auto px-6 pb-6">
-                <div className="border-t border-black/8 dark:border-white/10">
-                  {hiddenItems.map((item) => (
-                    <QuickActionRow key={item.title} item={item} />
-                  ))}
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </>
-      ) : null}
     </section>
   );
 }

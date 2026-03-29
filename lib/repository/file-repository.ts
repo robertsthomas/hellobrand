@@ -286,7 +286,8 @@ export class FileRepository {
       createdAt: now,
       updatedAt: now,
       analyzedAt: null,
-      confirmedAt: options?.confirmedAt ?? now
+      confirmedAt: options?.confirmedAt ?? now,
+      statusBeforeArchive: null
     };
 
     store.deals.unshift(deal);
@@ -331,6 +332,16 @@ export class FileRepository {
     store.dealTerms = store.dealTerms.filter((entry) => entry.dealId !== dealId);
     store.riskFlags = store.riskFlags.filter((entry) => entry.dealId !== dealId);
     store.emailDrafts = store.emailDrafts.filter((entry) => entry.dealId !== dealId);
+    store.dealEmailLinks = store.dealEmailLinks.filter((entry) => entry.dealId !== dealId);
+    store.emailCandidateMatches = store.emailCandidateMatches.filter(
+      (entry) => entry.dealId !== dealId
+    );
+    store.emailDealEvents = store.emailDealEvents.filter((entry) => entry.dealId !== dealId);
+    store.emailDealTermSuggestions = store.emailDealTermSuggestions.filter(
+      (entry) => entry.dealId !== dealId
+    );
+    store.emailActionItems = store.emailActionItems.filter((entry) => entry.dealId !== dealId);
+    store.brandContacts = store.brandContacts.filter((entry) => entry.dealId !== dealId);
     const deletedThreadIds = store.assistantThreads
       .filter((entry) => entry.dealId === dealId)
       .map((entry) => entry.id);

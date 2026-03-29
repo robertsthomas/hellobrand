@@ -2,6 +2,7 @@
 
 import { Bot, Sparkles } from "lucide-react";
 
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import type { AssistantUiBlock } from "@/lib/types";
 
 type AssistantBlockProps = {
@@ -83,28 +84,36 @@ function AssistantWorkspaceList({
 
       <div className="space-y-2">
         {workspaces.length > 0 ? (
-          workspaces.map((workspace) => (
-            <button
-              key={workspace.dealId}
-              type="button"
-              onClick={() =>
-                onNavigate(workspace.href, {
-                  prompt: workspace.prompt ?? prompt,
-                  close: false
-                })
-              }
-              className="flex w-full items-start justify-between gap-3 border border-black/10 bg-white px-3 py-3 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{workspace.brandName}</p>
-                <p className="truncate text-xs text-black/60 dark:text-white/65">{workspace.campaignName}</p>
-              </div>
-              <div className="shrink-0 text-right text-[11px] uppercase tracking-[0.12em] text-[#98a2b3]">
-                <p>{workspace.status.replaceAll("_", " ")}</p>
-                <p className="mt-1">{workspace.paymentStatus.replaceAll("_", " ")}</p>
-              </div>
-            </button>
-          ))
+          workspaces.map((workspace) => {
+            const labels = getDisplayDealLabels(workspace);
+
+            return (
+              <button
+                key={workspace.dealId}
+                type="button"
+                onClick={() =>
+                  onNavigate(workspace.href, {
+                    prompt: workspace.prompt ?? prompt,
+                    close: false
+                  })
+                }
+                className="flex w-full items-start justify-between gap-3 border border-black/10 bg-white px-3 py-3 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {labels.brandName ?? workspace.brandName}
+                  </p>
+                  <p className="truncate text-xs text-black/60 dark:text-white/65">
+                    {labels.campaignName ?? workspace.campaignName}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right text-[11px] uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <p>{workspace.status.replaceAll("_", " ")}</p>
+                  <p className="mt-1">{workspace.paymentStatus.replaceAll("_", " ")}</p>
+                </div>
+              </button>
+            );
+          })
         ) : (
           <div className="border border-dashed border-black/10 px-3 py-3 text-xs text-black/60 dark:border-white/10 dark:text-white/65">
             No matching workspaces yet.

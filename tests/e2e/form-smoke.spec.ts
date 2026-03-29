@@ -84,7 +84,7 @@ test.describe("form smoke", () => {
     const runtime = startRuntimeErrorCapture(page);
 
     try {
-      await gotoAuthed(page, "/app/deals/demo-deal?tab=notes");
+      await gotoAuthed(page, "/app/p/demo-deal?tab=notes");
       await expect(
         page.getByRole("heading", { name: "Notes", exact: true })
       ).toBeVisible();

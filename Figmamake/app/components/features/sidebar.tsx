@@ -6,7 +6,7 @@ export function Sidebar() {
   
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/app/dashboard" },
-    { icon: Briefcase, label: "All deals", path: "/app/deals/history" },
+    { icon: Briefcase, label: "All deals", path: "/app/p/history" },
     { icon: BarChart3, label: "Analytics", path: "/app/analytics" },
     { icon: Bell, label: "Notifications", path: "/app/notifications" },
     { icon: HelpCircle, label: "Help", path: "/app/help" },

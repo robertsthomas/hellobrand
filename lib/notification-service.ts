@@ -288,7 +288,7 @@ function computeDealNotificationSeeds(input: {
         description: formattedAmount
           ? `Payment of ${formattedAmount} is overdue and needs follow-up.`
           : "Payment is overdue and needs follow-up.",
-        href: `/app/deals/${deal.id}`,
+        href: `/app/p/${deal.id}`,
         dedupeKey: `payment.overdue:${deal.id}`,
         createdAt: deal.updatedAt
       });
@@ -305,7 +305,7 @@ function computeDealNotificationSeeds(input: {
         description: formattedAmount
           ? `${brandName} paid ${formattedAmount}.`
           : `Payment has been received from ${brandName}.`,
-        href: `/app/deals/${deal.id}`,
+        href: `/app/p/${deal.id}`,
         dedupeKey: `payment.received:${deal.id}`,
         createdAt: deal.updatedAt
       });
@@ -327,7 +327,7 @@ function computeDealNotificationSeeds(input: {
             dealId: deal.id,
             title: `${deliverable.title} due${daysUntil === 0 ? " today" : ` in ${daysUntil} day${daysUntil === 1 ? "" : "s"}`}`,
             description: `${deliverable.title} for ${brandName} is coming up.`,
-            href: `/app/deals/${deal.id}`,
+            href: `/app/p/${deal.id}`,
             dedupeKey: `deadline.upcoming:${deal.id}:${deliverable.id}`,
             createdAt: deliverable.dueDate
           });
@@ -343,7 +343,7 @@ function computeDealNotificationSeeds(input: {
           dealId: deal.id,
           title: `${deliverable.title} approved`,
           description: `Your ${deliverable.title} ${deliverable.channel ? `on ${deliverable.channel} ` : ""}was approved by ${brandName}.`,
-          href: `/app/deals/${deal.id}`,
+          href: `/app/p/${deal.id}`,
           dedupeKey: `deliverable.approved:${deal.id}:${deliverable.id}`,
           createdAt: deal.updatedAt
         });
@@ -360,7 +360,7 @@ function computeDealNotificationSeeds(input: {
         dealId: deal.id,
         title: `${brandName} contract has ${highRisks.length} risk flag${highRisks.length === 1 ? "" : "s"}`,
         description: `Review ${highRisks.length} high-severity item${highRisks.length === 1 ? "" : "s"} before signing.`,
-        href: `/app/deals/${deal.id}`,
+        href: `/app/p/${deal.id}`,
         dedupeKey: `risk.contract:${deal.id}`,
         createdAt: highRisks[0]?.createdAt ?? deal.updatedAt
       });
@@ -376,7 +376,7 @@ function computeDealNotificationSeeds(input: {
         dealId: deal.id,
         title: `${doc.fileName} processing complete`,
         description: `${brandName} contract document is ready for review.`,
-        href: `/app/deals/${deal.id}`,
+        href: `/app/p/${deal.id}`,
         dedupeKey: `document.ready:${doc.id}`,
         createdAt: doc.updatedAt
       });

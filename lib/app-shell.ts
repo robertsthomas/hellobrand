@@ -23,7 +23,7 @@ export type AppNavItem = {
 
 export const appNavItems: AppNavItem[] = [
   { href: "/app", label: "Dashboard", icon: Home },
-  { href: "/app/deals/history", label: "All partnerships", icon: Archive },
+  { href: "/app/p/history", label: "All partnerships", icon: Archive },
   { href: "/app/inbox", label: "Inbox", icon: Inbox },
   { href: "/app/payments", label: "Payments", icon: Receipt },
   { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
@@ -40,8 +40,8 @@ export function isAppNavItemActive(pathname: string, href: string) {
     return pathname === "/app" || pathname === "/app/dashboard";
   }
 
-  if (href === "/app/deals/history") {
-    return pathname.startsWith("/app/deals/");
+  if (href === "/app/p/history") {
+    return pathname.startsWith("/app/p/");
   }
 
   if (href === "/app/settings") {
@@ -56,11 +56,11 @@ export function getAppRouteMeta(pathname: string): AppRouteMeta {
     return { section: "Workspace", title: "Dashboard" };
   }
 
-  if (pathname.startsWith("/app/deals/history")) {
+  if (pathname.startsWith("/app/p/history")) {
     return { section: "Partnerships", title: "All partnerships" };
   }
 
-  if (pathname.startsWith("/app/deals/")) {
+  if (pathname.startsWith("/app/p/")) {
     return { section: "Partnerships", title: "Partnership workspace" };
   }
 

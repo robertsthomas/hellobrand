@@ -100,18 +100,18 @@ pnpm run start:prd
 
 ## API surface
 
-- `GET /api/deals`
-- `POST /api/deals`
-- `GET /api/deals/:dealId`
-- `PATCH /api/deals/:dealId`
-- `POST /api/deals/:dealId/contract` (temporary alias)
-- `GET /api/deals/:dealId/documents`
-- `POST /api/deals/:dealId/documents`
+- `GET /api/p`
+- `POST /api/p`
+- `GET /api/p/:dealId`
+- `PATCH /api/p/:dealId`
+- `POST /api/p/:dealId/contract` (temporary alias)
+- `GET /api/p/:dealId/documents`
+- `POST /api/p/:dealId/documents`
 - `POST /api/documents/:documentId/reprocess`
-- `GET /api/deals/:dealId/report`
-- `PATCH /api/deals/:dealId/report`
-- `GET /api/deals/:dealId/drafts`
-- `POST /api/deals/:dealId/drafts`
+- `GET /api/p/:dealId/report`
+- `PATCH /api/p/:dealId/report`
+- `GET /api/p/:dealId/drafts`
+- `POST /api/p/:dealId/drafts`
 - `POST /api/intake`
 - `GET /api/intake/:sessionId`
 - `POST /api/intake/:sessionId/retry`
@@ -156,8 +156,8 @@ The v1 suite covers:
 - `/app/analytics`
 - `/app/inbox`
 - `/app/settings`
-- `/app/deals/demo-deal?tab=brief`
-- `/app/deals/demo-deal?tab=emails`
+- `/app/p/demo-deal?tab=brief`
+- `/app/p/demo-deal?tab=emails`
 
 Each Playwright app server runs with:
 

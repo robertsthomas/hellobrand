@@ -111,6 +111,10 @@ function toProfileAuditRecord(event: {
   };
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 export async function getProfileForViewer(viewer: Viewer) {
   if (!process.env.DATABASE_URL) {
     return buildFileBackedProfile(viewer);
@@ -124,18 +128,36 @@ export async function getProfileForViewer(viewer: Viewer) {
     return toProfileRecord(existing);
   }
 
-  const created = await prisma.profile.create({
-    data: {
-      userId: viewer.id,
-      displayName: viewer.displayName,
-      contactEmail: viewer.email,
-      defaultCurrency: "USD",
-      reminderLeadDays: 3,
-      conflictAlertsEnabled: true,
-      paymentRemindersEnabled: true,
-      emailNotificationsEnabled: false
+  let created;
+
+  try {
+    created = await prisma.profile.create({
+      data: {
+        userId: viewer.id,
+        displayName: viewer.displayName,
+        contactEmail: viewer.email,
+        defaultCurrency: "USD",
+        reminderLeadDays: 3,
+        conflictAlertsEnabled: true,
+        paymentRemindersEnabled: true,
+        emailNotificationsEnabled: false
+      }
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
     }
-  });
+
+    const concurrentProfile = await prisma.profile.findUnique({
+      where: { userId: viewer.id }
+    });
+
+    if (!concurrentProfile) {
+      throw error;
+    }
+
+    return toProfileRecord(concurrentProfile);
+  }
 
   const record = toProfileRecord(created);
 

@@ -273,7 +273,7 @@ function ConnectorArrow() {
   return (
     <div className="flex items-center justify-center py-1 lg:py-0">
       <ArrowDown className="h-5 w-5 text-white/30 lg:hidden" strokeWidth={1.5} />
-      <ArrowRight className="hidden h-5 w-5 text-white/30 lg:block" strokeWidth={1.5} />
+      <ArrowRight className="hidden h-8 w-8 text-white/35 lg:block" strokeWidth={1.75} />
     </div>
   );
 }
@@ -321,7 +321,7 @@ export function DocumentScanShowcase() {
           </motion.p>
         </div>
 
-        <div className="flex flex-col items-center gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:gap-4">
+        <div className="flex flex-col items-center gap-5 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center lg:gap-10 xl:gap-14">
           <div className="flex w-full justify-center lg:justify-end">
             <DocumentSheet reducedMotion={Boolean(reducedMotion)} />
           </div>

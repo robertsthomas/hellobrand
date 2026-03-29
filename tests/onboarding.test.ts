@@ -32,25 +32,66 @@ describe("guide registry", () => {
     }
   });
 
-  test("shows sidebar_new_workspace as first step on dashboard", () => {
+  test("welcome_start_here is the first step on dashboard for new users", () => {
     const ctx = makeContext({ pathname: "/app" });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
     expect(step).not.toBeNull();
-    expect(step!.id).toBe("sidebar_new_workspace");
+    expect(step!.id).toBe("welcome_start_here");
   });
 
-  test("sidebar steps show in order on dashboard", () => {
-    const ctx = makeContext({ pathname: "/app" });
-    const sidebarIds = [
-      "sidebar_new_workspace",
-      "sidebar_inbox",
-      "sidebar_payments",
-      "sidebar_analytics",
-      "sidebar_settings"
+  test("welcome_start_here auto-completes when user has a workspace", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasActiveWorkspace: true
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).not.toBe("welcome_start_here");
+  });
+
+  test("welcome_start_here auto-completes when a workspace notification exists", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasWorkspaceNotification: true
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).toBe("workspace_generating");
+  });
+
+  test("workspace_generating shows when notification exists", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasWorkspaceNotification: true,
+      dismissedStepIds: new Set(["welcome_start_here"])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).toBe("workspace_generating");
+  });
+
+  test("workspace_generating is skipped without notification", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasWorkspaceNotification: false,
+      hasActiveWorkspace: true,
+      dismissedStepIds: new Set(["welcome_start_here"])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).not.toBe("workspace_generating");
+  });
+
+  test("workspace tour steps show in order on partnership page", () => {
+    const workspaceIds = [
+      "workspace_overview",
+      "workspace_terms",
+      "workspace_risks",
+      "workspace_deliverables"
     ];
 
-    let currentCtx = ctx;
-    for (const expectedId of sidebarIds) {
+    let currentCtx = makeContext({
+      pathname: "/app/p/abc-123",
+      hasActiveWorkspace: true
+    });
+
+    for (const expectedId of workspaceIds) {
       const step = getActiveGuideStep(GUIDE_STEPS, currentCtx);
       expect(step?.id).toBe(expectedId);
       currentCtx = {
@@ -60,79 +101,103 @@ describe("guide registry", () => {
     }
   });
 
-  test("add_first_documents shows after sidebar steps on /app routes", () => {
-    const priorIds = [
-      "sidebar_new_workspace",
-      "sidebar_inbox",
-      "sidebar_payments",
-      "sidebar_analytics",
-      "sidebar_settings"
-    ];
+  test("open_first_workspace shows on dashboard when user has workspaces but tour not done", () => {
     const ctx = makeContext({
-      pathname: "/app/intake/new",
-      dismissedStepIds: new Set(priorIds)
+      pathname: "/app",
+      hasActiveWorkspace: true,
+      dismissedStepIds: new Set(["welcome_start_here", "workspace_generating"])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).toBe("add_first_documents");
+    expect(step?.id).toBe("open_first_workspace");
   });
 
-  test("add_first_documents auto-completes when user has workspace", () => {
+  test("open_first_workspace does not show for users without workspaces", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasActiveWorkspace: false,
+      dismissedStepIds: new Set(["welcome_start_here"])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).not.toBe("open_first_workspace");
+  });
+
+  test("assistant_intro is gated behind workspace tour", () => {
     const ctx = makeContext({
       pathname: "/app",
       hasActiveWorkspace: true,
       dismissedStepIds: new Set([
-        "sidebar_new_workspace",
-        "sidebar_inbox",
-        "sidebar_payments",
-        "sidebar_analytics",
-        "sidebar_settings"
+        "welcome_start_here",
+        "workspace_generating",
+        "open_first_workspace"
+      ])
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).not.toBe("assistant_intro");
+  });
+
+  test("assistant_intro shows once workspace tour steps are dismissed", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      hasActiveWorkspace: true,
+      dismissedStepIds: new Set([
+        "welcome_start_here",
+        "workspace_generating",
+        "open_first_workspace",
+        "workspace_overview",
+        "workspace_terms",
+        "workspace_risks",
+        "workspace_deliverables"
       ])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
     expect(step?.id).toBe("assistant_intro");
   });
 
-  test("add_first_documents auto-completes when a workspace notification exists", () => {
+  test("payments_intro shows on payments page", () => {
     const ctx = makeContext({
-      pathname: "/app",
-      hasWorkspaceNotification: true,
-      dismissedStepIds: new Set([
-        "sidebar_new_workspace",
-        "sidebar_inbox",
-        "sidebar_payments",
-        "sidebar_analytics",
-        "sidebar_settings"
-      ])
-    });
-    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).toBe("notifications_workspace_generating");
-  });
-
-  test("notifications tip becomes eligible as soon as a workspace notification exists", () => {
-    const ctx = makeContext({
-      pathname: "/app",
-      hasWorkspaceNotification: true,
-      dismissedStepIds: new Set([
-        "sidebar_new_workspace",
-        "sidebar_inbox",
-        "sidebar_payments",
-        "sidebar_analytics",
-        "sidebar_settings",
-        "add_first_documents"
-      ])
-    });
-    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).toBe("notifications_workspace_generating");
-  });
-
-  test("assistant_intro shows on any /app route", () => {
-    const dismissed = new Set(
-      GUIDE_STEPS.filter((s) => s.id !== "assistant_intro").map((s) => s.id)
-    );
-    const ctx = makeContext({
-      pathname: "/app/deals/abc-123",
+      pathname: "/app/payments",
       hasActiveWorkspace: true,
-      dismissedStepIds: dismissed
+      dismissedStepIds: new Set(GUIDE_STEPS.filter((s) => s.id !== "payments_intro").map((s) => s.id))
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step?.id).toBe("payments_intro");
+  });
+
+  test("payments_intro does not show on other pages", () => {
+    const ctx = makeContext({
+      pathname: "/app",
+      dismissedStepIds: new Set(
+        GUIDE_STEPS.filter((s) => s.id !== "payments_intro").map((s) => s.id)
+      )
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step).toBeNull();
+  });
+
+  test("no steps show on non-matching routes like /app/inbox", () => {
+    const ctx = makeContext({
+      pathname: "/app/inbox",
+      hasActiveWorkspace: false
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step).toBeNull();
+  });
+
+  test("welcome_start_here does not match sub-routes like /app/intake/new", () => {
+    const ctx = makeContext({
+      pathname: "/app/intake/new",
+      hasActiveWorkspace: false
+    });
+    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
+    expect(step).toBeNull();
+  });
+
+  test("assistant_intro matches any /app sub-route after tour done", () => {
+    const allDone = new Set(GUIDE_STEPS.filter((s) => s.id !== "assistant_intro" && s.id !== "payments_intro").map((s) => s.id));
+    const ctx = makeContext({
+      pathname: "/app/inbox",
+      hasActiveWorkspace: true,
+      dismissedStepIds: allDone
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
     expect(step?.id).toBe("assistant_intro");
@@ -141,29 +206,16 @@ describe("guide registry", () => {
   test("skips dismissed steps", () => {
     const ctx = makeContext({
       pathname: "/app",
-      dismissedStepIds: new Set(["sidebar_new_workspace"])
+      dismissedStepIds: new Set(["welcome_start_here"])
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step?.id).toBe("sidebar_inbox");
-  });
-
-  test("returns deal workspace step for deal routes after general steps dismissed", () => {
-    const generalStepIds = GUIDE_STEPS
-      .filter((s) => !s.id.startsWith("workspace_") && !s.id.endsWith("_tab_tip") && s.id !== "emails_tab_tip")
-      .map((s) => s.id);
-    const ctx = makeContext({
-      pathname: "/app/deals/abc-123",
-      hasActiveWorkspace: true,
-      dismissedStepIds: new Set(generalStepIds)
-    });
-    const step = getActiveGuideStep(GUIDE_STEPS, ctx);
-    expect(step).not.toBeNull();
-    expect(step!.id).toBe("workspace_tabs_intro");
+    expect(step?.id).not.toBe("welcome_start_here");
   });
 
   test("returns null when all steps are dismissed", () => {
     const ctx = makeContext({
       pathname: "/app",
+      hasActiveWorkspace: true,
       dismissedStepIds: new Set(GUIDE_STEPS.map((s) => s.id))
     });
     const step = getActiveGuideStep(GUIDE_STEPS, ctx);

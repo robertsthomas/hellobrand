@@ -1,34 +1,26 @@
 "use client";
 
-import { useState } from "react";
 import { X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { useGuide } from "@/components/guide-provider";
-import { GUIDE_STEPS } from "@/lib/guide-registry";
 
 export function GuideMobileModal() {
   const { activeStep, remainingCount, isMobile, dismissStep, skipAll } = useGuide();
-  const [stepIndex, setStepIndex] = useState(0);
 
   if (!isMobile || !activeStep) return null;
 
   const isLast = remainingCount <= 1;
 
   const handleNext = () => {
-    setStepIndex((i) => i + 1);
     dismissStep(activeStep.id);
   };
 
   const handleClose = () => {
     skipAll();
   };
-
-  const mobileSteps = GUIDE_STEPS.filter((s) => !s.desktopOnly);
-  const totalSteps = mobileSteps.length;
-  const currentNumber = totalSteps - remainingCount + 1;
 
   return (
     <DialogPrimitive.Root open>
@@ -42,7 +34,7 @@ export function GuideMobileModal() {
           {/* Header with step count and close */}
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              Tip {currentNumber} of {totalSteps}
+              {remainingCount} tip{remainingCount === 1 ? "" : "s"} remaining
             </p>
             <button
               type="button"

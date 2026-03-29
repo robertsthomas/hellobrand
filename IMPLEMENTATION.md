@@ -73,7 +73,7 @@ Added `BriefData` interface with: `campaignOverview`, `messagingPoints`, `talkin
 ### `components/brief-overview.tsx`
 Client component rendering BriefData in a two-column grid: campaign overview, messaging points, talking points, creative concept, brand guidelines, approval requirements, target audience, tone & style, do-not-mention list. Shows source document file names and a graceful empty state when no brief is uploaded.
 
-### `app/app/deals/[dealId]/page.tsx`
+### `app/app/p/[dealId]/page.tsx`
 Added "Brief" tab between Deliverables and Emails, rendering `<BriefOverview>` with the deal's brief data and documents list for source attribution.
 
 ### Repository updates

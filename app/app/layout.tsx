@@ -5,6 +5,7 @@ import { AppFrame } from "@/components/app-frame";
 import { PostHogUserIdentify } from "@/components/posthog-user-identify";
 import { ProfileOnboardingBanner } from "@/components/profile-onboarding-banner";
 import { requireViewer } from "@/lib/auth";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
   getCachedDealAggregates,
   getCachedOnboardingState,
@@ -43,11 +44,15 @@ export default async function WorkspaceLayout({
         hasActiveWorkspace={hasActiveWorkspace}
         notifications={notifications}
         onboardingComplete={isOnboardingComplete}
-        workspaceNavItems={dealAggregates.map((aggregate) => ({
-          dealId: aggregate.deal.id,
-          label: aggregate.deal.campaignName,
-          brandName: aggregate.deal.brandName
-        }))}
+        workspaceNavItems={dealAggregates.map((aggregate) => {
+          const labels = getDisplayDealLabels(aggregate.deal);
+
+          return {
+            dealId: aggregate.deal.id,
+            label: labels.campaignName ?? aggregate.deal.campaignName,
+            brandName: labels.brandName ?? aggregate.deal.brandName
+          };
+        })}
       >
         {!isOnboardingComplete ? (
           <ProfileOnboardingBanner

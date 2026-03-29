@@ -11,23 +11,38 @@ export function DashboardSkeleton() {
     <div className="px-5 py-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-6">
         <div className="border border-black/8 bg-white px-7 py-7 dark:border-white/10 dark:bg-[#15191f]">
-          <Pulse className="h-8 w-48" />
-          <Pulse className="mt-2 h-5 w-72" />
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <Pulse className="h-4 w-40" />
+          <Pulse className="mt-2 h-9 w-72" />
+          <Pulse className="mt-4 h-5 w-[480px] max-w-full" />
+        </div>
+        <div className="border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-[#15191f]">
+          <Pulse className="h-4 w-28" />
+          <Pulse className="mt-2 h-8 w-56" />
+          <Pulse className="mt-2 h-5 w-96 max-w-full" />
+          <div className="mt-6 space-y-3">
+            {Array.from({ length: 2 }).map((_, i) => (
               <div
                 key={i}
                 className="border border-black/7 bg-[#fbfbfc] px-5 py-5 dark:border-white/10 dark:bg-[#10141a]"
               >
-                <Pulse className="h-4 w-24" />
-                <Pulse className="mt-5 h-10 w-32" />
-                <Pulse className="mt-2 h-4 w-20" />
+                <Pulse className="h-5 w-64" />
+                <Pulse className="mt-2 h-4 w-32" />
+                <Pulse className="mt-4 h-10 w-full" />
               </div>
             ))}
           </div>
         </div>
-        <Pulse className="h-10 w-96" />
-        <Pulse className="h-64 w-full" />
+        <div className="grid gap-6 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="border border-black/8 bg-white px-5 py-4 dark:border-white/10 dark:bg-[#15191f]"
+            >
+              <Pulse className="h-4 w-24" />
+              <Pulse className="mt-2 h-4 w-40" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

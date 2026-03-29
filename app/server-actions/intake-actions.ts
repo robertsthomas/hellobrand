@@ -215,7 +215,7 @@ export async function confirmIntakeSessionAction(formData: FormData) {
       dealId: aggregate.deal.id
     });
 
-    redirect(`/app/deals/${aggregate.deal.id}`);
+    redirect(`/app/p/${aggregate.deal.id}`);
   } catch (error) {
     debug.fail(error, {
       viewerId: viewer.id

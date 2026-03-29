@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { DevDashboardClient } from "@/components/dev/dev-dashboard-client";
 import {
@@ -16,10 +16,6 @@ export default async function DevDashboardPage() {
   }
 
   const viewer = await getDevDashboardViewerFromSession();
-
-  if (!viewer) {
-    redirect("/login");
-  }
 
   const snapshot = await getDevDashboardSnapshot();
 

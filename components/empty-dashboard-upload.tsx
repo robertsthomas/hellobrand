@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Play, Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
 import { InfoTooltip } from "@/components/app-tooltip";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { captureAppEvent } from "@/lib/posthog/events";
+import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
 import {
   deleteLocalWorkspace,
@@ -52,12 +54,11 @@ function buildWorkspaceLabel(input: {
     return subjectLine;
   }
 
-  if (input.files.length === 1) {
-    return input.files[0]?.name.replace(/\.[^.]+$/, "") ?? "New workspace";
-  }
-
-  if (input.files.length > 1) {
-    return `${input.files.length} uploaded documents`;
+  const fileBackedTitle = deriveWorkspaceTitleFromFileNames(
+    input.files.map((file) => file.name)
+  );
+  if (fileBackedTitle) {
+    return fileBackedTitle;
   }
 
   return "Pasted brand context";
@@ -99,6 +100,9 @@ function sourceSummary(inputSource: "upload" | "paste" | "mixed" | null) {
   return "Uploaded documents";
 }
 
+const GENERATE_WORKSPACE_BUTTON_CLASS =
+  "h-10 border border-black/10 bg-white px-4 text-sm font-semibold text-foreground transition hover:border-black/20 hover:bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.05]";
+
 function pendingSourceSummary(files: SelectedFileMeta[], pastedText: string) {
   const hasText = pastedText.trim().length > 0;
 
@@ -118,11 +122,13 @@ function pendingSourceSummary(files: SelectedFileMeta[], pastedText: string) {
 }
 
 function toServerQueuedWorkspaceItem(item: IntakeDraftListItem): ServerQueuedWorkspaceItem {
+  const labels = getDisplayDealLabels(item.deal);
+
   return {
     sessionId: item.session.id,
     dealId: item.deal.id,
-    brandName: item.deal.brandName,
-    campaignName: item.deal.campaignName,
+    brandName: labels.brandName ?? item.deal.brandName,
+    campaignName: labels.campaignName ?? item.deal.campaignName,
     updatedAt: item.session.updatedAt,
     status: "queued",
     inputSource: item.session.inputSource
@@ -522,49 +528,59 @@ export function EmptyDashboardUpload({
 
           {localWorkspaces.length > 0 ? (
             <div className="grid gap-3">
-              <div className="grid gap-3">
-                {localWorkspaces.map((workspace) => (
-                  <div
-                    key={workspace.localId}
-                    className="grid gap-3 border border-black/8 p-4 dark:border-white/10 md:grid-cols-[minmax(0,1fr)_auto]"
-                  >
-                    <div className="min-w-0 space-y-1.5">
-                      <p className="truncate font-semibold text-foreground">
-                        {workspace.campaignName}
-                      </p>
-                      <p className="text-sm text-muted-foreground">{workspace.brandName}</p>
-                      <p className="text-sm text-[#667085] dark:text-[#a3acb9]">
-                        {sourceSummary(workspace.inputSource)}
-                        {workspace.fileCount > 0
-                          ? ` • ${workspace.fileCount} file${workspace.fileCount === 1 ? "" : "s"}`
-                          : ""}
-                        {workspace.hasPastedText ? " • text added" : ""}
-                      </p>
+              <div className="divide-y divide-black/8 border-y border-black/8 dark:divide-white/10 dark:border-white/10">
+                {localWorkspaces.map((workspace) => {
+                  const labels = getDisplayDealLabels(workspace);
+
+                  return (
+                    <div
+                      key={workspace.localId}
+                      className="grid gap-2 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                    >
+                      <div className="min-w-0 space-y-1.5">
+                        <p className="truncate text-base font-semibold text-foreground">
+                          {labels.campaignName ?? workspace.campaignName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {labels.brandName ?? workspace.brandName}
+                        </p>
+                        <p className="text-sm text-[#667085] dark:text-[#a3acb9]">
+                          {sourceSummary(workspace.inputSource)}
+                          {workspace.fileCount > 0
+                            ? ` • ${workspace.fileCount} file${workspace.fileCount === 1 ? "" : "s"}`
+                            : ""}
+                          {workspace.hasPastedText ? " • text added" : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
+                        <button
+                          type="button"
+                          onClick={() => void removeLocalWorkspace(workspace.localId)}
+                          className="text-sm text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
+                          aria-label={`Remove ${labels.campaignName ?? workspace.campaignName}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                        <span className="text-xs font-medium text-black/55 dark:text-white/55">
+                          Ready to start
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
-                      <button
-                        type="button"
-                        onClick={() => void removeLocalWorkspace(workspace.localId)}
-                        className="text-sm text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
-                        aria-label={`Remove ${workspace.campaignName}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                      <span className="text-xs font-medium uppercase tracking-[0.14em] text-black/55 dark:text-white/55">
-                        Waiting to start
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => void startAnalysis()}
-                  className={cn(buttonVariants({ className: "gap-2" }))}
+                  className={cn(
+                    buttonVariants({
+                      variant: "outline",
+                      className: GENERATE_WORKSPACE_BUTTON_CLASS
+                    })
+                  )}
                 >
-                  <Play className="h-4 w-4" />
                   Generate workspace
                 </button>
                 {!isComposerVisible ? (
@@ -594,9 +610,13 @@ export function EmptyDashboardUpload({
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => void startAnalysis()}
-                className={cn(buttonVariants({ className: "gap-2" }))}
+                className={cn(
+                  buttonVariants({
+                    variant: "outline",
+                    className: GENERATE_WORKSPACE_BUTTON_CLASS
+                  })
+                )}
               >
-                <Play className="h-4 w-4" />
                 Generate workspace
               </button>
               {!isComposerVisible ? (
@@ -624,36 +644,40 @@ export function EmptyDashboardUpload({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-[#8f98a6]">
                 Already queued
               </p>
-              <div className="divide-y divide-black/8 border-t border-black/8 dark:divide-white/10 dark:border-white/10">
-                {serverQueuedWorkspaces.map((workspace) => (
-                  <div
-                    key={workspace.sessionId}
-                    className="grid gap-2 py-4 md:grid-cols-[minmax(0,1fr)_auto]"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-foreground">
-                        {workspace.campaignName}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {workspace.brandName}
-                      </p>
-                      <p className="mt-2 text-sm text-[#667085] dark:text-[#a3acb9]">
-                        {sourceSummary(workspace.inputSource)}
-                      </p>
+              <div className="divide-y divide-black/8 border-y border-black/8 dark:divide-white/10 dark:border-white/10">
+                {serverQueuedWorkspaces.map((workspace) => {
+                  const labels = getDisplayDealLabels(workspace);
+
+                  return (
+                    <div
+                      key={workspace.sessionId}
+                      className="grid gap-2 py-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">
+                          {labels.campaignName ?? workspace.campaignName}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {labels.brandName ?? workspace.brandName}
+                        </p>
+                        <p className="mt-2 text-sm text-[#667085] dark:text-[#a3acb9]">
+                          {sourceSummary(workspace.inputSource)}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
+                        <span className="text-xs font-medium text-[#98a2b3] dark:text-[#8f98a6]">
+                          Queued on server
+                        </span>
+                        <Link
+                          href={`/app/intake/${workspace.sessionId}`}
+                          className="text-sm font-medium text-black/60 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+                        >
+                          View
+                        </Link>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
-                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
-                        Ready on server
-                      </span>
-                      <Link
-                        href={`/app/intake/${workspace.sessionId}`}
-                        className="text-sm font-medium text-black/60 transition hover:text-black dark:text-white/60 dark:hover:text-white"
-                      >
-                        View
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ) : null}

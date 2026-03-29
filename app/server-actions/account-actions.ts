@@ -47,7 +47,7 @@ export async function savePaymentAction(formData: FormData) {
 
   await updatePaymentForViewer(viewer, dealId, input);
   revalidatePath("/app/payments");
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   updateTag(`user-${viewer.id}-payments`);
   updateTag(`user-${viewer.id}-deals`);

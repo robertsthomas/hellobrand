@@ -13,9 +13,14 @@ import {
   deleteIntakeDraftAction
 } from "@/app/actions";
 import { requireViewer } from "@/lib/auth";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
+import { cleanDisplayText } from "@/lib/display-text";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, humanizeToken, stripHtmlTags } from "@/lib/utils";
+
+const mobileSectionClassName =
+  "-mx-4 border-y border-black/5 bg-white/85 px-4 py-6 dark:border-white/10 dark:bg-white/[0.06] sm:mx-0 sm:border sm:p-6 sm:shadow-panel";
 
 function presentText(value: string | null | undefined) {
   if (!value) {
@@ -72,7 +77,7 @@ function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+    <section className={mobileSectionClassName}>
       <div className="space-y-1">
         <h3 className="text-xl font-semibold text-ink">{title}</h3>
         <p className="text-sm text-black/60 dark:text-white/65">{description}</p>
@@ -179,7 +184,7 @@ async function IntakeReviewContent({
   const { session, aggregate, profileDefaults } = sessionData;
 
   if (session.status === "completed" && aggregate) {
-    redirect(`/app/deals/${aggregate.deal.id}`);
+    redirect(`/app/p/${aggregate.deal.id}`);
   }
 
   const showConfirmation =
@@ -224,25 +229,29 @@ async function IntakeReviewContent({
   const initialProfileHandle =
     presentText(profileDefaults?.businessName) ?? derivedHandle ?? "";
   const inputClassName =
-    "w-full rounded-2xl border border-black/10 bg-sand/40 px-4 py-3 text-base transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
+    "w-full rounded-none border border-black/10 bg-sand/25 px-4 py-3 text-base transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
   const textareaClassName =
-    "min-h-32 w-full rounded-[20px] border border-black/10 bg-sand/40 px-4 py-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
+    "min-h-32 w-full rounded-none border border-black/10 bg-sand/25 px-4 py-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
 
   const contactType =
     normalized?.primaryContact?.organizationType ??
     (normalized?.agencyName ? "agency" : "brand");
+  const displayLabels = getDisplayDealLabels({
+    brandName: normalized?.brandName,
+    campaignName: normalized?.contractTitle
+  });
   const summaryCards = [
     {
       label: "Brand",
-      value: normalized?.brandName ?? (analysisRunning ? "Analyzing..." : "Not found"),
+      value: displayLabels.brandName ?? (analysisRunning ? "Analyzing..." : "Not detected yet"),
       loading: analysisRunning && !normalized?.brandName
     },
     {
       label: "Primary contact",
       value:
-        normalized?.primaryContact?.name ??
-        normalized?.primaryContact?.email ??
-        (analysisRunning ? "Analyzing..." : "Not found"),
+        cleanDisplayText(normalized?.primaryContact?.name) ??
+        cleanDisplayText(normalized?.primaryContact?.email) ??
+        (analysisRunning ? "Analyzing..." : "Not detected yet"),
       loading:
         analysisRunning &&
         !normalized?.primaryContact?.name &&
@@ -328,27 +337,29 @@ async function IntakeReviewContent({
           </details>
         ) : null}
 
-        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
-              <div className="space-y-2">
-                <h2 className="text-2xl font-semibold text-ink">Confirm this partnership</h2>
-                <p className="text-sm text-black/60 dark:text-white/65">
-                  The intake always stays in the same order. Missing details can stay
-                  empty until you fill them in manually.
-                </p>
+        <section className="space-y-6">
+              <div className={mobileSectionClassName}>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-semibold text-ink">Confirm this partnership</h2>
+                  <p className="text-sm text-black/60 dark:text-white/65">
+                    The intake always stays in the same order. Missing details can stay
+                    empty until you fill them in manually.
+                  </p>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {summaryCards.map((card) => (
+                    <SummaryCard
+                      key={card.label}
+                      label={card.label}
+                      value={card.value}
+                      loading={card.loading}
+                    />
+                  ))}
+                </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {summaryCards.map((card) => (
-                  <SummaryCard
-                    key={card.label}
-                    label={card.label}
-                    value={card.value}
-                    loading={card.loading}
-                  />
-                ))}
-              </div>
-
-              <form action={confirmIntakeSessionAction} className="mt-6 space-y-6">
+              <form action={confirmIntakeSessionAction} className="space-y-6">
                 <WorkspaceCreationOverlay />
                 <input type="hidden" name="sessionId" value={session.id} />
                 <SectionCard
@@ -655,7 +666,7 @@ async function IntakeReviewContent({
                 </SectionCard>
 
                 <div className="sticky bottom-5 z-20 flex justify-end">
-                  <div className="flex items-center gap-3 border border-black/8 bg-white/92 px-3 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92">
+                  <div className="flex w-full items-center justify-between gap-3 border border-black/8 bg-white/92 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92 sm:w-auto sm:px-3">
                     <span className="hidden text-sm text-black/55 dark:text-white/55 md:inline">
                       Review complete?
                     </span>
@@ -673,7 +684,7 @@ async function IntakeReviewContent({
               </form>
         </section>
 
-        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <section className={mobileSectionClassName}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold text-ink">Profile defaults</h2>
@@ -732,7 +743,7 @@ async function IntakeReviewContent({
           )}
         </section>
 
-        <section className=" border border-black/5 bg-white/85 p-6 shadow-panel dark:border-white/10 dark:bg-white/[0.06]">
+        <section className={mobileSectionClassName}>
               <h2 className="text-xl font-semibold text-ink">Risk watchouts</h2>
               <div className="mt-4 grid gap-3">
                 {riskFlags.slice(0, 4).map((flag) => (

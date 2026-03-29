@@ -69,6 +69,7 @@ function toDealRecord(deal: {
   brandName: string;
   campaignName: string;
   status: string;
+  statusBeforeArchive: string | null;
   paymentStatus: string;
   countersignStatus: string;
   summary: string | null;
@@ -754,6 +755,7 @@ export class PrismaRepository {
         brandName: patch.brandName,
         campaignName: patch.campaignName,
         status: patch.status,
+        statusBeforeArchive: patch.statusBeforeArchive,
         paymentStatus: patch.paymentStatus,
         countersignStatus: patch.countersignStatus,
         summary: patch.summary,
@@ -804,12 +806,40 @@ export class PrismaRepository {
       return false;
     }
 
-    await prisma.deal.delete({
-      where: { id: dealId }
+    const anonymousSessions = await prisma.anonymousAnalysisSession.findMany({
+      where: { claimedDealId: dealId },
+      select: {
+        id: true,
+        storagePath: true
+      }
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.appNotification.deleteMany({
+        where: {
+          userId,
+          dealId
+        }
+      });
+
+      await tx.anonymousAnalysisSession.deleteMany({
+        where: {
+          claimedDealId: dealId
+        }
+      });
+
+      await tx.deal.delete({
+        where: { id: dealId }
+      });
     });
 
     await Promise.all(
-      existing.documents.map((document) => deleteStoredBytes(document.storagePath))
+      [
+        ...existing.documents.map((document) => document.storagePath),
+        ...anonymousSessions
+          .map((session) => session.storagePath)
+          .filter((storagePath): storagePath is string => Boolean(storagePath))
+      ].map((storagePath) => deleteStoredBytes(storagePath))
     );
 
     return true;

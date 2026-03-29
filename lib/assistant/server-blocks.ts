@@ -47,7 +47,7 @@ export async function buildWorkspaceSelectionBlock(input: {
       paymentStatus: deal.paymentStatus,
       href: buildAssistantHref(input.tab || "overview", {
         dealId: deal.id
-      }) ?? `/app/deals/${deal.id}`,
+      }) ?? `/app/p/${deal.id}`,
       prompt: input.prompt
     }))
   };

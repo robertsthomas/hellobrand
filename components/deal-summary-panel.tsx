@@ -27,13 +27,19 @@ import {
   getWorkspaceSummaries
 } from "@/lib/summaries";
 import type { SummaryRecord, SummaryType } from "@/lib/types";
-import { formatDate, humanizeToken } from "@/lib/utils";
+import { cn, formatDate, humanizeToken } from "@/lib/utils";
 
 interface DealSummaryPanelProps {
   dealId: string;
   summaries: SummaryRecord[];
   currentSummary: SummaryRecord | null;
 }
+
+const VARIANT_TABS: { type: SummaryType; label: string }[] = [
+  { type: "legal", label: "Legal" },
+  { type: "plain_language", label: "Plain language" },
+  { type: "short", label: "Short" }
+];
 
 function SummaryBody({ summary }: { summary: SummaryRecord }) {
   const sections = parseDealSummarySections(summary.body);
@@ -126,105 +132,110 @@ export function DealSummaryPanel({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["legal", "plain_language", "short"] as const).map((summaryType) => (
-              <Button
-                key={summaryType}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Variant switcher */}
+        <div className="flex items-center gap-0 border border-black/10 dark:border-white/10">
+          {VARIANT_TABS.map((tab) => {
+            const isActive = currentSummary.summaryType === tab.type;
+
+            return (
+              <button
+                key={tab.type}
                 type="button"
-                size="sm"
-                variant={currentSummary.summaryType === summaryType ? "default" : "outline"}
                 disabled={isPending}
-                onClick={() => runVariantAction(summaryType)}
+                onClick={() => runVariantAction(tab.type)}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50",
+                  isActive
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
+                )}
               >
-                {getSummaryTypeLabel(summaryType)}
-              </Button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline">
-              {currentSummary.summaryType
-                ? getSummaryTypeLabel(currentSummary.summaryType)
-                : "Summary"}
-            </Badge>
-            <span>Current version from {formatDate(currentSummary.createdAt)}</span>
-          </div>
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-          <CollapsibleTrigger asChild>
-            <Button type="button" size="sm" variant="outline">
-              <History className="h-4 w-4" />
-              History
-              <Badge variant="secondary" className="ml-1">
-                {workspaceSummaries.length}
-              </Badge>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : ""}`}
-              />
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-4 w-full min-w-[320px] border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-black/10 md:max-w-[520px]">
-            <div className="space-y-3">
-              {workspaceSummaries.map((summary) => {
-                const isCurrent = summary.id === currentSummary.id;
-                const isComparing = summary.id === compareSummaryId;
+        {/* History toggle */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            {formatDate(currentSummary.createdAt)}
+          </span>
+          <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
+            <CollapsibleTrigger asChild>
+              <Button type="button" size="sm" variant="outline">
+                <History className="h-4 w-4" />
+                History
+                <Badge variant="secondary" className="ml-1">
+                  {workspaceSummaries.length}
+                </Badge>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 w-full min-w-[320px] border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-black/10 md:max-w-[520px]">
+              <div className="space-y-3">
+                {workspaceSummaries.map((summary) => {
+                  const isCurrent = summary.id === currentSummary.id;
+                  const isComparing = summary.id === compareSummaryId;
 
-                return (
-                  <div
-                    key={summary.id}
-                    className="flex flex-wrap items-center justify-between gap-3 border border-black/6 px-3 py-3 dark:border-white/10"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant={isCurrent ? "default" : "outline"}>
-                          {summary.summaryType
-                            ? getSummaryTypeLabel(summary.summaryType)
-                            : "Summary"}
-                        </Badge>
-                        {isCurrent ? (
-                          <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                            Current
+                  return (
+                    <div
+                      key={summary.id}
+                      className="flex flex-wrap items-center justify-between gap-3 border border-black/6 px-3 py-3 dark:border-white/10"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">
+                            {summary.summaryType
+                              ? getSummaryTypeLabel(summary.summaryType)
+                              : "Summary"}
                           </span>
-                        ) : null}
+                          {isCurrent ? (
+                            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                              Current
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(summary.createdAt)} · {humanizeToken(summary.source ?? "analysis")}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(summary.createdAt)} · {humanizeToken(summary.source ?? "analysis")}
-                      </p>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={isComparing ? "default" : "outline"}
-                        onClick={() =>
-                          setCompareSummaryId((current) =>
-                            current === summary.id ? null : summary.id
-                          )
-                        }
-                      >
-                        <GitCompareArrows className="h-4 w-4" />
-                        {isComparing ? "Hide compare" : "Compare"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={isPending || isCurrent}
-                        onClick={() => runRestoreAction(summary.id)}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Restore
-                      </Button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={isComparing ? "default" : "outline"}
+                          onClick={() =>
+                            setCompareSummaryId((current) =>
+                              current === summary.id ? null : summary.id
+                            )
+                          }
+                        >
+                          <GitCompareArrows className="h-4 w-4" />
+                          {isComparing ? "Hide compare" : "Compare"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={isPending || isCurrent}
+                          onClick={() => runRestoreAction(summary.id)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Restore
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+                  );
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       </div>
 
       {isPending && pendingLabel ? (
@@ -245,11 +256,11 @@ export function DealSummaryPanel({
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
             <div className="flex items-center gap-2">
-              <Badge variant="outline">
+              <span className="text-sm font-medium text-foreground">
                 {compareSummary.summaryType
                   ? getSummaryTypeLabel(compareSummary.summaryType)
                   : "Summary"}
-              </Badge>
+              </span>
               <span className="text-sm text-muted-foreground">
                 {formatDate(compareSummary.createdAt)}
               </span>
@@ -258,12 +269,12 @@ export function DealSummaryPanel({
           </div>
           <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
             <div className="flex items-center gap-2">
-              <Badge>Current</Badge>
-              <Badge variant="outline">
+              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Current</span>
+              <span className="text-sm font-medium text-foreground">
                 {currentSummary.summaryType
                   ? getSummaryTypeLabel(currentSummary.summaryType)
                   : "Summary"}
-              </Badge>
+              </span>
             </div>
             <SummaryBody summary={currentSummary} />
           </div>

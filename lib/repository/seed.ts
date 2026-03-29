@@ -108,7 +108,8 @@ export function createSeedStore(): AppStore {
         createdAt: now,
         updatedAt: now,
         analyzedAt: now,
-        confirmedAt: now
+        confirmedAt: now,
+        statusBeforeArchive: null
       }
     ],
     documents: [

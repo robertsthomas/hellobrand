@@ -74,6 +74,20 @@ export function GuideProvider({
     () => new Set(initialGuideState.completedStepIds)
   );
 
+  // Sync with server state when it changes (e.g., after cache revalidation)
+  useEffect(() => {
+    setDismissedStepIds((prev) => {
+      const next = new Set(initialGuideState.dismissedStepIds);
+      for (const id of prev) next.add(id);
+      return next.size === prev.size ? prev : next;
+    });
+    setCompletedStepIds((prev) => {
+      const next = new Set(initialGuideState.completedStepIds);
+      for (const id of prev) next.add(id);
+      return next.size === prev.size ? prev : next;
+    });
+  }, [initialGuideState]);
+
   // lg breakpoint matches the sidebar visibility (hidden lg:flex)
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {

@@ -52,6 +52,57 @@ function invalidateDeals(viewerId: string, dealId?: string) {
   }
 }
 
+function resolveSafeWorkspaceRedirect(target: string | null | undefined) {
+  if (!target || !target.startsWith("/app")) {
+    return "/app";
+  }
+
+  return target;
+}
+
+async function performWorkspaceDelete(
+  viewer: Awaited<ReturnType<typeof requireViewer>>,
+  dealId: string,
+  redirectTo: string,
+  actionName: string
+) {
+  const debug = startServerDebug("action_delete_workspace", {
+    action: actionName,
+    dealId,
+    redirectTo
+  });
+
+  try {
+    const deleted = await deleteDealFromDeals(viewer, dealId);
+
+    if (!deleted) {
+      throw new Error("Could not delete workspace.");
+    }
+
+    debug.complete({
+      viewerId: viewer.id,
+      dealId
+    });
+  } catch (error) {
+    debug.fail(error, {
+      viewerId: viewer.id,
+      dealId
+    });
+    throw error;
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/p/history");
+  revalidatePath(`/app/p/${dealId}`);
+  revalidatePath("/app/payments");
+  revalidatePath("/app/inbox");
+  revalidatePath("/app/analytics");
+  revalidatePath("/app/settings/notifications");
+  invalidateDeals(viewer.id, dealId);
+  updateTag(`user-${viewer.id}-payments`);
+  updateTag(`user-${viewer.id}-notifications`);
+}
+
 export async function createDealAction(formData: FormData) {
   const viewer = await requireViewer();
   const input = createDealSchema.parse({
@@ -61,7 +112,7 @@ export async function createDealAction(formData: FormData) {
   });
 
   const deal = await createDealFromDeals(viewer, input);
-  redirect(`/app/deals/${deal.id}`);
+  redirect(`/app/p/${deal.id}`);
 }
 
 export async function uploadDocumentsAction(formData: FormData) {
@@ -94,9 +145,9 @@ export async function uploadDocumentsAction(formData: FormData) {
     throw error;
   }
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
-  revalidatePath("/app/deals/history");
+  revalidatePath("/app/p/history");
   invalidateDeals(viewer.id, dealId);
 }
 
@@ -105,7 +156,7 @@ export async function reprocessDocumentAction(formData: FormData) {
   const documentId = String(formData.get("documentId") ?? "");
   const dealId = String(formData.get("dealId") ?? "");
   await reprocessDocumentFromDeals(viewer, documentId);
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   invalidateDeals(viewer.id, dealId);
 }
 
@@ -119,7 +170,7 @@ export async function saveDealMetaAction(formData: FormData) {
   });
 
   await updateDealFromDeals(viewer, dealId, input);
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -188,7 +239,7 @@ export async function saveTermsAction(formData: FormData) {
     brandCategory: normalizeDealCategory(input.brandCategory)
   });
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -199,7 +250,7 @@ export async function saveDealNotesAction(formData: FormData) {
 
   await updateDealNotesFromDeals(viewer, dealId, parseNullableString(formData.get("notes")));
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -211,7 +262,7 @@ export async function confirmTermsReviewAction(formData: FormData) {
 
   await confirmTermsFieldForViewer(viewer, dealId, fieldPath);
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -222,7 +273,7 @@ export async function generateDraftAction(formData: FormData) {
   const intent = draftIntentSchema.parse(formData.get("intent")) as DraftIntent;
 
   await generateDraftFromDeals(viewer, dealId, intent);
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   invalidateDeals(viewer.id, dealId);
 }
 
@@ -242,7 +293,7 @@ export async function activateSummaryVariantAction(
 
   try {
     await activateSummaryVariantForViewer(viewer, dealId, summaryType);
-    revalidatePath(`/app/deals/${dealId}`);
+    revalidatePath(`/app/p/${dealId}`);
     revalidatePath("/app");
     invalidateDeals(viewer.id, dealId);
     return { ok: true };
@@ -261,7 +312,7 @@ export async function restoreSummaryVersionAction(dealId: string, summaryId: str
 
   try {
     await restoreSummaryForViewer(viewer, dealId, summaryId);
-    revalidatePath(`/app/deals/${dealId}`);
+    revalidatePath(`/app/p/${dealId}`);
     revalidatePath("/app");
     invalidateDeals(viewer.id, dealId);
     return { ok: true };
@@ -278,37 +329,33 @@ export async function restoreSummaryVersionAction(dealId: string, summaryId: str
 export async function deleteWorkspaceAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
-  const redirectTo = String(formData.get("redirectTo") ?? "/app");
-  const debug = startServerDebug("action_delete_workspace", {
-    action: "deleteWorkspaceAction",
-    dealId,
-    redirectTo
-  });
+  const redirectTo = resolveSafeWorkspaceRedirect(String(formData.get("redirectTo") ?? "/app"));
 
-  try {
-    const deleted = await deleteDealFromDeals(viewer, dealId);
+  await performWorkspaceDelete(viewer, dealId, redirectTo, "deleteWorkspaceAction");
+  redirect(redirectTo);
+}
 
-    if (!deleted) {
-      throw new Error("Could not delete workspace.");
-    }
+export async function deleteWorkspaceConfirmedAction(
+  _previousState: { error: string | null },
+  formData: FormData
+) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+  const redirectTo = resolveSafeWorkspaceRedirect(String(formData.get("redirectTo") ?? "/app"));
+  const confirmation = String(formData.get("confirmationText") ?? "").trim().toLowerCase();
 
-    debug.complete({
-      viewerId: viewer.id,
-      dealId
-    });
-  } catch (error) {
-    debug.fail(error, {
-      viewerId: viewer.id,
-      dealId
-    });
-    throw error;
+  if (confirmation !== "delete") {
+    return {
+      error: 'Type "delete" to confirm this partnership deletion.'
+    };
   }
 
-  revalidatePath("/app");
-  revalidatePath("/app/deals/history");
-  revalidatePath("/app/payments");
-  invalidateDeals(viewer.id, dealId);
-  updateTag(`user-${viewer.id}-payments`);
+  await performWorkspaceDelete(
+    viewer,
+    dealId,
+    redirectTo,
+    "deleteWorkspaceConfirmedAction"
+  );
   redirect(redirectTo);
 }
 
@@ -320,8 +367,58 @@ export async function applyPendingChangesAction(formData: FormData) {
 
   await applyPendingChangesForViewer(viewer, dealId, acceptedFields);
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
+  invalidateDeals(viewer.id, dealId);
+}
+
+export async function archiveDealAction(dealId: string) {
+  const viewer = await requireViewer();
+  const deal = await updateDealFromDeals(viewer, dealId, {});
+
+  if (!deal) {
+    return { error: "Partnership not found." };
+  }
+
+  if (deal.status === "archived") {
+    return { error: "Partnership is already archived." };
+  }
+
+  await updateDealFromDeals(viewer, dealId, {
+    statusBeforeArchive: deal.status,
+    status: "archived"
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/p/history");
+  revalidatePath(`/app/p/${dealId}`);
+  revalidatePath("/app/payments");
+  invalidateDeals(viewer.id, dealId);
+}
+
+export async function unarchiveDealAction(dealId: string) {
+  const viewer = await requireViewer();
+  const deal = await updateDealFromDeals(viewer, dealId, {});
+
+  if (!deal) {
+    return { error: "Partnership not found." };
+  }
+
+  if (deal.status !== "archived") {
+    return { error: "Partnership is not archived." };
+  }
+
+  const restoreStatus = deal.statusBeforeArchive ?? "completed";
+
+  await updateDealFromDeals(viewer, dealId, {
+    status: restoreStatus as never,
+    statusBeforeArchive: null
+  });
+
+  revalidatePath("/app");
+  revalidatePath("/app/p/history");
+  revalidatePath(`/app/p/${dealId}`);
+  revalidatePath("/app/payments");
   invalidateDeals(viewer.id, dealId);
 }
 
@@ -331,7 +428,7 @@ export async function dismissPendingChangesAction(formData: FormData) {
 
   await dismissPendingChangesForViewer(viewer, dealId);
 
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -339,7 +436,7 @@ export async function dismissPendingChangesAction(formData: FormData) {
 export async function updateDeliverablesAction(dealId: string, deliverables: unknown[]) {
   const viewer = await requireViewer();
   await updateTermsFromDeals(viewer, dealId, { deliverables: deliverables as never });
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");
   invalidateDeals(viewer.id, dealId);
 }
@@ -397,7 +494,7 @@ function parseInvoiceInputFromForm(formData: FormData) {
 }
 
 function invalidateInvoiceSurfaces(viewerId: string, dealId: string) {
-  revalidatePath(`/app/deals/${dealId}`);
+  revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app/payments");
   revalidatePath("/app");
   invalidateDeals(viewerId, dealId);

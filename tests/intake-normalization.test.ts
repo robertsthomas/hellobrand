@@ -138,6 +138,20 @@ describe("intake normalization", () => {
     expect(normalized?.paymentAmount).toBe(2800);
   });
 
+  test("splits markdown-style heading leakage out of brand and campaign labels", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Amazon Kids ## Stories with Alexa",
+      campaignName: "Amazon Kids ## Stories with Alexa"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("Amazon Kids");
+    expect(normalized?.contractTitle).toBe("Amazon Kids - Stories with Alexa");
+  });
+
   test("filters boilerplate contract delivery clauses out of timeline items", () => {
     const aggregate = createAggregate();
     aggregate.documents = [

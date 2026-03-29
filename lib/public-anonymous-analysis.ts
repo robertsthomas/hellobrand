@@ -688,7 +688,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
     if (session.claimedByUserId === viewer.id) {
       return {
         dealId: session.claimedDealId,
-        href: `/app/deals/${session.claimedDealId}`,
+        href: `/app/p/${session.claimedDealId}`,
         alreadyClaimed: true
       };
     }
@@ -713,7 +713,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       if (latestSession.claimedByUserId === viewer.id) {
         return {
           dealId: latestSession.claimedDealId,
-          href: `/app/deals/${latestSession.claimedDealId}`,
+          href: `/app/p/${latestSession.claimedDealId}`,
           alreadyClaimed: true
         };
       }
@@ -846,7 +846,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
 
     return {
       dealId: deal.id,
-      href: `/app/deals/${deal.id}`,
+      href: `/app/p/${deal.id}`,
       alreadyClaimed: false
     };
   } catch (error) {

@@ -544,7 +544,7 @@ function invoiceReminderSeed(input: {
     dealId: input.dealId,
     title,
     description,
-    href: `/app/deals/${input.dealId}?tab=invoices`,
+    href: `/app/p/${input.dealId}?tab=invoices`,
     dedupeKey: `invoice.generate_prompt:${input.dealId}:${input.offsetDays}`,
     createdAt: input.sendOn
   };

@@ -1,3 +1,4 @@
+import { cleanDisplayText } from "@/lib/display-text";
 import type { RiskFlagRecord } from "@/lib/types";
 import { cn, normalizeEvidenceSnippet } from "@/lib/utils";
 import {
@@ -35,13 +36,16 @@ export function RiskFlags({ flags }: { flags: RiskFlagRecord[] }) {
         >
           {flags.map((flag) => {
             const evidence = cleanRiskEvidence(flag.evidence);
+            const title = cleanDisplayText(flag.title) ?? flag.title;
+            const detail = cleanDisplayText(flag.detail) ?? flag.detail;
+            const suggestedAction = cleanDisplayText(flag.suggestedAction);
 
             return (
               <AccordionItem key={flag.id} value={flag.id} className="border-black/8 dark:border-white/10">
                 <AccordionTrigger className="py-4 hover:no-underline">
                   <div className="flex flex-wrap items-center gap-3 pr-6 text-left">
                     <h3 className="text-base font-semibold text-black/80 dark:text-white/85">
-                      {flag.title}
+                      {title}
                     </h3>
                     <span
                       className={cn(
@@ -58,11 +62,11 @@ export function RiskFlags({ flags }: { flags: RiskFlagRecord[] }) {
                 <AccordionContent className="pb-5">
                   <div className="max-w-4xl space-y-4">
                     <p className="text-sm leading-6 text-black/65 dark:text-white/70">
-                      {flag.detail}
+                      {detail}
                     </p>
-                    {flag.suggestedAction ? (
+                    {suggestedAction ? (
                       <p className="text-sm font-medium text-black/75 dark:text-white/80">
-                        Suggested action: {flag.suggestedAction}
+                        Suggested action: {suggestedAction}
                       </p>
                     ) : null}
                     {evidence.length > 0 ? (

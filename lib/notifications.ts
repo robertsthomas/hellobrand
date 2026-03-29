@@ -193,7 +193,7 @@ function workspaceNotificationHref(input: {
     case "workspace.duplicates_found":
       return `/app/intake/${input.sessionId}/review`;
     case "workspace.confirmed":
-      return `/app/deals/${input.dealId}`;
+      return `/app/p/${input.dealId}`;
     case "workspace.cancelled":
       return "/app";
     default:

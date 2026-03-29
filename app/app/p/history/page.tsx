@@ -11,6 +11,10 @@ import type { DealRecord } from "@/lib/types";
 function mapStageGroup(
   deal: Pick<DealRecord, "status" | "paymentStatus">
 ): DealHistoryRow["stageGroup"] {
+  if (deal.status === "archived") {
+    return "archived";
+  }
+
   if (deal.status === "paid" || deal.status === "completed" || deal.paymentStatus === "paid") {
     return "completed";
   }
@@ -25,6 +29,10 @@ function mapStageGroup(
 function mapStageLabel(
   deal: Pick<DealRecord, "status" | "paymentStatus">
 ): DealHistoryRow["stageLabel"] {
+  if (deal.status === "archived") {
+    return "Archived";
+  }
+
   if (deal.status === "paid" || deal.status === "completed" || deal.paymentStatus === "paid") {
     return "Completed";
   }

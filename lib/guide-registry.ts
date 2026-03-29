@@ -19,114 +19,104 @@ export interface GuideContext {
   completedStepIds: Set<string>;
 }
 
+const WORKSPACE_TOUR_STEP_IDS = [
+  "workspace_overview",
+  "workspace_terms",
+  "workspace_risks",
+  "workspace_deliverables"
+];
+
+function isWorkspaceTourDone(ctx: GuideContext) {
+  return WORKSPACE_TOUR_STEP_IDS.every(
+    (id) => ctx.dismissedStepIds.has(id) || ctx.completedStepIds.has(id)
+  );
+}
+
 export const GUIDE_STEPS: GuideStep[] = [
-  // Sidebar tour — shown first on dashboard for new users
+  // ── Phase 1: First landing (dashboard, no workspaces) ──
   {
-    id: "sidebar_new_workspace",
-    title: "Create a new workspace",
-    body: "Each partnership gets its own workspace. Upload contracts, briefs, or emails to get started.",
-    anchorSelector: '[data-guide="sidebar-new-workspace"]',
-    routeMatch: "/app",
-    side: "right",
-    desktopOnly: true // tooltip only on desktop; modal on mobile
-  },
-  {
-    id: "sidebar_inbox",
-    title: "Your inbox at a glance",
-    body: "The Inbox aggregates email threads linked to your partnerships. Deal matches appear here automatically.",
-    anchorSelector: '[data-guide="sidebar-inbox"]',
-    routeMatch: "/app",
-    side: "right",
-    desktopOnly: true // tooltip only on desktop; modal on mobile
-  },
-  {
-    id: "sidebar_payments",
-    title: "Track your payments",
-    body: "See all invoices, due dates, and payment statuses across partnerships in one place.",
-    anchorSelector: '[data-guide="sidebar-payments"]',
-    routeMatch: "/app",
-    side: "right",
-    desktopOnly: true // tooltip only on desktop; modal on mobile
-  },
-  {
-    id: "sidebar_analytics",
-    title: "Analytics overview",
-    body: "View earnings trends, deal velocity, and portfolio insights to understand your creator business.",
-    anchorSelector: '[data-guide="sidebar-analytics"]',
-    routeMatch: "/app",
-    side: "right",
-    desktopOnly: true // tooltip only on desktop; modal on mobile
-  },
-  {
-    id: "sidebar_settings",
-    title: "Customize your settings",
-    body: "Update your profile, notification preferences, billing, and accent color from Settings.",
-    anchorSelector: '[data-guide="sidebar-settings"]',
-    routeMatch: "/app",
-    side: "right",
-    desktopOnly: true // tooltip only on desktop; modal on mobile
-  },
-  // Add documents — shown on intake/new workspace page
-  {
-    id: "add_first_documents",
-    title: "Add your first documents",
-    body: "Upload a contract, brief, or email thread. HelloBrand will extract terms, flag risks, and build your workspace.",
+    id: "welcome_start_here",
+    title: "Start here",
+    body: "Upload a contract, brief, or email from a brand. HelloBrand extracts the terms, flags risks, and builds your workspace automatically.",
     anchorSelector: '[data-guide="add-documents"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app$/,
     side: "bottom",
     autoCompleteCondition: (ctx) =>
       ctx.hasActiveWorkspace || ctx.hasWorkspaceNotification
   },
-  // Notifications — shown after first workspace starts generating
+
+  // ── Phase 2: Workspace generating ──
   {
-    id: "notifications_workspace_generating",
-    title: "Your workspace is generating",
-    body: "We're analyzing your documents in the background. Check the notifications drawer for status updates, you'll see when it's done.",
+    id: "workspace_generating",
+    title: "Your workspace is being built",
+    body: "We're analyzing your documents now. You'll get a notification here when it's ready to review.",
     anchorSelector: '[data-guide="header-notifications"]',
-    routeMatch: "/app",
+    routeMatch: /^\/app$/,
     side: "bottom",
     eligibility: (ctx) => ctx.hasWorkspaceNotification
   },
-  // AI assistant — shown on any app route
+
+  // ── Phase 2b: Nudge to open workspace (dashboard, has workspaces) ──
+  {
+    id: "open_first_workspace",
+    title: "Open your workspace",
+    body: "Click into a partnership to see the terms, risks, and deliverables HelloBrand extracted from your documents.",
+    anchorSelector: '[data-guide="active-partnerships"]',
+    routeMatch: /^\/app$/,
+    side: "top",
+    eligibility: (ctx) => ctx.hasActiveWorkspace && !isWorkspaceTourDone(ctx)
+  },
+
+  // ── Phase 3: Workspace tour (partnership page) ──
+  {
+    id: "workspace_overview",
+    title: "Your partnership workspace",
+    body: "Everything HelloBrand extracted from your documents lives here. Use the tabs to review terms, check risks, and track deliverables.",
+    anchorSelector: '[data-guide="workspace-tabs"]',
+    routeMatch: /^\/app\/p\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "workspace_terms",
+    title: "Review your contract terms",
+    body: "Payment amounts, usage rights, exclusivity, and deadlines are extracted automatically. You can edit any field if something looks off.",
+    anchorSelector: '[data-guide="tab-terms"]',
+    routeMatch: /^\/app\/p\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "workspace_risks",
+    title: "Check flagged risks",
+    body: "HelloBrand highlights clauses that could cost you money or limit your future work. Review these before signing.",
+    anchorSelector: '[data-guide="tab-risks"]',
+    routeMatch: /^\/app\/p\/[^/]+$/,
+    side: "bottom"
+  },
+  {
+    id: "workspace_deliverables",
+    title: "Track what you owe",
+    body: "Deliverables, due dates, and posting requirements extracted from your contract. The dashboard will remind you when things are due.",
+    anchorSelector: '[data-guide="tab-deliverables"]',
+    routeMatch: /^\/app\/p\/[^/]+$/,
+    side: "bottom"
+  },
+
+  // ── Phase 4: Contextual discovery ──
   {
     id: "assistant_intro",
-    title: "Meet your AI assistant",
-    body: "Ask questions about your deals, draft negotiation emails, or get help understanding contract terms. Available anywhere in the app.",
+    title: "Your AI assistant",
+    body: "Ask questions about your contracts, draft negotiation emails, or get help with any partnership decision.",
     anchorSelector: '[data-guide="assistant-fab"]',
     routeMatch: "/app",
-    side: "top"
-  },
-  // Deal workspace tabs — shown when viewing a deal
-  {
-    id: "workspace_tabs_intro",
-    title: "Explore your workspace tabs",
-    body: "Each workspace has tabs for the overview, terms, risks, deliverables, brief, emails, documents, and notes.",
-    anchorSelector: '[data-guide="workspace-tabs"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
+    side: "top",
+    eligibility: (ctx) => isWorkspaceTourDone(ctx)
   },
   {
-    id: "brief_tab_tip",
-    title: "Check the brief tab",
-    body: "If your deal includes a campaign brief, you'll find the extracted creative direction, requirements, and timelines here.",
-    anchorSelector: '[data-guide="tab-brief"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
-  },
-  {
-    id: "documents_tab_tip",
-    title: "Manage your documents",
-    body: "View, re-upload, or add new documents to your workspace. HelloBrand re-analyzes terms when you add new files.",
-    anchorSelector: '[data-guide="tab-documents"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
-    side: "bottom"
-  },
-  {
-    id: "emails_tab_tip",
-    title: "Connected email insights",
-    body: "When you connect your email, HelloBrand tracks brand communications, surfaces action items, and suggests term updates.",
-    anchorSelector: '[data-guide="tab-emails"]',
-    routeMatch: /^\/app\/deals\/[^/]+$/,
+    id: "payments_intro",
+    title: "Payment tracking",
+    body: "All invoices, due dates, and payment statuses across your partnerships in one view. Overdue payments surface on your dashboard automatically.",
+    anchorSelector: '[data-guide="payments-summary"]',
+    routeMatch: /^\/app\/payments$/,
     side: "bottom"
   }
 ];

@@ -10,7 +10,7 @@ import { assistantMessageText, assistantRecordToUIMessage } from "@/lib/assistan
 describe("assistant app manual helpers", () => {
   test("builds valid partnership tab hrefs", () => {
     expect(buildAssistantHref("deal-tab:risks", { dealId: "deal-123" })).toBe(
-      "/app/deals/deal-123?tab=risks"
+      "/app/p/deal-123?tab=risks"
     );
   });
 
@@ -21,7 +21,7 @@ describe("assistant app manual helpers", () => {
 
   test("maps route titles from the app shell", () => {
     expect(assistantPageTitle("/app/payments")).toBe("Payments");
-    expect(assistantPageTitle("/app/deals/demo-deal")).toBe("Partnership workspace");
+    expect(assistantPageTitle("/app/p/demo-deal")).toBe("Partnership workspace");
   });
 });
 

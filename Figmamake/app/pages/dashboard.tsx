@@ -22,13 +22,13 @@ export function DashboardPage() {
               Upload your first brand deal to get started. We'll help you understand the terms and negotiate with confidence.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link to="/app/deals/upload">
+              <Link to="/app/p/upload">
                 <Button className="gap-2">
                   <Upload className="w-4 h-4" />
                   Upload Contract
                 </Button>
               </Link>
-              <Link to="/app/deals/new">
+              <Link to="/app/p/new">
                 <Button variant="outline" className="gap-2">
                   <Plus className="w-4 h-4" />
                   Create Deal Manually
@@ -56,7 +56,7 @@ export function DashboardPage() {
                   Welcome back, Sarah. Here's what's happening with your deals.
                 </p>
               </div>
-              <Link to="/app/deals/upload">
+              <Link to="/app/p/upload">
                 <Button className="gap-2">
                   <Plus className="w-4 h-4" />
                   New Deal
@@ -104,7 +104,7 @@ export function DashboardPage() {
                   <div>
                     <div className="flex items-center justify-between mb-6">
                       <h2>Recent Deals</h2>
-                      <Link to="/app/deals/history">
+                      <Link to="/app/p/history">
                         <Button variant="ghost" size="sm">View All</Button>
                       </Link>
                     </div>
@@ -121,7 +121,7 @@ export function DashboardPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/deals/1'}>
+                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/p/1'}>
                             <td className="px-0 py-4">
                               <p className="font-medium text-sm">Glossier Spring Campaign</p>
                               <p className="text-xs text-muted-foreground mt-0.5">4 deliverables pending</p>
@@ -145,7 +145,7 @@ export function DashboardPage() {
                             </td>
                           </tr>
 
-                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/deals/2'}>
+                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/p/2'}>
                             <td className="px-0 py-4">
                               <p className="font-medium text-sm">Nike Sneaker Launch</p>
                               <p className="text-xs text-muted-foreground mt-0.5">Processing complete</p>
@@ -161,7 +161,7 @@ export function DashboardPage() {
                             <td className="px-4 py-4 text-xs text-muted-foreground">—</td>
                           </tr>
 
-                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/deals/3'}>
+                          <tr className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/p/3'}>
                             <td className="px-0 py-4">
                               <p className="font-medium text-sm">Sephora Product Review</p>
                               <p className="text-xs text-muted-foreground mt-0.5">Payment received</p>
@@ -274,7 +274,7 @@ export function DashboardPage() {
                         { id: 5, title: "Fenty Beauty Collab", status: "Active", statusColor: "bg-success", payment: "$12,000", due: "Apr 5, 2026", progress: 40, riskFlags: 1 },
                         { id: 6, title: "Dyson Product Review", status: "Negotiating", statusColor: "bg-warning", payment: "$6,500", due: "TBD", progress: 0, riskFlags: 3 },
                       ].map((deal) => (
-                        <tr key={deal.id} className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => window.location.href = `/app/deals/${deal.id}`}>
+                        <tr key={deal.id} className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => window.location.href = `/app/p/${deal.id}`}>
                           <td className="px-6 py-4 font-medium">{deal.title}</td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">

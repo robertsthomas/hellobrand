@@ -432,15 +432,16 @@ export function NotificationsCenter({
                           TYPE_ICON_STYLES[item.type]
                         )}
                       >
-                        <Icon
-                          className={cn(
-                            "h-[18px] w-[18px] stroke-[1.7]",
-                            item.status === "active" &&
-                              (item.type === "workspace_generating" ||
-                                item.type === "workspace_checking_duplicates") &&
-                              "animate-spin"
-                          )}
-                        />
+                        {item.status === "active" &&
+                        (item.type === "workspace_generating" ||
+                          item.type === "workspace_checking_duplicates") ? (
+                          <span
+                            className="inline-block h-[18px] w-[18px] animate-spin rounded-full border-2 border-current/20 border-t-current"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <Icon className="h-[18px] w-[18px] stroke-[1.7]" />
+                        )}
                       </div>
                       <div className="mt-1 h-2 w-2 shrink-0">
                         {isUnread ? <div className="h-2 w-2 rounded-full bg-red-500" /> : null}

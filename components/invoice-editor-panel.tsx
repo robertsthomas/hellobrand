@@ -13,9 +13,21 @@ import { SubmitButton } from "@/components/submit-button";
 import type { DocumentRecord, InvoiceLineItem, InvoiceRecord } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
+function createClientLineItemId() {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.crypto !== "undefined" &&
+    "randomUUID" in window.crypto
+  ) {
+    return window.crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function createLineItem(): InvoiceLineItem {
   return {
-    id: crypto.randomUUID(),
+    id: createClientLineItemId(),
     deliverableId: null,
     title: "",
     description: null,

@@ -1,4 +1,4 @@
-import WorkspaceDealDetailPage from "@/app/app/deals/[dealId]/page";
+import WorkspaceDealDetailPage from "@/app/app/p/[dealId]/page";
 
 export default function PartnershipWorkspacePage({
   params,

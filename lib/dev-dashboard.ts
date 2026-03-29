@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 
 import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
+import { DEFAULT_E2E_VIEWER } from "@/lib/e2e-auth";
 import { prisma } from "@/lib/prisma";
 
 export type DevDashboardViewer = {
@@ -83,7 +84,13 @@ export async function getDevDashboardViewerFromSession(): Promise<DevDashboardVi
   const session = await auth();
 
   if (!session.userId) {
-    return null;
+    return process.env.NODE_ENV !== "production"
+      ? {
+          id: DEFAULT_E2E_VIEWER.id,
+          email: DEFAULT_E2E_VIEWER.email,
+          displayName: DEFAULT_E2E_VIEWER.displayName
+        }
+      : null;
   }
 
   const claims = (session.sessionClaims as Record<string, unknown> | undefined) ?? null;

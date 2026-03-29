@@ -117,7 +117,7 @@ export function OnboardingPage() {
           </div>
 
           <div className="flex gap-4">
-            <Link to="/app/deals/upload" className="flex-1">
+            <Link to="/app/p/upload" className="flex-1">
               <Button className="w-full">
                 Upload Your First Contract
               </Button>

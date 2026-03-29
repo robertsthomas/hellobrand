@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 type DashboardDealsTableRow = {
@@ -122,6 +123,18 @@ export function DashboardDealsTable({
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>(sortStateForValue("campaign-asc"));
+  const displayDeals = useMemo(
+    () =>
+      deals.map((deal) => {
+        const labels = getDisplayDealLabels(deal);
+        return {
+          ...deal,
+          brandName: labels.brandName ?? deal.brandName,
+          campaignName: labels.campaignName ?? deal.campaignName,
+        };
+      }),
+    [deals],
+  );
 
   const columns = useMemo<ColumnDef<DashboardDealsTableRow>[]>(
     () => [
@@ -130,7 +143,7 @@ export function DashboardDealsTable({
         header: "Campaign",
         cell: ({ row }) => (
           <Link
-            href={`/app/deals/${row.original.id}`}
+            href={`/app/p/${row.original.id}`}
             className="font-semibold text-foreground transition-colors hover:text-primary"
           >
             {row.original.campaignName}
@@ -235,7 +248,7 @@ export function DashboardDealsTable({
   );
 
   const table = useReactTable({
-    data: deals,
+    data: displayDeals,
     columns,
     state: {
       globalFilter,

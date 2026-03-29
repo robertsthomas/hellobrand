@@ -64,11 +64,11 @@ export function buildAssistantHref(
       return null;
     }
 
-    return `/app/deals/${options.dealId}?tab=${tab}`;
+    return `/app/p/${options.dealId}?tab=${tab}`;
   }
 
   if (options?.dealId && isValidAssistantTab(target)) {
-    return `/app/deals/${options.dealId}?tab=${target}`;
+    return `/app/p/${options.dealId}?tab=${target}`;
   }
 
   return null;

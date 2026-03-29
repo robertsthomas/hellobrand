@@ -563,7 +563,18 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     throw new Error("Deal not found.");
   }
 
-  const PIPELINE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes max
+  const PIPELINE_TIMEOUT_MS = (() => {
+    const configured = Number.parseInt(
+      process.env.DOCUMENT_PIPELINE_TIMEOUT_MS ?? "",
+      10
+    );
+
+    if (Number.isFinite(configured) && configured > 0) {
+      return configured;
+    }
+
+    return 8 * 60 * 1000;
+  })();
 
   await repository.updateDocument(document.id, {
     processingStatus: "processing",

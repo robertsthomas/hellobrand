@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Check, LoaderCircle, Pencil, X } from "lucide-react";
+import { Check, ChevronDown, LoaderCircle, Pencil, X } from "lucide-react";
 
 import { confirmTermsReviewAction, saveTermsAction } from "@/app/actions";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
@@ -160,32 +160,54 @@ function structuredReadOnlyRows(value: string) {
 /* ------------------------------------------------------------------ */
 
 function Section({
+  sectionKey,
   title,
   description,
+  open,
+  onToggleOpen,
   editing,
+  showEditToggle = true,
   reviewCount = 0,
   onToggleEdit,
   onOpenReview,
   children
 }: {
+  sectionKey: string;
   title: string;
   description?: string;
+  open: boolean;
+  onToggleOpen: () => void;
   editing: boolean;
+  showEditToggle?: boolean;
   reviewCount?: number;
   onToggleEdit: () => void;
   onOpenReview?: () => void;
   children: ReactNode;
 }) {
   return (
-    <section className="grid gap-5 border-t border-black/8 pt-6 dark:border-white/10">
+    <section
+      data-section={sectionKey}
+      className="border-t border-black/8 pt-6 dark:border-white/10"
+    >
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          {description ? (
-            <p className="text-sm text-muted-foreground">{description}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          className="flex min-w-0 flex-1 items-start justify-between gap-4 text-left"
+        >
+          <div className="space-y-1">
+            <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            {description ? (
+              <p className="text-sm text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+          <ChevronDown
+            className={`mt-1 h-4 w-4 shrink-0 text-black/45 transition-transform dark:text-white/45 ${
+              open ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
           {reviewCount > 0 && onOpenReview ? (
             <button
               type="button"
@@ -195,20 +217,22 @@ function Section({
               {reviewBadgeLabel(reviewCount)}
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onToggleEdit}
-            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
-              editing
-                ? "border-primary/20 bg-primary/5 text-primary"
-                : "border-black/8 text-black/40 hover:border-black/15 hover:text-black/60 dark:border-white/10 dark:text-white/40 dark:hover:border-white/20 dark:hover:text-white/60"
-            }`}
-          >
-            {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-          </button>
+          {showEditToggle ? (
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
+                editing
+                  ? "border-primary/20 bg-primary/5 text-primary"
+                  : "border-black/8 text-black/40 hover:border-black/15 hover:text-black/60 dark:border-white/10 dark:text-white/40 dark:hover:border-white/20 dark:hover:text-white/60"
+              }`}
+            >
+              {editing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+            </button>
+          ) : null}
         </div>
       </div>
-      {children}
+      {open ? <div className="mt-5 grid gap-5">{children}</div> : null}
     </section>
   );
 }
@@ -462,12 +486,27 @@ export function TermsEditor({
 }) {
   const router = useRouter();
   const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    partnership: true,
+    payment: true,
+    deliverables: true,
+    usage: true,
+    exclusivity: true,
+    termination: true,
+    notes: true
+  });
   const [openReviewSection, setOpenReviewSection] = useState<keyof typeof SECTION_FIELDS | null>(
     null
   );
   const [confirmingField, setConfirmingField] = useState<string | null>(null);
   function toggle(key: string) { setEditingSections((p) => ({ ...p, [key]: !p[key] })); }
   function ed(key: string) { return editingSections[key] ?? false; }
+  function toggleOpen(key: string) {
+    setOpenSections((current) => ({ ...current, [key]: !(current[key] ?? true) }));
+  }
+  function isOpen(key: string) {
+    return openSections[key] ?? true;
+  }
 
   const catOpts = DEAL_CATEGORY_OPTIONS.map((c) => ({ value: c, label: dealCategoryLabel(c) ?? c }));
   const manuallyReviewedFields = useMemo(
@@ -543,8 +582,11 @@ export function TermsEditor({
 
       {/* ───── Partnership ───── */}
       <Section
+        sectionKey="partnership"
         title="Partnership"
         description="Core identifying details for the partnership and the external team."
+        open={isOpen("partnership")}
+        onToggleOpen={() => toggleOpen("partnership")}
         editing={ed("partnership")}
         reviewCount={sectionReviewItems.partnership.length}
         onOpenReview={() => setOpenReviewSection("partnership")}
@@ -591,8 +633,11 @@ export function TermsEditor({
 
       {/* ───── Payment ───── */}
       <Section
+        sectionKey="payment"
         title="Payment"
         description="Commercial terms used for invoicing and revenue tracking."
+        open={isOpen("payment")}
+        onToggleOpen={() => toggleOpen("payment")}
         editing={ed("payment")}
         reviewCount={sectionReviewItems.payment.length}
         onOpenReview={() => setOpenReviewSection("payment")}
@@ -642,22 +687,18 @@ export function TermsEditor({
       </Section>
 
       {/* ───── Deliverables (always editable) ───── */}
-      <section className="grid gap-5 border-t border-black/8 pt-6 dark:border-white/10">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground">Deliverables</h3>
-            <p className="text-sm text-muted-foreground">Use editable rows instead of raw JSON for deliverables and channel permissions.</p>
-          </div>
-          {sectionReviewItems.deliverables.length > 0 ? (
-            <button
-              type="button"
-              onClick={() => setOpenReviewSection("deliverables")}
-              className="inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap border border-clay/20 bg-clay/5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-clay transition hover:border-clay/35"
-            >
-              {reviewBadgeLabel(sectionReviewItems.deliverables.length)}
-            </button>
-          ) : null}
-        </div>
+      <Section
+        sectionKey="deliverables"
+        title="Deliverables"
+        description="Use editable rows instead of raw JSON for deliverables and channel permissions."
+        open={isOpen("deliverables")}
+        onToggleOpen={() => toggleOpen("deliverables")}
+        editing
+        showEditToggle={false}
+        reviewCount={sectionReviewItems.deliverables.length}
+        onOpenReview={() => setOpenReviewSection("deliverables")}
+        onToggleEdit={() => undefined}
+      >
         <TermsArrayFieldsEditor
           deliverables={terms?.deliverables ?? []}
           usageChannels={terms?.usageChannels ?? []}
@@ -665,12 +706,15 @@ export function TermsEditor({
           textareaClassName={TEXTAREA_CLASS}
         />
         <Signals fields={["deliverables"]} evidence={evidence} sections={sections} />
-      </section>
+      </Section>
 
       {/* ───── Usage rights ───── */}
       <Section
+        sectionKey="usage"
         title="Usage rights"
         description="Usage, paid amplification, whitelisting, and territory settings."
+        open={isOpen("usage")}
+        onToggleOpen={() => toggleOpen("usage")}
         editing={ed("usage")}
         reviewCount={sectionReviewItems.usage.length}
         onOpenReview={() => setOpenReviewSection("usage")}
@@ -719,8 +763,11 @@ export function TermsEditor({
 
       {/* ───── Exclusivity ───── */}
       <Section
+        sectionKey="exclusivity"
         title="Exclusivity"
         description="Restrictions on competitors, timing, and category overlap."
+        open={isOpen("exclusivity")}
+        onToggleOpen={() => toggleOpen("exclusivity")}
         editing={ed("exclusivity")}
         reviewCount={sectionReviewItems.exclusivity.length}
         onOpenReview={() => setOpenReviewSection("exclusivity")}
@@ -799,8 +846,11 @@ export function TermsEditor({
 
       {/* ───── Revisions & termination ───── */}
       <Section
+        sectionKey="termination"
         title="Revisions and termination"
         description="Revision limits, termination rights, and governing terms."
+        open={isOpen("termination")}
+        onToggleOpen={() => toggleOpen("termination")}
         editing={ed("termination")}
         reviewCount={sectionReviewItems.termination.length}
         onOpenReview={() => setOpenReviewSection("termination")}
@@ -855,7 +905,14 @@ export function TermsEditor({
       </Section>
 
       {/* ───── Notes ───── */}
-      <Section title="Notes" editing={ed("notes")} onToggleEdit={() => toggle("notes")}>
+      <Section
+        sectionKey="notes"
+        title="Notes"
+        open={isOpen("notes")}
+        onToggleOpen={() => toggleOpen("notes")}
+        editing={ed("notes")}
+        onToggleEdit={() => toggle("notes")}
+      >
         {ed("notes") ? (
           <textarea className={`${TEXTAREA_CLASS} min-h-24`} name="notes" defaultValue={fieldValue(terms?.notes)} placeholder="Add workspace notes..." />
         ) : (

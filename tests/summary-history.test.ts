@@ -1,6 +1,7 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { buildGeneratedSummaryVariant, validateSummaryVariantBody } from "@/lib/summary-variants";
+import * as llmModule from "@/lib/analysis/llm";
 import {
   getCurrentWorkspaceSummary,
   getLatestSummaryByType,
@@ -31,6 +32,10 @@ function createAggregate(): DealAggregate {
     intakeSession: null
   };
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("summary history", () => {
   test("backfills legacy workspace summaries as legal summaries", () => {
@@ -124,6 +129,26 @@ describe("summary history", () => {
     expect(result.summaryType).toBe("plain_language");
     expect(result.parentSummaryId).toBe(aggregate.summaries[0].id);
     expect(validateSummaryVariantBody(aggregate, result.body)).toBeNull();
+  });
+
+  test("falls back when simplified summary generation is budget-blocked", async () => {
+    const aggregate = createAggregate();
+    vi.spyOn(llmModule, "hasLlmKey").mockReturnValue(true);
+    vi.spyOn(llmModule, "generateSimplifiedSummaryWithLlm").mockRejectedValueOnce(
+      new Error("LLM budget limit reached.")
+    );
+
+    const result = await buildGeneratedSummaryVariant({
+      aggregate,
+      baseSummary: aggregate.summaries[0],
+      targetType: "plain_language"
+    });
+
+    expect(result.summaryType).toBe("plain_language");
+    expect(result.source).toBe("simplification");
+    expect(result.version).toBe("fallback:plain_language");
+    expect(validateSummaryVariantBody(aggregate, result.body)).toBeNull();
+
   });
 
   test("blocks simplified summaries that lose the payment amount", () => {

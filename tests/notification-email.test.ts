@@ -313,7 +313,7 @@ describe("notification email queueing", () => {
       eventType: "invoice.generate_prompt",
       title: "Generate the Nimbus invoice",
       body: "Today is the final posting milestone. Generate the invoice now.",
-      href: "/app/deals/deal-1?tab=invoices"
+      href: "/app/p/deal-1?tab=invoices"
     });
 
     const result = await enqueueNotificationEmailDelivery("notification-invoice");

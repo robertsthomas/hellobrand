@@ -151,7 +151,10 @@ export function IntakeProcessingState({
 
                 <div className="flex w-6 shrink-0 justify-end">
                   {isActive ? (
-                    <span className="intake-loader-spinner" aria-hidden="true" />
+                    <span
+                      className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-black/10 border-t-[#0f1728]"
+                      aria-hidden="true"
+                    />
                   ) : isComplete ? (
                     <span className="h-2 w-2 rounded-full bg-[#0f1728]" aria-hidden="true" />
                   ) : (

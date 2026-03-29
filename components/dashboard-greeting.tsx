@@ -37,8 +37,8 @@ export function DashboardGreeting({ firstName }: { firstName: string }) {
 
   return (
     <div>
-      <p className="text-sm text-muted-foreground">{dashboardDate}</p>
-      <h1 className="mt-2 text-[34px] font-semibold tracking-[-0.06em] text-foreground lg:text-[42px]">
+      <p className="text-sm font-medium text-muted-foreground">{dashboardDate}</p>
+      <h1 className="mt-1.5 text-[28px] font-semibold tracking-[-0.05em] text-foreground lg:text-[34px]">
         {greeting}, {firstName}
       </h1>
     </div>

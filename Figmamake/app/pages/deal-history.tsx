@@ -46,7 +46,7 @@ export function DealHistoryPage() {
                 <h1>All Deals</h1>
                 <p className="text-muted-foreground mt-1">View and manage all your brand partnerships</p>
               </div>
-              <Link to="/app/deals/upload">
+              <Link to="/app/p/upload">
                 <Button className="gap-2">
                   <Plus className="w-4 h-4" />
                   New Deal
@@ -138,7 +138,7 @@ export function DealHistoryPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link to={`/app/deals/${deal.id}`}>
+                        <Link to={`/app/p/${deal.id}`}>
                           <Button size="sm" variant="ghost" className="text-xs h-7">View</Button>
                         </Link>
                       </td>

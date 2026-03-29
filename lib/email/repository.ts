@@ -1362,7 +1362,8 @@ export async function listEmailCandidateMatchesForUser(
       analyzedAt: iso(row.deal.analyzedAt),
       confirmedAt: iso(row.deal.confirmedAt),
       createdAt: iso(row.deal.createdAt) ?? new Date().toISOString(),
-      updatedAt: iso(row.deal.updatedAt) ?? new Date().toISOString()
+      updatedAt: iso(row.deal.updatedAt) ?? new Date().toISOString(),
+      statusBeforeArchive: row.deal.statusBeforeArchive ?? null
     },
     thread: toThreadRecord(row.thread),
     account: toAccountRecord(row.thread.account),

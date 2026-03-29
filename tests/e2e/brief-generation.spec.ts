@@ -24,7 +24,7 @@ test.describe("brief generation", () => {
   }, testInfo) => {
     const tier = getTierName(testInfo.project.name);
 
-    const response = await page.goto("/app/deals/demo-deal?tab=brief");
+    const response = await page.goto("/app/p/demo-deal?tab=brief");
     const status = response?.status() ?? 0;
 
     if (tier === "basic") {
