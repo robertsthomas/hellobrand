@@ -22,6 +22,24 @@ import { formatCurrency, humanizeToken, stripHtmlTags } from "@/lib/utils";
 const mobileSectionClassName =
   "-mx-4 border-y border-black/5 bg-white/85 px-4 py-6 dark:border-white/10 dark:bg-white/[0.06] sm:mx-0 sm:border sm:p-6 sm:shadow-panel";
 
+const CURRENCY_OPTIONS = [
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "NZD",
+  "JPY",
+  "CHF",
+  "SEK",
+  "NOK",
+  "DKK",
+  "SGD",
+  "HKD",
+  "BRL",
+  "MXN"
+] as const;
+
 function presentText(value: string | null | undefined) {
   if (!value) {
     return null;
@@ -153,7 +171,7 @@ export default function IntakeSessionPage({
   params: Promise<{ sessionId: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
+    <Suspense fallback={<div className="flex min-h-full items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
       <IntakeReviewContent params={params} />
     </Suspense>
   );
@@ -542,8 +560,8 @@ async function IntakeReviewContent({
                       </span>
                     </label>
 
-                    <div className="grid gap-5 md:grid-cols-[1.1fr_0.7fr_0.6fr]">
-                      <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
+                    <div className="grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,0.58fr)] md:items-start">
+                      <label className="grid content-start gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                         Primary payment amount
                         <input
                           className={inputClassName}
@@ -564,23 +582,36 @@ async function IntakeReviewContent({
                         })}
                       </label>
 
-                      <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
+                      <label className="grid content-start gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                         Currency
-                        <input
-                          className={inputClassName}
+                        <select
+                          className={`${inputClassName} h-[50px] appearance-none pr-10`}
                           name="currency"
                           defaultValue={normalized?.currency ?? aggregate?.terms?.currency ?? "USD"}
-                          placeholder="USD"
-                        />
+                          disabled={analysisRunning}
+                          aria-disabled={analysisRunning}
+                        >
+                          {CURRENCY_OPTIONS.map((currency) => (
+                            <option key={currency} value={currency}>
+                              {currency}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                          Use the payout currency for the primary payment.
+                        </span>
                       </label>
 
-                      <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
-                        <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
+                      <div className="grid content-start gap-2">
+                        <div className="text-sm font-medium text-black/70 dark:text-white/75">
                           Deliverable count
                         </div>
-                        <div className="mt-2 text-2xl font-semibold text-ink">
+                        <div className="flex h-[50px] items-center border border-black/10 bg-sand/55 px-4 text-2xl font-semibold text-ink dark:border-white/12 dark:bg-white/[0.04]">
                           {normalized?.deliverableCount ?? 0}
                         </div>
+                        <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                          Generated from the current deliverables list.
+                        </span>
                       </div>
                     </div>
                   </div>

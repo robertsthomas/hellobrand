@@ -1,4 +1,14 @@
-import { aiCachePolicy, hasAiClient, runOpenRouterTask } from "@/lib/ai/gateway";
+import { z } from "zod";
+
+import { aiCachePolicy, hasAiClient } from "@/lib/ai/gateway";
+import {
+  isoDateContext,
+  joinPromptSections,
+  promptBullets,
+  promptNumbered,
+  promptQuotedText
+} from "@/lib/ai/prompting";
+import { runStructuredOpenRouterTask } from "@/lib/ai/structured";
 import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict-intelligence";
 import type {
   BriefData,
@@ -33,6 +43,71 @@ type LlmRoute = {
   primary: string;
   fallbacks: string[];
 };
+
+const extractionResponseSchema = z.object({
+  data: z.record(z.unknown()).default({}),
+  evidence: z.array(
+    z.object({
+      fieldPath: z.string().trim().min(1),
+      snippet: z.string().trim().min(1),
+      confidence: z.number().nullable().optional()
+    })
+  ).default([]),
+  confidence: z.number().nullable().optional()
+});
+
+const riskFlagsResponseSchema = z.object({
+  riskFlags: z.array(
+    z.object({
+      category: z.enum([
+        "usage_rights",
+        "exclusivity",
+        "payment_terms",
+        "deliverables",
+        "termination",
+        "other"
+      ]),
+      title: z.string().trim().min(1),
+      detail: z.string().trim().min(1),
+      severity: z.enum(["low", "medium", "high"]),
+      suggestedAction: z.string().trim().nullable().optional(),
+      evidence: z.array(z.string().trim().min(1)).default([])
+    })
+  ).default([])
+});
+
+const summaryResponseSchema = z.object({
+  sections: z.array(
+    z.object({
+      title: z.string().trim().min(1),
+      paragraphs: z.array(z.string().trim().min(1)).min(1)
+    })
+  ).default([]),
+  body: z.string().default("")
+});
+
+const briefExtractionResponseSchema = z.object({
+  campaignOverview: z.string().nullable().optional(),
+  messagingPoints: z.array(z.string().trim().min(1)).default([]),
+  talkingPoints: z.array(z.string().trim().min(1)).default([]),
+  creativeConceptOverview: z.string().nullable().optional(),
+  brandGuidelines: z.string().nullable().optional(),
+  approvalRequirements: z.string().nullable().optional(),
+  targetAudience: z.string().nullable().optional(),
+  toneAndStyle: z.string().nullable().optional(),
+  doNotMention: z.array(z.string().trim().min(1)).default([])
+});
+
+const generatedBriefResponseSchema = z.object({
+  sections: z.array(
+    z.object({
+      id: z.string().trim().min(1),
+      title: z.string().trim().min(1),
+      content: z.string().trim().min(1),
+      items: z.array(z.string().trim().min(1)).optional()
+    })
+  ).default([])
+});
 
 function shouldLogLlmDebug() {
   return process.env.DEBUG_DOCUMENT_PIPELINE === "1" || process.env.NODE_ENV !== "production";
@@ -171,23 +246,12 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
   return { primary, fallbacks };
 }
 
-function safeParseJson(input: string) {
-  try {
-    return JSON.parse(input) as Record<string, unknown>;
-  } catch {
-    const match = input.match(/\{[\s\S]*\}$/);
-    if (!match) {
-      throw new Error("Model did not return valid JSON.");
-    }
-
-    return JSON.parse(match[0]) as Record<string, unknown>;
-  }
-}
-
-async function requestJson(
+async function requestStructured<TSchema extends z.ZodTypeAny>(
   task: LlmTask,
   systemPrompt: string,
   userPrompt: string,
+  schema: TSchema,
+  fallback: z.infer<TSchema>,
   debugMeta?: Record<string, unknown>
 ) {
   const route = getLlmRoute(task);
@@ -219,7 +283,7 @@ async function requestJson(
   });
 
   try {
-    const response = await runOpenRouterTask<Record<string, unknown>>({
+    const response = await runStructuredOpenRouterTask({
       context: {
         featureKey: task === "generate_brief" ? "brief_generation" : "document_analysis",
         taskKey: task,
@@ -230,10 +294,9 @@ async function requestJson(
         "\n\nIMPORTANT: Never use em dashes (—) or en dashes (–) in any output. Use commas, periods, or semicolons instead.",
       userPrompt,
       temperature: 0.1,
-      responseFormat: { type: "json_object" },
+      schema,
+      fallback,
       cache,
-      parse: (content) => safeParseJson(content),
-      serialize: (value) => value
     });
 
     if (!response) {
@@ -264,6 +327,277 @@ async function requestJson(
     });
     throw error;
   }
+}
+
+function extractSectionSystemPrompt() {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Return only facts that are explicitly stated in the section.",
+        "Do not guess missing values or infer unstated business terms.",
+        "Use null, empty arrays, or omission when the section does not support a field.",
+        "Evidence snippets must be copied from the section and must be meaningful phrases or full sentences.",
+        "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence."
+      ])
+    },
+    {
+      tag: "few_shot_examples",
+      content: [
+        "<example>",
+        'Section text: Payment will be made within 45 days of receiving the final invoice.',
+        'Good evidence: "Payment will be made within 45 days of receiving the final invoice."',
+        'Bad evidence: "45 days" or "Payment".',
+        "</example>",
+        "",
+        "<example>",
+        'Section text: Creator grants Brand the right to use the content in paid social advertisements for 90 days.',
+        'Extract usage-rights facts only from that sentence. Do not invent territory, ownership, or whitelisting if they are not stated.',
+        "</example>"
+      ].join("\n")
+    },
+    {
+      tag: "output_contract",
+      content:
+        'Return JSON with this shape: { "data": { ...creator_deal_terms_fields }, "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }], "confidence": 0.0 }.'
+    }
+  ]);
+}
+
+function extractSectionUserPrompt(
+  section: DocumentSectionInput,
+  documentKind: DocumentKind,
+  fallback: ExtractionPipelineResult
+) {
+  return joinPromptSections([
+    {
+      tag: "document_metadata",
+      content: promptBullets([
+        `Today: ${isoDateContext()}`,
+        `Document kind: ${documentKind}`,
+        `Section index: ${section.chunkIndex}`,
+        `Section title: ${section.title}`
+      ])
+    },
+    {
+      tag: "section_text",
+      content: promptQuotedText(section.content)
+    },
+    {
+      tag: "fallback_extraction",
+      content: promptQuotedText(JSON.stringify(fallback.data, null, 2))
+    },
+    {
+      tag: "task",
+      content:
+        "Based on the section above, extract only the explicit creator-partnership facts and attach direct evidence snippets from this section."
+    }
+  ]);
+}
+
+function analyzeRisksSystemPrompt() {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        "You analyze creator partnership risk after factual extraction is complete. You focus on creator-specific negotiation and risk signals."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Only flag risks that are supported by the provided document text or extracted facts.",
+        "Focus on material creator issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination.",
+        "Do not restate every contract term.",
+        "If a risk is not clearly supported, omit it rather than guessing.",
+        "Every evidence snippet must be a real clause or sentence from the document."
+      ])
+    },
+    {
+      tag: "few_shot_examples",
+      content: [
+        "<example>",
+        'Document text: Brand may use the content in paid media worldwide in perpetuity.',
+        'Good risk: category=usage_rights, severity=high, evidence=["Brand may use the content in paid media worldwide in perpetuity."]',
+        "</example>",
+        "",
+        "<example>",
+        'Document text: Creator will deliver one Instagram Reel by May 5.',
+        "Do not create a deliverables risk unless the scope is vague, open-ended, or conflicting.",
+        "</example>"
+      ].join("\n")
+    },
+    {
+      tag: "output_contract",
+      content:
+        'Return JSON with this shape: { "riskFlags": [{ "category": "usage_rights", "title": "Perpetual paid usage rights", "detail": "plain-language explanation", "severity": "high", "suggestedAction": "practical negotiation step", "evidence": ["quoted snippet"] }] }.'
+    }
+  ]);
+}
+
+function analyzeRisksUserPrompt(
+  text: string,
+  documentKind: DocumentKind,
+  extraction: ExtractionPipelineResult,
+  fallback: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>
+) {
+  return joinPromptSections([
+    {
+      tag: "document_metadata",
+      content: promptBullets([
+        `Today: ${isoDateContext()}`,
+        `Document kind: ${documentKind}`
+      ])
+    },
+    {
+      tag: "normalized_document_text",
+      content: promptQuotedText(text)
+    },
+    {
+      tag: "structured_extraction",
+      content: promptQuotedText(JSON.stringify(extraction.data, null, 2))
+    },
+    {
+      tag: "fallback_risks",
+      content: promptQuotedText(JSON.stringify(fallback, null, 2))
+    },
+    {
+      tag: "task",
+      content:
+        "Based on the document text and extracted facts above, return only the creator-relevant risk flags that are directly supported."
+    }
+  ]);
+}
+
+function summarySystemPrompt(mode: "default" | "rewrite") {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        mode === "rewrite"
+          ? "You rewrite creator contract summaries without changing their meaning."
+          : "You write concise, plain-English creator partnership summaries."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Preserve material obligations, restrictions, payment facts, exclusivity, rights limits, and watchouts.",
+        "Keep the language creator-facing and practical, not legalistic.",
+        "Use plain text only.",
+        'Use these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts".',
+        "Do not use markdown bullets or heading markers in paragraph content."
+      ])
+    },
+    {
+      tag: "output_contract",
+      content:
+        'Return JSON with this shape: { "sections": [{ "title": "What this partnership is", "paragraphs": ["plain text paragraph"] }], "body": "plain text summary" }.'
+    }
+  ]);
+}
+
+function summaryUserPrompt(input: {
+  extraction: ExtractionPipelineResult | null;
+  risks: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">> | null;
+  fallbackBody: string;
+  targetType?: SummaryType;
+  styleInstruction?: string;
+  baseSummary?: string;
+  grounding?: Record<string, unknown>;
+}) {
+  const sections = [
+    input.extraction
+      ? {
+          tag: "extracted_fields",
+          content: promptQuotedText(JSON.stringify(input.extraction.data, null, 2))
+        }
+      : null,
+    input.risks
+      ? {
+          tag: "risk_flags",
+          content: promptQuotedText(JSON.stringify(input.risks, null, 2))
+        }
+      : null,
+    input.baseSummary
+      ? {
+          tag: "current_summary",
+          content: promptQuotedText(input.baseSummary)
+        }
+      : null,
+    input.grounding
+      ? {
+          tag: "grounding_facts",
+          content: promptQuotedText(JSON.stringify(input.grounding, null, 2))
+        }
+      : null,
+    {
+      tag: "fallback_summary",
+      content: promptQuotedText(input.fallbackBody)
+    },
+    {
+      tag: "task",
+      content: input.styleInstruction
+        ? `Target summary type: ${input.targetType}\n${input.styleInstruction}`
+        : "Write the creator-facing summary from the extracted facts and risk flags above."
+    }
+  ];
+
+  return joinPromptSections(sections);
+}
+
+function briefExtractionSystemPrompt() {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        "You extract campaign-brief fields from creator partnership documents. You are strict and only capture what is explicitly stated."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Only include information explicitly present in the document.",
+        "Return null or empty arrays for anything not found.",
+        "Do not merge or invent missing messaging, approvals, or audience details."
+      ])
+    },
+    {
+      tag: "output_contract",
+      content:
+        "Return a JSON object with these fields: campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention."
+    }
+  ]);
+}
+
+function briefGenerationSystemPrompt() {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        "You write polished, actionable campaign briefs for creators using grounded partnership context."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Use the provided partnership context only.",
+        "Preserve risks, deliverables, timing, rights, and approval constraints when they are present.",
+        "Pre-fill from existing briefData when available, but improve clarity and organization.",
+        "Each section must have an id, title, and content. Items are optional."
+      ])
+    },
+    {
+      tag: "section_ids",
+      content: promptBullets(BRIEF_SECTION_IDS.map((id) => `"${id}"`))
+    },
+    {
+      tag: "output_contract",
+      content:
+        'Return JSON: { "sections": [{ "id": "...", "title": "...", "content": "...", "items": ["..."] }] }.'
+    }
+  ]);
 }
 
 function asString(value: unknown) {
@@ -580,14 +914,20 @@ export async function extractSectionWithLlm(
   documentKind: DocumentKind,
   fallback: ExtractionPipelineResult
 ): Promise<ExtractionPipelineResult> {
-  const payload = await requestJson(
+  const payload = await requestStructured(
     "extract_section",
-    "You extract creator partnership facts from one document section at a time. Return only explicit facts from the section. Never guess missing values. Use null for anything not present. Keep output compact and factual.",
-    `Extract facts from this ${documentKind} section.\n\nSection title: ${section.title}\nSection text:\n${section.content}\n\nFallback extraction for this section:\n${JSON.stringify(
-      fallback.data,
-      null,
-      2
-    )}\n\nReturn JSON with this shape:\n{\n  "data": { ...creator_deal_terms_fields },\n  "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }],\n  "confidence": 0.0\n}\n\nOnly include evidence snippets taken directly from this section. Evidence must be a complete quoted phrase or sentence, not a list number, bullet, page marker, heading fragment, or standalone token like "3.".`,
+    extractSectionSystemPrompt(),
+    extractSectionUserPrompt(section, documentKind, fallback),
+    extractionResponseSchema,
+    {
+      data: fallback.data as Record<string, unknown>,
+      evidence: fallback.evidence.map((entry) => ({
+        fieldPath: entry.fieldPath,
+        snippet: entry.snippet,
+        confidence: entry.confidence ?? null
+      })),
+      confidence: fallback.confidence
+    },
     {
       requestType: "extract_section",
       documentKind,
@@ -618,14 +958,12 @@ export async function analyzeRisksWithLlm(
   fallback: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>,
   documentId: string
 ) {
-  const payload = await requestJson(
+  const payload = await requestStructured(
     "analyze_risks",
-    "You analyze creator partnership risk after factual extraction is complete. Focus on creator-specific issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination. Do not restate every contract term.",
-    `Document kind: ${documentKind}\n\nNormalized document text:\n${text}\n\nStructured extraction:\n${JSON.stringify(
-      extraction.data,
-      null,
-      2
-    )}\n\nFallback risks:\n${JSON.stringify(fallback, null, 2)}\n\nReturn JSON with this shape:\n{\n  "riskFlags": [\n    {\n      "category": "usage_rights",\n      "title": "Perpetual paid usage rights",\n      "detail": "plain-language explanation",\n      "severity": "high",\n      "suggestedAction": "practical negotiation step",\n      "evidence": ["quoted snippet"]\n    }\n  ]\n}\n\nEvidence must be an actual supporting clause or sentence from the document. Never return numbering fragments, bullets, page labels, isolated references, or snippets shorter than a meaningful phrase.`,
+    analyzeRisksSystemPrompt(),
+    analyzeRisksUserPrompt(text, documentKind, extraction, fallback),
+    riskFlagsResponseSchema,
+    { riskFlags: fallback },
     {
       requestType: "analyze_risks",
       documentKind,
@@ -644,14 +982,16 @@ export async function generateSummaryWithLlm(
   fallback: DocumentSummaryResult
 ) {
   const evidenceCount = Array.isArray(extraction.evidence) ? extraction.evidence.length : 0;
-  const payload = await requestJson(
+  const payload = await requestStructured(
     "generate_summary",
-    "You write concise, plain-English creator partnership summaries. You are not a law firm. Be clear, direct, and useful.",
-    `Using the extracted fields and risk flags below, write a creator-facing summary with these sections: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nExtracted fields:\n${JSON.stringify(
-      extraction.data,
-      null,
-      2
-    )}\n\nRisk flags:\n${JSON.stringify(risks, null, 2)}\n\nFallback summary:\n${fallback.body}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this partnership is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
+    summarySystemPrompt("default"),
+    summaryUserPrompt({
+      extraction,
+      risks,
+      fallbackBody: fallback.body
+    }),
+    summaryResponseSchema,
+    { sections: [], body: fallback.body },
     {
       requestType: "generate_summary",
       riskCount: risks.length,
@@ -713,14 +1053,20 @@ export async function generateSimplifiedSummaryWithLlm(input: {
       ? "Rewrite the legal summary in simpler creator-friendly language. Keep all material obligations, payment details, rights limits, exclusivity, and watchouts explicit."
       : "Compress the summary into a quick-reference version. Use one short paragraph per section, but still keep payment details, deliverables, rights limits, exclusivity, and watchouts explicit.";
 
-  const payload = await requestJson(
+  const payload = await requestStructured(
     "generate_summary",
-    "You rewrite creator contract summaries without changing their meaning. You must preserve material obligations, restrictions, payment facts, and risks.",
-    `Target summary type: ${input.targetType}\n\n${styleInstruction}\n\nUse these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts". Use plain text only. Do not use markdown symbols, heading markers, or bullet markers.\n\nCurrent legal summary:\n${input.baseSummary}\n\nGrounding facts:\n${JSON.stringify(
-      input.grounding,
-      null,
-      2
-    )}\n\nReturn JSON with shape:\n{\n  "sections": [\n    {\n      "title": "What this partnership is",\n      "paragraphs": ["plain text paragraph"]\n    }\n  ],\n  "body": "plain text summary"\n}`,
+    summarySystemPrompt("rewrite"),
+    summaryUserPrompt({
+      extraction: null,
+      risks: null,
+      fallbackBody: input.fallback.body,
+      targetType: input.targetType,
+      styleInstruction,
+      baseSummary: input.baseSummary,
+      grounding: input.grounding
+    }),
+    summaryResponseSchema,
+    { sections: [], body: input.fallback.body },
     {
       requestType: "generate_summary",
       purpose: `summary_variant:${input.targetType}`,
@@ -777,15 +1123,44 @@ export async function extractBriefWithLlm(
   kind: DocumentKind,
   fallback: BriefData
 ): Promise<BriefData> {
-  const systemPrompt = `You are a creator-partnership analyst. Extract campaign brief fields from the document and return a JSON object with these fields:
-campaignOverview (string|null), messagingPoints (string[]), talkingPoints (string[]), creativeConceptOverview (string|null), brandGuidelines (string|null), approvalRequirements (string|null), targetAudience (string|null), toneAndStyle (string|null), doNotMention (string[]).
-Only include information explicitly stated. Return null or empty arrays for fields not found.`;
-
   try {
-    const payload = await requestJson("extract_section", systemPrompt, text.slice(0, 6000), {
-      documentKind: kind,
-      purpose: "brief_extraction"
-    });
+    const payload = await requestStructured(
+      "extract_section",
+      briefExtractionSystemPrompt(),
+      joinPromptSections([
+        {
+          tag: "document_metadata",
+          content: promptBullets([
+            `Today: ${isoDateContext()}`,
+            `Document kind: ${kind}`
+          ])
+        },
+        {
+          tag: "document_text",
+          content: promptQuotedText(text.slice(0, 6000))
+        },
+        {
+          tag: "task",
+          content: "Extract the campaign-brief fields from the document above."
+        }
+      ]),
+      briefExtractionResponseSchema,
+      {
+        campaignOverview: fallback.campaignOverview,
+        messagingPoints: fallback.messagingPoints,
+        talkingPoints: fallback.talkingPoints,
+        creativeConceptOverview: fallback.creativeConceptOverview,
+        brandGuidelines: fallback.brandGuidelines,
+        approvalRequirements: fallback.approvalRequirements,
+        targetAudience: fallback.targetAudience,
+        toneAndStyle: fallback.toneAndStyle,
+        doNotMention: fallback.doNotMention
+      },
+      {
+        documentKind: kind,
+        purpose: "brief_extraction"
+      }
+    );
 
     return {
       campaignOverview: asString(payload.campaignOverview) ?? fallback.campaignOverview,
@@ -892,20 +1267,26 @@ function buildBriefContext(aggregate: DealAggregate) {
 }
 
 export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<GeneratedBrief> {
-  const systemPrompt = `You are a creator campaign brief writer. Synthesize all partnership context into a polished, actionable campaign brief with these specific sections (use these exact IDs):
-
-${BRIEF_SECTION_IDS.map((id) => `- "${id}"`).join("\n")}
-
-For each section, provide an id, title, content (paragraph text), and optional items (bullet list).
-Pre-fill from existing briefData where available and enhance with partnership context.
-Return JSON: { "sections": [{ "id": "...", "title": "...", "content": "...", "items": ["..."] }] }`;
-
-  const userPrompt = `Generate a professional campaign brief from this partnership context:\n\n${buildBriefContext(aggregate)}`;
-
-  const payload = await requestJson("generate_brief", systemPrompt, userPrompt, {
-    requestType: "generate_brief",
-    dealId: aggregate.deal.id
-  });
+  const payload = await requestStructured(
+    "generate_brief",
+    briefGenerationSystemPrompt(),
+    joinPromptSections([
+      {
+        tag: "partnership_context",
+        content: promptQuotedText(buildBriefContext(aggregate))
+      },
+      {
+        tag: "task",
+        content: "Generate the creator-facing campaign brief from the partnership context above."
+      }
+    ]),
+    generatedBriefResponseSchema,
+    { sections: [] },
+    {
+      requestType: "generate_brief",
+      dealId: aggregate.deal.id
+    }
+  );
 
   const sections = normalizeBriefSections(payload.sections);
 

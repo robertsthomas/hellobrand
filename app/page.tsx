@@ -24,6 +24,8 @@ import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
 import { PublicFunnelLink } from "@/components/public-funnel-link";
 import { HeroTabRail } from "@/components/hero-tab-rail";
+import { RuntimeStatusPage } from "@/components/runtime-status-page";
+import { getAppSettings } from "@/lib/admin-settings";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -51,7 +53,10 @@ function isMaintenanceModeEnabled() {
 }
 
 export default async function LandingPage() {
-  const session = await auth();
+  const [session, appSettings] = await Promise.all([
+    auth(),
+    getAppSettings()
+  ]);
 
   if (session.userId) {
     redirect("/app");
@@ -59,6 +64,18 @@ export default async function LandingPage() {
 
   if (isMaintenanceModeEnabled()) {
     return <MaintenancePage />;
+  }
+
+  if (!appSettings.publicSiteEnabled) {
+    return (
+      <RuntimeStatusPage
+        eyebrow="Public access paused"
+        title="The public site is temporarily offline."
+        description="A HelloBrand admin has paused public access for now. Try again later or ask the team to re-enable the site from the admin board."
+        actionHref="/login"
+        actionLabel="Go to login"
+      />
+    );
   }
 
   return (

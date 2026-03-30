@@ -46,6 +46,7 @@ function isMobileViewport() {
 
 export function AppFrame({
   children,
+  banner,
   guideState,
   hasActiveWorkspace,
   notifications,
@@ -53,6 +54,7 @@ export function AppFrame({
   workspaceNavItems = []
 }: {
   children: ReactNode;
+  banner?: ReactNode;
   guideState?: ProductGuideState;
   hasActiveWorkspace?: boolean;
   notifications?: NotificationItem[];
@@ -67,7 +69,7 @@ export function AppFrame({
   const router = useRouter();
   const posthog = usePostHog();
   const searchParams = useSearchParams();
-  const mainRef = useRef<HTMLElement | null>(null);
+  const mainRef = useRef<HTMLDivElement | null>(null);
 
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
@@ -490,13 +492,20 @@ export function AppFrame({
           </header>
 
           <main
-            ref={mainRef}
             className={cn(
-              "workspace-dot-grid min-h-0 flex-1 overflow-x-hidden bg-white pt-[calc(64px+env(safe-area-inset-top))] lg:pt-[72px] dark:bg-[#111318]",
-              isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"
+              "workspace-dot-grid flex min-h-0 flex-1 flex-col overflow-hidden bg-white pt-[calc(64px+env(safe-area-inset-top))] lg:pt-[72px] dark:bg-[#111318]"
             )}
           >
-            <div className="flex h-full min-h-0 flex-col">{children}</div>
+            {banner ? <div className="shrink-0">{banner}</div> : null}
+            <div
+              ref={mainRef}
+              className={cn(
+                "flex min-h-0 flex-1 flex-col overflow-x-hidden",
+                isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"
+              )}
+            >
+              <div className="flex min-h-full min-w-0 flex-col">{children}</div>
+            </div>
           </main>
 
           <MobileFab

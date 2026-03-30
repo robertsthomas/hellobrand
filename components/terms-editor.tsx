@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, LoaderCircle, Pencil, X } from "lucide-react";
 
@@ -120,6 +120,15 @@ function formatReviewValue(
 
 function reviewBadgeLabel(count: number) {
   return `${count} review item${count === 1 ? "" : "s"}`;
+}
+
+function serializeFormState(form: HTMLFormElement) {
+  const entries = Array.from(new FormData(form).entries())
+    .filter(([_, value]) => typeof value === "string")
+    .map(([key, value]) => [key, value] as const)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey));
+
+  return JSON.stringify(entries);
 }
 
 function structuredReadOnlyRows(value: string) {
@@ -485,6 +494,9 @@ export function TermsEditor({
   extractionResults: ExtractionResultRecord[];
 }) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const initialSnapshotRef = useRef<string | null>(null);
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [editingSections, setEditingSections] = useState<Record<string, boolean>>({});
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     partnership: true,
@@ -561,9 +573,33 @@ export function TermsEditor({
     }
   }
 
+  const syncPendingChanges = useCallback(() => {
+    const form = formRef.current;
+    if (!form) {
+      return;
+    }
+
+    const snapshot = serializeFormState(form);
+    if (initialSnapshotRef.current === null) {
+      initialSnapshotRef.current = snapshot;
+      setHasPendingChanges(false);
+      return;
+    }
+
+    setHasPendingChanges(snapshot !== initialSnapshotRef.current);
+  }, []);
+
+  useEffect(() => {
+    initialSnapshotRef.current = null;
+    syncPendingChanges();
+  }, [dealId, terms, syncPendingChanges]);
+
   return (
     <form
+      ref={formRef}
       action={saveTermsAction}
+      onInput={syncPendingChanges}
+      onChange={syncPendingChanges}
       className="grid gap-8 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6"
     >
       <div>
@@ -948,6 +984,7 @@ export function TermsEditor({
         <SubmitButton
           pendingLabel="Saving key terms..."
           showSpinner
+          disabled={!hasPendingChanges}
           className="inline-flex items-center gap-2 bg-ocean px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Check className="h-4 w-4" />

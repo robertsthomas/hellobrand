@@ -9,9 +9,11 @@ function isMaintenanceModeEnabled() {
 function isMaintenanceAllowedPath(pathname: string) {
   return (
     pathname === "/" ||
+    pathname.startsWith("/admin") ||
     pathname === "/privacy" ||
     pathname === "/waitlist" ||
     pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/email/google/callback") ||
     pathname.startsWith("/api/email/outlook/callback") ||

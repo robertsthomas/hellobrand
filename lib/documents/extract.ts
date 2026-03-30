@@ -63,9 +63,10 @@ function shouldTryLlamaParse(mimeType: string, fileName: string) {
 
 function llamaParsePrompt() {
   return [
-    "Extract the document into clean markdown while preserving section headings, clause boundaries, lists, dates, tables, and payment or deliverable language.",
-    "Do not summarize or omit legal terms.",
-    "Keep creator deal structure readable for downstream extraction."
+    "Extract the document into clean markdown for downstream contract and brief analysis.",
+    "Preserve section headings, numbered clause boundaries, lists, dates, tables, signature blocks, payment language, deliverable language, and usage-rights language exactly as written.",
+    "Do not summarize, paraphrase, normalize away legal wording, or omit repeated clause language when it is part of the contract structure.",
+    "Keep adjacent lines from the same clause together so downstream extraction can recover evidence snippets accurately."
   ].join(" ");
 }
 

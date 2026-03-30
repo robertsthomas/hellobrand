@@ -13,6 +13,7 @@ import {
   invoiceReminderSweepFunction,
   notificationEmailSendFunction,
   processContractFunction,
+  workspaceNudgeSweepFunction,
   workspaceReminderSweepFunction
 } from "@/lib/inngest/functions";
 
@@ -24,6 +25,7 @@ export const { GET, POST, PUT } = serve({
     notificationEmailSendFunction,
     invoiceReminderSweepFunction,
     workspaceReminderSweepFunction,
+    workspaceNudgeSweepFunction,
     emailInitialSyncFunction,
     emailIncrementalSyncFunction,
     emailRenewalSweepFunction,

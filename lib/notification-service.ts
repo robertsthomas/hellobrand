@@ -8,6 +8,7 @@ import { enqueueNotificationEmailDelivery } from "@/lib/notification-email";
 import {
   buildEmailResyncRequiredNotificationSeed,
   buildWorkspaceNotificationSeed,
+  buildWorkspaceNudgeSeed,
   getWorkspaceSupersededEventTypes,
   notificationTypeForEventType,
   type NotificationSeed,
@@ -386,6 +387,93 @@ function computeDealNotificationSeeds(input: {
   return seeds;
 }
 
+export function computeWorkspaceNudgeSeeds(aggregates: DealAggregate[]): NotificationSeed[] {
+  const seeds: NotificationSeed[] = [];
+  const skipStatuses = new Set(["archived", "completed", "paid"]);
+
+  for (const aggregate of aggregates) {
+    const { deal, terms } = aggregate;
+
+    if (skipStatuses.has(deal.status) || !deal.confirmedAt) {
+      continue;
+    }
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+    const campaignName = normalized?.contractTitle ?? deal.campaignName;
+
+    if (terms?.paymentAmount == null) {
+      seeds.push(
+        buildWorkspaceNudgeSeed({
+          dealId: deal.id,
+          campaignName,
+          eventType: "workspace.missing_payment"
+        })
+      );
+    }
+
+    const deliverables = terms?.deliverables ?? [];
+    if (deliverables.length === 0) {
+      seeds.push(
+        buildWorkspaceNudgeSeed({
+          dealId: deal.id,
+          campaignName,
+          eventType: "workspace.missing_deliverables"
+        })
+      );
+    }
+
+    if (terms?.usageRights == null) {
+      seeds.push(
+        buildWorkspaceNudgeSeed({
+          dealId: deal.id,
+          campaignName,
+          eventType: "workspace.missing_usage_rights"
+        })
+      );
+    }
+  }
+
+  return seeds;
+}
+
+export async function runWorkspaceNudgeSweep() {
+  if (!ensureDatabase()) {
+    return { processed: 0, nudgesSent: 0 };
+  }
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const usersWithRecentDeals = await prisma.deal.findMany({
+    where: {
+      confirmedAt: { not: null },
+      updatedAt: { gte: sevenDaysAgo },
+      status: { notIn: ["archived", "completed", "paid"] }
+    },
+    select: { userId: true },
+    distinct: ["userId"]
+  });
+
+  let nudgesSent = 0;
+
+  for (const { userId } of usersWithRecentDeals) {
+    const aggregates = await loadConfirmedAggregatesForViewer(userId);
+    const seeds = computeWorkspaceNudgeSeeds(aggregates);
+
+    for (const seed of seeds) {
+      const row = await upsertNotificationSeed(userId, seed);
+
+      try {
+        await enqueueNotificationEmailDelivery(row.id);
+        nudgesSent++;
+      } catch {
+        // Email delivery failure is non-blocking
+      }
+    }
+  }
+
+  return { processed: usersWithRecentDeals.length, nudgesSent };
+}
+
 async function loadConfirmedAggregatesForViewer(viewerId: string) {
   const repository = getRepository();
   const deals = await repository.listDeals(viewerId);
@@ -417,11 +505,13 @@ export async function syncComputedNotificationsForViewer(viewer: Viewer) {
     conflictAlertsEnabled: profile?.conflictAlertsEnabled ?? true
   });
 
-  for (const seed of seeds) {
+  const nudgeSeeds = computeWorkspaceNudgeSeeds(aggregates);
+
+  for (const seed of [...seeds, ...nudgeSeeds]) {
     await upsertNotificationSeed(viewer.id, seed);
   }
 
-  const activeDedupeKeys = seeds.map((seed) => seed.dedupeKey);
+  const activeDedupeKeys = [...seeds, ...nudgeSeeds].map((seed) => seed.dedupeKey);
   const staleWhere = {
     userId: viewer.id,
     category: {

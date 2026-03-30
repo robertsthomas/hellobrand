@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Play } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { buildWorkspaceNotificationItem } from "@/lib/notifications";
+import { dispatchWorkspaceGenerationNotification } from "@/lib/workspace-generation-hint";
 import { cn } from "@/lib/utils";
 
 export function StartQueuedAnalysisButton({
@@ -27,6 +29,19 @@ export function StartQueuedAnalysisButton({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    const optimisticNotificationId = `optimistic-workspace-processing:${Date.now()}`;
+
+    dispatchWorkspaceGenerationNotification({
+      action: "upsert",
+      notification: buildWorkspaceNotificationItem({
+        id: optimisticNotificationId,
+        sessionId: sessionIds[0] ?? optimisticNotificationId,
+        dealId: sessionIds[0] ?? optimisticNotificationId,
+        draftBrandName: "Your",
+        draftCampaignName: "workspace",
+        eventType: "workspace.processing_started"
+      })
+    });
 
     try {
       const response = await fetch("/api/intake/queue/start", {
@@ -42,9 +57,26 @@ export function StartQueuedAnalysisButton({
         throw new Error(payload.error ?? "Could not start analysis.");
       }
 
+      dispatchWorkspaceGenerationNotification({
+        action: "upsert",
+        replaceId: optimisticNotificationId,
+        notification: buildWorkspaceNotificationItem({
+          sessionId: payload.session.id,
+          dealId: payload.session.dealId ?? payload.session.id,
+          draftBrandName: payload.session.draftBrandName ?? null,
+          draftCampaignName: payload.session.draftCampaignName ?? null,
+          eventType: "workspace.processing_started",
+          createdAt: payload.session.updatedAt ?? new Date().toISOString()
+        })
+      });
+
       router.push(`/app/intake/${payload.session.id}`);
       router.refresh();
     } catch (error) {
+      dispatchWorkspaceGenerationNotification({
+        action: "remove",
+        notificationId: optimisticNotificationId
+      });
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start analysis."
       );

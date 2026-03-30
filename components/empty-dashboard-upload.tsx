@@ -11,9 +11,10 @@ import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
+import { buildWorkspaceNotificationItem } from "@/lib/notifications";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
-import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
+import { dispatchWorkspaceGenerationNotification } from "@/lib/workspace-generation-hint";
 import {
   deleteLocalWorkspace,
   loadLocalWorkspace,
@@ -133,6 +134,25 @@ function toServerQueuedWorkspaceItem(item: IntakeDraftListItem): ServerQueuedWor
     status: "queued",
     inputSource: item.session.inputSource
   };
+}
+
+function buildOptimisticWorkspaceGeneratingNotification(input: {
+  id: string;
+  sessionId: string;
+  dealId: string;
+  brandName?: string | null;
+  campaignName?: string | null;
+  createdAt?: string;
+}) {
+  return buildWorkspaceNotificationItem({
+    id: input.id,
+    sessionId: input.sessionId,
+    dealId: input.dealId,
+    brandName: input.brandName,
+    campaignName: input.campaignName,
+    eventType: "workspace.processing_started",
+    createdAt: input.createdAt ?? new Date().toISOString()
+  });
 }
 
 export function EmptyDashboardUpload({
@@ -258,7 +278,7 @@ export function EmptyDashboardUpload({
     }
   }
 
-  async function startAnalysisInBackground() {
+  async function startAnalysisInBackground(optimisticNotificationId: string) {
     try {
       const createdSessionIds: string[] = [];
 
@@ -314,9 +334,27 @@ export function EmptyDashboardUpload({
         throw new Error(payload.error ?? "Could not start analysis.");
       }
 
+      dispatchWorkspaceGenerationNotification({
+        action: "upsert",
+        replaceId: optimisticNotificationId,
+        notification: buildWorkspaceNotificationItem({
+          sessionId: payload.session.id,
+          dealId: payload.session.dealId ?? payload.session.id,
+          draftBrandName: payload.session.draftBrandName ?? null,
+          draftCampaignName: payload.session.draftCampaignName ?? null,
+          eventType: "workspace.processing_started",
+          createdAt: payload.session.updatedAt ?? new Date().toISOString()
+        }),
+        showHint: true
+      });
+
       router.refresh();
     } catch (error) {
       console.error("[startAnalysisInBackground] Failed:", error);
+      dispatchWorkspaceGenerationNotification({
+        action: "remove",
+        notificationId: optimisticNotificationId
+      });
       router.refresh();
     }
   }
@@ -329,17 +367,39 @@ export function EmptyDashboardUpload({
 
     setErrorMessage(null);
     reset(initialMode);
-    window.sessionStorage.setItem(
-      WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY,
-      "1"
-    );
+    const primaryQueuedWorkspace =
+      serverQueuedWorkspaces[0] ??
+      (localWorkspaces[0]
+        ? {
+            sessionId: `optimistic-${localWorkspaces[0].localId}`,
+            dealId: `optimistic-${localWorkspaces[0].localId}`,
+            brandName: localWorkspaces[0].brandName,
+            campaignName: localWorkspaces[0].campaignName
+          }
+        : null);
+    const optimisticNotificationId = `optimistic-workspace-processing:${Date.now()}`;
+
+    if (primaryQueuedWorkspace) {
+      dispatchWorkspaceGenerationNotification({
+        action: "upsert",
+        notification: buildOptimisticWorkspaceGeneratingNotification({
+          id: optimisticNotificationId,
+          sessionId: primaryQueuedWorkspace.sessionId,
+          dealId: primaryQueuedWorkspace.dealId,
+          brandName: primaryQueuedWorkspace.brandName,
+          campaignName: primaryQueuedWorkspace.campaignName
+        }),
+        showHint: true
+      });
+    }
+
     captureAppEvent(posthog, "workspace_analysis_started", {
       queuedCount,
       localWorkspaceCount: localWorkspaces.length,
       serverQueuedCount: serverQueuedWorkspaces.length
     });
     router.push("/app");
-    void startAnalysisInBackground();
+    void startAnalysisInBackground(optimisticNotificationId);
   }
 
   return (

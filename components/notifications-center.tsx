@@ -34,8 +34,44 @@ import {
   type NotificationListResponse,
   type NotificationType
 } from "@/lib/notifications";
-import { WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY } from "@/lib/workspace-generation-hint";
+import { WORKSPACE_GENERATION_NOTIFICATION_EVENT } from "@/lib/workspace-generation-hint";
 import { cn } from "@/lib/utils";
+
+type WorkspaceNotificationEventDetail =
+  | {
+      action: "upsert";
+      notification: NotificationItem;
+      showHint?: boolean;
+      replaceId?: string;
+    }
+  | {
+      action: "remove";
+      notificationId: string;
+    };
+
+function mergeNotificationItems(
+  current: NotificationItem[],
+  nextItem: NotificationItem,
+  replaceId?: string
+) {
+  const existingIndex = current.findIndex(
+    (item) =>
+      item.id === replaceId ||
+      item.id === nextItem.id ||
+      (item.sessionId !== null &&
+        nextItem.sessionId !== null &&
+        item.sessionId === nextItem.sessionId &&
+        item.eventType === nextItem.eventType)
+  );
+
+  if (existingIndex === -1) {
+    return [nextItem, ...current];
+  }
+
+  return current.map((item, index) =>
+    index === existingIndex ? { ...item, ...nextItem } : item
+  );
+}
 
 const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   email_resync_required: RefreshCw,
@@ -52,7 +88,8 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   workspace_failed: X,
   workspace_duplicate_found: Search,
   workspace_confirmed: Check,
-  workspace_cancelled: X
+  workspace_cancelled: X,
+  workspace_missing_data: FileText
 };
 
 const TYPE_ICON_STYLES: Record<NotificationType, string> = {
@@ -70,7 +107,8 @@ const TYPE_ICON_STYLES: Record<NotificationType, string> = {
   workspace_failed: "text-[#8a8f98] dark:text-white/35",
   workspace_duplicate_found: "text-[#7a6a4f] dark:text-white/50",
   workspace_confirmed: "text-[#5f6f64] dark:text-white/50",
-  workspace_cancelled: "text-[#8a8f98] dark:text-white/35"
+  workspace_cancelled: "text-[#8a8f98] dark:text-white/35",
+  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50"
 };
 
 async function fetchNotifications() {
@@ -95,6 +133,7 @@ export function NotificationsCenter({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [showGenerationHint, setShowGenerationHint] = useState(false);
+  const [pendingHintNotificationId, setPendingHintNotificationId] = useState<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>(notifications);
   const [unreadCount, setUnreadCount] = useState(
@@ -135,6 +174,12 @@ export function NotificationsCenter({
     setUnreadCount(notifications.filter(isNotificationUnread).length);
   }, [notifications]);
 
+  const optimisticUnreadCount = useMemo(
+    () => optimisticItems.filter(isNotificationUnread).length,
+    [optimisticItems]
+  );
+  const previewItems = useMemo(() => optimisticItems.slice(0, 6), [optimisticItems]);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px)");
     setIsMobileViewport(mediaQuery.matches);
@@ -150,25 +195,72 @@ export function NotificationsCenter({
   useEffect(() => {
     if (pathname !== "/app") {
       setShowGenerationHint(false);
+      setPendingHintNotificationId(null);
+      return;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/app" || !pendingHintNotificationId) {
       return;
     }
 
-    const shouldShowHint =
-      window.sessionStorage.getItem(WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY) === "1";
+    const hasNotificationInDrawer = previewItems.some(
+      (item) => item.id === pendingHintNotificationId
+    );
 
-    if (!shouldShowHint) {
+    if (!hasNotificationInDrawer) {
       return;
     }
 
-    window.sessionStorage.removeItem(WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY);
     setShowGenerationHint(true);
+    setPendingHintNotificationId(null);
 
     const timeoutId = window.setTimeout(() => {
       setShowGenerationHint(false);
     }, 7000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pathname]);
+  }, [pathname, pendingHintNotificationId, previewItems]);
+
+  useEffect(() => {
+    const handleWorkspaceNotificationEvent = (event: Event) => {
+      const detail = (event as CustomEvent<WorkspaceNotificationEventDetail>).detail;
+
+      if (!detail) {
+        return;
+      }
+
+      if (detail.action === "remove") {
+        setItems((current) =>
+          current.filter((item) => item.id !== detail.notificationId)
+        );
+        setPendingHintNotificationId((current) =>
+          current === detail.notificationId ? null : current
+        );
+        return;
+      }
+
+      setItems((current) =>
+        mergeNotificationItems(current, detail.notification, detail.replaceId)
+      );
+
+      if (detail.showHint) {
+        setPendingHintNotificationId(detail.notification.id);
+      }
+    };
+
+    window.addEventListener(
+      WORKSPACE_GENERATION_NOTIFICATION_EVENT,
+      handleWorkspaceNotificationEvent as EventListener
+    );
+
+    return () =>
+      window.removeEventListener(
+        WORKSPACE_GENERATION_NOTIFICATION_EVENT,
+        handleWorkspaceNotificationEvent as EventListener
+      );
+  }, []);
 
   const refresh = useCallback(async () => {
     const next = await fetchNotifications();
@@ -269,12 +361,6 @@ export function NotificationsCenter({
     });
   }, [applyOptimistic, refresh]);
 
-  const optimisticUnreadCount = useMemo(
-    () => optimisticItems.filter(isNotificationUnread).length,
-    [optimisticItems]
-  );
-  const previewItems = useMemo(() => optimisticItems.slice(0, 6), [optimisticItems]);
-
   const notificationTrigger = (
     <button
       type="button"
@@ -299,6 +385,7 @@ export function NotificationsCenter({
       onOpenChange={(nextOpen) => {
         if (nextOpen) {
           setShowGenerationHint(false);
+          setPendingHintNotificationId(null);
         }
 
         setOpen(nextOpen);

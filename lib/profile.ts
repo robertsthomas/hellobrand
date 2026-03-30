@@ -1,6 +1,7 @@
 import { clerkClient } from "@clerk/nextjs/server";
 
 import { buildClerkProfileSyncPayload } from "@/lib/clerk-profile";
+import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
 import { prisma } from "@/lib/prisma";
 import type { ProfileAuditRecord, ProfileRecord, Viewer } from "@/lib/types";
 
@@ -20,7 +21,7 @@ function buildFileBackedProfile(viewer: Viewer): ProfileRecord {
     reminderLeadDays: 3,
     conflictAlertsEnabled: true,
     paymentRemindersEnabled: true,
-    emailNotificationsEnabled: false,
+    emailNotificationsEnabled: true,
     accentColor: null,
     createdAt: now,
     updatedAt: now
@@ -125,6 +126,23 @@ export async function getProfileForViewer(viewer: Viewer) {
   });
 
   if (existing) {
+    const emailNotificationsEnabled = await resolveEmailNotificationsEnabled({
+      id: existing.id,
+      emailNotificationsEnabled: existing.emailNotificationsEnabled,
+      createdAt: existing.createdAt
+    });
+
+    if (emailNotificationsEnabled !== existing.emailNotificationsEnabled) {
+      const upgraded = await prisma.profile.update({
+        where: { id: existing.id },
+        data: { emailNotificationsEnabled }
+      });
+
+      const record = toProfileRecord(upgraded);
+      void syncProfileToClerk(viewer.id, record).catch(() => undefined);
+      return record;
+    }
+
     return toProfileRecord(existing);
   }
 
@@ -140,7 +158,7 @@ export async function getProfileForViewer(viewer: Viewer) {
         reminderLeadDays: 3,
         conflictAlertsEnabled: true,
         paymentRemindersEnabled: true,
-        emailNotificationsEnabled: false
+        emailNotificationsEnabled: true
       }
     });
   } catch (error) {
@@ -188,6 +206,16 @@ export async function updateProfileForViewer(
     where: { userId: viewer.id }
   });
 
+  const existingEmailNotificationsEnabled = await resolveEmailNotificationsEnabled(
+    existing
+      ? {
+          id: existing.id,
+          emailNotificationsEnabled: existing.emailNotificationsEnabled,
+          createdAt: existing.createdAt
+        }
+      : null
+  );
+
   const normalizedPatch = {
     displayName: normalizeNullableString(patch.displayName),
     creatorLegalName: normalizeNullableString(patch.creatorLegalName),
@@ -202,7 +230,7 @@ export async function updateProfileForViewer(
     paymentRemindersEnabled:
       patch.paymentRemindersEnabled ?? existing?.paymentRemindersEnabled ?? true,
     emailNotificationsEnabled:
-      patch.emailNotificationsEnabled ?? existing?.emailNotificationsEnabled ?? false,
+      patch.emailNotificationsEnabled ?? existingEmailNotificationsEnabled,
     accentColor: patch.accentColor !== undefined ? patch.accentColor : (existing?.accentColor ?? null)
   };
 
@@ -226,7 +254,7 @@ export async function updateProfileForViewer(
     reminderLeadDays: existing?.reminderLeadDays ?? 3,
     conflictAlertsEnabled: existing?.conflictAlertsEnabled ?? true,
     paymentRemindersEnabled: existing?.paymentRemindersEnabled ?? true,
-    emailNotificationsEnabled: existing?.emailNotificationsEnabled ?? false,
+    emailNotificationsEnabled: existingEmailNotificationsEnabled,
     accentColor: existing?.accentColor ?? null
   };
 

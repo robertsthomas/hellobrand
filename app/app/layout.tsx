@@ -4,6 +4,8 @@ import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
 import { PostHogUserIdentify } from "@/components/posthog-user-identify";
 import { ProfileOnboardingBanner } from "@/components/profile-onboarding-banner";
+import { RuntimeStatusPage } from "@/components/runtime-status-page";
+import { getAppSettings } from "@/lib/admin-settings";
 import { requireViewer } from "@/lib/auth";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
@@ -19,6 +21,18 @@ export default async function WorkspaceLayout({
   children: ReactNode;
 }) {
   const viewer = await requireViewer();
+  const appSettings = await getAppSettings();
+
+  if (!appSettings.appAccessEnabled) {
+    return (
+      <RuntimeStatusPage
+        eyebrow="App paused"
+        title="The creator app is temporarily unavailable."
+        description="An admin has paused app access. Your account and data are still there, but the workspace is locked until the app is switched back on."
+      />
+    );
+  }
+
   const [profile, onboardingState, dealAggregates, notificationFeed] = await Promise.all([
     getCachedProfile(viewer),
     getCachedOnboardingState(viewer),
@@ -40,6 +54,15 @@ export default async function WorkspaceLayout({
         displayName={viewer.displayName}
       />
       <AppFrame
+        banner={
+          !isOnboardingComplete ? (
+            <ProfileOnboardingBanner
+              email={viewer.email}
+              initialName={profile.creatorLegalName ?? profile.displayName ?? viewer.displayName}
+              initialHandle={profile.businessName ?? ""}
+            />
+          ) : null
+        }
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}
         notifications={notifications}
@@ -54,13 +77,6 @@ export default async function WorkspaceLayout({
           };
         })}
       >
-        {!isOnboardingComplete ? (
-          <ProfileOnboardingBanner
-            email={viewer.email}
-            initialName={profile.creatorLegalName ?? profile.displayName ?? viewer.displayName}
-            initialHandle={profile.businessName ?? ""}
-          />
-        ) : null}
         {children}
       </AppFrame>
     </>

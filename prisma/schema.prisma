@@ -91,6 +91,43 @@ model User {
   invoiceReminderTouchpoints   InvoiceReminderTouchpoint[]
 }
 
+model AdminCredential {
+  id           String         @id @default(uuid())
+  username     String         @unique
+  passwordHash String
+  passwordSalt String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  sessions AdminSession[]
+}
+
+model AdminSession {
+  id           String          @id @default(uuid())
+  credentialId String
+  tokenHash    String          @unique
+  expiresAt    DateTime
+  lastSeenAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  credential AdminCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+
+  @@index([credentialId, expiresAt])
+  @@index([expiresAt])
+}
+
+model AppSettings {
+  id                       String   @id @default("primary")
+  appAccessEnabled         Boolean  @default(true)
+  publicSiteEnabled        Boolean  @default(true)
+  signUpsEnabled           Boolean  @default(true)
+  emailDeliveryEnabled     Boolean  @default(true)
+  updatedByAdminUsername   String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
 model AnonymousAnalysisSession {
   id              String    @id @default(uuid())
   token           String    @unique

@@ -138,7 +138,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: null,
-    cachePromptVersion: "assistant.v1",
+    cachePromptVersion: "assistant.v2",
     routeVersion: "assistant.route.v1",
     throttle: true
   },
@@ -150,7 +150,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "extract.v1",
+    cachePromptVersion: "extract.v2",
     routeVersion: "extract.route.v2",
     throttle: true
   },
@@ -162,7 +162,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "risks.v1",
+    cachePromptVersion: "risks.v2",
     routeVersion: "risks.route.v2",
     throttle: true
   },
@@ -174,7 +174,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "summary.v1",
+    cachePromptVersion: "summary.v2",
     routeVersion: "summary.route.v2",
     throttle: true
   },
@@ -186,7 +186,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "brief.v1",
+    cachePromptVersion: "brief.v2",
     routeVersion: "brief.route.v2",
     throttle: true
   },
@@ -198,7 +198,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 7,
-    cachePromptVersion: "email.summary.v1",
+    cachePromptVersion: "email.summary.v2",
     routeVersion: "email.summary.route.v1",
     throttle: true
   },
@@ -210,7 +210,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5.4-mini", "google/gemini-3-flash-preview"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24,
-    cachePromptVersion: "email.draft.v1",
+    cachePromptVersion: "email.draft.v2",
     routeVersion: "email.draft.route.v3",
     throttle: true
   },
@@ -222,7 +222,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 7,
-    cachePromptVersion: "email.suggestions.v1",
+    cachePromptVersion: "email.suggestions.v2",
     routeVersion: "email.suggestions.route.v1",
     throttle: true
   },
@@ -234,7 +234,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 7,
-    cachePromptVersion: "email.action-items.v1",
+    cachePromptVersion: "email.action-items.v2",
     routeVersion: "email.action-items.route.v1",
     throttle: true
   }

@@ -19,6 +19,9 @@ export type NotificationEventType =
   | "workspace.duplicates_found"
   | "workspace.confirmed"
   | "workspace.cancelled"
+  | "workspace.missing_payment"
+  | "workspace.missing_deliverables"
+  | "workspace.missing_usage_rights"
   | "payment.overdue"
   | "payment.received"
   | "invoice.generate_prompt"
@@ -42,7 +45,8 @@ export type NotificationType =
   | "workspace_failed"
   | "workspace_duplicate_found"
   | "workspace_confirmed"
-  | "workspace_cancelled";
+  | "workspace_cancelled"
+  | "workspace_missing_data";
 
 export interface NotificationItem {
   id: string;
@@ -83,6 +87,27 @@ export interface NotificationSeed {
   href: string;
   dedupeKey: string;
   createdAt?: Date | string;
+}
+
+export interface WorkspaceNotificationClientPayload {
+  sessionId: string;
+  dealId: string;
+  brandName?: string | null;
+  campaignName?: string | null;
+  draftBrandName?: string | null;
+  draftCampaignName?: string | null;
+  createdAt?: Date | string;
+  eventType: Extract<
+    NotificationEventType,
+    | "workspace.queued"
+    | "workspace.processing_started"
+    | "workspace.ready_for_review"
+    | "workspace.failed"
+    | "workspace.duplicate_checking"
+    | "workspace.duplicates_found"
+    | "workspace.confirmed"
+    | "workspace.cancelled"
+  >;
 }
 
 const WORKSPACE_SUPERSESSION_MAP: Partial<
@@ -149,6 +174,10 @@ export function notificationTypeForEventType(
       return "workspace_confirmed";
     case "workspace.cancelled":
       return "workspace_cancelled";
+    case "workspace.missing_payment":
+    case "workspace.missing_deliverables":
+    case "workspace.missing_usage_rights":
+      return "workspace_missing_data";
   }
 }
 
@@ -175,6 +204,41 @@ export function buildEmailResyncRequiredNotificationSeed(input: {
     href: "/app/settings",
     dedupeKey: `email.resync_required:${input.accountId}`,
     createdAt: input.createdAt
+  };
+}
+
+export function buildWorkspaceNudgeSeed(input: {
+  dealId: string;
+  campaignName: string;
+  eventType: "workspace.missing_payment" | "workspace.missing_deliverables" | "workspace.missing_usage_rights";
+}): NotificationSeed {
+  const labels: Record<typeof input.eventType, { title: string; description: string }> = {
+    "workspace.missing_payment": {
+      title: `Payment amount missing from ${input.campaignName}`,
+      description: "Add a payment amount to track your earnings, or upload documents that include payment details."
+    },
+    "workspace.missing_deliverables": {
+      title: `No deliverables found in ${input.campaignName}`,
+      description: "Add deliverables so HelloBrand can track due dates and send reminders."
+    },
+    "workspace.missing_usage_rights": {
+      title: `Usage rights not specified in ${input.campaignName}`,
+      description: "Add usage rights to understand what the brand can do with your content."
+    }
+  };
+
+  const label = labels[input.eventType];
+
+  return {
+    category: "workspace",
+    eventType: input.eventType,
+    entityType: "deal",
+    entityId: input.dealId,
+    dealId: input.dealId,
+    title: label.title,
+    description: label.description,
+    href: `/app/p/${input.dealId}?tab=terms`,
+    dedupeKey: `${input.eventType}:${input.dealId}`
   };
 }
 
@@ -373,6 +437,46 @@ export function buildWorkspaceNotificationSeed(input: {
     default:
       throw new Error(`Unsupported workspace notification event: ${input.eventType}`);
   }
+}
+
+export function buildWorkspaceNotificationItem(
+  input: WorkspaceNotificationClientPayload & {
+    id?: string;
+    status?: NotificationStatus;
+    readAt?: string | null;
+    clearedAt?: string | null;
+    supersededAt?: string | null;
+    read?: boolean;
+  }
+): NotificationItem {
+  const seed = buildWorkspaceNotificationSeed(input);
+  const createdAt =
+    typeof seed.createdAt === "string"
+      ? seed.createdAt
+      : seed.createdAt instanceof Date
+        ? seed.createdAt.toISOString()
+        : new Date().toISOString();
+
+  return {
+    id: input.id ?? `optimistic:${seed.dedupeKey}`,
+    category: seed.category,
+    eventType: seed.eventType,
+    type: notificationTypeForEventType(seed.eventType),
+    status: input.status ?? "active",
+    entityType: seed.entityType,
+    entityId: seed.entityId,
+    title: seed.title,
+    description: seed.description,
+    href: seed.href,
+    dealId: seed.dealId ?? null,
+    sessionId: seed.sessionId ?? null,
+    createdAt,
+    updatedAt: createdAt,
+    readAt: input.readAt ?? null,
+    clearedAt: input.clearedAt ?? null,
+    supersededAt: input.supersededAt ?? null,
+    read: input.read ?? false
+  };
 }
 
 export function formatNotificationRelativeTime(dateString: string) {

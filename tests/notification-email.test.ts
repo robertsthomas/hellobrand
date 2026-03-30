@@ -12,8 +12,10 @@ type NotificationRecord = {
   user: {
     email: string;
     profile: {
+      id: string;
       contactEmail: string | null;
       emailNotificationsEnabled: boolean;
+      createdAt: Date;
     } | null;
   };
 };
@@ -35,6 +37,7 @@ type DeliveryRecord = {
 const {
   notifications,
   deliveries,
+  auditEvents,
   inngestSend,
   resendSend,
   prismaMock
@@ -51,8 +54,10 @@ const {
     user: {
       email: string;
       profile: {
+        id: string;
         contactEmail: string | null;
         emailNotificationsEnabled: boolean;
+        createdAt: Date;
       } | null;
     };
   };
@@ -72,6 +77,7 @@ const {
 
   const notifications = new Map<string, NR>();
   const deliveries = new Map<string, DR>();
+  const auditEvents = new Map<string, Array<{ changedFields: unknown }>>();
   const inngestSend = vi.fn();
   const resendSend = vi.fn();
 
@@ -164,10 +170,15 @@ const {
           return cloneDelivery(updated);
         }
       )
+    },
+    profileAuditEvent: {
+      findMany: vi.fn(async ({ where }: { where: { profileId: string } }) =>
+        structuredClone(auditEvents.get(where.profileId) ?? [])
+      )
     }
   };
 
-  return { notifications, deliveries, inngestSend, resendSend, prismaMock };
+  return { notifications, deliveries, auditEvents, inngestSend, resendSend, prismaMock };
 });
 
 vi.mock("@/lib/prisma", () => ({
@@ -208,8 +219,10 @@ function seedWorkspaceNotification(input?: Partial<NotificationRecord>) {
     user: {
       email: "owner@example.com",
       profile: {
+        id: "profile-1",
         contactEmail: "owner@example.com",
-        emailNotificationsEnabled: true
+        emailNotificationsEnabled: true,
+        createdAt: new Date("2026-03-30T00:00:00.000Z")
       }
     },
     ...input
@@ -250,12 +263,14 @@ describe("notification email queueing", () => {
   beforeEach(() => {
     notifications.clear();
     deliveries.clear();
+    auditEvents.clear();
     inngestSend.mockReset();
     resendSend.mockReset();
     prismaMock.appNotification.findUnique.mockClear();
     prismaMock.notificationEmailDelivery.findUnique.mockClear();
     prismaMock.notificationEmailDelivery.create.mockClear();
     prismaMock.notificationEmailDelivery.update.mockClear();
+    prismaMock.profileAuditEvent.findMany.mockClear();
     process.env.DATABASE_URL = "postgres://example";
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3011";
     process.env.RESEND_FROM_EMAIL = "onboarding@resend.dev";
@@ -264,22 +279,60 @@ describe("notification email queueing", () => {
     process.env.INNGEST_EVENT_KEY = "event-key";
   });
 
-  it("does not enqueue deliveries when email notifications are disabled", async () => {
+  it("does not enqueue deliveries when email notifications are explicitly disabled", async () => {
     seedWorkspaceNotification({
       user: {
         email: "owner@example.com",
         profile: {
+          id: "profile-1",
           contactEmail: "owner@example.com",
-          emailNotificationsEnabled: false
+          emailNotificationsEnabled: false,
+          createdAt: new Date("2026-03-01T00:00:00.000Z")
         }
       }
     });
+    auditEvents.set("profile-1", [{ changedFields: ["emailNotificationsEnabled"] }]);
 
     const result = await enqueueNotificationEmailDelivery("notification-1");
 
     expect(result).toBeNull();
     expect(deliveries.size).toBe(0);
     expect(inngestSend).not.toHaveBeenCalled();
+  });
+
+  it("enqueues deliveries when the user has no profile record yet", async () => {
+    seedWorkspaceNotification({
+      user: {
+        email: "owner@example.com",
+        profile: null
+      }
+    });
+
+    const result = await enqueueNotificationEmailDelivery("notification-1");
+
+    expect(result?.status).toBe("pending");
+    expect(deliveries.size).toBe(1);
+    expect(inngestSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("enqueues deliveries for legacy default-disabled profiles without an explicit opt-out", async () => {
+    seedWorkspaceNotification({
+      user: {
+        email: "owner@example.com",
+        profile: {
+          id: "profile-1",
+          contactEmail: "owner@example.com",
+          emailNotificationsEnabled: false,
+          createdAt: new Date("2026-03-01T00:00:00.000Z")
+        }
+      }
+    });
+
+    const result = await enqueueNotificationEmailDelivery("notification-1");
+
+    expect(result?.status).toBe("pending");
+    expect(deliveries.size).toBe(1);
+    expect(inngestSend).toHaveBeenCalledTimes(1);
   });
 
   it("does not enqueue deliveries for intermediate workspace events", async () => {
@@ -327,8 +380,10 @@ describe("notification email sending", () => {
   beforeEach(() => {
     notifications.clear();
     deliveries.clear();
+    auditEvents.clear();
     inngestSend.mockReset();
     resendSend.mockReset();
+    prismaMock.profileAuditEvent.findMany.mockClear();
     process.env.DATABASE_URL = "postgres://example";
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3011";
     process.env.RESEND_FROM_EMAIL = "onboarding@resend.dev";
@@ -369,8 +424,10 @@ describe("notification email sending", () => {
       user: {
         email: "owner@example.com",
         profile: {
+          id: "profile-1",
           contactEmail: "other@example.com",
-          emailNotificationsEnabled: true
+          emailNotificationsEnabled: true,
+          createdAt: new Date("2026-03-30T00:00:00.000Z")
         }
       }
     });

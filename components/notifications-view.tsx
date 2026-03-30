@@ -52,7 +52,8 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   workspace_failed: X,
   workspace_duplicate_found: Search,
   workspace_confirmed: Check,
-  workspace_cancelled: X
+  workspace_cancelled: X,
+  workspace_missing_data: FileText
 };
 
 const TYPE_ICON_STYLES: Record<NotificationType, string> = {
@@ -70,7 +71,8 @@ const TYPE_ICON_STYLES: Record<NotificationType, string> = {
   workspace_failed: "text-[#8a8f98] dark:text-white/35",
   workspace_duplicate_found: "text-[#7a6a4f] dark:text-white/50",
   workspace_confirmed: "text-[#5f6f64] dark:text-white/50",
-  workspace_cancelled: "text-[#8a8f98] dark:text-white/35"
+  workspace_cancelled: "text-[#8a8f98] dark:text-white/35",
+  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50"
 };
 
 async function fetchNotifications() {

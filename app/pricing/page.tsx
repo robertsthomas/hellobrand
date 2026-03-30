@@ -2,10 +2,27 @@ import Link from "next/link";
 
 import { MarketingNav } from "@/components/marketing-nav";
 import { PostHogActionLink } from "@/components/posthog-action-link";
+import { RuntimeStatusPage } from "@/components/runtime-status-page";
+import { getAppSettings } from "@/lib/admin-settings";
 import { buildMarketingPlanAvailability } from "@/lib/billing/plans";
 
 export default async function PricingPage() {
-  const plans = await buildMarketingPlanAvailability();
+  const [plans, appSettings] = await Promise.all([
+    buildMarketingPlanAvailability(),
+    getAppSettings()
+  ]);
+
+  if (!appSettings.publicSiteEnabled) {
+    return (
+      <RuntimeStatusPage
+        eyebrow="Pricing paused"
+        title="Pricing is hidden while the public site is paused."
+        description="An admin has switched off public access, so marketing and pricing pages are currently unavailable."
+        actionHref="/login"
+        actionLabel="Go to login"
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#fefcfa] text-foreground dark:bg-[#0f1115]">

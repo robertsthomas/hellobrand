@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  buildWorkspaceNotificationItem,
   buildWorkspaceNotificationSeed,
   getWorkspaceSupersededEventTypes,
   isNotificationUnread,
@@ -42,6 +43,27 @@ describe("workspace notification seeds", () => {
       title: "Possible duplicate: Acme",
       description:
         "This workspace may overlap with Existing Brand. Review to merge or keep separate."
+    });
+  });
+
+  test("builds a client notification item for optimistic workspace generation", () => {
+    const notification = buildWorkspaceNotificationItem({
+      id: "optimistic:workspace.processing_started:session-1",
+      sessionId: "session-1",
+      dealId: "deal-1",
+      brandName: "Acme",
+      campaignName: "Spring Launch",
+      eventType: "workspace.processing_started",
+      createdAt: "2026-03-23T12:05:00.000Z"
+    });
+
+    expect(notification).toMatchObject({
+      id: "optimistic:workspace.processing_started:session-1",
+      type: "workspace_generating",
+      title: "Acme workspace is generating",
+      href: "/app/intake/session-1",
+      readAt: null,
+      read: false
     });
   });
 });

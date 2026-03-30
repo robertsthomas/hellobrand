@@ -24,7 +24,8 @@ import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
 import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
@@ -186,7 +187,7 @@ async function DealDetailContent({
           <PendingChangesBanner dealId={deal.id} terms={terms} />
         ) : null}
 
-        <Tabs defaultValue={currentTab} className="gap-6">
+        <WorkspaceTabs defaultTab={currentTab}>
           <ScrollableTabsList>
             <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent">
               <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
@@ -219,7 +220,7 @@ async function DealDetailContent({
             </TabsList>
           </ScrollableTabsList>
 
-          <TabsContent value="overview" className="mt-0 space-y-6">
+          <TabsContent value="overview" id="tab-overview" className="mt-0 space-y-6">
             <DealContextPanel terms={terms} />
             {(aggregate.conflictResults?.length ?? 0) > 0 ? (
               <ConflictWarnings
@@ -276,7 +277,7 @@ async function DealDetailContent({
             </div>
           </TabsContent>
 
-          <TabsContent value="terms" className="mt-0 space-y-6">
+          <TabsContent value="terms" id="tab-terms" className="mt-0 space-y-6">
             <TermsEditor
               dealId={deal.id}
               terms={terms}
@@ -286,11 +287,11 @@ async function DealDetailContent({
             />
           </TabsContent>
 
-          <TabsContent value="risks" className="mt-0 space-y-6">
+          <TabsContent value="risks" id="tab-risks" className="mt-0 space-y-6">
             <RiskFlags flags={riskFlags} />
           </TabsContent>
 
-          <TabsContent value="deliverables" className="mt-0 space-y-6">
+          <TabsContent value="deliverables" id="tab-deliverables" className="mt-0 space-y-6">
             {(terms?.deliverables?.length ?? 0) > 0 ? (
               <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
             ) : null}
@@ -358,7 +359,7 @@ async function DealDetailContent({
           <TabsContent value="notes" className="mt-0 space-y-6">
             <DealNotesPanel dealId={deal.id} notes={terms?.notes ?? null} />
           </TabsContent>
-        </Tabs>
+        </WorkspaceTabs>
 
         <div className="border-t border-black/6 pt-6 dark:border-white/8">
           <DeleteDealDialog

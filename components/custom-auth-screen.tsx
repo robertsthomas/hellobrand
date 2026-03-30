@@ -74,14 +74,21 @@ function factorSafeIdentifier(factor: unknown) {
   return null;
 }
 
-export function CustomAuthScreen() {
+export function CustomAuthScreen({
+  signUpsEnabled = true
+}: {
+  signUpsEnabled?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const posthog = usePostHog();
   const { signIn, fetchStatus: signInFetchStatus } = useSignIn();
   const { signUp, fetchStatus: signUpFetchStatus } = useSignUp();
 
-  const queryMode = useMemo(() => deriveMode(searchParams.get("mode")), [searchParams]);
+  const queryMode = useMemo(() => {
+    const nextMode = deriveMode(searchParams.get("mode"));
+    return !signUpsEnabled && nextMode === "sign-up" ? "sign-in" : nextMode;
+  }, [searchParams, signUpsEnabled]);
   const redirectTarget = useMemo(
     () => safeRedirectPath(searchParams.get("redirect")),
     [searchParams]
@@ -154,6 +161,11 @@ export function CustomAuthScreen() {
   }
 
   function updateMode(nextMode: AuthMode) {
+    if (!signUpsEnabled && nextMode === "sign-up") {
+      setErrorMessages(["New sign-ups are paused right now."]);
+      return;
+    }
+
     captureAppEvent(posthog, "auth_mode_switched", {
       mode: nextMode,
       redirectTarget
@@ -286,6 +298,11 @@ export function CustomAuthScreen() {
 
   async function handleSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!signUpsEnabled) {
+      setErrorMessages(["New sign-ups are paused right now."]);
+      return;
+    }
 
     if (signUpPassword !== confirmPassword) {
       setErrorMessages(["Passwords do not match."]);
@@ -517,13 +534,17 @@ export function CustomAuthScreen() {
               {mode === "sign-in" ? (
                 <p>
                   Need an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => updateMode("sign-up")}
-                    className="font-medium text-ocean underline underline-offset-4 dark:text-sand"
-                  >
-                    Sign up
-                  </button>
+                  {signUpsEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => updateMode("sign-up")}
+                      className="font-medium text-ocean underline underline-offset-4 dark:text-sand"
+                    >
+                      Sign up
+                    </button>
+                  ) : (
+                    <span className="font-medium text-muted-foreground">Sign-ups are paused</span>
+                  )}
                 </p>
               ) : (
                 <p>
@@ -564,7 +585,9 @@ export function CustomAuthScreen() {
                 ? verificationBody
                 : mode === "sign-in"
                   ? "Sign in with your email or username and password."
-                  : "Start with email and password. We’ll send a quick verification code after that."}
+                  : signUpsEnabled
+                    ? "Start with email and password. We’ll send a quick verification code after that."
+                    : "New sign-ups are paused right now."}
             </p>
 
             {verificationNotice ? (
@@ -798,13 +821,17 @@ export function CustomAuthScreen() {
           {mode === "sign-in" ? (
             <p>
               Need an account?{" "}
-              <button
-                type="button"
-                onClick={() => updateMode("sign-up")}
-                className="font-medium text-ocean underline underline-offset-4 dark:text-sand"
-              >
-                Sign up
-              </button>
+              {signUpsEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => updateMode("sign-up")}
+                  className="font-medium text-ocean underline underline-offset-4 dark:text-sand"
+                >
+                  Sign up
+                </button>
+              ) : (
+                <span className="font-medium text-muted-foreground">Sign-ups are paused</span>
+              )}
             </p>
           ) : (
             <p>

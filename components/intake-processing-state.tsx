@@ -117,7 +117,7 @@ export function IntakeProcessingState({
         {/* "You can leave" note */}
         <div className="mt-10 border-t border-black/6 pt-6 dark:border-white/8">
           <div className="flex items-start justify-center gap-3 text-left">
-            <Bell className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            {/* <Bell className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" /> */}
             <p className="text-sm leading-6 text-muted-foreground">
               You can close this page and keep exploring. We'll notify you when your workspace is ready to review.
             </p>

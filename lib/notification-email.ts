@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+import { getAppSettings } from "@/lib/admin-settings";
+import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { inngest } from "@/lib/inngest/client";
 import { prisma } from "@/lib/prisma";
@@ -18,8 +20,10 @@ type NotificationWithEmailContext = {
   user: {
     email: string;
     profile: {
+      id: string;
       contactEmail: string | null;
       emailNotificationsEnabled: boolean;
+      createdAt: Date;
     } | null;
   };
 };
@@ -134,8 +138,10 @@ async function loadNotificationWithEmailContext(appNotificationId: string) {
           email: true,
           profile: {
             select: {
+              id: true,
               contactEmail: true,
-              emailNotificationsEnabled: true
+              emailNotificationsEnabled: true,
+              createdAt: true
             }
           }
         }
@@ -151,7 +157,10 @@ function shouldSendNotificationEmail(notification: NotificationWithEmailContext)
   ) {
     return (
       notification.eventType === "workspace.ready_for_review" ||
-      notification.eventType === "workspace.failed"
+      notification.eventType === "workspace.failed" ||
+      notification.eventType === "workspace.missing_payment" ||
+      notification.eventType === "workspace.missing_deliverables" ||
+      notification.eventType === "workspace.missing_usage_rights"
     );
   }
 
@@ -206,6 +215,11 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
     return null;
   }
 
+  const appSettings = await getAppSettings();
+  if (!appSettings.emailDeliveryEnabled) {
+    return null;
+  }
+
   const notification = await loadNotificationWithEmailContext(appNotificationId);
   if (
     !notification ||
@@ -216,13 +230,14 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   }
 
   const profile = notification.user.profile;
-  if (!profile?.emailNotificationsEnabled) {
+  const emailNotificationsEnabled = await resolveEmailNotificationsEnabled(profile);
+  if (!emailNotificationsEnabled) {
     return null;
   }
 
   const recipientEmail = resolveNotificationRecipient(
     notification.user.email,
-    profile.contactEmail
+    profile?.contactEmail ?? null
   );
 
   if (!recipientEmail) {

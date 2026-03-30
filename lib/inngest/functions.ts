@@ -5,6 +5,7 @@ import {
   sendNotificationEmailDelivery,
   sendPendingWorkspaceReminders
 } from "@/lib/notification-email";
+import { runWorkspaceNudgeSweep } from "@/lib/notification-service";
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document" },
@@ -195,5 +196,17 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
       ok: true,
       ...result
     };
+  }
+);
+
+export const workspaceNudgeSweepFunction = inngest.createFunction(
+  { id: "workspace-nudge-sweep" },
+  { cron: "0 11 * * *" },
+  async ({ step }) => {
+    const result = await step.run("run-workspace-nudge-sweep", async () =>
+      runWorkspaceNudgeSweep()
+    );
+
+    return { ok: true, ...result };
   }
 );

@@ -20,7 +20,7 @@ export default function IntakeProcessingPage({
   params: Promise<{ sessionId: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
+    <Suspense fallback={<div className="flex min-h-full items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
       <IntakeProcessingContent params={params} />
     </Suspense>
   );
@@ -62,7 +62,7 @@ async function IntakeProcessingContent({
 
   if (session.status === "queued") {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center p-8">
+      <div className="flex min-h-full items-center justify-center p-8">
         <div className="w-full max-w-2xl space-y-8 border border-black/8 bg-white p-8 dark:border-white/10 dark:bg-[#161a1f]">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
@@ -112,7 +112,7 @@ async function IntakeProcessingContent({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-5 py-8">
+    <div className="flex min-h-full flex-col items-center justify-center px-5 py-8">
       <div className="w-full max-w-md">
         <IntakeProcessingState
           documentsCount={documents.length}
@@ -134,9 +134,9 @@ async function IntakeProcessingContent({
             <input type="hidden" name="sessionId" value={session.id} />
             <input type="hidden" name="redirectTo" value="/app" />
             <DeleteDraftButton
-              className="text-sm text-muted-foreground transition hover:text-destructive"
+              className="text-sm text-muted-foreground transition hover:text-destructive bg-primary/5 hover:bg-primary/10 rounded-full px-4 py-2"
             >
-              Cancel
+              Cancel Intake
             </DeleteDraftButton>
           </form>
         </div>

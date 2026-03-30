@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { CustomAuthScreen } from "@/components/custom-auth-screen";
+import { getAppSettings } from "@/lib/admin-settings";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 
 export default async function LoginPage({
@@ -9,7 +10,10 @@ export default async function LoginPage({
 }: {
   searchParams?: Promise<{ redirect?: string }>;
 }) {
-  const session = await auth();
+  const [session, appSettings] = await Promise.all([
+    auth(),
+    getAppSettings()
+  ]);
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const redirectPath = safeRedirectPath(resolvedSearchParams?.redirect);
 
@@ -17,5 +21,5 @@ export default async function LoginPage({
     redirect(redirectPath);
   }
 
-  return <CustomAuthScreen />;
+  return <CustomAuthScreen signUpsEnabled={appSettings.signUpsEnabled} />;
 }
