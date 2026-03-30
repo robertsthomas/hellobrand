@@ -175,6 +175,18 @@ const {
       findMany: vi.fn(async ({ where }: { where: { profileId: string } }) =>
         structuredClone(auditEvents.get(where.profileId) ?? [])
       )
+    },
+    appSettings: {
+      upsert: vi.fn(async () => ({
+        id: "primary",
+        appAccessEnabled: true,
+        publicSiteEnabled: true,
+        signUpsEnabled: true,
+        emailDeliveryEnabled: true,
+        updatedByAdminUsername: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }))
     }
   };
 

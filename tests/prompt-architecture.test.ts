@@ -25,6 +25,7 @@ vi.mock("@/lib/ai/gateway", () => ({
   runOpenRouterTask: runOpenRouterTaskMock
 }));
 
+import { generateAssistantWorkspaceDraft } from "@/lib/assistant/draft";
 import { buildAssistantPrompt } from "@/lib/assistant/prompt";
 import { joinPromptSections } from "@/lib/ai/prompting";
 import { extractSectionWithLlm } from "@/lib/analysis/llm";
@@ -69,6 +70,119 @@ describe("assistant prompt architecture", () => {
     expect(prompt).toContain("<behavior_rules>");
     expect(prompt).toContain("When the user needs exact facts");
     expect(prompt).toContain("Current partnership snapshot");
+  });
+});
+
+describe("assistant workspace draft architecture", () => {
+  beforeEach(() => {
+    runStructuredOpenRouterTaskMock.mockReset();
+    runStructuredOpenRouterTaskMock.mockResolvedValue({
+      data: {
+        subject: "Usage rights update",
+        body: "Hi Northstar team,\n\nI’d love to keep moving, but I’d like to narrow the paid usage scope before we finalize. Would you be open to organic reposting only, or a shorter paid usage term with separate compensation?\n\nBest,\nCreator"
+      },
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      resolvedModel: "google/gemini-2.5-flash",
+      requestedModel: "google/gemini-2.5-flash",
+      cacheHit: false,
+      budgetDecision: "normal"
+    });
+  });
+
+  it("builds a structured workspace draft prompt with hierarchy, context, and evidence", async () => {
+    await generateAssistantWorkspaceDraft({
+      viewer: {
+        id: "viewer-1",
+        displayName: "Creator"
+      } as any,
+      partnership: {
+        deal: {
+          id: "deal-1",
+          updatedAt: "2026-03-29T12:00:00.000Z",
+          brandName: "Northstar",
+          campaignName: "Spring launch",
+          status: "negotiating",
+          paymentStatus: "invoiced",
+          summary: "Paid usage feels broader than the agreed scope."
+        },
+        terms: {
+          paymentAmount: 2000,
+          currency: "USD",
+          paymentTerms: "Net 45",
+          paymentTrigger: "Final invoice",
+          deliverables: [{ id: "d-1", title: "Instagram Reel", quantity: 1, dueDate: "2026-04-03T00:00:00.000Z", channel: "Instagram", description: null, status: "pending" }],
+          usageRights: "Paid social and organic reposting",
+          usageDuration: "6 months",
+          usageTerritory: "US",
+          usageChannels: ["Instagram", "TikTok"],
+          exclusivityApplies: false,
+          exclusivityCategory: null,
+          exclusivityDuration: null,
+          approvalRequirements: "Brand approval required before posting",
+          revisions: "1 round",
+          termination: "Mutual written notice",
+          notes: null
+        },
+        currentSummary: {
+          body: "This deal still needs usage-rights tightening before signature."
+        },
+        riskFlags: [
+          {
+            id: "risk-1",
+            dealId: "deal-1",
+            category: "usage_rights",
+            title: "Broad paid usage",
+            detail: "The contract allows broad paid usage across multiple channels.",
+            severity: "high",
+            suggestedAction: "Limit paid usage to a shorter term or separate buyout.",
+            evidence: ["Brand may use creator content in paid advertising for six months."],
+            sourceDocumentId: "doc-1",
+            createdAt: "2026-03-29T12:00:00.000Z"
+          }
+        ],
+        extractionEvidence: [
+          {
+            fieldPath: "usageRights",
+            snippet: "Brand may use creator content in paid advertising for six months.",
+            confidence: 0.92
+          }
+        ],
+        documents: [],
+        summaries: [],
+        extractionResults: []
+      } as any,
+      profile: {
+        preferredSignature: "Creator",
+        displayName: "Creator"
+      } as any,
+      context: {
+        pathname: "/app/p/deal-1",
+        pageTitle: "Partnership workspace",
+        dealId: "deal-1",
+        tab: "risks",
+        tone: "professional",
+        trigger: {
+          kind: "risk_flag",
+          sourceId: "risk-1",
+          label: "Negotiate watchout",
+          prompt: "Help me push back on the paid usage terms."
+        }
+      },
+      focus: "Push back on the paid usage scope before signature.",
+      intent: "limit-usage-rights",
+      recipient: "Northstar team"
+    });
+
+    const call = runStructuredOpenRouterTaskMock.mock.calls[0]?.[0];
+
+    expect(call.systemPrompt).toContain("<instruction_hierarchy>");
+    expect(call.systemPrompt).toContain("<draft_job>");
+    expect(call.systemPrompt).toContain("Saved workspace facts are highest priority.");
+    expect(call.userPrompt).toContain("<workspace_snapshot>");
+    expect(call.userPrompt).toContain("<assistant_context>");
+    expect(call.userPrompt).toContain("<risk_context>");
+    expect(call.userPrompt).toContain("<evidence_context>");
+    expect(call.userPrompt).toContain("Push back on the paid usage scope before signature.");
   });
 });
 

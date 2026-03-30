@@ -1,3 +1,4 @@
+import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { cleanDisplayText } from "@/lib/display-text";
 import type { RiskFlagRecord } from "@/lib/types";
 import { cn, normalizeEvidenceSnippet } from "@/lib/utils";
@@ -14,7 +15,15 @@ function cleanRiskEvidence(evidence: string[]) {
     .filter((snippet): snippet is string => Boolean(snippet));
 }
 
-export function RiskFlags({ flags }: { flags: RiskFlagRecord[] }) {
+export function RiskFlags({
+  flags,
+  dealId
+}: {
+  flags: RiskFlagRecord[];
+  dealId?: string;
+}) {
+  const leadFlag = flags[0] ?? null;
+
   return (
     <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -26,6 +35,23 @@ export function RiskFlags({ flags }: { flags: RiskFlagRecord[] }) {
             These are creator-focused negotiation flags, not legal advice.
           </p>
         </div>
+        {dealId && leadFlag ? (
+          <AssistantTriggerButton
+            label="Draft negotiation email"
+            trigger={{
+              kind: "risk_flag",
+              sourceId: leadFlag.id,
+              label: "Negotiate watchout",
+              prompt: [
+                `Draft a creator-professional negotiation email for this partnership that addresses this watchout: ${leadFlag.title}.`,
+                leadFlag.suggestedAction
+                  ? `Use this as the primary ask: ${leadFlag.suggestedAction}.`
+                  : "Ask for a concrete revision or clarification.",
+                "Keep it grounded in the saved workspace facts and avoid inventing prior agreements."
+              ].join(" ")
+            }}
+          />
+        ) : null}
       </div>
       {flags.length > 0 ? (
         <Accordion

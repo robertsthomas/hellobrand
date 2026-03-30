@@ -676,6 +676,7 @@ export type AssistantTriggerKind =
   | "risk_flag"
   | "payment"
   | "deliverable"
+  | "approval"
   | "deal_context"
   | "email"
   | "general";

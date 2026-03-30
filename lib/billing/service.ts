@@ -36,6 +36,7 @@ import {
   getDevBillingIntervalOverride,
   getDevBillingStatusOverride,
   getDevPlanOverride,
+  getDevPlanOverrideAsync,
   getDevTrialDaysLeftOverride,
   getStripePriceId,
   getStripeSecretKey,
@@ -268,10 +269,10 @@ async function ensureStripeCustomer(
   return customer.id;
 }
 
-function buildFileBackedBillingOverview(): BillingOverview {
+async function buildFileBackedBillingOverview(): Promise<BillingOverview> {
   const stripeConfigured = isStripeConfigured();
   const planCatalog = buildPlanAvailability();
-  const overridePlanTier = getDevPlanOverride();
+  const overridePlanTier = await getDevPlanOverrideAsync();
   const overrideInterval = getDevBillingIntervalOverride();
   const overrideStatus = getDevBillingStatusOverride();
   const overrideTrialDaysLeft = getDevTrialDaysLeftOverride();
@@ -369,7 +370,7 @@ export async function getBillingOverviewForViewer(
         }
       })
     ]);
-    const overridePlanTier = getDevPlanOverride();
+    const overridePlanTier = await getDevPlanOverrideAsync();
     const overrideInterval = getDevBillingIntervalOverride();
     const overrideStatus = getDevBillingStatusOverride();
     const overrideTrialDaysLeft = getDevTrialDaysLeftOverride();

@@ -38,7 +38,7 @@ test.describe("archive partnerships", () => {
 
     if ((response?.status() ?? 0) !== 200) return;
 
-    const archivedTab = page.getByRole("tab", { name: "Archived" });
+    const archivedTab = page.getByRole("button", { name: /Archived/i });
     await expect(archivedTab).toBeVisible({ timeout: 3000 });
   });
 

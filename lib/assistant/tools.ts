@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { generateAssistantWorkspaceDraft } from "@/lib/assistant/draft";
 import {
   createAssistantDraftBlock,
   createAssistantNavigationBlock
@@ -236,19 +237,33 @@ export function buildAssistantTools(input: {
         const profile = process.env.DATABASE_URL
           ? await getProfileForViewer(input.viewer).catch(() => null)
           : null;
+        const validIntent = safeIntent(intent);
         const sender =
           profile?.preferredSignature?.trim() ||
           profile?.displayName?.trim() ||
           input.viewer.displayName;
-        const validIntent = safeIntent(intent);
-        const draft = validIntent
-          ? generateEmailDraft(aggregate, validIntent, sender)
-          : buildGenericDraft(
-              aggregate.deal.campaignName || aggregate.deal.brandName,
-              recipient || `${aggregate.deal.brandName} team`,
-              focus,
-              sender
-            );
+        let draft: { subject: string; body: string };
+
+        try {
+          draft = await generateAssistantWorkspaceDraft({
+            viewer: input.viewer,
+            partnership: aggregate,
+            profile,
+            context: input.context,
+            focus,
+            recipient: recipient ?? null,
+            intent: validIntent
+          });
+        } catch {
+          draft = validIntent
+            ? generateEmailDraft(aggregate, validIntent, sender)
+            : buildGenericDraft(
+                aggregate.deal.campaignName || aggregate.deal.brandName,
+                recipient || `${aggregate.deal.brandName} team`,
+                focus,
+                sender
+              );
+        }
 
         return createAssistantDraftBlock({
           label: replaceDashesWithCommas(focus),

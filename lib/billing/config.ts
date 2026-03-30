@@ -46,6 +46,30 @@ export function getDevPlanOverride() {
   return isValidPlanTier(value) ? value : null;
 }
 
+/**
+ * Async version that also checks the e2e tier cookie.
+ * Used in async contexts like getViewerEntitlements.
+ */
+export async function getDevPlanOverrideAsync(): Promise<PlanTier | null> {
+  if (!isNonProduction()) {
+    return null;
+  }
+
+  if (process.env.HELLOBRAND_E2E_ENABLED === "1") {
+    try {
+      const { cookies } = await import("next/headers");
+      const cookieStore = await cookies();
+      const tier = cookieStore.get("hb_e2e_tier")?.value?.trim().toLowerCase() ?? null;
+      if (isValidPlanTier(tier)) return tier;
+    } catch {
+      // Not in a request context
+    }
+  }
+
+  const value = process.env.HELLOBRAND_DEV_PLAN?.trim().toLowerCase() ?? null;
+  return isValidPlanTier(value) ? value : null;
+}
+
 export function getDevBillingIntervalOverride() {
   if (!isNonProduction()) {
     return null;

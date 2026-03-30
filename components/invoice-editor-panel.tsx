@@ -9,8 +9,14 @@ import {
   generateInvoiceDraftAction,
   saveInvoiceDraftAction
 } from "@/app/actions";
+import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { SubmitButton } from "@/components/submit-button";
-import type { DocumentRecord, InvoiceLineItem, InvoiceRecord } from "@/lib/types";
+import type {
+  DocumentRecord,
+  InvoiceLineItem,
+  InvoiceRecord,
+  PaymentStatus
+} from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
 function createClientLineItemId() {
@@ -52,11 +58,15 @@ function documentPreviewUrl(documentId: string) {
 export function InvoiceEditorPanel({
   dealId,
   invoice,
-  invoiceDocuments
+  invoiceDocuments,
+  paymentStatus,
+  paymentTerms
 }: {
   dealId: string;
   invoice: InvoiceRecord | null;
   invoiceDocuments: DocumentRecord[];
+  paymentStatus: PaymentStatus;
+  paymentTerms: string | null;
 }) {
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(
     invoice?.lineItems.length ? invoice.lineItems : [createLineItem()]
@@ -68,6 +78,10 @@ export function InvoiceEditorPanel({
   );
 
   const lineItemsJson = useMemo(() => JSON.stringify(lineItems), [lineItems]);
+  const paymentTriggerPrompt =
+    paymentStatus === "late" || paymentStatus === "awaiting_payment" || paymentStatus === "invoiced"
+      ? "Draft a concise creator-professional payment follow-up email for this partnership. Reference the saved workspace payment timing, ask what is still needed, and keep the tone firm but professional."
+      : `Draft a concise creator-professional email asking the brand to confirm payment timing and invoice requirements for this partnership. The current workspace payment terms are ${paymentTerms ?? "not fully clear"}.`;
 
   const updateItem = (
     id: string,
@@ -98,12 +112,34 @@ export function InvoiceEditorPanel({
 
         <form action={generateInvoiceDraftAction}>
           <input type="hidden" name="dealId" value={dealId} />
-          <SubmitButton
-            pendingLabel="Generating invoice..."
-            className="inline-flex items-center justify-center bg-primary px-5 py-3 text-sm font-semibold text-white"
-          >
-            Generate invoice
-          </SubmitButton>
+          <div className="flex flex-wrap items-center gap-3">
+            <SubmitButton
+              pendingLabel="Generating invoice..."
+              className="inline-flex items-center justify-center bg-primary px-5 py-3 text-sm font-semibold text-white"
+            >
+              Generate invoice
+            </SubmitButton>
+            <AssistantTriggerButton
+              label={
+                paymentStatus === "late" ||
+                paymentStatus === "awaiting_payment" ||
+                paymentStatus === "invoiced"
+                  ? "Draft payment follow-up"
+                  : "Clarify payment timing"
+              }
+              trigger={{
+                kind: "payment",
+                sourceId: dealId,
+                label:
+                  paymentStatus === "late" ||
+                  paymentStatus === "awaiting_payment" ||
+                  paymentStatus === "invoiced"
+                    ? "Follow up on payment"
+                    : "Clarify payment timing",
+                prompt: paymentTriggerPrompt
+              }}
+            />
+          </div>
         </form>
 
         {invoiceDocuments.length > 0 ? (
@@ -143,15 +179,30 @@ export function InvoiceEditorPanel({
           </p>
         </div>
 
-        {invoice.pdfDocumentId ? (
-          <Link
-            href={documentPreviewUrl(invoice.pdfDocumentId)}
-            target="_blank"
-            className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
-          >
-            Open finalized PDF
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {(paymentStatus === "late" ||
+            paymentStatus === "awaiting_payment" ||
+            paymentStatus === "invoiced") ? (
+            <AssistantTriggerButton
+              label="Draft payment follow-up"
+              trigger={{
+                kind: "payment",
+                sourceId: invoice.id,
+                label: "Follow up on payment",
+                prompt: paymentTriggerPrompt
+              }}
+            />
+          ) : null}
+          {invoice.pdfDocumentId ? (
+            <Link
+              href={documentPreviewUrl(invoice.pdfDocumentId)}
+              target="_blank"
+              className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
+            >
+              Open finalized PDF
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <form className="space-y-6">

@@ -96,7 +96,7 @@ describe("ai gateway", () => {
     expect(prepared.budgetDecision).toBe("degraded");
     expect(prepared.requestedModel).toBe("google/gemini-2.5-flash");
     expect(prepared.fallbacks).toEqual([]);
-    expect(prepared.maxTokens).toBe(560);
+    expect(prepared.maxTokens).toBe(Math.max(120, Math.floor(4096 * 0.7)));
   });
 
   it("uses the fast Gemini route for email drafts", async () => {
@@ -107,7 +107,7 @@ describe("ai gateway", () => {
 
     expect(prepared.requestedModel).toBe("google/gemini-2.5-flash");
     expect(prepared.fallbacks).toEqual(["openai/gpt-5.4-mini", "google/gemini-3-flash-preview"]);
-    expect(prepared.maxTokens).toBe(800);
+    expect(prepared.maxTokens).toBe(4096);
     expect(prepared.budgetDecision).toBe("normal");
   });
 

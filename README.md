@@ -133,38 +133,62 @@ The included tests cover fallback extraction, document parsing behavior, email d
 
 ## Playwright E2E
 
-The repo includes a local-first Playwright matrix for `basic`, `standard`, and `premium` entitlement coverage. It uses three local Next.js servers, file-backed seed data, and a non-production test-auth cookie instead of the Clerk sign-in UI.
+The repo includes a local-first Playwright matrix for `basic`, `standard`, and `premium` entitlement coverage. It uses a single Next.js dev server with per-tier cookies instead of three separate servers. Tier switching happens via an `hb_e2e_tier` cookie set during global setup, so one server handles all three tiers.
 
-Install browser binaries, then run:
+Install browser binaries first:
 
 ```bash
 pnpm exec playwright install chromium
-pnpm run test:e2e
 ```
 
-Helpful variants:
+### Running E2E tests
+
+**Two-terminal approach (recommended, fastest):**
+
+Terminal 1 (leave running):
 
 ```bash
-pnpm run test:e2e:ui
-pnpm run test:e2e:headed
+doppler run -- pnpm test:e2e:server
 ```
 
-The v1 suite covers:
+Terminal 2:
 
-- `/pricing`
-- `/app/settings/billing`
-- `/app/analytics`
-- `/app/inbox`
-- `/app/settings`
-- `/app/p/demo-deal?tab=brief`
-- `/app/p/demo-deal?tab=emails`
+```bash
+doppler run -- pnpm test:e2e
+```
 
-Each Playwright app server runs with:
+Playwright detects the running server and skips startup entirely. Tests begin in seconds.
 
-- `HELLOBRAND_DEV_PLAN=<basic|standard|premium>`
-- `HELLOBRAND_E2E_ENABLED=1`
-- `HELLOBRAND_E2E_AUTH_SECRET=<local secret>`
-- `DATABASE_URL=`
+**Helpful variants:**
+
+```bash
+doppler run -- pnpm test:e2e:ui
+doppler run -- pnpm test:e2e:headed
+```
+
+### How tier switching works
+
+The `test:e2e:server` script starts a single dev server with `HELLOBRAND_E2E_ENABLED=1`. During Playwright global setup, each tier project (basic, standard, premium) gets a storage state file with an `hb_e2e_tier` cookie. The server reads this cookie via `getDevPlanOverrideAsync()` to determine which plan tier to simulate for that request.
+
+### E2E test coverage
+
+- Archive partnerships (dashboard, history table, row actions)
+- Billing (plan cards, usage meters, checkout, stripe warning)
+- Brief generation (tier gates, usage meters)
+- Deal workspace (history, 404, dashboard)
+- Delete partnership (confirmation flow)
+- Form smoke tests (settings, profile, payments, notes)
+- Inbox (locked preview, upgrade CTA, premium workspace)
+- Intake flow (new workspace page)
+- Invoices (draft generation)
+- Navigation (sidebar, redirects, pricing, billing)
+- Onboarding (guide tooltips, modal flow)
+- Payments (page load)
+- Public upload (anonymous analysis, quota gate, file validation)
+- Search (page load, query handling)
+- Settings (sub-tabs, email connections, notifications)
+- Tier matrix (pricing cards, billing tiers, feature gates)
+- Workspace nudges (notifications API, bell, terms tab)
 
 ## CI/CD
 

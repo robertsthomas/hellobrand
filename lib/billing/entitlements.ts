@@ -1,6 +1,6 @@
 import { BillingSubscriptionStatus, PlanTier } from "@prisma/client";
 
-import { getDevPlanOverride } from "@/lib/billing/config";
+import { getDevPlanOverrideAsync } from "@/lib/billing/config";
 import {
   isActiveBillingSubscriptionStatus,
   resolveEffectiveEntitlementTier
@@ -180,7 +180,7 @@ function usageErrorMessage(key: UsageLimitKey, limit: number, effectiveTier: Pla
 }
 
 export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntitlements> {
-  const overrideTier = getDevPlanOverride();
+  const overrideTier = await getDevPlanOverrideAsync();
   const workspaceCount = await getActiveWorkspaceCount(viewer);
 
   if (!process.env.DATABASE_URL) {

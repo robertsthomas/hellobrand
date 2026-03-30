@@ -166,6 +166,7 @@ export const assistantTriggerKindValues = [
   "risk_flag",
   "payment",
   "deliverable",
+  "approval",
   "deal_context",
   "email",
   "general"

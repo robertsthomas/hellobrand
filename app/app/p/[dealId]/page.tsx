@@ -230,7 +230,10 @@ async function DealDetailContent({
               />
             ) : null}
             {(terms?.disclosureObligations?.length ?? 0) > 0 ? (
-              <DisclosureObligations obligations={terms?.disclosureObligations ?? []} />
+              <DisclosureObligations
+                dealId={deal.id}
+                obligations={terms?.disclosureObligations ?? []}
+              />
             ) : null}
             <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
               <DealSummaryPanel
@@ -288,14 +291,14 @@ async function DealDetailContent({
           </TabsContent>
 
           <TabsContent value="risks" id="tab-risks" className="mt-0 space-y-6">
-            <RiskFlags flags={riskFlags} />
+            <RiskFlags dealId={deal.id} flags={riskFlags} />
           </TabsContent>
 
           <TabsContent value="deliverables" id="tab-deliverables" className="mt-0 space-y-6">
             {(terms?.deliverables?.length ?? 0) > 0 ? (
               <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
             ) : null}
-            <DeliverablesList deliverables={terms?.deliverables ?? []} />
+            <DeliverablesList dealId={deal.id} deliverables={terms?.deliverables ?? []} />
           </TabsContent>
 
           <TabsContent value="brief" className="mt-0 space-y-6">
@@ -353,6 +356,8 @@ async function DealDetailContent({
               dealId={deal.id}
               invoice={aggregate.invoiceRecord ?? null}
               invoiceDocuments={invoiceDocuments}
+              paymentStatus={deal.paymentStatus}
+              paymentTerms={terms?.paymentTerms ?? null}
             />
           </TabsContent>
 
