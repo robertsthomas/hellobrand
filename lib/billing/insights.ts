@@ -23,7 +23,7 @@ function isPaid(status: string) {
 }
 
 function isOutstanding(status: string) {
-  return status === "awaiting_payment" || status === "invoiced" || status === "late";
+  return status === "awaiting_payment" || status === "late";
 }
 
 function startOfMonth(date: Date) {

@@ -88,6 +88,7 @@ model User {
   appNotifications            AppNotification[]
   notificationEmailDeliveries NotificationEmailDelivery[]
   invoiceRecords               InvoiceRecord[]
+  invoiceDeliveryRecords       InvoiceDeliveryRecord[]
   invoiceReminderTouchpoints   InvoiceReminderTouchpoint[]
 }
 
@@ -204,6 +205,7 @@ model Deal {
   emailActionItems      EmailActionItem[]
   brandContacts         BrandContact[]
   appNotifications      AppNotification[]
+  invoiceDeliveryRecords InvoiceDeliveryRecord[]
   invoiceReminderTouchpoints InvoiceReminderTouchpoint[]
 }
 
@@ -878,6 +880,7 @@ model InvoiceRecord {
   status               String
   draftSavedAt         DateTime?
   finalizedAt          DateTime?
+  sentAt               DateTime?
   invoiceDate          DateTime?
   dueDate              DateTime?
   currency             String?
@@ -888,14 +891,44 @@ model InvoiceRecord {
   lineItemsJson        Json
   pdfDocumentId        String?
   manualNumberOverride Boolean   @default(false)
+  lastSentThreadId     String?
+  lastSentMessageId    String?
+  lastSentAccountId    String?
+  lastSentToEmail      String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries InvoiceDeliveryRecord[]
 
   @@unique([userId, invoiceNumber])
   @@index([userId, status, updatedAt])
+}
+
+model InvoiceDeliveryRecord {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  dealId       String
+  userId       String
+  provider     String?
+  threadId     String?
+  messageId    String?
+  accountId    String?
+  toEmail      String?
+  subject      String
+  status       String
+  errorMessage String?
+  sentAt       DateTime
+  createdAt    DateTime @default(now())
+
+  invoice InvoiceRecord @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  deal    Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sentAt])
+  @@index([dealId, sentAt])
+  @@index([userId, sentAt])
 }
 
 model InvoiceReminderTouchpoint {

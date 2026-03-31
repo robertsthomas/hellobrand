@@ -4,6 +4,7 @@ import { InboxPreviewLocked } from "@/components/inbox-preview-locked";
 import { InboxWorkspace } from "@/components/inbox-workspace";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
+import { getCachedDealForViewer } from "@/lib/cached-data";
 import { listDealsForViewer } from "@/lib/deals";
 import {
   getEmailThreadForViewer,
@@ -21,6 +22,7 @@ export default function InboxPage({
     accountId?: string;
     dealId?: string;
     thread?: string;
+    attachInvoice?: string;
   }>;
 }) {
   return (
@@ -39,6 +41,7 @@ async function InboxContent({
     accountId?: string;
     dealId?: string;
     thread?: string;
+    attachInvoice?: string;
   }>;
 }) {
   const viewer = await requireViewer();
@@ -81,6 +84,38 @@ async function InboxContent({
       threads.map((item) => item.thread.id)
     )
   ]);
+  const linkedDealIds = Array.from(
+    new Set(threads.flatMap((item) => item.links.map((link) => link.dealId)))
+  );
+  const linkedDealAggregates = await Promise.all(
+    linkedDealIds.map(async (dealId) => ({
+      dealId,
+      aggregate: await getCachedDealForViewer(viewer, dealId)
+    }))
+  );
+  const invoiceAttachmentsByDealId = Object.fromEntries(
+    linkedDealAggregates.flatMap(({ dealId, aggregate }) => {
+      const invoice = aggregate?.invoiceRecord;
+      const invoiceDocument = aggregate?.documents.find(
+        (document) => document.id === invoice?.pdfDocumentId
+      );
+
+      if (!invoice || !invoice.pdfDocumentId || !invoiceDocument) {
+        return [];
+      }
+
+      return [[
+        dealId,
+        {
+          dealId,
+          documentId: invoiceDocument.id,
+          fileName: invoiceDocument.fileName,
+          invoiceNumber: invoice.invoiceNumber,
+          status: invoice.status
+        }
+      ]];
+    })
+  );
 
   return (
     <InboxWorkspace
@@ -90,6 +125,8 @@ async function InboxContent({
       deals={deals}
       hasConnectedAccounts={emailAccounts.length > 0}
       connectedProviders={connectedProviders}
+      invoiceAttachmentsByDealId={invoiceAttachmentsByDealId}
+      autoAttachInvoice={resolved.attachInvoice === "1"}
       selectedFilters={{
         q: resolved.q ?? "",
         provider: selectedProvider,

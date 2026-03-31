@@ -15,7 +15,8 @@ type EmailEligibleEventType =
   | "workspace.missing_deliverables"
   | "workspace.missing_usage_rights"
   | "email.resync_required"
-  | "invoice.generate_prompt";
+  | "invoice.generate_prompt"
+  | "invoice.send_prompt";
 
 export type NotificationEmailCopy = {
   subject: string;
@@ -153,6 +154,9 @@ function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string):
     case "invoice.generate_prompt": {
       return title;
     }
+    case "invoice.send_prompt": {
+      return title;
+    }
   }
 }
 
@@ -172,6 +176,8 @@ function resolveCtaLabel(eventType: EmailEligibleEventType): string {
       return "Reconnect inbox";
     case "invoice.generate_prompt":
       return "Generate invoice";
+    case "invoice.send_prompt":
+      return "Send invoice";
   }
 }
 
@@ -182,7 +188,8 @@ const EMAIL_ELIGIBLE_EVENT_TYPES = new Set<string>([
   "workspace.missing_deliverables",
   "workspace.missing_usage_rights",
   "email.resync_required",
-  "invoice.generate_prompt"
+  "invoice.generate_prompt",
+  "invoice.send_prompt"
 ]);
 
 function isEmailEligibleEventType(eventType: string): eventType is EmailEligibleEventType {
@@ -315,7 +322,10 @@ function shouldSendNotificationEmail(notification: NotificationWithEmailContext)
   }
 
   if (notification.category === "payments") {
-    return notification.eventType === "invoice.generate_prompt";
+    return (
+      notification.eventType === "invoice.generate_prompt" ||
+      notification.eventType === "invoice.send_prompt"
+    );
   }
 
   return false;

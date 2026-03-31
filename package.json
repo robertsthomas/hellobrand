@@ -13,6 +13,7 @@
     "start": "next start",
     "start:prd": "doppler run --config prd -- next start",
     "start:dev": "doppler run --config dev -- next start",
+    "db:migrate": "doppler run -- pnpm exec prisma migrate dev",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev",
     "lint": "eslint .",
     "test": "vitest run",

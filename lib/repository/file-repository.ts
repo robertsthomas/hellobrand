@@ -27,6 +27,7 @@ import type {
   ExtractionResultRecord,
   IntakeBatchGroupRecord,
   IntakeBatchRecord,
+  InvoiceDeliveryRecord,
   InvoiceRecord,
   InvoiceReminderTouchpointRecord,
   JobRecord,
@@ -62,11 +63,13 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
         deal.paymentStatus === "not_invoiced"
           ? "not_invoiced"
           : deal.paymentStatus === "invoiced"
-            ? "invoiced"
+            ? "not_invoiced"
             : deal.paymentStatus === "late"
               ? "late"
               : deal.paymentStatus === "awaiting_payment"
                 ? "awaiting_payment"
+                : deal.paymentStatus === "paid"
+                  ? "paid"
                 : "not_invoiced",
       legalDisclaimer:
         deal.legalDisclaimer ||
@@ -145,7 +148,21 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
     assistantThreads: store.assistantThreads ?? [],
     assistantMessages: store.assistantMessages ?? [],
     assistantContextSnapshots: store.assistantContextSnapshots ?? [],
-    invoiceRecords: store.invoiceRecords ?? [],
+    invoiceRecords: (store.invoiceRecords ?? []).map((record) => ({
+      ...record,
+      status:
+        record.status === "sent" || record.status === "voided"
+          ? record.status
+          : record.status === "finalized"
+            ? "finalized"
+            : "draft",
+      sentAt: record.sentAt ?? null,
+      lastSentThreadId: record.lastSentThreadId ?? null,
+      lastSentMessageId: record.lastSentMessageId ?? null,
+      lastSentAccountId: record.lastSentAccountId ?? null,
+      lastSentToEmail: record.lastSentToEmail ?? null
+    })),
+    invoiceDeliveryRecords: store.invoiceDeliveryRecords ?? [],
     invoiceReminderTouchpoints: store.invoiceReminderTouchpoints ?? [],
     jobs: (store.jobs ?? []).map((job) => ({
       ...job,
@@ -424,6 +441,15 @@ export class FileRepository {
     );
   }
 
+  async listInvoiceDeliveryRecords(userId: string, dealId: string) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.invoiceDeliveryRecords.filter(
+        (record) => record.userId === userId && record.dealId === dealId
+      )
+    );
+  }
+
   async upsertInvoiceRecord(
     userId: string,
     dealId: string,
@@ -447,6 +473,25 @@ export class FileRepository {
       store.invoiceRecords.unshift(next);
     }
 
+    await saveStore(store);
+    return next;
+  }
+
+  async createInvoiceDeliveryRecord(
+    userId: string,
+    dealId: string,
+    patch: Omit<InvoiceDeliveryRecord, "id" | "dealId" | "userId" | "createdAt">
+  ) {
+    const store = await ensureStore();
+    const next: InvoiceDeliveryRecord = {
+      id: randomUUID(),
+      userId,
+      dealId,
+      createdAt: new Date().toISOString(),
+      ...patch
+    };
+
+    store.invoiceDeliveryRecords.unshift(next);
     await saveStore(store);
     return next;
   }

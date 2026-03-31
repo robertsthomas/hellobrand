@@ -9,6 +9,10 @@ function documentPreviewUrl(documentId: string) {
   return `/api/documents/${documentId}/content`;
 }
 
+function documentDownloadUrl(documentId: string) {
+  return `/api/documents/${documentId}/content?download=1`;
+}
+
 function lineItemMeta(item: InvoiceLineItem) {
   return [item.channel, item.description].filter(Boolean).join(" · ");
 }
@@ -18,7 +22,8 @@ export function PaymentsWorkspaceDetail({
   payment,
   invoice,
   invoiceDocuments,
-  breakdownItems
+  breakdownItems,
+  sendViaInboxHref
 }: {
   deal: {
     id: string;
@@ -29,6 +34,7 @@ export function PaymentsWorkspaceDetail({
   invoice: InvoiceRecord | null;
   invoiceDocuments: DocumentRecord[];
   breakdownItems: InvoiceLineItem[];
+  sendViaInboxHref?: string | null;
 }) {
   const breakdownCurrency = invoice?.currency ?? payment.currency ?? "USD";
 
@@ -97,15 +103,30 @@ export function PaymentsWorkspaceDetail({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {invoiceDocuments.map((document) => (
+              <div key={document.id} className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={documentPreviewUrl(document.id)}
+                  target="_blank"
+                  className="inline-flex border border-black/10 px-3 py-2 text-sm font-medium text-foreground transition hover:border-black/20"
+                >
+                  Open {document.fileName}
+                </Link>
+                <Link
+                  href={documentDownloadUrl(document.id)}
+                  className="inline-flex border border-black/10 px-3 py-2 text-sm font-medium text-foreground transition hover:border-black/20"
+                >
+                  Download PDF
+                </Link>
+              </div>
+            ))}
+            {invoice?.pdfDocumentId && invoice.status !== "voided" && sendViaInboxHref ? (
               <Link
-                key={document.id}
-                href={documentPreviewUrl(document.id)}
-                target="_blank"
+                href={sendViaInboxHref}
                 className="inline-flex border border-black/10 px-3 py-2 text-sm font-medium text-foreground transition hover:border-black/20"
               >
-                {document.fileName}
+                Send via linked inbox
               </Link>
-            ))}
+            ) : null}
           </div>
         </div>
       </div>
@@ -182,7 +203,6 @@ export function PaymentsWorkspaceDetail({
               defaultValue={payment.status}
             >
               <option value="not_invoiced">Not invoiced</option>
-              <option value="invoiced">Invoiced</option>
               <option value="awaiting_payment">Awaiting payment</option>
               <option value="paid">Paid</option>
               <option value="late" disabled>
@@ -206,7 +226,10 @@ export function PaymentsWorkspaceDetail({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
               Invoice
             </p>
-            <p className="mt-2 text-foreground">{invoice?.invoiceNumber ?? "Not generated"}</p>
+            <p className="mt-2 text-foreground">
+              {invoice?.invoiceNumber ?? "Not generated"}
+              {invoice ? ` · ${invoice.status.replaceAll("_", " ")}` : ""}
+            </p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
@@ -221,6 +244,13 @@ export function PaymentsWorkspaceDetail({
             <p className="mt-2 text-foreground">{formatDate(invoice?.dueDate ?? payment.dueDate)}</p>
           </div>
         </div>
+
+        {invoice?.sentAt ? (
+          <div className="border-t border-black/8 pt-4 text-sm text-muted-foreground">
+            Invoice sent {formatDate(invoice.sentAt)}
+            {invoice.lastSentToEmail ? ` to ${invoice.lastSentToEmail}` : ""}.
+          </div>
+        ) : null}
 
         <div className="flex justify-end">
           <SubmitButton

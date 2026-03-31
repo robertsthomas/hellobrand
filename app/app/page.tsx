@@ -65,7 +65,7 @@ function paymentBadgeClass(status: string) {
     return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
   }
 
-  if (status === "awaiting_payment" || status === "invoiced") {
+  if (status === "awaiting_payment") {
     return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300";
   }
 
@@ -154,7 +154,7 @@ function buildDealNextStep(deal: {
     };
   }
 
-  if (deal.paymentStatus === "awaiting_payment" || deal.paymentStatus === "invoiced") {
+  if (deal.paymentStatus === "awaiting_payment") {
     return {
       label: "Track payout progress",
       tone: "success" as const
@@ -177,7 +177,7 @@ function partnershipPriority(deal: {
   if (deal.paymentStatus === "late") return 0;
   if (deal.riskFlags.some((flag) => flag.severity === "high")) return 1;
   if (nextDueDays !== null && nextDueDays >= 0 && nextDueDays <= 7) return 2;
-  if (deal.paymentStatus === "awaiting_payment" || deal.paymentStatus === "invoiced") return 3;
+  if (deal.paymentStatus === "awaiting_payment") return 3;
   return 4;
 }
 
@@ -264,7 +264,7 @@ async function DashboardContent() {
   ).length;
   const totalRevenue = dealRows.reduce((sum, deal) => sum + (deal.paymentAmount ?? 0), 0);
   const pendingPayoutDeals = dealRows.filter((deal) =>
-    ["invoiced", "awaiting_payment", "late"].includes(deal.paymentStatus)
+    ["awaiting_payment", "late"].includes(deal.paymentStatus)
   );
   const pendingPaymentsAmount = pendingPayoutDeals.reduce(
     (sum, deal) => sum + (deal.paymentAmount ?? 0),

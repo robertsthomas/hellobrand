@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   DealAggregate,
   DeliverableItem,
+  InvoiceDeliveryRecord,
   InvoiceLineItem,
   InvoiceParty,
   InvoiceRecord,
@@ -105,11 +106,25 @@ export function computeInvoiceReminderAnchorDate(aggregate: DealAggregate) {
   return computeAnchorFromTerms(aggregate.terms);
 }
 
-function draftOrAttachmentExists(aggregate: DealAggregate) {
-  return Boolean(
-    aggregate.invoiceRecord?.draftSavedAt ||
-      aggregate.documents.some((document) => document.documentKind === "invoice")
-  );
+function latestInvoiceDocument(aggregate: DealAggregate) {
+  return aggregate.documents.find((document) => document.documentKind === "invoice") ?? null;
+}
+
+function generationReminderAnchorDate(aggregate: DealAggregate) {
+  if (aggregate.invoiceRecord || latestInvoiceDocument(aggregate)) {
+    return null;
+  }
+
+  return computeInvoiceReminderAnchorDate(aggregate);
+}
+
+function sendReminderAnchorDate(aggregate: DealAggregate) {
+  const invoice = aggregate.invoiceRecord;
+  if (!invoice || invoice.status !== "finalized" || !invoice.pdfDocumentId || invoice.sentAt) {
+    return null;
+  }
+
+  return startOfDayIso(invoice.finalizedAt ?? invoice.draftSavedAt ?? invoice.updatedAt);
 }
 
 function createFallbackLineItems(input: {
@@ -295,6 +310,7 @@ async function buildInvoiceDraftPayload(
     status: existingInvoice?.status ?? "draft",
     draftSavedAt: existingInvoice?.draftSavedAt ?? new Date().toISOString(),
     finalizedAt: existingInvoice?.finalizedAt ?? null,
+    sentAt: existingInvoice?.sentAt ?? null,
     invoiceDate,
     dueDate,
     currency,
@@ -308,7 +324,11 @@ async function buildInvoiceDraftPayload(
     issuer,
     lineItems,
     pdfDocumentId: existingInvoice?.pdfDocumentId ?? null,
-    manualNumberOverride: existingInvoice?.manualNumberOverride ?? false
+    manualNumberOverride: existingInvoice?.manualNumberOverride ?? false,
+    lastSentThreadId: existingInvoice?.lastSentThreadId ?? null,
+    lastSentMessageId: existingInvoice?.lastSentMessageId ?? null,
+    lastSentAccountId: existingInvoice?.lastSentAccountId ?? null,
+    lastSentToEmail: existingInvoice?.lastSentToEmail ?? null
   } satisfies Omit<
     InvoiceRecord,
     "id" | "dealId" | "userId" | "createdAt" | "updatedAt"
@@ -317,6 +337,10 @@ async function buildInvoiceDraftPayload(
 
 export async function getInvoiceForViewer(viewer: Viewer, dealId: string) {
   return getRepository().getInvoiceRecord(viewer.id, dealId);
+}
+
+export async function listInvoiceDeliveriesForViewer(viewer: Viewer, dealId: string) {
+  return getRepository().listInvoiceDeliveryRecords(viewer.id, dealId);
 }
 
 export async function generateInvoiceDraftForViewer(viewer: Viewer, dealId: string) {
@@ -334,6 +358,35 @@ export async function generateInvoiceDraftForViewer(viewer: Viewer, dealId: stri
   const payload = await buildInvoiceDraftPayload(viewer, aggregate, null);
   await assertInvoiceNumberAvailable(viewer.id, payload.invoiceNumber, dealId);
   const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, payload);
+  await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
+  return saved;
+}
+
+export async function regenerateInvoiceDraftForViewer(viewer: Viewer, dealId: string) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate?.invoiceRecord || aggregate.invoiceRecord.status !== "draft") {
+    return aggregate?.invoiceRecord ?? null;
+  }
+
+  const existing = aggregate.invoiceRecord;
+  const refreshed = await buildInvoiceDraftPayload(viewer, aggregate, null);
+  const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
+    ...refreshed,
+    invoiceNumber: existing.invoiceNumber,
+    invoiceDate: existing.invoiceDate ?? refreshed.invoiceDate,
+    dueDate: existing.dueDate ?? refreshed.dueDate,
+    pdfDocumentId: existing.pdfDocumentId,
+    manualNumberOverride: existing.manualNumberOverride,
+    draftSavedAt: new Date().toISOString(),
+    finalizedAt: null,
+    sentAt: null,
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null,
+    status: "draft"
+  });
+
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
   return saved;
 }
@@ -362,13 +415,19 @@ export async function saveInvoiceDraftForViewer(
     ...input,
     status: "draft",
     draftSavedAt: new Date().toISOString(),
-    finalizedAt: existing?.finalizedAt ?? input.finalizedAt ?? null,
+    finalizedAt: null,
+    sentAt: null,
     currency: normalizeCurrency(input.currency),
     subtotal: computeSubtotal(lineItems),
     lineItems,
+    pdfDocumentId: existing?.status === "draft" ? existing?.pdfDocumentId ?? input.pdfDocumentId ?? null : null,
     manualNumberOverride:
       input.manualNumberOverride ||
-      Boolean(existing && existing.invoiceNumber !== input.invoiceNumber)
+      Boolean(existing && existing.invoiceNumber !== input.invoiceNumber),
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null
   });
 
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
@@ -398,7 +457,12 @@ export async function finalizeInvoiceForViewer(
   const finalizedRecord = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
     ...draft,
     status: "finalized",
-    finalizedAt
+    finalizedAt,
+    sentAt: null,
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null
   });
 
   const pdfBytes = renderInvoicePdf({
@@ -439,29 +503,144 @@ export async function finalizeInvoiceForViewer(
   });
 
   if (process.env.DATABASE_URL) {
+    const resolvedPaymentStatus = aggregate.paymentRecord?.paidDate
+      ? "paid"
+      : saved.dueDate
+        ? "awaiting_payment"
+        : "invoiced";
+
     await updatePaymentForViewer(viewer, dealId, {
       amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? saved.subtotal,
       currency: saved.currency,
       invoiceDate: saved.invoiceDate,
       dueDate: saved.dueDate,
       paidDate: aggregate.paymentRecord?.paidDate ?? null,
-      status:
-        aggregate.paymentRecord?.status === "not_invoiced"
-          ? "invoiced"
-          : aggregate.paymentRecord?.status ?? "invoiced",
+      status: resolvedPaymentStatus,
       notes: aggregate.paymentRecord?.notes ?? saved.notes,
       source: "invoice_finalize"
     });
   } else {
+    const resolvedDealPaymentStatus = aggregate.deal.paymentStatus === "paid"
+      ? "paid"
+      : saved.dueDate
+        ? "awaiting_payment"
+        : "invoiced";
+
     await getRepository().updateDeal(viewer.id, dealId, {
-      paymentStatus:
-        aggregate.deal.paymentStatus === "not_invoiced"
-          ? "invoiced"
-          : aggregate.deal.paymentStatus
+      paymentStatus: resolvedDealPaymentStatus
+    });
+  }
+
+  await syncInvoiceReminderTouchpointsForViewer(viewer, dealId);
+  return saved;
+}
+
+export async function voidInvoiceForViewer(viewer: Viewer, dealId: string) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate?.invoiceRecord) {
+    return null;
+  }
+
+  const currentStatus = aggregate.invoiceRecord.status;
+  if (currentStatus === "draft" || currentStatus === "voided") {
+    return aggregate.invoiceRecord;
+  }
+
+  const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
+    ...aggregate.invoiceRecord,
+    status: "voided",
+    sentAt: null,
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null
+  });
+
+  if (process.env.DATABASE_URL) {
+    await updatePaymentForViewer(viewer, dealId, {
+      amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? saved.subtotal,
+      currency: saved.currency,
+      invoiceDate: saved.invoiceDate,
+      dueDate: saved.dueDate,
+      paidDate: aggregate.paymentRecord?.paidDate ?? null,
+      status: aggregate.paymentRecord?.paidDate ? "paid" : "not_invoiced",
+      notes: aggregate.paymentRecord?.notes ?? saved.notes,
+      source: "invoice_void"
+    });
+  } else {
+    await getRepository().updateDeal(viewer.id, dealId, {
+      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced"
     });
   }
 
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
+  return saved;
+}
+
+export async function markInvoiceSentForViewer(
+  viewer: Viewer,
+  dealId: string,
+  input: {
+    threadId: string;
+    messageId: string | null;
+    accountId: string;
+    provider: InvoiceDeliveryRecord["provider"];
+    toEmail: string | null;
+    subject: string;
+    errorMessage?: string | null;
+  }
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  const invoice = aggregate?.invoiceRecord;
+  if (!aggregate || !invoice || !invoice.pdfDocumentId) {
+    throw new Error("Finalize the invoice before sending it.");
+  }
+
+  const sentAt = new Date().toISOString();
+  const nextStatus = input.errorMessage ? invoice.status : "sent";
+  const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
+    ...invoice,
+    status: nextStatus,
+    sentAt: input.errorMessage ? invoice.sentAt : sentAt,
+    lastSentThreadId: input.threadId,
+    lastSentMessageId: input.messageId,
+    lastSentAccountId: input.accountId,
+    lastSentToEmail: input.toEmail
+  });
+
+  await getRepository().createInvoiceDeliveryRecord(viewer.id, dealId, {
+    invoiceId: saved.id,
+    provider: input.provider,
+    threadId: input.threadId,
+    messageId: input.messageId,
+    accountId: input.accountId,
+    toEmail: input.toEmail,
+    subject: input.subject,
+    status: input.errorMessage ? "failed" : "sent",
+    errorMessage: input.errorMessage ?? null,
+    sentAt
+  });
+
+  if (!input.errorMessage) {
+    if (process.env.DATABASE_URL) {
+      await updatePaymentForViewer(viewer, dealId, {
+        amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? saved.subtotal,
+        currency: saved.currency,
+        invoiceDate: saved.invoiceDate,
+        dueDate: saved.dueDate,
+        paidDate: aggregate.paymentRecord?.paidDate ?? null,
+        status: aggregate.paymentRecord?.paidDate ? "paid" : "awaiting_payment",
+        notes: aggregate.paymentRecord?.notes ?? saved.notes,
+        source: "invoice_send"
+      });
+    } else {
+      await getRepository().updateDeal(viewer.id, dealId, {
+        paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "awaiting_payment"
+      });
+    }
+  }
+
+  await syncInvoiceReminderTouchpointsForViewer(viewer, dealId);
   return saved;
 }
 
@@ -490,12 +669,22 @@ export async function syncInvoiceReminderTouchpointsForViewer(
     return [];
   }
 
-  if (draftOrAttachmentExists(aggregate)) {
-    await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
-    return [];
+  const sendAnchorDate = sendReminderAnchorDate(aggregate);
+  if (sendAnchorDate) {
+    return getRepository().upsertInvoiceReminderTouchpoints(
+      viewer.id,
+      dealId,
+      TOUCHPOINT_OFFSETS.map((offsetDays) => ({
+        anchorDate: sendAnchorDate,
+        offsetDays,
+        sendOn: startOfDayIso(addDays(sendAnchorDate, offsetDays)),
+        status: "pending",
+        notificationId: null
+      }))
+    );
   }
 
-  const anchorDate = computeInvoiceReminderAnchorDate(aggregate);
+  const anchorDate = generationReminderAnchorDate(aggregate);
   if (!anchorDate) {
     await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
     return [];
@@ -519,33 +708,49 @@ function invoiceReminderSeed(input: {
   dealId: string;
   brandName: string;
   campaignName: string;
+  reminderType: "generate" | "send";
   offsetDays: number;
   sendOn: string;
 }) {
   const title =
-    input.offsetDays === 0
-      ? `${input.brandName} invoice is ready to generate`
-      : input.offsetDays === 1
-        ? `${input.brandName} invoice is still waiting`
-        : `${input.brandName} invoice follow-up is due`;
+    input.reminderType === "send"
+      ? input.offsetDays === 0
+        ? `${input.brandName} invoice is ready to send`
+        : input.offsetDays === 1
+          ? `${input.brandName} invoice has not been sent yet`
+          : `${input.brandName} invoice send follow-up is due`
+      : input.offsetDays === 0
+        ? `${input.brandName} invoice is ready to generate`
+        : input.offsetDays === 1
+          ? `${input.brandName} invoice is still waiting`
+          : `${input.brandName} invoice follow-up is due`;
 
   const description =
-    input.offsetDays === 0
-      ? `Today is the final posting milestone for ${input.campaignName}. Generate the workspace invoice now.`
-      : input.offsetDays === 1
-        ? `You still have not generated the invoice for ${input.campaignName}. Review the workspace invoice tab and send it when ready.`
-        : `It has been ${input.offsetDays} days since the final posting milestone for ${input.campaignName}. Generate or attach the invoice if it is still outstanding.`;
+    input.reminderType === "send"
+      ? input.offsetDays === 0
+        ? `Your invoice for ${input.campaignName} is finalized. Send it from the linked inbox thread or export it now.`
+        : input.offsetDays === 1
+          ? `Your finalized invoice for ${input.campaignName} still has not been sent. Open the workspace invoice tab or linked inbox to send it.`
+          : `It has been ${input.offsetDays} days since the invoice for ${input.campaignName} was finalized. Send or resend it if payment is still pending.`
+      : input.offsetDays === 0
+        ? `Today is the final posting milestone for ${input.campaignName}. Generate the workspace invoice now.`
+        : input.offsetDays === 1
+          ? `You still have not generated the invoice for ${input.campaignName}. Review the workspace invoice tab and send it when ready.`
+          : `It has been ${input.offsetDays} days since the final posting milestone for ${input.campaignName}. Generate or attach the invoice if it is still outstanding.`;
 
   return {
     category: "payments" as const,
-    eventType: "invoice.generate_prompt" as const,
+    eventType:
+      (input.reminderType === "send"
+        ? "invoice.send_prompt"
+        : "invoice.generate_prompt") as "invoice.generate_prompt" | "invoice.send_prompt",
     entityType: "deal",
     entityId: input.dealId,
     dealId: input.dealId,
     title,
     description,
     href: `/app/p/${input.dealId}?tab=invoices`,
-    dedupeKey: `invoice.generate_prompt:${input.dealId}:${input.offsetDays}`,
+    dedupeKey: `invoice.${input.reminderType}_prompt:${input.dealId}:${input.offsetDays}`,
     createdAt: input.sendOn
   };
 }
@@ -575,7 +780,12 @@ export async function syncAllInvoiceReminderTouchpoints() {
         },
         select: {
           dealId: true,
-          draftSavedAt: true
+          draftSavedAt: true,
+          finalizedAt: true,
+          sentAt: true,
+          status: true,
+          pdfDocumentId: true,
+          updatedAt: true
         }
       })
     : [];
@@ -585,10 +795,7 @@ export async function syncAllInvoiceReminderTouchpoints() {
 
   for (const deal of deals) {
     const invoiceRecord = invoiceRecordByDealId.get(deal.id);
-    const hasInvoiceState =
-      Boolean(invoiceRecord?.draftSavedAt) ||
-      deal.documents.some((document) => document.documentKind === "invoice");
-    const anchorDate = computeAnchorFromTerms(
+    const generationAnchor = computeAnchorFromTerms(
       deal.terms
         ? {
             deliverables: Array.isArray(deal.terms.deliverables)
@@ -604,8 +811,18 @@ export async function syncAllInvoiceReminderTouchpoints() {
           }
         : null
     );
+    const sendAnchor =
+      invoiceRecord?.status === "finalized" &&
+      invoiceRecord.pdfDocumentId &&
+      !invoiceRecord.sentAt
+        ? startOfDayIso(
+            invoiceRecord.finalizedAt ??
+              invoiceRecord.draftSavedAt ??
+              invoiceRecord.updatedAt
+          )
+        : null;
 
-    if (hasInvoiceState || !anchorDate) {
+    if (!sendAnchor && !generationAnchor) {
       const existing = await getRepository().listInvoiceReminderTouchpoints(deal.userId, {
         dealId: deal.id
       });
@@ -625,9 +842,9 @@ export async function syncAllInvoiceReminderTouchpoints() {
       deal.userId,
       deal.id,
       TOUCHPOINT_OFFSETS.map((offsetDays) => ({
-        anchorDate,
+        anchorDate: sendAnchor ?? generationAnchor!,
         offsetDays,
-        sendOn: startOfDayIso(addDays(anchorDate, offsetDays)),
+        sendOn: startOfDayIso(addDays(sendAnchor ?? generationAnchor!, offsetDays)),
         status: "pending",
         notificationId: null
       }))
@@ -670,7 +887,12 @@ export async function runInvoiceReminderSweep() {
         },
         select: {
           dealId: true,
-          draftSavedAt: true
+          draftSavedAt: true,
+          finalizedAt: true,
+          sentAt: true,
+          status: true,
+          pdfDocumentId: true,
+          updatedAt: true
         }
       })
     : [];
@@ -682,11 +904,14 @@ export async function runInvoiceReminderSweep() {
 
   for (const touchpoint of dueTouchpoints) {
     const invoiceRecord = invoiceRecordByDealId.get(touchpoint.dealId);
-    const hasInvoiceState =
-      Boolean(invoiceRecord?.draftSavedAt) ||
-      touchpoint.deal.documents.some((document) => document.documentKind === "invoice");
+    const reminderType =
+      invoiceRecord?.status === "finalized" && invoiceRecord.pdfDocumentId && !invoiceRecord.sentAt
+        ? "send"
+        : !invoiceRecord && !touchpoint.deal.documents.some((document) => document.documentKind === "invoice")
+          ? "generate"
+          : null;
 
-    if (hasInvoiceState) {
+    if (!reminderType) {
       await getRepository().updateInvoiceReminderTouchpoint(touchpoint.id, {
         status: "cancelled"
       });
@@ -700,6 +925,7 @@ export async function runInvoiceReminderSweep() {
         dealId: touchpoint.dealId,
         brandName: touchpoint.deal.brandName,
         campaignName: touchpoint.deal.campaignName,
+        reminderType,
         offsetDays: touchpoint.offsetDays,
         sendOn: touchpoint.sendOn.toISOString()
       })

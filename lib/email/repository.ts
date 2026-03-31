@@ -497,6 +497,7 @@ export async function getEmailAttachmentForUser(userId: string, attachmentId: st
       filename: true,
       mimeType: true,
       sizeBytes: true,
+      storageKey: true,
       providerAttachmentId: true,
       message: {
         select: {
@@ -520,10 +521,141 @@ export async function getEmailAttachmentForUser(userId: string, attachmentId: st
     filename: attachment.filename,
     mimeType: attachment.mimeType,
     sizeBytes: attachment.sizeBytes,
+    storageKey: attachment.storageKey,
     providerAttachmentId: attachment.providerAttachmentId,
     providerMessageId: attachment.message.providerMessageId,
     account: toAccountRecord(attachment.message.thread.account)
   };
+}
+
+export async function saveOutboundEmailMessage(input: {
+  userId: string;
+  threadId: string;
+  providerMessageId: string;
+  internetMessageId: string | null;
+  from: EmailParticipant | null;
+  to: EmailParticipant[];
+  cc: EmailParticipant[];
+  bcc: EmailParticipant[];
+  subject: string;
+  textBody: string | null;
+  htmlBody: string | null;
+  sentAt: string;
+  attachments: Array<{
+    providerAttachmentId: string;
+    filename: string;
+    mimeType: string;
+    sizeBytes: number;
+    storageKey: string | null;
+  }>;
+}) {
+  const thread = await prisma.emailThread.findFirst({
+    where: {
+      id: input.threadId,
+      account: {
+        userId: input.userId
+      }
+    },
+    include: {
+      account: true
+    }
+  });
+
+  if (!thread) {
+    return null;
+  }
+
+  const existing = await prisma.emailMessage.findUnique({
+    where: {
+      threadId_providerMessageId: {
+        threadId: input.threadId,
+        providerMessageId: input.providerMessageId
+      }
+    },
+    select: { id: true }
+  });
+
+  const message = await prisma.emailMessage.upsert({
+    where: {
+      threadId_providerMessageId: {
+        threadId: input.threadId,
+        providerMessageId: input.providerMessageId
+      }
+    },
+    update: {
+      internetMessageId: input.internetMessageId,
+      fromJson: input.from ? toJsonValue(input.from) : Prisma.JsonNull,
+      toJson: toJsonValue(input.to),
+      ccJson: toJsonValue(input.cc),
+      bccJson: toJsonValue(input.bcc),
+      subject: input.subject,
+      textBody: input.textBody,
+      htmlBody: input.htmlBody,
+      sentAt: new Date(input.sentAt),
+      receivedAt: new Date(input.sentAt),
+      direction: "outbound",
+      hasAttachments: input.attachments.length > 0
+    },
+    create: {
+      threadId: input.threadId,
+      providerMessageId: input.providerMessageId,
+      internetMessageId: input.internetMessageId,
+      fromJson: input.from ? toJsonValue(input.from) : Prisma.JsonNull,
+      toJson: toJsonValue(input.to),
+      ccJson: toJsonValue(input.cc),
+      bccJson: toJsonValue(input.bcc),
+      subject: input.subject,
+      textBody: input.textBody,
+      htmlBody: input.htmlBody,
+      sentAt: new Date(input.sentAt),
+      receivedAt: new Date(input.sentAt),
+      direction: "outbound",
+      hasAttachments: input.attachments.length > 0
+    }
+  });
+
+  await prisma.emailAttachment.deleteMany({
+    where: { messageId: message.id }
+  });
+
+  if (input.attachments.length > 0) {
+    await prisma.emailAttachment.createMany({
+      data: input.attachments.map((attachment) => ({
+        messageId: message.id,
+        providerAttachmentId: attachment.providerAttachmentId,
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        storageKey: attachment.storageKey,
+        extractedText: null
+      }))
+    });
+  }
+
+  await prisma.emailThread.update({
+    where: { id: input.threadId },
+    data: {
+      subject: input.subject,
+      snippet: input.textBody?.slice(0, 280) ?? null,
+      lastMessageAt: new Date(input.sentAt),
+      ...(existing
+        ? {}
+        : {
+            messageCount: {
+              increment: 1
+            }
+          })
+    }
+  });
+
+  const saved = await prisma.emailMessage.findUniqueOrThrow({
+    where: { id: message.id },
+    include: {
+      attachments: true
+    }
+  });
+
+  return toMessageRecord(saved);
 }
 
 export async function getConnectedEmailAccountForUser(userId: string, accountId: string) {

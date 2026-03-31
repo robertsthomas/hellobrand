@@ -31,7 +31,7 @@ function paymentBadgeClass(status: string) {
     return "border-red-200 bg-red-50 text-red-700";
   }
 
-  if (status === "awaiting_payment" || status === "invoiced") {
+  if (status === "awaiting_payment") {
     return "border-orange-200 bg-orange-50 text-orange-700";
   }
 

@@ -23,6 +23,8 @@ import {
 import {
   finalizeInvoiceForViewer,
   generateInvoiceDraftForViewer,
+  regenerateInvoiceDraftForViewer,
+  voidInvoiceForViewer,
   saveInvoiceDraftForViewer
 } from "@/lib/invoices";
 import { startServerDebug } from "@/lib/server-debug";
@@ -510,6 +512,14 @@ export async function generateInvoiceDraftAction(formData: FormData) {
   invalidateInvoiceSurfaces(viewer.id, dealId);
 }
 
+export async function regenerateInvoiceDraftAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+
+  await regenerateInvoiceDraftForViewer(viewer, dealId);
+  invalidateInvoiceSurfaces(viewer.id, dealId);
+}
+
 export async function saveInvoiceDraftAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
@@ -520,8 +530,13 @@ export async function saveInvoiceDraftAction(formData: FormData) {
     status: "draft",
     draftSavedAt: null,
     finalizedAt: null,
+    sentAt: null,
     pdfDocumentId: input.pdfDocumentId ?? null,
-    manualNumberOverride: input.manualNumberOverride ?? false
+    manualNumberOverride: input.manualNumberOverride ?? false,
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null
   });
   invalidateInvoiceSurfaces(viewer.id, dealId);
 }
@@ -536,8 +551,21 @@ export async function finalizeInvoiceAction(formData: FormData) {
     status: "draft",
     draftSavedAt: null,
     finalizedAt: null,
+    sentAt: null,
     pdfDocumentId: input.pdfDocumentId ?? null,
-    manualNumberOverride: input.manualNumberOverride ?? false
+    manualNumberOverride: input.manualNumberOverride ?? false,
+    lastSentThreadId: null,
+    lastSentMessageId: null,
+    lastSentAccountId: null,
+    lastSentToEmail: null
   });
+  invalidateInvoiceSurfaces(viewer.id, dealId);
+}
+
+export async function voidInvoiceAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+
+  await voidInvoiceForViewer(viewer, dealId);
   invalidateInvoiceSurfaces(viewer.id, dealId);
 }

@@ -16,8 +16,9 @@ export type PaymentStatus =
   | "paid"
   | "late";
 
-export type InvoiceStatus = "draft" | "finalized";
+export type InvoiceStatus = "draft" | "finalized" | "sent" | "voided";
 export type InvoiceReminderTouchpointStatus = "pending" | "sent" | "cancelled";
+export type InvoiceDeliveryStatus = "sent" | "failed";
 
 export type CountersignStatus = "unknown" | "pending" | "signed";
 export type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
@@ -922,6 +923,7 @@ export interface InvoiceRecord {
   status: InvoiceStatus;
   draftSavedAt: string | null;
   finalizedAt: string | null;
+  sentAt: string | null;
   invoiceDate: string | null;
   dueDate: string | null;
   currency: string | null;
@@ -932,8 +934,29 @@ export interface InvoiceRecord {
   lineItems: InvoiceLineItem[];
   pdfDocumentId: string | null;
   manualNumberOverride: boolean;
+  lastSentThreadId: string | null;
+  lastSentMessageId: string | null;
+  lastSentAccountId: string | null;
+  lastSentToEmail: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvoiceDeliveryRecord {
+  id: string;
+  invoiceId: string;
+  dealId: string;
+  userId: string;
+  provider: EmailProvider | null;
+  threadId: string | null;
+  messageId: string | null;
+  accountId: string | null;
+  toEmail: string | null;
+  subject: string;
+  status: InvoiceDeliveryStatus;
+  errorMessage: string | null;
+  sentAt: string;
+  createdAt: string;
 }
 
 export interface InvoiceReminderTouchpointRecord {
@@ -1012,6 +1035,7 @@ export interface AppStore {
   assistantMessages: AssistantMessageRecord[];
   assistantContextSnapshots: AssistantContextSnapshotRecord[];
   invoiceRecords: InvoiceRecord[];
+  invoiceDeliveryRecords: InvoiceDeliveryRecord[];
   invoiceReminderTouchpoints: InvoiceReminderTouchpointRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];

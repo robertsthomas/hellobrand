@@ -98,7 +98,7 @@ export function createSeedStore(): AppStore {
         brandName: "Nimbus Athletics",
         campaignName: "Spring Recovery Drop",
         status: "negotiating",
-        paymentStatus: "invoiced",
+        paymentStatus: "not_invoiced",
         countersignStatus: "pending",
         summary:
           "You are being paid $2,000 for one Instagram Reel and two Story frames. The biggest watchouts are Net 45 payment terms and six months of paid ad usage.",
@@ -187,6 +187,7 @@ export function createSeedStore(): AppStore {
     assistantMessages: [],
     assistantContextSnapshots: [],
     invoiceRecords: [],
+    invoiceDeliveryRecords: [],
     invoiceReminderTouchpoints: [],
     jobs: [
       {

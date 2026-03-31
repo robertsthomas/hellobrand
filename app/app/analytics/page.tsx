@@ -219,7 +219,6 @@ async function AnalyticsContent() {
   ).length;
   const awaitingPaymentCount = safeAggregates.filter(
     (aggregate) =>
-      aggregate?.deal.paymentStatus === "invoiced" ||
       aggregate?.deal.paymentStatus === "awaiting_payment" ||
       aggregate?.deal.paymentStatus === "late"
   ).length;

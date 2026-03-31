@@ -32,6 +32,7 @@ import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import { listInvoiceDeliveriesForViewer } from "@/lib/invoices";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 
@@ -64,7 +65,7 @@ function buildNextAction(deal: {
   if (deal.status === "contract_received") {
     return { label: "Review contract and confirm terms", tone: "accent" as const, tab: "terms" };
   }
-  if (deal.paymentStatus === "awaiting_payment" || deal.paymentStatus === "invoiced") {
+  if (deal.paymentStatus === "awaiting_payment") {
     return { label: "Track payout progress", tone: "neutral" as const, tab: "deliverables" };
   }
   return { label: "Partnership is on track", tone: "neutral" as const, tab: "overview" };
@@ -110,12 +111,13 @@ async function DealDetailContent({
 
   const hasPremiumInbox = entitlements.features.premium_inbox;
   const hasBriefGeneration = entitlements.features.brief_generation;
-  const [linkedEmailThreads, emailAccounts] = hasPremiumInbox
+  const [linkedEmailThreads, emailAccounts, invoiceDeliveries] = hasPremiumInbox
     ? await Promise.all([
         listLinkedEmailThreadsForViewerDeal(viewer, dealId),
-        listEmailAccountsForViewer(viewer)
+        listEmailAccountsForViewer(viewer),
+        listInvoiceDeliveriesForViewer(viewer, dealId)
       ])
-    : [[], []];
+    : [[], [], []];
 
   const {
     deal,
@@ -142,6 +144,10 @@ async function DealDetailContent({
   const riskCount = riskFlags.length;
   const highRiskCount = riskFlags.filter((f) => f.severity === "high").length;
   const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
+  const sendViaInboxHref =
+    aggregate.invoiceRecord?.pdfDocumentId && linkedEmailThreads[0]?.thread.id
+      ? `/app/inbox?dealId=${deal.id}&thread=${linkedEmailThreads[0].thread.id}&attachInvoice=1`
+      : null;
 
   const VALID_TABS = ["overview", "terms", "deliverables", "emails", "documents"];
   const currentTab =
@@ -371,9 +377,11 @@ async function DealDetailContent({
             <InvoiceEditorPanel
               dealId={deal.id}
               invoice={aggregate.invoiceRecord ?? null}
+              invoiceDeliveries={invoiceDeliveries}
               invoiceDocuments={invoiceDocuments}
               paymentStatus={deal.paymentStatus}
               paymentTerms={terms?.paymentTerms ?? null}
+              sendViaInboxHref={sendViaInboxHref}
             />
           </TabsContent>
 
@@ -383,7 +391,9 @@ async function DealDetailContent({
               <DealEmailPanel
                 dealId={deal.id}
                 linkedThreads={linkedEmailThreads}
-                hasConnectedAccounts={emailAccounts.some((account) => account.status !== "disconnected")}
+                hasConnectedAccounts={emailAccounts.some(
+                  (account: { status: string }) => account.status !== "disconnected"
+                )}
               />
             ) : (
               <FeatureUpgradeCard

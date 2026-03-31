@@ -155,6 +155,14 @@ type DraftPromptSuggestionCacheEntry = {
   suggestions: DraftPromptSuggestion[];
 };
 
+type ThreadInvoiceAttachment = {
+  dealId: string;
+  documentId: string;
+  fileName: string;
+  invoiceNumber: string;
+  status: string;
+};
+
 const DRAFT_REFINEMENT_OPTIONS = {
   length: [
     {
@@ -672,6 +680,8 @@ export function InboxWorkspace({
   deals,
   hasConnectedAccounts,
   connectedProviders,
+  invoiceAttachmentsByDealId,
+  autoAttachInvoice,
   selectedFilters
 }: {
   threads: EmailThreadListItem[];
@@ -680,6 +690,8 @@ export function InboxWorkspace({
   deals: DealRecord[];
   hasConnectedAccounts: boolean;
   connectedProviders: string[];
+  invoiceAttachmentsByDealId: Record<string, ThreadInvoiceAttachment>;
+  autoAttachInvoice: boolean;
   selectedFilters: {
     q: string;
     provider: string;
@@ -705,6 +717,8 @@ export function InboxWorkspace({
   >({});
   const [aiReplyMenuWidth, setAiReplyMenuWidth] = useState<number | null>(null);
   const [promptActionMenuWidth, setPromptActionMenuWidth] = useState<number | null>(null);
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [isInvoiceAttached, setIsInvoiceAttached] = useState(false);
   const aiSuggestionCacheRef = useRef(aiSuggestionCache);
   const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
   const {
@@ -904,6 +918,24 @@ export function InboxWorkspace({
       .map((link) => byId.get(link.dealId))
       .filter((entry): entry is DealRecord => Boolean(entry)) ?? [];
   }, [deals, selectedThread]);
+  const selectedThreadInvoiceAttachment = useMemo(() => {
+    if (!selectedThread) {
+      return null;
+    }
+
+    if (selectedDealId && invoiceAttachmentsByDealId[selectedDealId]) {
+      return invoiceAttachmentsByDealId[selectedDealId] ?? null;
+    }
+
+    for (const link of selectedThread.links) {
+      const attachment = invoiceAttachmentsByDealId[link.dealId];
+      if (attachment) {
+        return attachment;
+      }
+    }
+
+    return null;
+  }, [invoiceAttachmentsByDealId, selectedDealId, selectedThread]);
   const selectedThreadSuggestionVersion = useMemo(
     () =>
       selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null,
@@ -963,6 +995,64 @@ export function InboxWorkspace({
     latestActionItemAt,
     selectedThreadPreviewState?.actionItemsSeenAt
   );
+  const canAttachInvoice =
+    Boolean(selectedThreadInvoiceAttachment) && selectedThreadInvoiceAttachment?.status !== "voided";
+
+  useEffect(() => {
+    setIsInvoiceAttached(Boolean(autoAttachInvoice && canAttachInvoice));
+  }, [autoAttachInvoice, canAttachInvoice, selectedThread?.thread.id]);
+
+  const sendReply = useCallback(async () => {
+    if (!selectedThread || !canSendReply) {
+      return;
+    }
+
+    setIsSendingReply(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/email/threads/${selectedThread.thread.id}/send`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          dealId: isInvoiceAttached
+            ? ((selectedThreadInvoiceAttachment?.dealId ?? selectedDealId) || null)
+            : (selectedDealId || null),
+          subject: replySubject,
+          body: replyBody,
+          attachmentDocumentIds:
+            isInvoiceAttached && selectedThreadInvoiceAttachment
+              ? [selectedThreadInvoiceAttachment.documentId]
+              : []
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not send reply.");
+      }
+
+      clearDraftComposer();
+      setIsInvoiceAttached(false);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not send reply.");
+    } finally {
+      setIsSendingReply(false);
+    }
+  }, [
+    canSendReply,
+    clearDraftComposer,
+    isInvoiceAttached,
+    replyBody,
+    replySubject,
+    router,
+    selectedDealId,
+    selectedThread,
+    selectedThreadInvoiceAttachment
+  ]);
 
   const prefetchThreadSuggestions = useCallback(
     async (
@@ -1949,15 +2039,54 @@ export function InboxWorkspace({
                                   </>
                                 ) : null}
                               </div>
-                              <button
-                                type="button"
-                                disabled={!canSendReply}
-                                className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
-                              >
-                                <Send className="h-3.5 w-3.5" />
-                                Send
-                              </button>
+                              <div className="flex items-center gap-2">
+                                {canAttachInvoice ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsInvoiceAttached((current) => !current)}
+                                    className={`inline-flex h-9 items-center gap-2 border px-3 text-[12px] font-medium transition ${
+                                      isInvoiceAttached
+                                        ? "border-foreground bg-foreground text-background"
+                                        : "border-black/10 text-foreground hover:bg-black/[0.03]"
+                                    }`}
+                                  >
+                                    <Paperclip className="h-3.5 w-3.5" />
+                                    {isInvoiceAttached ? "Invoice attached" : "Attach invoice"}
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => void sendReply()}
+                                  disabled={!canSendReply || isSendingReply}
+                                  className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                  {isSendingReply ? "Sending..." : "Send"}
+                                </button>
+                              </div>
                             </div>
+                            {selectedThreadInvoiceAttachment ? (
+                              <div className="flex flex-wrap items-center justify-between gap-3 border border-black/8 bg-secondary/10 px-4 py-3 text-[12px] text-muted-foreground">
+                                <div>
+                                  <p className="font-medium text-foreground">
+                                    {selectedThreadInvoiceAttachment.invoiceNumber}
+                                  </p>
+                                  <p>
+                                    {selectedThreadInvoiceAttachment.fileName}
+                                  </p>
+                                  {!canAttachInvoice ? (
+                                    <p className="mt-1">This invoice has been voided and will not be attached.</p>
+                                  ) : null}
+                                </div>
+                                <Link
+                                  href={`/api/documents/${selectedThreadInvoiceAttachment.documentId}/content`}
+                                  target="_blank"
+                                  className="inline-flex border-b border-black/20 pb-1 text-[12px] font-medium text-foreground transition hover:border-black/50"
+                                >
+                                  Preview invoice
+                                </Link>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                     </div>

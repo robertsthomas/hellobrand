@@ -7,6 +7,7 @@ import { PaymentsSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
+import { listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { buildInvoiceLineItems } from "@/lib/invoices";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -29,7 +30,10 @@ async function PaymentWorkspaceContent({
 }) {
   const { dealId } = await params;
   const viewer = await requireViewer();
-  const aggregate = await getCachedDealForViewer(viewer, dealId);
+  const [aggregate, linkedEmailThreads] = await Promise.all([
+    getCachedDealForViewer(viewer, dealId),
+    listLinkedEmailThreadsForViewerDeal(viewer, dealId)
+  ]);
 
   if (!aggregate) {
     notFound();
@@ -59,6 +63,10 @@ async function PaymentWorkspaceContent({
     };
   const invoice = aggregate.invoiceRecord ?? null;
   const invoiceDocuments = aggregate.documents.filter((document) => document.documentKind === "invoice");
+  const sendViaInboxHref =
+    invoice?.pdfDocumentId && linkedEmailThreads[0]?.thread.id
+      ? `/app/inbox?dealId=${displayDeal.id}&thread=${linkedEmailThreads[0].thread.id}&attachInvoice=1`
+      : null;
   const breakdownItems =
     invoice?.lineItems.length
         ? invoice.lineItems
@@ -98,6 +106,7 @@ async function PaymentWorkspaceContent({
           invoice={invoice}
           invoiceDocuments={invoiceDocuments}
           breakdownItems={breakdownItems}
+          sendViaInboxHref={sendViaInboxHref}
         />
       </div>
     </div>

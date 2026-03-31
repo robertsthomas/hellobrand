@@ -16,8 +16,10 @@ export { applyPendingChangesAction } from "@/app/server-actions/deal-actions";
 export { dismissPendingChangesAction } from "@/app/server-actions/deal-actions";
 export { updateDeliverablesAction } from "@/app/server-actions/deal-actions";
 export { generateInvoiceDraftAction } from "@/app/server-actions/deal-actions";
+export { regenerateInvoiceDraftAction } from "@/app/server-actions/deal-actions";
 export { saveInvoiceDraftAction } from "@/app/server-actions/deal-actions";
 export { finalizeInvoiceAction } from "@/app/server-actions/deal-actions";
+export { voidInvoiceAction } from "@/app/server-actions/deal-actions";
 
 export { startIntakeAction } from "@/app/server-actions/intake-actions";
 export { retryIntakeSessionAction } from "@/app/server-actions/intake-actions";

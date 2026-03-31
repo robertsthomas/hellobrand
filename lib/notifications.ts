@@ -25,6 +25,7 @@ export type NotificationEventType =
   | "payment.overdue"
   | "payment.received"
   | "invoice.generate_prompt"
+  | "invoice.send_prompt"
   | "deadline.upcoming"
   | "risk.contract"
   | "document.ready"
@@ -34,6 +35,7 @@ export type NotificationType =
   | "email_resync_required"
   | "payment_overdue"
   | "invoice_generate_prompt"
+  | "invoice_send_prompt"
   | "upcoming_deadline"
   | "contract_risk"
   | "deliverable_approved"
@@ -151,6 +153,8 @@ export function notificationTypeForEventType(
       return "payment_received";
     case "invoice.generate_prompt":
       return "invoice_generate_prompt";
+    case "invoice.send_prompt":
+      return "invoice_send_prompt";
     case "deadline.upcoming":
       return "upcoming_deadline";
     case "risk.contract":

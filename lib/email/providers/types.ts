@@ -33,3 +33,18 @@ export type ProviderThreadPayload = {
   isContractRelated: boolean;
   messages: ProviderMessagePayload[];
 };
+
+export type ProviderSendAttachmentInput = {
+  filename: string;
+  mimeType: string;
+  bytes: Buffer;
+};
+
+export type ProviderSendMessageResult = {
+  providerMessageId: string;
+  internetMessageId: string | null;
+  providerThreadId: string | null;
+  to: EmailParticipant[];
+  cc: EmailParticipant[];
+  bcc: EmailParticipant[];
+};

@@ -27,6 +27,7 @@ import type {
   ExtractionResultRecord,
   IntakeBatchGroupRecord,
   IntakeBatchRecord,
+  InvoiceDeliveryRecord,
   JobRecord,
   InvoiceLineItem,
   InvoiceParty,
@@ -379,6 +380,7 @@ function toInvoiceRecord(record: {
   status: string;
   draftSavedAt: Date | null;
   finalizedAt: Date | null;
+  sentAt: Date | null;
   invoiceDate: Date | null;
   dueDate: Date | null;
   currency: string | null;
@@ -389,6 +391,10 @@ function toInvoiceRecord(record: {
   lineItemsJson: unknown;
   pdfDocumentId: string | null;
   manualNumberOverride: boolean;
+  lastSentThreadId: string | null;
+  lastSentMessageId: string | null;
+  lastSentAccountId: string | null;
+  lastSentToEmail: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): InvoiceRecord {
@@ -400,6 +406,7 @@ function toInvoiceRecord(record: {
     status: record.status as InvoiceRecord["status"],
     draftSavedAt: iso(record.draftSavedAt),
     finalizedAt: iso(record.finalizedAt),
+    sentAt: iso(record.sentAt),
     invoiceDate: iso(record.invoiceDate),
     dueDate: iso(record.dueDate),
     currency: record.currency,
@@ -410,8 +417,46 @@ function toInvoiceRecord(record: {
     lineItems: toInvoiceLineItems(record.lineItemsJson),
     pdfDocumentId: record.pdfDocumentId,
     manualNumberOverride: record.manualNumberOverride,
+    lastSentThreadId: record.lastSentThreadId,
+    lastSentMessageId: record.lastSentMessageId,
+    lastSentAccountId: record.lastSentAccountId,
+    lastSentToEmail: record.lastSentToEmail,
     createdAt: iso(record.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(record.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toInvoiceDeliveryRecord(record: {
+  id: string;
+  invoiceId: string;
+  dealId: string;
+  userId: string;
+  provider: string | null;
+  threadId: string | null;
+  messageId: string | null;
+  accountId: string | null;
+  toEmail: string | null;
+  subject: string;
+  status: string;
+  errorMessage: string | null;
+  sentAt: Date;
+  createdAt: Date;
+}): InvoiceDeliveryRecord {
+  return {
+    id: record.id,
+    invoiceId: record.invoiceId,
+    dealId: record.dealId,
+    userId: record.userId,
+    provider: record.provider as InvoiceDeliveryRecord["provider"],
+    threadId: record.threadId,
+    messageId: record.messageId,
+    accountId: record.accountId,
+    toEmail: record.toEmail,
+    subject: record.subject,
+    status: record.status as InvoiceDeliveryRecord["status"],
+    errorMessage: record.errorMessage,
+    sentAt: iso(record.sentAt) ?? new Date().toISOString(),
+    createdAt: iso(record.createdAt) ?? new Date().toISOString()
   };
 }
 
@@ -756,7 +801,7 @@ export class PrismaRepository {
         campaignName: patch.campaignName,
         status: patch.status,
         statusBeforeArchive: patch.statusBeforeArchive,
-        paymentStatus: patch.paymentStatus,
+        paymentStatus: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus,
         countersignStatus: patch.countersignStatus,
         summary: patch.summary,
         legalDisclaimer: patch.legalDisclaimer,
@@ -781,8 +826,13 @@ export class PrismaRepository {
     if (patch.paymentStatus) {
       await prisma.paymentRecord.upsert({
         where: { dealId },
-        update: { status: patch.paymentStatus },
-        create: { dealId, status: patch.paymentStatus }
+        update: {
+          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus
+        },
+        create: {
+          dealId,
+          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus
+        }
       });
     }
 
@@ -883,6 +933,15 @@ export class PrismaRepository {
     return record ? toInvoiceRecord(record) : null;
   }
 
+  async listInvoiceDeliveryRecords(userId: string, dealId: string) {
+    const records = await prisma.invoiceDeliveryRecord.findMany({
+      where: { userId, dealId },
+      orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }]
+    });
+
+    return records.map(toInvoiceDeliveryRecord);
+  }
+
   async upsertInvoiceRecord(
     userId: string,
     dealId: string,
@@ -895,6 +954,7 @@ export class PrismaRepository {
         status: patch.status,
         draftSavedAt: patch.draftSavedAt ? new Date(patch.draftSavedAt) : null,
         finalizedAt: patch.finalizedAt ? new Date(patch.finalizedAt) : null,
+        sentAt: patch.sentAt ? new Date(patch.sentAt) : null,
         invoiceDate: patch.invoiceDate ? new Date(patch.invoiceDate) : null,
         dueDate: patch.dueDate ? new Date(patch.dueDate) : null,
         currency: patch.currency,
@@ -904,7 +964,11 @@ export class PrismaRepository {
         issuerJson: toJsonValue(patch.issuer),
         lineItemsJson: toJsonValue(patch.lineItems),
         pdfDocumentId: patch.pdfDocumentId,
-        manualNumberOverride: patch.manualNumberOverride
+        manualNumberOverride: patch.manualNumberOverride,
+        lastSentThreadId: patch.lastSentThreadId,
+        lastSentMessageId: patch.lastSentMessageId,
+        lastSentAccountId: patch.lastSentAccountId,
+        lastSentToEmail: patch.lastSentToEmail
       },
       create: {
         dealId,
@@ -913,6 +977,7 @@ export class PrismaRepository {
         status: patch.status,
         draftSavedAt: patch.draftSavedAt ? new Date(patch.draftSavedAt) : null,
         finalizedAt: patch.finalizedAt ? new Date(patch.finalizedAt) : null,
+        sentAt: patch.sentAt ? new Date(patch.sentAt) : null,
         invoiceDate: patch.invoiceDate ? new Date(patch.invoiceDate) : null,
         dueDate: patch.dueDate ? new Date(patch.dueDate) : null,
         currency: patch.currency,
@@ -922,11 +987,40 @@ export class PrismaRepository {
         issuerJson: toJsonValue(patch.issuer),
         lineItemsJson: toJsonValue(patch.lineItems),
         pdfDocumentId: patch.pdfDocumentId,
-        manualNumberOverride: patch.manualNumberOverride
+        manualNumberOverride: patch.manualNumberOverride,
+        lastSentThreadId: patch.lastSentThreadId,
+        lastSentMessageId: patch.lastSentMessageId,
+        lastSentAccountId: patch.lastSentAccountId,
+        lastSentToEmail: patch.lastSentToEmail
       }
     });
 
     return toInvoiceRecord(record);
+  }
+
+  async createInvoiceDeliveryRecord(
+    userId: string,
+    dealId: string,
+    patch: Omit<InvoiceDeliveryRecord, "id" | "dealId" | "userId" | "createdAt">
+  ) {
+    const record = await prisma.invoiceDeliveryRecord.create({
+      data: {
+        invoiceId: patch.invoiceId,
+        dealId,
+        userId,
+        provider: patch.provider,
+        threadId: patch.threadId,
+        messageId: patch.messageId,
+        accountId: patch.accountId,
+        toEmail: patch.toEmail,
+        subject: patch.subject,
+        status: patch.status,
+        errorMessage: patch.errorMessage,
+        sentAt: new Date(patch.sentAt)
+      }
+    });
+
+    return toInvoiceDeliveryRecord(record);
   }
 
   async listInvoiceReminderTouchpoints(userId: string, options?: { dealId?: string }) {

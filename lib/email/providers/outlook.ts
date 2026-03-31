@@ -5,7 +5,11 @@ import {
   getOutlookRedirectUri,
   outlookScopes
 } from "@/lib/email/config";
-import type { ProviderThreadPayload } from "@/lib/email/providers/types";
+import type {
+  ProviderSendAttachmentInput,
+  ProviderSendMessageResult,
+  ProviderThreadPayload
+} from "@/lib/email/providers/types";
 import type { EmailParticipant } from "@/lib/types";
 
 const GRAPH_API_BASE = "https://graph.microsoft.com/v1.0";
@@ -49,6 +53,22 @@ function uniqueParticipants(entries: Array<EmailParticipant | null | undefined>)
   }
 
   return participants;
+}
+
+function toGraphRecipients(participants: EmailParticipant[]) {
+  return participants.map((participant) => ({
+    emailAddress: {
+      address: participant.email,
+      name: participant.name ?? undefined
+    }
+  }));
+}
+
+function textToHtml(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim().length > 0 ? `<div>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>` : "<div><br/></div>")
+    .join("");
 }
 
 function stripHtml(html: string | null | undefined) {
@@ -419,6 +439,88 @@ export async function fetchOutlookAttachment(
   return {
     bytes: Buffer.from(await response.arrayBuffer()),
     sizeBytes: Number(response.headers.get("content-length") ?? 0)
+  };
+}
+
+export async function sendOutlookThreadReply(
+  accessToken: string,
+  input: {
+    replyToMessageId: string;
+    threadId: string;
+    subject: string;
+    body: string;
+    to: EmailParticipant[];
+    cc?: EmailParticipant[];
+    bcc?: EmailParticipant[];
+    attachments?: ProviderSendAttachmentInput[];
+  }
+): Promise<ProviderSendMessageResult> {
+  const draft = await graphRequest<{ id: string; conversationId?: string }>(
+    `/me/messages/${encodeURIComponent(input.replyToMessageId)}/createReply`,
+    accessToken,
+    {
+      method: "POST"
+    }
+  );
+
+  await graphRequest(
+    `/me/messages/${encodeURIComponent(draft.id)}`,
+    accessToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        subject: input.subject,
+        body: {
+          contentType: "HTML",
+          content: textToHtml(input.body)
+        },
+        toRecipients: toGraphRecipients(input.to),
+        ccRecipients: toGraphRecipients(input.cc ?? []),
+        bccRecipients: toGraphRecipients(input.bcc ?? [])
+      })
+    }
+  );
+
+  for (const attachment of input.attachments ?? []) {
+    await graphRequest(
+      `/me/messages/${encodeURIComponent(draft.id)}/attachments`,
+      accessToken,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          name: attachment.filename,
+          contentType: attachment.mimeType,
+          contentBytes: Buffer.from(attachment.bytes).toString("base64")
+        })
+      }
+    );
+  }
+
+  const sendResponse = await fetch(
+    `${GRAPH_API_BASE}/me/messages/${encodeURIComponent(draft.id)}/send`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json"
+      }
+    }
+  );
+
+  if (!sendResponse.ok) {
+    throw new Error(
+      `Microsoft Graph request failed (${sendResponse.status}): ${await sendResponse.text()}`
+    );
+  }
+
+  return {
+    providerMessageId: draft.id,
+    internetMessageId: null,
+    providerThreadId: draft.conversationId ?? input.threadId,
+    to: input.to,
+    cc: input.cc ?? [],
+    bcc: input.bcc ?? []
   };
 }
 

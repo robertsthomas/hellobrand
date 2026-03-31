@@ -337,7 +337,7 @@ export default async function BillingSettingsPage({
                 )}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Includes invoiced, awaiting payment, and late payout states.
+                Includes sent invoices that are awaiting payment or already late.
               </p>
             </div>
 

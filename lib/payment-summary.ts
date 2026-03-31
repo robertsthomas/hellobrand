@@ -80,7 +80,7 @@ export function summarizePaymentRows(rows: PaymentRowLike[]): PaymentPageSummary
   for (const row of rows) {
     addAmount(tracked, row.payment);
 
-    if (["invoiced", "awaiting_payment", "late"].includes(row.payment.status)) {
+    if (["awaiting_payment", "late"].includes(row.payment.status)) {
       addAmount(outstanding, row.payment);
     }
 

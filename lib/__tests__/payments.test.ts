@@ -9,16 +9,18 @@ function normalizePaymentStatus(
   dueDate: Date | null,
   paidDate: Date | null
 ): PaymentStatus {
+  const normalizedInputStatus = status === "invoiced" ? "not_invoiced" : status;
+
   if (paidDate || status === "paid") {
     return "paid";
   }
 
-  if (dueDate && dueDate.getTime() < Date.now()) {
+  if (dueDate && dueDate.getTime() < Date.now() && normalizedInputStatus === "awaiting_payment") {
     return "late";
   }
 
-  if (status === "awaiting_payment" || status === "invoiced") {
-    return status;
+  if (normalizedInputStatus === "awaiting_payment") {
+    return "awaiting_payment";
   }
 
   return "not_invoiced";
@@ -63,7 +65,7 @@ describe("normalizePaymentStatus", () => {
 
   it("returns late when dueDate is in the past and not paid", () => {
     const pastDate = new Date("2020-01-01");
-    expect(normalizePaymentStatus("invoiced", pastDate, null)).toBe("late");
+    expect(normalizePaymentStatus("awaiting_payment", pastDate, null)).toBe("late");
   });
 
   it("returns awaiting_payment when status matches and not overdue", () => {
@@ -73,9 +75,9 @@ describe("normalizePaymentStatus", () => {
     );
   });
 
-  it("returns invoiced when status matches and not overdue", () => {
+  it("normalizes legacy invoiced status to not_invoiced when not sent yet", () => {
     const futureDate = new Date("2099-12-31");
-    expect(normalizePaymentStatus("invoiced", futureDate, null)).toBe("invoiced");
+    expect(normalizePaymentStatus("invoiced", futureDate, null)).toBe("not_invoiced");
   });
 
   it("returns not_invoiced for unknown status with no dates", () => {
@@ -143,10 +145,10 @@ describe("PaymentRecord shape", () => {
   it("supports all payment statuses", () => {
     const statuses: PaymentStatus[] = [
       "not_invoiced",
-      "invoiced",
       "awaiting_payment",
       "paid",
-      "late"
+      "late",
+      "invoiced"
     ];
     for (const status of statuses) {
       const payment = makePayment({ status });
@@ -171,15 +173,15 @@ describe("PaymentRecord shape", () => {
 });
 
 describe("payment edge cases", () => {
-  it("normalizes status correctly for invoiced + future due date", () => {
+  it("normalizes legacy invoiced + future due date to not_invoiced", () => {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
-    expect(normalizePaymentStatus("invoiced", futureDate, null)).toBe("invoiced");
+    expect(normalizePaymentStatus("invoiced", futureDate, null)).toBe("not_invoiced");
   });
 
-  it("normalizes to late for invoiced + past due date", () => {
+  it("does not mark legacy invoiced as late before it is actually sent", () => {
     const pastDate = new Date("2024-01-01");
-    expect(normalizePaymentStatus("invoiced", pastDate, null)).toBe("late");
+    expect(normalizePaymentStatus("invoiced", pastDate, null)).toBe("not_invoiced");
   });
 
   it("normalizes to paid even with past due date if paid", () => {

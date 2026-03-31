@@ -1,5 +1,9 @@
 import { gmailScopes, getGooglePubSubTopic, getGoogleRedirectUri } from "@/lib/email/config";
-import type { ProviderThreadPayload } from "@/lib/email/providers/types";
+import type {
+  ProviderSendAttachmentInput,
+  ProviderSendMessageResult,
+  ProviderThreadPayload
+} from "@/lib/email/providers/types";
 import type { EmailParticipant } from "@/lib/types";
 
 const GOOGLE_AUTH_BASE = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -118,6 +122,28 @@ function decodeGmailBody(data: string | null | undefined) {
   }
 
   return Buffer.from(data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+}
+
+function encodeBase64Url(value: Buffer | string) {
+  return Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function escapeHeaderValue(value: string) {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+function formatAddressList(participants: EmailParticipant[]) {
+  return participants
+    .map((participant) =>
+      participant.name
+        ? `"${escapeHeaderValue(participant.name)}" <${participant.email}>`
+        : participant.email
+    )
+    .join(", ");
 }
 
 function collectBodyParts(
@@ -456,6 +482,76 @@ export async function fetchGmailAttachment(
   return {
     bytes: Buffer.from((payload.data ?? "").replace(/-/g, "+").replace(/_/g, "/"), "base64"),
     sizeBytes: Number(payload.size ?? 0)
+  };
+}
+
+export async function sendGmailThreadReply(
+  accessToken: string,
+  input: {
+    threadId: string;
+    subject: string;
+    body: string;
+    to: EmailParticipant[];
+    cc?: EmailParticipant[];
+    bcc?: EmailParticipant[];
+    inReplyTo?: string | null;
+    references?: string[];
+    attachments?: ProviderSendAttachmentInput[];
+  }
+): Promise<ProviderSendMessageResult> {
+  const boundary = `hb_${Date.now().toString(36)}`;
+  const parts = [
+    `From: me`,
+    `To: ${formatAddressList(input.to)}`,
+    input.cc && input.cc.length > 0 ? `Cc: ${formatAddressList(input.cc)}` : null,
+    input.bcc && input.bcc.length > 0 ? `Bcc: ${formatAddressList(input.bcc)}` : null,
+    `Subject: ${escapeHeaderValue(input.subject)}`,
+    "MIME-Version: 1.0",
+    input.inReplyTo ? `In-Reply-To: <${input.inReplyTo.replace(/^<|>$/g, "")}>` : null,
+    input.references && input.references.length > 0
+      ? `References: ${input.references.map((value) => `<${value.replace(/^<|>$/g, "")}>`).join(" ")}`
+      : null,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    input.body,
+    ""
+  ].filter((value): value is string => value !== null);
+
+  for (const attachment of input.attachments ?? []) {
+    parts.push(
+      `--${boundary}`,
+      `Content-Type: ${attachment.mimeType}; name="${escapeHeaderValue(attachment.filename)}"`,
+      "Content-Transfer-Encoding: base64",
+      `Content-Disposition: attachment; filename="${escapeHeaderValue(attachment.filename)}"`,
+      "",
+      Buffer.from(attachment.bytes).toString("base64"),
+      ""
+    );
+  }
+
+  parts.push(`--${boundary}--`, "");
+
+  const payload = await gmailRequest<{
+    id: string;
+    threadId?: string;
+  }>("/messages/send", accessToken, {
+    method: "POST",
+    body: JSON.stringify({
+      raw: encodeBase64Url(parts.join("\r\n")),
+      threadId: input.threadId
+    })
+  });
+
+  return {
+    providerMessageId: payload.id,
+    internetMessageId: null,
+    providerThreadId: payload.threadId ?? input.threadId,
+    to: input.to,
+    cc: input.cc ?? [],
+    bcc: input.bcc ?? []
   };
 }
 

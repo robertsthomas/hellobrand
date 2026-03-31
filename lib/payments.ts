@@ -40,16 +40,22 @@ function normalizePaymentStatus(
   dueDate: Date | null,
   paidDate: Date | null
 ): PaymentStatus {
+  const normalizedInputStatus = status === "invoiced" ? "not_invoiced" : status;
+
   if (paidDate || status === "paid") {
     return "paid";
   }
 
-  if (dueDate && dueDate.getTime() < Date.now()) {
+  if (
+    dueDate &&
+    dueDate.getTime() < Date.now() &&
+    normalizedInputStatus === "awaiting_payment"
+  ) {
     return "late";
   }
 
-  if (status === "awaiting_payment" || status === "invoiced") {
-    return status;
+  if (normalizedInputStatus === "awaiting_payment") {
+    return "awaiting_payment";
   }
 
   return "not_invoiced";

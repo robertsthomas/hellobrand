@@ -64,7 +64,7 @@ function paymentBadgeClass(status: string) {
     return "border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300";
   }
 
-  if (status === "awaiting_payment" || status === "invoiced") {
+  if (status === "awaiting_payment") {
     return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300";
   }
 
@@ -331,8 +331,7 @@ export function DashboardDealsTable({
               className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-[#161a1f]"
             >
               <option value="all">All payments</option>
-              <option value="draft">Draft</option>
-              <option value="invoiced">Invoiced</option>
+              <option value="not_invoiced">Not invoiced</option>
               <option value="awaiting_payment">Awaiting payment</option>
               <option value="late">Late</option>
               <option value="paid">Paid</option>

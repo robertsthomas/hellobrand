@@ -7,12 +7,15 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   finalizeInvoiceAction,
   generateInvoiceDraftAction,
-  saveInvoiceDraftAction
+  regenerateInvoiceDraftAction,
+  saveInvoiceDraftAction,
+  voidInvoiceAction
 } from "@/app/actions";
 import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { SubmitButton } from "@/components/submit-button";
 import type {
   DocumentRecord,
+  InvoiceDeliveryRecord,
   InvoiceLineItem,
   InvoiceRecord,
   PaymentStatus
@@ -55,18 +58,30 @@ function documentPreviewUrl(documentId: string) {
   return `/api/documents/${documentId}/content`;
 }
 
+function documentDownloadUrl(documentId: string) {
+  return `/api/documents/${documentId}/content?download=1`;
+}
+
+function hasPaymentFollowUpStatus(status: PaymentStatus) {
+  return status === "late" || status === "awaiting_payment" || status === "invoiced";
+}
+
 export function InvoiceEditorPanel({
   dealId,
   invoice,
+  invoiceDeliveries = [],
   invoiceDocuments,
   paymentStatus,
-  paymentTerms
+  paymentTerms,
+  sendViaInboxHref
 }: {
   dealId: string;
   invoice: InvoiceRecord | null;
+  invoiceDeliveries?: InvoiceDeliveryRecord[];
   invoiceDocuments: DocumentRecord[];
   paymentStatus: PaymentStatus;
   paymentTerms: string | null;
+  sendViaInboxHref?: string | null;
 }) {
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>(
     invoice?.lineItems.length ? invoice.lineItems : [createLineItem()]
@@ -79,7 +94,7 @@ export function InvoiceEditorPanel({
 
   const lineItemsJson = useMemo(() => JSON.stringify(lineItems), [lineItems]);
   const paymentTriggerPrompt =
-    paymentStatus === "late" || paymentStatus === "awaiting_payment" || paymentStatus === "invoiced"
+    hasPaymentFollowUpStatus(paymentStatus)
       ? "Draft a concise creator-professional payment follow-up email for this partnership. Reference the saved workspace payment timing, ask what is still needed, and keep the tone firm but professional."
       : `Draft a concise creator-professional email asking the brand to confirm payment timing and invoice requirements for this partnership. The current workspace payment terms are ${paymentTerms ?? "not fully clear"}.`;
 
@@ -121,9 +136,7 @@ export function InvoiceEditorPanel({
             </SubmitButton>
             <AssistantTriggerButton
               label={
-                paymentStatus === "late" ||
-                paymentStatus === "awaiting_payment" ||
-                paymentStatus === "invoiced"
+                hasPaymentFollowUpStatus(paymentStatus)
                   ? "Draft payment follow-up"
                   : "Clarify payment timing"
               }
@@ -131,9 +144,7 @@ export function InvoiceEditorPanel({
                 kind: "payment",
                 sourceId: dealId,
                 label:
-                  paymentStatus === "late" ||
-                  paymentStatus === "awaiting_payment" ||
-                  paymentStatus === "invoiced"
+                  hasPaymentFollowUpStatus(paymentStatus)
                     ? "Follow up on payment"
                     : "Clarify payment timing",
                 prompt: paymentTriggerPrompt
@@ -177,12 +188,16 @@ export function InvoiceEditorPanel({
           <p className="text-sm text-muted-foreground">
             Status: {humanizeToken(invoice.status)} · Invoice date {formatDate(invoice.invoiceDate)} · Due {formatDate(invoice.dueDate)}
           </p>
+          {invoice.sentAt ? (
+            <p className="text-sm text-muted-foreground">
+              Sent {formatDate(invoice.sentAt)}
+              {invoice.lastSentToEmail ? ` to ${invoice.lastSentToEmail}` : ""}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {(paymentStatus === "late" ||
-            paymentStatus === "awaiting_payment" ||
-            paymentStatus === "invoiced") ? (
+          {hasPaymentFollowUpStatus(paymentStatus) ? (
             <AssistantTriggerButton
               label="Draft payment follow-up"
               trigger={{
@@ -194,13 +209,29 @@ export function InvoiceEditorPanel({
             />
           ) : null}
           {invoice.pdfDocumentId ? (
-            <Link
-              href={documentPreviewUrl(invoice.pdfDocumentId)}
-              target="_blank"
-              className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
-            >
-              Open finalized PDF
-            </Link>
+            <>
+              <Link
+                href={documentPreviewUrl(invoice.pdfDocumentId)}
+                target="_blank"
+                className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
+              >
+                Open finalized PDF
+              </Link>
+              <Link
+                href={documentDownloadUrl(invoice.pdfDocumentId)}
+                className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
+              >
+                Download PDF
+              </Link>
+              {sendViaInboxHref && invoice.status !== "voided" ? (
+                <Link
+                  href={sendViaInboxHref}
+                  className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
+                >
+                  Send via linked inbox
+                </Link>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
@@ -435,22 +466,44 @@ export function InvoiceEditorPanel({
           <div className="space-y-1 text-sm text-muted-foreground">
             <p>{invoiceDocuments.length} attached invoice document{invoiceDocuments.length === 1 ? "" : "s"}</p>
             {invoice.finalizedAt ? <p>Finalized {formatDate(invoice.finalizedAt)}</p> : null}
+            {invoice.sentAt ? <p>Sent {formatDate(invoice.sentAt)}</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <SubmitButton
-              formAction={saveInvoiceDraftAction}
-              pendingLabel="Saving invoice draft..."
-              className="inline-flex items-center justify-center border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:bg-[#f7f5f1]"
-            >
-              Save draft
-            </SubmitButton>
+            {invoice.status === "draft" ? (
+              <SubmitButton
+                formAction={regenerateInvoiceDraftAction}
+                pendingLabel="Refreshing draft..."
+                className="inline-flex items-center justify-center border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:bg-[#f7f5f1]"
+              >
+                Regenerate from workspace
+              </SubmitButton>
+            ) : null}
+            {invoice.status === "draft" ? (
+              <SubmitButton
+                formAction={saveInvoiceDraftAction}
+                pendingLabel="Saving invoice draft..."
+                className="inline-flex items-center justify-center border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:bg-[#f7f5f1]"
+              >
+                Save draft
+              </SubmitButton>
+            ) : null}
             <SubmitButton
               formAction={finalizeInvoiceAction}
               pendingLabel="Finalizing invoice..."
+              disabled={invoice.status === "voided"}
               className="inline-flex items-center justify-center bg-primary px-5 py-2 text-sm font-semibold text-white"
             >
               Finalize and attach PDF
             </SubmitButton>
+            {invoice.status !== "voided" ? (
+              <SubmitButton
+                formAction={voidInvoiceAction}
+                pendingLabel="Voiding invoice..."
+                className="inline-flex items-center justify-center border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+              >
+                Void invoice
+              </SubmitButton>
+            ) : null}
           </div>
         </div>
       </form>
@@ -470,6 +523,35 @@ export function InvoiceEditorPanel({
               <span>{document.fileName}</span>
               <span className="text-muted-foreground">Open</span>
             </Link>
+          ))}
+        </div>
+      ) : null}
+      {invoiceDeliveries.length > 0 ? (
+        <div className="space-y-3 border-t border-black/8 pt-5 dark:border-white/10">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            Delivery history
+          </p>
+          {invoiceDeliveries.map((delivery) => (
+            <div
+              key={delivery.id}
+              className="flex flex-wrap items-start justify-between gap-3 border border-black/8 px-4 py-3 text-sm dark:border-white/10"
+            >
+              <div>
+                <p className="font-medium text-foreground">
+                  {humanizeToken(delivery.status)}
+                  {delivery.toEmail ? ` · ${delivery.toEmail}` : ""}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {delivery.subject} · {formatDate(delivery.sentAt)}
+                </p>
+                {delivery.errorMessage ? (
+                  <p className="mt-1 text-red-600">{delivery.errorMessage}</p>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground">
+                {delivery.provider ? humanizeToken(delivery.provider) : "Linked inbox"}
+              </p>
+            </div>
           ))}
         </div>
       ) : null}

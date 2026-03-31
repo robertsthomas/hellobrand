@@ -24,7 +24,7 @@ function makeRow({
 describe("summarizePaymentRows", () => {
   it("returns single-currency totals when all tracked payments match", () => {
     const summary = summarizePaymentRows([
-      makeRow({ amount: 1500, status: "invoiced" }),
+      makeRow({ amount: 1500, status: "not_invoiced" }),
       makeRow({ amount: 500, status: "paid" }),
       makeRow({ amount: 250, status: "late" })
     ]);
@@ -36,10 +36,10 @@ describe("summarizePaymentRows", () => {
       breakdown: [{ currency: "USD", amount: 2250 }]
     });
     expect(summary.outstanding).toEqual({
-      total: 1750,
+      total: 250,
       currency: "USD",
       hasMixedCurrencies: false,
-      breakdown: [{ currency: "USD", amount: 1750 }]
+      breakdown: [{ currency: "USD", amount: 250 }]
     });
     expect(summary.late).toEqual({
       total: 250,
@@ -51,7 +51,7 @@ describe("summarizePaymentRows", () => {
 
   it("keeps a currency breakdown instead of fabricating a mixed total", () => {
     const summary = summarizePaymentRows([
-      makeRow({ amount: 1000, currency: "usd", status: "invoiced" }),
+      makeRow({ amount: 1000, currency: "usd", status: "not_invoiced" }),
       makeRow({ amount: 800, currency: "EUR", status: "awaiting_payment" }),
       makeRow({ amount: 300, currency: "GBP", status: "paid" })
     ]);
@@ -65,12 +65,10 @@ describe("summarizePaymentRows", () => {
       { currency: "USD", amount: 1000 }
     ]);
 
-    expect(summary.outstanding.total).toBeNull();
-    expect(summary.outstanding.hasMixedCurrencies).toBe(true);
-    expect(summary.outstanding.breakdown).toEqual([
-      { currency: "EUR", amount: 800 },
-      { currency: "USD", amount: 1000 }
-    ]);
+    expect(summary.outstanding.total).toBe(800);
+    expect(summary.outstanding.currency).toBe("EUR");
+    expect(summary.outstanding.hasMixedCurrencies).toBe(false);
+    expect(summary.outstanding.breakdown).toEqual([{ currency: "EUR", amount: 800 }]);
   });
 
   it("defaults empty and null-currency rows safely", () => {

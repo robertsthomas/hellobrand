@@ -5,7 +5,13 @@ import { ImapFlow, type MessageAddressObject, type MessageStructureObject } from
 import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 import nodemailer from "nodemailer";
 
-import type { ProviderAttachmentPayload, ProviderMessagePayload, ProviderThreadPayload } from "@/lib/email/providers/types";
+import type {
+  ProviderAttachmentPayload,
+  ProviderMessagePayload,
+  ProviderSendAttachmentInput,
+  ProviderSendMessageResult,
+  ProviderThreadPayload
+} from "@/lib/email/providers/types";
 import type { EmailParticipant } from "@/lib/types";
 
 const YAHOO_IMAP_HOST = "imap.mail.yahoo.com";
@@ -583,4 +589,61 @@ export async function fetchYahooAttachment(
       sizeBytes: bytes.length
     };
   });
+}
+
+export async function sendYahooThreadReply(
+  emailAddress: string,
+  appPassword: string,
+  input: {
+    threadId: string;
+    subject: string;
+    body: string;
+    to: EmailParticipant[];
+    cc?: EmailParticipant[];
+    bcc?: EmailParticipant[];
+    inReplyTo?: string | null;
+    references?: string[];
+    attachments?: ProviderSendAttachmentInput[];
+  }
+): Promise<ProviderSendMessageResult> {
+  const transporter = nodemailer.createTransport({
+    host: YAHOO_SMTP_HOST,
+    port: YAHOO_SMTP_PORT,
+    secure: true,
+    auth: {
+      user: emailAddress,
+      pass: appPassword
+    },
+    connectionTimeout: 20_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000
+  });
+
+  const result = await transporter.sendMail({
+    from: emailAddress,
+    to: input.to.map((participant) => participant.name ? `${participant.name} <${participant.email}>` : participant.email),
+    cc: (input.cc ?? []).map((participant) => participant.name ? `${participant.name} <${participant.email}>` : participant.email),
+    bcc: (input.bcc ?? []).map((participant) => participant.name ? `${participant.name} <${participant.email}>` : participant.email),
+    subject: input.subject,
+    text: input.body,
+    inReplyTo: input.inReplyTo ?? undefined,
+    references: input.references ?? undefined,
+    attachments: (input.attachments ?? []).map((attachment) => ({
+      filename: attachment.filename,
+      contentType: attachment.mimeType,
+      content: attachment.bytes
+    }))
+  });
+
+  const normalizedMessageId =
+    typeof result.messageId === "string" ? result.messageId.replace(/^<|>$/g, "") : null;
+
+  return {
+    providerMessageId: normalizedMessageId ?? `${Date.now()}`,
+    internetMessageId: normalizedMessageId,
+    providerThreadId: input.threadId,
+    to: input.to,
+    cc: input.cc ?? [],
+    bcc: input.bcc ?? []
+  };
 }

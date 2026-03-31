@@ -3,6 +3,7 @@ import { getViewerById } from "@/lib/auth";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { startServerDebug } from "@/lib/server-debug";
+import { readStoredBytes } from "@/lib/storage";
 import type {
   ConnectedEmailAccountRecord,
   DealTermsRecord,
@@ -20,14 +21,15 @@ import { generateEmailReplyDraft, generateEmailThreadSummary, streamEmailReplyDr
 import { detectImportantEmailEvents, buildEmailTermSuggestion, detectPromiseDiscrepancies, scoreThreadAgainstDeal } from "@/lib/email/smart-inbox";
 import { extractActionItemsFromMessage } from "@/lib/email/action-items";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
-import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailAttachment, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch } from "@/lib/email/providers/gmail";
-import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookAttachment, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription } from "@/lib/email/providers/outlook";
-import { fetchYahooAttachment, listRecentYahooThreads, listYahooThreadsSinceCursor, verifyYahooMailboxAccess } from "@/lib/email/providers/yahoo";
+import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailAttachment, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch, sendGmailThreadReply } from "@/lib/email/providers/gmail";
+import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookAttachment, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
+import { fetchYahooAttachment, listRecentYahooThreads, listYahooThreadsSinceCursor, sendYahooThreadReply, verifyYahooMailboxAccess } from "@/lib/email/providers/yahoo";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { hasProviderConfig, resolveEmailAppBaseUrl } from "@/lib/email/config";
 import {
   assertViewerHasFeature
 } from "@/lib/billing/entitlements";
+import { markInvoiceSentForViewer } from "@/lib/invoices";
 import { listDealAggregatesForViewer, mergeTerms } from "@/lib/deals";
 import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
 import {
@@ -58,6 +60,7 @@ import {
   saveEmailActionItem,
   saveEmailDealTermSuggestion,
   saveEmailRiskFlag,
+  saveOutboundEmailMessage,
   saveEmailThreadSummary,
   saveSyncedEmailThread,
   upsertBrandContact,
@@ -83,6 +86,36 @@ function redirectTarget(pathname: string, searchParams?: Record<string, string |
   }
 
   return params.size > 0 ? `${pathname}?${params.toString()}` : pathname;
+}
+
+function textBodyToHtml(value: string) {
+  return value
+    .split("\n")
+    .map((line) =>
+      line.trim().length > 0
+        ? `<div>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+        : "<div><br/></div>"
+    )
+    .join("");
+}
+
+function latestReplyTarget(detail: EmailThreadDetail) {
+  const latestInbound = [...detail.messages]
+    .reverse()
+    .find((message) => message.direction === "inbound" && message.from?.email);
+  const anchor = latestInbound ?? detail.messages[detail.messages.length - 1] ?? null;
+
+  return {
+    anchor,
+    to:
+      latestInbound?.from
+        ? [latestInbound.from]
+        : anchor?.to?.length
+          ? anchor.to
+          : [],
+    cc: latestInbound?.cc ?? anchor?.cc ?? [],
+    bcc: [] as EmailThreadDetail["messages"][number]["bcc"]
+  };
 }
 
 function tokenExpiresAt(expiresIn: number | undefined) {
@@ -965,6 +998,170 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
   return detail;
 }
 
+export async function sendEmailThreadReplyForViewer(
+  viewer: Viewer,
+  threadId: string,
+  input: {
+    dealId?: string | null;
+    subject: string;
+    body: string;
+    attachmentDocumentIds?: string[];
+  }
+) {
+  await assertPremiumInboxAccess(viewer);
+  if (!process.env.DATABASE_URL) {
+    throw new Error("Connected inbox sending is unavailable without a database.");
+  }
+
+  const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
+  if (!detail) {
+    throw new Error("Email thread not found.");
+  }
+
+  const { anchor, to, cc, bcc } = latestReplyTarget(detail);
+  if (to.length === 0) {
+    throw new Error("Could not determine who to reply to in this thread.");
+  }
+
+  const account = detail.account;
+  const credentials = await ensureActiveEmailCredentials(account);
+  const accessToken = credentials.accessToken ?? "";
+  const mailPassword = credentials.mailPassword ?? "";
+  const normalizedSubject = input.subject.trim() || detail.thread.subject;
+  const normalizedBody = input.body.trim();
+
+  if (!normalizedBody) {
+    throw new Error("Reply body is required.");
+  }
+
+  const linkedDealId =
+    input.dealId?.trim() ||
+    detail.links[0]?.dealId ||
+    null;
+
+  const attachmentDocuments = await Promise.all(
+    (input.attachmentDocumentIds ?? []).map(async (documentId) => {
+      const document = await getRepository().getDocument(documentId);
+      if (!document || document.userId !== viewer.id) {
+        throw new Error("Attachment document not found.");
+      }
+
+      if (linkedDealId && document.dealId !== linkedDealId) {
+        throw new Error("Attachment document must belong to the linked workspace.");
+      }
+
+      return {
+        document,
+        bytes:
+          document.sourceType === "pasted_text"
+            ? Buffer.from(document.normalizedText ?? document.rawText ?? "", "utf8")
+            : await readStoredBytes(document.storagePath)
+      };
+    })
+  );
+
+  const sendResult =
+    account.provider === "gmail"
+      ? await sendGmailThreadReply(accessToken, {
+          threadId: detail.thread.providerThreadId,
+          subject: normalizedSubject,
+          body: normalizedBody,
+          to,
+          cc,
+          bcc,
+          inReplyTo: anchor?.internetMessageId ?? null,
+          references: detail.messages
+            .map((message) => message.internetMessageId)
+            .filter((value): value is string => Boolean(value))
+            .slice(-8),
+          attachments: attachmentDocuments.map(({ document, bytes }) => ({
+            filename: document.fileName,
+            mimeType: document.mimeType,
+            bytes
+          }))
+        })
+      : account.provider === "outlook"
+        ? await sendOutlookThreadReply(accessToken, {
+            replyToMessageId:
+              anchor?.providerMessageId ??
+              detail.messages[detail.messages.length - 1]?.providerMessageId ??
+              (() => {
+                throw new Error("Could not determine which Outlook message to reply to.");
+              })(),
+            threadId: detail.thread.providerThreadId,
+            subject: normalizedSubject,
+            body: normalizedBody,
+            to,
+            cc,
+            bcc,
+            attachments: attachmentDocuments.map(({ document, bytes }) => ({
+              filename: document.fileName,
+              mimeType: document.mimeType,
+              bytes
+            }))
+          })
+        : await sendYahooThreadReply(account.emailAddress, mailPassword, {
+            threadId: detail.thread.providerThreadId,
+            subject: normalizedSubject,
+            body: normalizedBody,
+            to,
+            cc,
+            bcc,
+            inReplyTo: anchor?.internetMessageId ?? null,
+            references: detail.messages
+              .map((message) => message.internetMessageId)
+              .filter((value): value is string => Boolean(value))
+              .slice(-8),
+            attachments: attachmentDocuments.map(({ document, bytes }) => ({
+              filename: document.fileName,
+              mimeType: document.mimeType,
+              bytes
+            }))
+          });
+
+  const sentAt = new Date().toISOString();
+  const savedMessage = await saveOutboundEmailMessage({
+    userId: viewer.id,
+    threadId: detail.thread.id,
+    providerMessageId: sendResult.providerMessageId,
+    internetMessageId: sendResult.internetMessageId,
+    from: {
+      name: account.displayName ?? viewer.displayName,
+      email: account.emailAddress
+    },
+    to: sendResult.to,
+    cc: sendResult.cc,
+    bcc: sendResult.bcc,
+    subject: normalizedSubject,
+    textBody: normalizedBody,
+    htmlBody: textBodyToHtml(normalizedBody),
+    sentAt,
+    attachments: attachmentDocuments.map(({ document, bytes }) => ({
+      providerAttachmentId: document.id,
+      filename: document.fileName,
+      mimeType: document.mimeType,
+      sizeBytes: bytes.length,
+      storageKey: document.storagePath
+    }))
+  });
+
+  if (linkedDealId && attachmentDocuments.some(({ document }) => document.documentKind === "invoice")) {
+    await markInvoiceSentForViewer(viewer, linkedDealId, {
+      threadId: detail.thread.id,
+      messageId: savedMessage?.id ?? null,
+      accountId: account.id,
+      provider: account.provider,
+      toEmail: sendResult.to[0]?.email ?? to[0]?.email ?? null,
+      subject: normalizedSubject
+    });
+  }
+
+  return {
+    threadId: detail.thread.id,
+    messageId: savedMessage?.id ?? null
+  };
+}
+
 export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: string) {
   await assertPremiumInboxAccess(viewer);
   if (!process.env.DATABASE_URL) {
@@ -974,6 +1171,16 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
   const attachment = await getEmailAttachmentForUser(viewer.id, attachmentId);
   if (!attachment) {
     return null;
+  }
+
+  if (attachment.storageKey) {
+    const bytes = await readStoredBytes(attachment.storageKey);
+    return {
+      filename: attachment.filename,
+      mimeType: attachment.mimeType || "application/octet-stream",
+      sizeBytes: attachment.sizeBytes || bytes.length,
+      bytes
+    };
   }
 
   const credentials = await ensureActiveEmailCredentials(attachment.account);

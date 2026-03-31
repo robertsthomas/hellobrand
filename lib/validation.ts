@@ -19,7 +19,12 @@ export const paymentStatusValues = [
   "late"
 ] as const;
 
-export const invoiceStatusValues = ["draft", "finalized"] as const;
+export const invoiceStatusValues = [
+  "draft",
+  "finalized",
+  "sent",
+  "voided"
+] as const;
 
 export const countersignStatusValues = ["unknown", "pending", "signed"] as const;
 export const dealCategoryValues = [
