@@ -153,13 +153,13 @@ async function PaymentsContent() {
                   <Link
                     key={deal.id}
                     href={`/app/payments/${deal.id}`}
-                    className="grid gap-4 border-b border-black/8 bg-white px-4 py-6 transition hover:bg-[#fbfbfa] md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]"
+                    className="block border-b border-black/8 bg-white px-4 py-5 transition hover:bg-[#fbfbfa] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px] md:items-center md:gap-4 md:py-6"
                   >
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">
                         {deal.brandName}
                       </p>
-                      <h2 className="mt-2 truncate text-[24px] font-semibold tracking-[-0.04em] text-foreground">
+                      <h2 className="mt-2 truncate text-xl font-semibold tracking-[-0.04em] text-foreground md:text-[24px]">
                         {deal.campaignName}
                       </h2>
                       <p className="mt-2 text-sm text-muted-foreground">
@@ -167,15 +167,29 @@ async function PaymentsContent() {
                       </p>
                     </div>
 
-                    <div className="text-sm text-foreground">
-                      {payment.status.replaceAll("_", " ")}
-                    </div>
-                    <div className="text-sm text-foreground">{invoiceState}</div>
-                    <div className="text-sm text-foreground">
-                      {payment.dueDate ? payment.dueDate.slice(0, 10) : "Not set"}
-                    </div>
-                    <div className="text-sm font-semibold text-foreground">
-                      {formatCurrency(payment.amount, payment.currency ?? "USD")}
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 md:contents">
+                      <div className="md:contents">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Status</p>
+                        <p className="mt-0.5 text-sm capitalize text-foreground md:mt-0">
+                          {payment.status.replaceAll("_", " ")}
+                        </p>
+                      </div>
+                      <div className="md:contents">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Invoice</p>
+                        <p className="mt-0.5 text-sm text-foreground md:mt-0">{invoiceState}</p>
+                      </div>
+                      <div className="md:contents">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Due</p>
+                        <p className="mt-0.5 text-sm text-foreground md:mt-0">
+                          {payment.dueDate ? payment.dueDate.slice(0, 10) : "Not set"}
+                        </p>
+                      </div>
+                      <div className="md:contents">
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Total</p>
+                        <p className="mt-0.5 text-sm font-semibold text-foreground md:mt-0">
+                          {formatCurrency(payment.amount, payment.currency ?? "USD")}
+                        </p>
+                      </div>
                     </div>
                   </Link>
                 );

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import {
   AlertTriangle,
+  ArrowLeft,
   Check,
   ChevronDown,
   CircleDot,
@@ -694,6 +695,7 @@ export function InboxWorkspace({
 
   const [query, setQuery] = useState(selectedFilters.q);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(!!initialSelectedThread);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiSuggestionCache, setAiSuggestionCache] = useState<
     Record<string, DraftPromptSuggestionCacheEntry>
@@ -1142,10 +1144,12 @@ export function InboxWorkspace({
 
   async function loadThread(threadId: string) {
     if (!threadId || threadId === selectedThreadId) {
+      setMobileDetailOpen(true);
       return;
     }
 
     window.history.replaceState(null, "", buildInboxUrl({ thread: threadId }));
+    setMobileDetailOpen(true);
     await loadSelectedThread(threadId);
   }
 
@@ -1285,7 +1289,7 @@ export function InboxWorkspace({
             </section>
           ) : (
             <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
-              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03]">
+              <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${mobileDetailOpen ? "hidden xl:flex" : ""}`}>
                 <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-[17px] font-semibold text-foreground">Linked Threads</h2>
@@ -1414,14 +1418,30 @@ export function InboxWorkspace({
                 </div>
               </section>
 
-              <section className="flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white lg:mr-28 dark:border-white/10 dark:bg-white/[0.03]">
+              <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white xl:mr-28 dark:border-white/10 dark:bg-white/[0.03] ${!mobileDetailOpen ? "hidden xl:flex" : ""}`}>
                 {!selectedThread ? (
                   <div className="px-6 py-10 text-[13px] text-muted-foreground">
-                    Select a thread to see the full conversation.
+                    <button
+                      type="button"
+                      onClick={() => setMobileDetailOpen(false)}
+                      className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground xl:hidden"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to threads
+                    </button>
+                    <p>Select a thread to see the full conversation.</p>
                   </div>
                 ) : (
                   <div className="flex h-full min-h-0 flex-col">
                     <div className="shrink-0 border-b border-black/8 px-6 py-5 dark:border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setMobileDetailOpen(false)}
+                        className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-foreground xl:hidden"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to threads
+                      </button>
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">

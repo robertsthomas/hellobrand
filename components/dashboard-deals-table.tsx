@@ -302,7 +302,7 @@ export function DashboardDealsTable({
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm">
+          <div className="grid w-full grid-cols-2 gap-3 text-sm sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <select
               value={String(table.getColumn("status")?.getFilterValue() ?? "all")}
               onChange={(event) =>
@@ -310,7 +310,7 @@ export function DashboardDealsTable({
                   .getColumn("status")
                   ?.setFilterValue(event.target.value === "all" ? undefined : event.target.value)
               }
-              className="h-12 min-w-[170px] rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none dark:border-white/15 dark:bg-[#161a1f]"
+              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-[#161a1f]"
             >
               <option value="all">All stages</option>
               <option value="contract_received">Contract received</option>
@@ -328,7 +328,7 @@ export function DashboardDealsTable({
                     event.target.value === "all" ? undefined : event.target.value,
                   )
               }
-              className="h-12 min-w-[170px] rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none dark:border-white/15 dark:bg-[#161a1f]"
+              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-[#161a1f]"
             >
               <option value="all">All payments</option>
               <option value="draft">Draft</option>
@@ -341,7 +341,7 @@ export function DashboardDealsTable({
             <select
               value={sortValue}
               onChange={(event) => setSorting(sortStateForValue(event.target.value))}
-              className="h-12 min-w-[160px] rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none dark:border-white/15 dark:bg-[#161a1f]"
+              className="col-span-2 h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[160px] dark:border-white/15 dark:bg-[#161a1f]"
             >
               <option value="campaign-asc">Campaign A-Z</option>
               <option value="campaign-desc">Campaign Z-A</option>
@@ -354,40 +354,123 @@ export function DashboardDealsTable({
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className="px-0 py-5 text-[11px] uppercase tracking-[0.22em] text-[#98a2b3] dark:text-[#8f98a6]"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id} className="hover:bg-[#f6f7f8] dark:hover:bg-white/[0.03]">
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  className={
-                    cell.column.id === "actions" ? "px-0 py-7 text-right" : "px-0 py-7"
-                  }
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      {/* Mobile card layout */}
+      <div className="space-y-3 py-4 md:hidden">
+        {table.getRowModel().rows.map((row) => (
+          <Link
+            key={row.id}
+            href={`/app/p/${row.original.id}`}
+            className="block border border-black/8 bg-white p-4 transition-colors hover:bg-[#f6f7f8] dark:border-white/10 dark:bg-[#161a1f] dark:hover:bg-white/[0.03]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold text-foreground">
+                  {row.original.campaignName}
+                </p>
+                <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                  {row.original.brandName}
+                </p>
+              </div>
+              <div className="shrink-0" onClick={(event) => event.preventDefault()}>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center text-black/45 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+                      aria-label={`Open actions for ${row.original.campaignName}`}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+                  >
+                    <DeleteDealDialog
+                      dealId={row.original.id}
+                      dealName={row.original.campaignName}
+                      redirectTo="/app"
+                      triggerMode="menu-item"
+                      menuLabel="Delete partnership"
+                    >
+                      Delete partnership
+                    </DeleteDealDialog>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Stage</p>
+                <div className="mt-1">
+                  <Badge className={statusBadgeClass(row.original.status)}>
+                    {humanizeToken(row.original.status)}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Payment</p>
+                <div className="mt-1">
+                  <Badge className={paymentBadgeClass(row.original.paymentStatus)}>
+                    {humanizeToken(row.original.paymentStatus)}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Amount</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {formatCurrency(row.original.paymentAmount, row.original.currency)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Next due</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatDate(row.original.nextDeliverableDate)}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Desktop table layout */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    className="px-0 py-5 text-[11px] uppercase tracking-[0.22em] text-[#98a2b3] dark:text-[#8f98a6]"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id} className="hover:bg-[#f6f7f8] dark:hover:bg-white/[0.03]">
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell
+                    key={cell.id}
+                    className={
+                      cell.column.id === "actions" ? "px-0 py-7 text-right" : "px-0 py-7"
+                    }
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
 
       <div className="py-5 text-sm text-muted-foreground">
         Showing {rowCount} of {deals.length} partnerships

@@ -14,7 +14,6 @@ import { Bot, Loader2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { AssistantPanel } from "@/components/assistant-panel";
-import { MobileFab } from "@/components/mobile-fab";
 import { assistantPageTitle, isValidAssistantTab } from "@/lib/assistant/app-manual";
 import { assistantRecordToUIMessage } from "@/lib/assistant/messages";
 import type {
@@ -185,14 +184,6 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   return (
     <AssistantContext.Provider value={{ open, openAssistant, closeAssistant }}>
       {children}
-
-      <MobileFab
-        side="right"
-        className="border border-black/10 bg-ocean text-white dark:border-white/10"
-        onClick={() => openAssistant()}
-      >
-        <Bot className="h-5 w-5" />
-      </MobileFab>
 
       <button
         type="button"

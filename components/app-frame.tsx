@@ -5,13 +5,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight, Hand, Menu, Plus, Search } from "lucide-react";
-import { usePostHog } from "posthog-js/react";
+import { Bot, ChevronRight, Hand, Menu, Search } from "lucide-react";
+
 
 import { PostHogActionLink } from "@/components/posthog-action-link";
 import { buttonVariants } from "@/components/ui/button";
-import { MobileFab } from "@/components/mobile-fab";
-import { AssistantProvider } from "@/components/assistant-provider";
+import { AssistantProvider, useAssistant } from "@/components/assistant-provider";
 import { GuideProvider } from "@/components/guide-provider";
 import { GuideMobileModal } from "@/components/guide-mobile-modal";
 import { GuideTooltip } from "@/components/guide-tooltip";
@@ -32,9 +31,29 @@ import {
   primaryAppNavItems,
   secondaryAppNavItems
 } from "@/lib/app-shell";
-import { captureAppEvent } from "@/lib/posthog/events";
+
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
+
+function MobileAssistantButton({ onClick }: { onClick?: () => void }) {
+  const { openAssistant } = useAssistant();
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onClick?.();
+        openAssistant();
+      }}
+      className="group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors hover:bg-secondary/35 lg:hidden"
+    >
+      <span className="assistant-shimmer inline-flex shrink-0 items-center gap-3 bg-gradient-to-r from-[#1a4d3e] via-[#81b29a] to-[#1a4d3e] bg-[length:200%_100%] bg-clip-text text-transparent dark:from-[#81b29a] dark:via-[#d4e7dc] dark:to-[#81b29a]">
+        <Bot className="h-4.5 w-4.5 shrink-0 stroke-[#1a4d3e] dark:stroke-[#81b29a]" />
+        AI Assistant
+      </span>
+    </button>
+  );
+}
 
 function isSidebarGuideStep(step: GuideStep | null) {
   return Boolean(step?.anchorSelector.includes('data-guide="sidebar-'));
@@ -67,7 +86,6 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const posthog = usePostHog();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLDivElement | null>(null);
 
@@ -434,6 +452,7 @@ export function AppFrame({
                       onClick: () => handleMobileMenuOpenChange(false)
                     })
                   )}
+                  <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
                 </div>
               </div>
 
@@ -508,21 +527,6 @@ export function AppFrame({
             </div>
           </main>
 
-          <MobileFab
-            side="left"
-            className={cn(
-              buttonVariants({ size: "icon" }),
-              "shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
-            )}
-            onClick={() => {
-              captureAppEvent(posthog, "workspace_entry_cta_clicked", {
-                source: "mobile_fab"
-              });
-              router.push("/app/intake/new");
-            }}
-          >
-            <Plus className="h-5 w-5" />
-          </MobileFab>
         </div>
       </div>
       </div>

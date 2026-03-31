@@ -366,9 +366,74 @@ export function DealHistoryTable({
           </div>
         </ScrollableTabsList>
 
-        <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0">
+        {/* Mobile card layout */}
+        <div className="space-y-3 md:hidden">
+          {pagedRows.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No partnerships match the current filters.
+            </div>
+          ) : (
+            pagedRows.map((row) => (
+              <Link
+                key={row.id}
+                href={`/app/p/${row.id}`}
+                className="block border border-black/8 bg-white p-4 transition-colors hover:bg-secondary/20 dark:border-white/10 dark:bg-[#161a1f] dark:hover:bg-white/[0.03]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-semibold text-foreground">{row.campaignName}</p>
+                    <p className="mt-0.5 truncate text-sm text-muted-foreground">{row.brandName}</p>
+                  </div>
+                  <div className="shrink-0" onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+                    <DealHistoryRowActions
+                      dealId={row.id}
+                      dealName={row.campaignName}
+                      isArchived={row.stageGroup === "archived"}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Amount</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{formatCurrency(row.amount, row.currency)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Status</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={cn("h-2 w-2 shrink-0 rounded-full", stageDotClass(row.stageGroup))} />
+                      <span className="text-sm text-foreground">{row.stageLabel}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Date</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{formatDate(row.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Risks</p>
+                    {row.riskCount > 0 ? (
+                      <span className="mt-1 inline-flex border border-[#f2c6b8] px-2 py-0.5 text-xs text-[#d76742]">
+                        {row.riskCount} flag{row.riskCount === 1 ? "" : "s"}
+                      </span>
+                    ) : (
+                      <p className="mt-1 text-sm text-muted-foreground">None</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 border-t border-black/6 pt-2 dark:border-white/8">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Deliverables</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{row.deliverablesLabel}</p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
+
+        {/* Desktop table layout */}
+        <div className="hidden md:block">
         <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
-          <Table className="min-w-[800px]">
+          <Table>
             <TableHeader>
               <TableRow className="border-black/8 bg-secondary/40 hover:bg-secondary/40 dark:border-white/10 dark:bg-white/[0.03]">
                 <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Brand</TableHead>
@@ -483,7 +548,7 @@ export function DealHistoryTable({
               type="button"
               variant="outline"
               size="sm"
-              className="rounded-full px-3"
+              className="h-10 rounded-full px-4 sm:h-8 sm:px-3"
               disabled={safePage <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
@@ -497,7 +562,7 @@ export function DealHistoryTable({
                   type="button"
                   variant={pageNumber === safePage ? "secondary" : "outline"}
                   size="sm"
-                  className="h-8 w-8 p-0"
+                  className="h-10 w-10 p-0 sm:h-8 sm:w-8"
                   onClick={() => setPage(pageNumber)}
                 >
                   {pageNumber}
@@ -507,7 +572,7 @@ export function DealHistoryTable({
               type="button"
               variant="outline"
               size="sm"
-              className="rounded-full px-3"
+              className="h-10 rounded-full px-4 sm:h-8 sm:px-3"
               disabled={safePage >= totalPages}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >

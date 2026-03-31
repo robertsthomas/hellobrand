@@ -352,6 +352,15 @@ html.dark ::selection {
   50% { transform: scale(1.08); }
 }
 
+@keyframes assistant-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: -100% 50%; }
+}
+
+.assistant-shimmer {
+  animation: assistant-shimmer 3s ease-in-out infinite;
+}
+
 @keyframes hello-hand-wave {
   0%, 100% {
     transform: rotate(18deg);
