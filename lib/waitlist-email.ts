@@ -17,11 +17,12 @@ export async function sendWaitlistConfirmationEmail(email: string) {
     subject: "You're on the HelloBrand waitlist!",
     html: `
       <div style="font-family: Arial, sans-serif; background: #f6f3ee; padding: 32px;">
-        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 32px; border: 1px solid #e7dfd3;">
-          <p style="margin: 0 0 12px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #7f6f5a;">HelloBrand</p>
-          <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">You're on the list!</h1>
-          <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4a4034;">Thanks for joining the HelloBrand waitlist. We're building the operating layer for creator partnerships, and we'll let you know as soon as we're ready to welcome you in.</p>
-          <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #7f6f5a;">Stay tuned, we'll be in touch soon.</p>
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 0; border: 1px solid #e7dfd3;">
+          <div style="border-top: 2px solid #1f1a14; padding: 32px;">
+            <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">You're on the list!</h1>
+            <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4a4034;">Thanks for joining the HelloBrand waitlist. We're building the operating layer for creator partnerships, and we'll let you know as soon as we're ready to welcome you in.</p>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #7f6f5a;">Stay tuned, we'll be in touch soon.</p>
+          </div>
         </div>
       </div>
     `.trim(),

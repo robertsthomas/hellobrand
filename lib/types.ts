@@ -373,6 +373,7 @@ export interface ConnectedEmailAccountRecord {
   scopes: string[];
   accessTokenEncrypted: string | null;
   refreshTokenEncrypted: string | null;
+  mailAuthConfigured: boolean;
   tokenExpiresAt: string | null;
   lastSyncAt: string | null;
   lastErrorCode: string | null;

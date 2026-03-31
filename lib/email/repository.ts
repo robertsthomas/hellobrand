@@ -125,6 +125,10 @@ function toAccountRecord(account: {
     scopes: toStringArray(account.scopes),
     accessTokenEncrypted: account.accessTokenEncrypted,
     refreshTokenEncrypted: account.refreshTokenEncrypted,
+    mailAuthConfigured:
+      account.provider === "yahoo"
+        ? Boolean(account.refreshTokenEncrypted)
+        : true,
     tokenExpiresAt: iso(account.tokenExpiresAt),
     lastSyncAt: iso(account.lastSyncAt),
     lastErrorCode: account.lastErrorCode,

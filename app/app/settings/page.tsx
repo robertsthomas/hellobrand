@@ -60,6 +60,7 @@ async function SettingsContent({
             displayName: account.displayName,
             status: account.status,
             scopes: account.scopes,
+            mailAuthConfigured: account.mailAuthConfigured,
             tokenExpiresAt: account.tokenExpiresAt,
             lastSyncAt: account.lastSyncAt,
             lastErrorCode: account.lastErrorCode,
@@ -69,9 +70,7 @@ async function SettingsContent({
           }))}
           statusMessage={
             resolvedSearchParams?.email_status === "connected"
-              ? resolvedSearchParams.email_provider === "yahoo"
-                ? "Yahoo connected. Mail sync requires Yahoo mail access approval before inbox import can start."
-                : `${emailProviderLabel(resolvedSearchParams.email_provider)} connected. Initial sync started.`
+              ? `${emailProviderLabel(resolvedSearchParams.email_provider)} connected. Initial sync started.`
               : null
           }
           errorMessage={resolvedSearchParams?.email_error ?? null}

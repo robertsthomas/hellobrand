@@ -14,6 +14,7 @@ function sanitizeAccount(account: Awaited<ReturnType<typeof listEmailAccountsFor
     displayName: account.displayName,
     status: account.status,
     scopes: account.scopes,
+    mailAuthConfigured: account.mailAuthConfigured,
     tokenExpiresAt: account.tokenExpiresAt,
     lastSyncAt: account.lastSyncAt,
     lastErrorCode: account.lastErrorCode,

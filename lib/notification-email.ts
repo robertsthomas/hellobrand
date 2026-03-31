@@ -8,6 +8,22 @@ import { prisma } from "@/lib/prisma";
 
 type NotificationEmailStatus = "pending" | "sent" | "failed" | "skipped";
 
+type EmailEligibleEventType =
+  | "workspace.ready_for_review"
+  | "workspace.failed"
+  | "workspace.missing_payment"
+  | "workspace.missing_deliverables"
+  | "workspace.missing_usage_rights"
+  | "email.resync_required"
+  | "invoice.generate_prompt";
+
+export type NotificationEmailCopy = {
+  subject: string;
+  headline: string;
+  body: string;
+  ctaLabel: string;
+};
+
 type NotificationWithEmailContext = {
   id: string;
   category: string;
@@ -96,28 +112,158 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
+function truncateEntityName(name: string, maxLength: number): string {
+  if (name.length <= maxLength) {
+    return name;
+  }
+  return name.slice(0, maxLength - 1).trimEnd() + "\u2026";
+}
+
+function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string): string {
+  switch (eventType) {
+    case "workspace.ready_for_review": {
+      const entity = title.replace(/ workspace is ready for review$/i, "") || "Your";
+      const truncated = truncateEntityName(entity, 22);
+      return `${truncated} workspace is ready for review`;
+    }
+    case "workspace.failed": {
+      const entity = title.replace(/ workspace processing failed$/i, "") || "Your";
+      const truncated = truncateEntityName(entity, 18);
+      return `${truncated} workspace could not be processed`;
+    }
+    case "workspace.missing_payment": {
+      const entity = title.replace(/^Payment amount missing from /i, "") || "This campaign";
+      const truncated = truncateEntityName(entity, 21);
+      return `${truncated} is missing a payment amount`;
+    }
+    case "workspace.missing_deliverables": {
+      const entity = title.replace(/^No deliverables found in /i, "") || "this campaign";
+      const truncated = truncateEntityName(entity, 25);
+      return `No deliverables found in ${truncated}`;
+    }
+    case "workspace.missing_usage_rights": {
+      const entity = title.replace(/^Usage rights not specified in /i, "") || "this campaign";
+      const truncated = truncateEntityName(entity, 22);
+      return `Usage rights missing from ${truncated}`;
+    }
+    case "email.resync_required": {
+      const entity = title.replace(/ inbox needs resync$/i, "") || "Your";
+      return `Your ${entity} inbox needs to reconnect`;
+    }
+    case "invoice.generate_prompt": {
+      return title;
+    }
+  }
+}
+
+function resolveCtaLabel(eventType: EmailEligibleEventType): string {
+  switch (eventType) {
+    case "workspace.ready_for_review":
+      return "Review workspace";
+    case "workspace.failed":
+      return "View error details";
+    case "workspace.missing_payment":
+      return "Add payment amount";
+    case "workspace.missing_deliverables":
+      return "Add deliverables";
+    case "workspace.missing_usage_rights":
+      return "Add usage rights";
+    case "email.resync_required":
+      return "Reconnect inbox";
+    case "invoice.generate_prompt":
+      return "Generate invoice";
+  }
+}
+
+const EMAIL_ELIGIBLE_EVENT_TYPES = new Set<string>([
+  "workspace.ready_for_review",
+  "workspace.failed",
+  "workspace.missing_payment",
+  "workspace.missing_deliverables",
+  "workspace.missing_usage_rights",
+  "email.resync_required",
+  "invoice.generate_prompt"
+]);
+
+function isEmailEligibleEventType(eventType: string): eventType is EmailEligibleEventType {
+  return EMAIL_ELIGIBLE_EVENT_TYPES.has(eventType);
+}
+
+/**
+ * Resolves email-specific copy (subject, headline, body, CTA) for a notification.
+ *
+ * Copy rules for adding new notification event types:
+ * - Subject must be under 60 characters (9 words). No "HelloBrand:" prefix,
+ *   the brand shows in the From name.
+ * - CTA label should name the specific action (e.g., "Review workspace"),
+ *   never "Open in HelloBrand".
+ * - No em dashes or en dashes in any copy.
+ * - Lead with the entity name when the user needs to act on it. Lead with
+ *   the data gap for nudge notifications.
+ * - Headline should not repeat the subject verbatim when possible.
+ * - Body should be 1-2 sentences, no "we'll notify you" language.
+ *
+ * To add a new event type: add it to `EmailEligibleEventType`, then add
+ * branches in `buildSubjectForEvent` and `resolveCtaLabel`. The TypeScript
+ * exhaustiveness check will enforce this at compile time.
+ */
+export function resolveNotificationEmailCopy(input: {
+  eventType: string;
+  title: string;
+  body: string;
+}): NotificationEmailCopy {
+  if (isEmailEligibleEventType(input.eventType)) {
+    return {
+      subject: buildSubjectForEvent(input.eventType, input.title),
+      headline: input.title,
+      body: input.body,
+      ctaLabel: resolveCtaLabel(input.eventType)
+    };
+  }
+
+  return {
+    subject: input.title,
+    headline: input.title,
+    body: input.body,
+    ctaLabel: "Open in HelloBrand"
+  };
+}
+
 export function buildNotificationEmailPayload(input: {
+  eventType: string;
   title: string;
   body: string;
   href: string;
 }) {
+  const copy = resolveNotificationEmailCopy({
+    eventType: input.eventType,
+    title: input.title,
+    body: input.body
+  });
   const absoluteHref = toAbsoluteHref(input.href);
-  const escapedTitle = escapeHtml(input.title);
-  const escapedBody = escapeHtml(input.body);
+  const escapedHeadline = escapeHtml(copy.headline);
+  const escapedBody = escapeHtml(copy.body);
+  const escapedCtaLabel = escapeHtml(copy.ctaLabel);
+
+  const settingsHref = toAbsoluteHref("/app/settings/notifications");
 
   return {
-    subject: `HelloBrand: ${input.title}`,
+    subject: copy.subject,
     html: `
       <div style="font-family: Arial, sans-serif; background: #f6f3ee; padding: 32px;">
-        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 32px; border: 1px solid #e7dfd3;">
-          <p style="margin: 0 0 12px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #7f6f5a;">HelloBrand</p>
-          <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">${escapedTitle}</h1>
-          <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4a4034;">${escapedBody}</p>
-          <a href="${absoluteHref}" style="display: inline-block; background: #1f1a14; color: #ffffff; text-decoration: none; padding: 12px 18px; font-size: 14px;">Open in HelloBrand</a>
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 0; border: 1px solid #e7dfd3;">
+          <div style="border-top: 2px solid #1f1a14; padding: 32px;">
+            <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">${escapedHeadline}</h1>
+            <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4a4034;">${escapedBody}</p>
+            <a href="${absoluteHref}" style="display: inline-block; background: #1f1a14; color: #ffffff; text-decoration: none; padding: 12px 18px; font-size: 14px;">${escapedCtaLabel}</a>
+          </div>
+          <div style="padding: 16px 32px; border-top: 1px solid #e7dfd3;">
+            <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #7f6f5a;">You're receiving this because you have email notifications enabled in <a href="${settingsHref}" style="color: #7f6f5a;">HelloBrand</a>.</p>
+          </div>
         </div>
       </div>
     `.trim(),
-    text: `${input.title}\n\n${input.body}\n\nOpen in HelloBrand: ${absoluteHref}`
+    text: `${copy.headline}\n\n${copy.body}\n\n${copy.ctaLabel}: ${absoluteHref}\n\nYou're receiving this because you have email notifications enabled in HelloBrand.`
   };
 }
 
@@ -356,6 +502,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
 
   const resend = new Resend(config.apiKey);
   const email = buildNotificationEmailPayload({
+    eventType: notification.eventType,
     title: notification.title,
     body: notification.body,
     href: notification.href

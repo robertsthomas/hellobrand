@@ -212,8 +212,10 @@ vi.mock("resend", () => ({
 }));
 
 import {
+  buildNotificationEmailPayload,
   canSendNotificationEmailInCurrentMode,
   enqueueNotificationEmailDelivery,
+  resolveNotificationEmailCopy,
   resolveNotificationRecipient,
   sendNotificationEmailDelivery
 } from "@/lib/notification-email";
@@ -515,5 +517,183 @@ describe("notification email sending", () => {
 
     expect(result?.status).toBe("failed");
     expect(result?.errorMessage).toBe("Invalid sender");
+  });
+});
+
+describe("notification email copy", () => {
+  const EMAIL_ELIGIBLE_EVENT_TYPES = [
+    "workspace.ready_for_review",
+    "workspace.failed",
+    "workspace.missing_payment",
+    "workspace.missing_deliverables",
+    "workspace.missing_usage_rights",
+    "email.resync_required",
+    "invoice.generate_prompt"
+  ] as const;
+
+  const COPY_FIXTURES: Array<{
+    eventType: string;
+    title: string;
+    body: string;
+    expectedSubject: string;
+    expectedCtaLabel: string;
+  }> = [
+    {
+      eventType: "workspace.ready_for_review",
+      title: "Nimbus workspace is ready for review",
+      body: "Your workspace has been analyzed and is ready for review.",
+      expectedSubject: "Nimbus workspace is ready for review",
+      expectedCtaLabel: "Review workspace"
+    },
+    {
+      eventType: "workspace.failed",
+      title: "Nimbus workspace processing failed",
+      body: "Something went wrong processing your documents.",
+      expectedSubject: "Nimbus workspace could not be processed",
+      expectedCtaLabel: "View error details"
+    },
+    {
+      eventType: "workspace.missing_payment",
+      title: "Payment amount missing from Summer Campaign 2026",
+      body: "Add a payment amount to track your earnings, or upload documents that include payment details.",
+      expectedSubject: "Summer Campaign 2026 is missing a payment amount",
+      expectedCtaLabel: "Add payment amount"
+    },
+    {
+      eventType: "workspace.missing_deliverables",
+      title: "No deliverables found in Summer Campaign 2026",
+      body: "Add deliverables so HelloBrand can track due dates and send reminders.",
+      expectedSubject: "No deliverables found in Summer Campaign 2026",
+      expectedCtaLabel: "Add deliverables"
+    },
+    {
+      eventType: "workspace.missing_usage_rights",
+      title: "Usage rights not specified in Summer Campaign 2026",
+      body: "Add usage rights to understand what the brand can do with your content.",
+      expectedSubject: "Usage rights missing from Summer Campaign 2026",
+      expectedCtaLabel: "Add usage rights"
+    },
+    {
+      eventType: "email.resync_required",
+      title: "Gmail inbox needs resync",
+      body: "We couldn't continue syncing test@gmail.com. Reconnect this inbox to start a fresh sync.",
+      expectedSubject: "Your Gmail inbox needs to reconnect",
+      expectedCtaLabel: "Reconnect inbox"
+    },
+    {
+      eventType: "invoice.generate_prompt",
+      title: "Nimbus invoice is ready to generate",
+      body: "Today is the final posting milestone for Summer Campaign. Generate the workspace invoice now.",
+      expectedSubject: "Nimbus invoice is ready to generate",
+      expectedCtaLabel: "Generate invoice"
+    }
+  ];
+
+  it.each(COPY_FIXTURES)(
+    "generates correct copy for $eventType",
+    ({ eventType, title, body, expectedSubject, expectedCtaLabel }) => {
+      const copy = resolveNotificationEmailCopy({ eventType, title, body });
+
+      expect(copy.subject).toBe(expectedSubject);
+      expect(copy.ctaLabel).toBe(expectedCtaLabel);
+      expect(copy.headline).toBe(title);
+      expect(copy.body).toBe(body);
+    }
+  );
+
+  it.each(COPY_FIXTURES)(
+    "subject for $eventType is under 60 characters",
+    ({ eventType, title, body }) => {
+      const copy = resolveNotificationEmailCopy({ eventType, title, body });
+      expect(copy.subject.length).toBeLessThanOrEqual(60);
+    }
+  );
+
+  it("truncates long entity names to stay under 60 characters", () => {
+    const longBrand = "Amazon Kids Stories with Alexa Extended Edition";
+    const copy = resolveNotificationEmailCopy({
+      eventType: "workspace.ready_for_review",
+      title: `${longBrand} workspace is ready for review`,
+      body: "Your workspace has been analyzed and is ready for review."
+    });
+
+    expect(copy.subject.length).toBeLessThanOrEqual(60);
+    expect(copy.subject).toContain("workspace is ready for review");
+  });
+
+  it("does not include the HelloBrand prefix in any subject", () => {
+    for (const fixture of COPY_FIXTURES) {
+      const copy = resolveNotificationEmailCopy(fixture);
+      expect(copy.subject).not.toMatch(/^HelloBrand:/);
+    }
+  });
+
+  it("returns a non-fallback CTA for every email-eligible event type", () => {
+    for (const eventType of EMAIL_ELIGIBLE_EVENT_TYPES) {
+      const copy = resolveNotificationEmailCopy({
+        eventType,
+        title: "Test title",
+        body: "Test body"
+      });
+      expect(copy.ctaLabel).not.toBe("Open in HelloBrand");
+    }
+  });
+});
+
+describe("notification email HTML rendering", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3011";
+  });
+
+  it("renders the CTA label in the HTML and plain text", () => {
+    const payload = buildNotificationEmailPayload({
+      eventType: "workspace.ready_for_review",
+      title: "Nimbus workspace is ready for review",
+      body: "Your workspace has been analyzed and is ready for review.",
+      href: "/app/intake/session-1/review"
+    });
+
+    expect(payload.html).toContain("Review workspace");
+    expect(payload.text).toContain("Review workspace");
+    expect(payload.html).not.toContain("Open in HelloBrand");
+  });
+
+  it("does not render the HELLOBRAND header text", () => {
+    const payload = buildNotificationEmailPayload({
+      eventType: "workspace.ready_for_review",
+      title: "Nimbus workspace is ready for review",
+      body: "Your workspace has been analyzed and is ready for review.",
+      href: "/app/intake/session-1/review"
+    });
+
+    expect(payload.html).not.toMatch(
+      /text-transform:\s*uppercase[^>]*>HelloBrand<\/p>/
+    );
+  });
+
+  it("includes a footer with notification settings link", () => {
+    const payload = buildNotificationEmailPayload({
+      eventType: "workspace.ready_for_review",
+      title: "Test",
+      body: "Test body",
+      href: "/app/intake/session-1/review"
+    });
+
+    expect(payload.html).toContain("/app/settings/notifications");
+    expect(payload.html).toContain("email notifications enabled");
+  });
+
+  it("does not contain em dashes or en dashes", () => {
+    const payload = buildNotificationEmailPayload({
+      eventType: "workspace.ready_for_review",
+      title: "Test workspace is ready for review",
+      body: "Your workspace has been analyzed and is ready for review.",
+      href: "/app/intake/session-1/review"
+    });
+
+    expect(payload.html).not.toContain("\u2013");
+    expect(payload.html).not.toContain("\u2014");
+    expect(payload.text).not.toContain("\u2013");
+    expect(payload.text).not.toContain("\u2014");
   });
 });

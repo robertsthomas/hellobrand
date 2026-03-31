@@ -75,7 +75,7 @@ export function hasProviderConfig(provider: EmailProvider) {
     );
   }
 
-  return Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET);
+  return true;
 }
 
 export const gmailScopes = [
