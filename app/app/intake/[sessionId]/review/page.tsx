@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { LoaderCircle, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
 
-import { ConflictWarnings } from "@/components/conflict-warnings";
+import { IntakeFieldGuideDialog } from "@/components/intake-field-guide-dialog";
 import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
 import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
@@ -17,6 +17,7 @@ import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { cleanDisplayText } from "@/lib/display-text";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import type { IntakeEvidenceGroup } from "@/lib/types";
 import { formatCurrency, humanizeToken, stripHtmlTags } from "@/lib/utils";
 
 const mobileSectionClassName =
@@ -115,7 +116,7 @@ function SummaryCard({
   loading?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
+    <div className="bg-sand/55 px-4 py-4 dark:bg-white/[0.04]">
       <div className="text-xs uppercase tracking-[0.16em] text-black/45 dark:text-white/45">
         {label}
       </div>
@@ -124,6 +125,32 @@ function SummaryCard({
         <span>{value}</span>
       </div>
     </div>
+  );
+}
+
+function InlineEvidence({ groups, ids }: { groups: IntakeEvidenceGroup[]; ids: string[] }) {
+  const matching = groups.filter((group) => ids.includes(group.id));
+  if (matching.length === 0) return null;
+
+  const snippets = matching.flatMap((group) => group.snippets);
+  if (snippets.length === 0) return null;
+
+  return (
+    <details className="mt-4 border border-black/5 bg-sand/35 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+      <summary className="cursor-pointer list-none text-xs font-medium text-black/50 dark:text-white/50">
+        Source evidence ({snippets.length})
+      </summary>
+      <div className="mt-3 grid gap-2">
+        {snippets.map((snippet, index) => (
+          <div
+            key={index}
+            className="whitespace-pre-wrap text-sm text-black/70 dark:text-white/70"
+          >
+            {stripHtmlTags(snippet) || "Excerpt unavailable."}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -292,27 +319,45 @@ async function IntakeReviewContent({
     }
   ];
 
+  const attentionItems = [
+    ...conflictResults.map((conflict) => ({
+      id: `conflict-${conflict.type}-${conflict.title}`,
+      label: conflict.title,
+      tone: "warning" as const
+    })),
+    ...riskFlags.slice(0, 4).map((flag) => ({
+      id: flag.id,
+      label: flag.title,
+      detail: flag.detail,
+      tone: (flag.severity === "high" ? "warning" : "neutral") as "warning" | "neutral"
+    }))
+  ];
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
+        {/* Header */}
         <section className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl space-y-3">
-            <h1 className="text-4xl font-semibold tracking-tight text-ink">
-              Intake review
-            </h1>
-            <p className="text-[17px] leading-8 text-black/60 dark:text-white/65">
-              Your extracted partnership details are ready to review before the workspace goes live.
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                Confirm workspace
+              </h1>
+              <IntakeFieldGuideDialog />
+            </div>
+            <p className="text-[15px] leading-7 text-black/60 dark:text-white/65 sm:text-[17px] sm:leading-8">
+              Review the extracted details, fix anything that looks off, then create the workspace.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-black/5 px-4 py-2 text-sm font-semibold text-black/65 dark:bg-white/10 dark:text-white/70">
+            <div className="bg-black/5 px-4 py-2 text-sm font-semibold text-black/65 dark:bg-white/10 dark:text-white/70">
               {humanizeToken(session.status)}
             </div>
             <form action={deleteIntakeDraftAction}>
               <input type="hidden" name="sessionId" value={session.id} />
               <input type="hidden" name="redirectTo" value="/app" />
               <DeleteDraftButton
-                className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
+                className="inline-flex items-center gap-2 border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete draft
@@ -320,20 +365,46 @@ async function IntakeReviewContent({
             </form>
           </div>
         </section>
+
         {session.errorMessage ? (
-          <section className=" border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
+          <section className="border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
             {session.errorMessage}
           </section>
         ) : null}
-        {conflictResults.length > 0 ? (
-          <ConflictWarnings
-            conflicts={conflictResults}
-            title="Potential conflicts before confirmation"
-            description="Review the highlighted fields below before creating the workspace. You can edit any generated value and continue."
-          />
+
+        {/* Needs attention: merged conflicts + risk watchouts */}
+        {attentionItems.length > 0 ? (
+          <section className="border border-clay/15 bg-clay/[0.04] p-5 dark:border-clay/20 dark:bg-clay/[0.06]">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
+              <h2 className="text-sm font-semibold text-ink">
+                Needs attention ({attentionItems.length})
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
+              Review these before confirming. You can edit any value in the form below.
+            </p>
+            <div className="mt-4 grid gap-2">
+              {attentionItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-start gap-3 bg-white/60 px-4 py-3 dark:bg-white/[0.03]"
+                >
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 ${item.tone === "warning" ? "bg-clay" : "bg-black/20 dark:bg-white/20"}`} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-ink">{item.label}</p>
+                    {"detail" in item && item.detail ? (
+                      <p className="mt-1 text-sm text-black/55 dark:text-white/55">{item.detail}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
+
         {session.errorMessage ? (
-          <details className=" border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
+          <details className="border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">
             <summary className="cursor-pointer font-medium text-black/70 dark:text-white/70">
               Debug details
             </summary>
@@ -355,28 +426,22 @@ async function IntakeReviewContent({
           </details>
         ) : null}
 
+        {/* Summary cards */}
+        <section className={mobileSectionClassName}>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {summaryCards.map((card) => (
+              <SummaryCard
+                key={card.label}
+                label={card.label}
+                value={card.value}
+                loading={card.loading}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* Main form */}
         <section className="space-y-6">
-              <div className={mobileSectionClassName}>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold text-ink">Confirm this partnership</h2>
-                  <p className="text-sm text-black/60 dark:text-white/65">
-                    The intake always stays in the same order. Missing details can stay
-                    empty until you fill them in manually.
-                  </p>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {summaryCards.map((card) => (
-                    <SummaryCard
-                      key={card.label}
-                      label={card.label}
-                      value={card.value}
-                      loading={card.loading}
-                    />
-                  ))}
-                </div>
-              </div>
-
               <form action={confirmIntakeSessionAction} className="space-y-6">
                 <WorkspaceCreationOverlay />
                 <input type="hidden" name="sessionId" value={session.id} />
@@ -423,11 +488,12 @@ async function IntakeReviewContent({
                       })}
                     </label>
                   </div>
+                  <InlineEvidence groups={evidenceGroups} ids={["partnership"]} />
                 </SectionCard>
 
                 <SectionCard
                   title="Primary contact"
-                  description="Keep one main external point of contact for this intake."
+                  description="Keep one main external point of contact for this partnership."
                 >
                   <div className="grid gap-5 md:grid-cols-2">
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
@@ -475,12 +541,7 @@ async function IntakeReviewContent({
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
-                      {supportText({
-                        analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact?.title),
-                        pendingLabel: "Looking for job titles in the source material...",
-                        emptyLabel: "Optional."
-                      })}
+
                     </label>
 
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
@@ -494,12 +555,6 @@ async function IntakeReviewContent({
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
-                      {supportText({
-                        analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact?.email),
-                        pendingLabel: "Extracting contact emails...",
-                        emptyLabel: "Optional."
-                      })}
                     </label>
 
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75 md:col-span-2">
@@ -512,19 +567,14 @@ async function IntakeReviewContent({
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
-                      {supportText({
-                        analysisRunning,
-                        hasValue: Boolean(normalized?.primaryContact?.phone),
-                        pendingLabel: "Checking for phone numbers...",
-                        emptyLabel: "Optional."
-                      })}
                     </label>
                   </div>
+                  <InlineEvidence groups={evidenceGroups} ids={["primary-contact"]} />
                 </SectionCard>
 
                 <SectionCard
                   title="Contract snapshot"
-                  description="This should feel like a clean, reusable summary of the partnership before the workspace opens."
+                  description="The key details for this partnership before the workspace opens."
                 >
                   <div className="grid gap-5">
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
@@ -544,20 +594,6 @@ async function IntakeReviewContent({
                         pendingLabel: "Generating a clean title from the source files...",
                         emptyLabel: "Use a creator-friendly title for the partnership."
                       })}
-                    </label>
-
-                    <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-                      AI contract summary
-                      <textarea
-                        className={textareaClassName}
-                        name="contractSummary"
-                        defaultValue={normalized?.contractSummary ?? ""}
-                        placeholder="A plain-English summary will appear here."
-                      />
-                      <span className="text-xs font-normal text-black/50 dark:text-white/50">
-                        Edit this if the generated summary needs correction before the
-                        workspace is created.
-                      </span>
                     </label>
 
                     <div className="grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.72fr)_minmax(0,0.58fr)] md:items-start">
@@ -615,11 +651,12 @@ async function IntakeReviewContent({
                       </div>
                     </div>
                   </div>
+                  <InlineEvidence groups={evidenceGroups} ids={["contract-snapshot"]} />
                 </SectionCard>
 
                 <SectionCard
                   title="Deliverables and timeline"
-                  description="All generated terms stay editable here, including category, restrictions, deliverables, timeline, and disclosure obligations."
+                  description="Expand to review categories, restrictions, deliverables, timeline, and disclosures."
                 >
                   <IntakeGeneratedFieldsEditor
                     inputClassName={inputClassName}
@@ -634,72 +671,34 @@ async function IntakeReviewContent({
                     initialAnalytics={normalized?.analytics ?? null}
                     conflictMessagesByField={conflictMessagesByField}
                   />
+                  <InlineEvidence groups={evidenceGroups} ids={["rights-and-disclosure", "timeline", "analytics"]} />
                 </SectionCard>
 
                 <SectionCard
-                  title="Notes and confirmation"
-                  description="Use notes for anything the AI missed, open questions, negotiated changes, or manual corrections."
+                  title="Notes"
+                  description="Anything the AI missed, open questions, or manual corrections."
                 >
-                  <div className="grid gap-5">
-                    <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-                      Notes
-                      <textarea
-                        className={textareaClassName}
-                        name="notes"
-                        defaultValue={normalized?.notes ?? ""}
-                        placeholder="Capture missing details, negotiation notes, or manual corrections."
-                        readOnly={analysisRunning}
-                        aria-disabled={analysisRunning}
-                      />
-                      <span className="text-xs font-normal text-black/50 dark:text-white/50">
-                        This stays editable and will carry into the partnership workspace after
-                        confirmation.
-                      </span>
-                    </label>
-
-                    <details className="rounded-2xl border border-black/5 bg-sand/35 px-4 py-4 dark:border-white/10 dark:bg-white/[0.04]">
-                      <summary className="cursor-pointer list-none text-sm font-semibold text-ink">
-                        Source evidence
-                      </summary>
-                      <div className="mt-4 grid gap-4">
-                        {evidenceGroups.length > 0 ? (
-                          evidenceGroups.map((group) => (
-                            <div
-                              key={group.id}
-                              className="rounded-2xl bg-white/80 px-4 py-4 dark:bg-white/[0.03]"
-                            >
-                              <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
-                                {group.title}
-                              </div>
-                              <div className="mt-3 grid gap-2">
-                                {group.snippets.map((snippet, index) => (
-                                  <div
-                                    key={`${group.id}-${index}`}
-                                    className="whitespace-pre-wrap text-sm text-black/70 dark:text-white/70"
-                                  >
-                                    {stripHtmlTags(snippet) || "Excerpt unavailable."}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-sm text-black/60 dark:text-white/65">
-                            {analysisRunning
-                              ? "Source snippets will appear here as extraction completes."
-                              : "No source evidence has been organized yet."}
-                          </div>
-                        )}
-                      </div>
-                    </details>
-
-                  </div>
+                  <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
+                    <textarea
+                      className={textareaClassName}
+                      name="notes"
+                      defaultValue={normalized?.notes ?? ""}
+                      placeholder="Capture missing details, negotiation notes, or manual corrections."
+                      readOnly={analysisRunning}
+                      aria-disabled={analysisRunning}
+                    />
+                    <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                      Carries into the partnership workspace after confirmation.
+                    </span>
+                  </label>
                 </SectionCard>
 
-                <div className="sticky bottom-5 z-20 flex justify-end">
-                  <div className="flex w-full items-center justify-between gap-3 border border-black/8 bg-white/92 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92 sm:w-auto sm:px-3">
-                    <span className="hidden text-sm text-black/55 dark:text-white/55 md:inline">
-                      Review complete?
+                <div className="sticky bottom-4 z-20">
+                  <div className="flex w-full items-center justify-between gap-3 border border-black/8 bg-white/92 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92">
+                    <span className="text-sm text-black/55 dark:text-white/55">
+                      {attentionItems.length > 0
+                        ? `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} to review`
+                        : "Ready to confirm"}
                     </span>
                     <PostHogSubmitButton
                       eventName="intake_confirmation_submitted"
@@ -708,95 +707,81 @@ async function IntakeReviewContent({
                       className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                       disabled={!showConfirmation}
                     >
-                      Generate partnership workspace
+                      Create workspace
                     </PostHogSubmitButton>
                   </div>
                 </div>
               </form>
         </section>
 
-        <section className={mobileSectionClassName}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-ink">Profile defaults</h2>
-              <p className="mt-2 text-sm text-black/60 dark:text-white/65">
+        {/* Below-CTA: profile defaults + risk watchouts (collapsed) */}
+        <div className="border-t border-black/8 pt-6 dark:border-white/10">
+          <details className={`group ${mobileSectionClassName}`}>
+            <summary className="cursor-pointer list-none">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ChevronRight className="h-4 w-4 shrink-0 text-black/40 transition-transform group-open:rotate-90 dark:text-white/40" />
+                  <h2 className="text-lg font-semibold text-ink">Profile defaults</h2>
+                </div>
+                <span className="text-xs text-black/45 dark:text-white/45">
+                  {profileConfigured ? "Configured" : "Not set up"}
+                </span>
+              </div>
+            </summary>
+            <div className="mt-4">
+              <p className="text-sm text-black/60 dark:text-white/65">
                 These creator details backfill the intake when extracted values are still
                 missing.
               </p>
-            </div>
 
-            {profileConfigured ? (
-              <CreatorProfileSetupDialog
-                configured={profileConfigured}
-                email={contactDefault}
-                initialName={initialProfileName}
-                initialHandle={initialProfileHandle}
-              />
-            ) : null}
-          </div>
-
-          {profileConfigured ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-sand/55 p-4 dark:bg-white/[0.04]">
-                <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
-                  Creator
+              {profileConfigured ? (
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+                  <div className="grid flex-1 gap-3 sm:grid-cols-3">
+                    <div className="bg-sand/55 p-4 dark:bg-white/[0.04]">
+                      <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                        Creator
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-ink">{creatorDefault}</div>
+                    </div>
+                    <div className="bg-sand/55 p-4 dark:bg-white/[0.04]">
+                      <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                        Business
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-ink">{businessDefault}</div>
+                    </div>
+                    <div className="bg-sand/55 p-4 dark:bg-white/[0.04]">
+                      <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
+                        Contact
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-ink">{contactDefault}</div>
+                    </div>
+                  </div>
+                  <CreatorProfileSetupDialog
+                    configured={profileConfigured}
+                    email={contactDefault}
+                    initialName={initialProfileName}
+                    initialHandle={initialProfileHandle}
+                  />
                 </div>
-                <div className="mt-2 text-sm font-semibold text-ink">{creatorDefault}</div>
-              </div>
-              <div className="rounded-2xl bg-sand/55 p-4 dark:bg-white/[0.04]">
-                <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
-                  Business
-                </div>
-                <div className="mt-2 text-sm font-semibold text-ink">{businessDefault}</div>
-              </div>
-              <div className="rounded-2xl bg-sand/55 p-4 dark:bg-white/[0.04]">
-                <div className="text-xs uppercase tracking-[0.14em] text-black/45 dark:text-white/45">
-                  Contact
-                </div>
-                <div className="mt-2 text-sm font-semibold text-ink">{contactDefault}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-6 flex min-h-40 items-center justify-center rounded-2xl bg-sand/45 p-6 text-center dark:bg-white/[0.04]">
-              <div className="flex max-w-md flex-col items-center gap-3">
-                <p className="text-sm text-black/60 dark:text-white/65">
-                  Set up your creator profile so future intakes can start with your
-                  name, handle, and contact defaults.
-                </p>
-                <CreatorProfileSetupDialog
-                  configured={profileConfigured}
-                  email={contactDefault}
-                  initialName={initialProfileName}
-                  initialHandle={initialProfileHandle}
-                />
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className={mobileSectionClassName}>
-              <h2 className="text-xl font-semibold text-ink">Risk watchouts</h2>
-              <div className="mt-4 grid gap-3">
-                {riskFlags.slice(0, 4).map((flag) => (
-                  <div
-                    key={flag.id}
-                    className="rounded-2xl bg-sand/55 p-4 dark:bg-white/[0.04]"
-                  >
-                    <div className="text-sm font-semibold text-ink">{flag.title}</div>
-                    <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-                      {flag.detail}
+              ) : (
+                <div className="mt-4 flex min-h-32 items-center justify-center bg-sand/45 p-6 text-center dark:bg-white/[0.04]">
+                  <div className="flex max-w-md flex-col items-center gap-3">
+                    <p className="text-sm text-black/60 dark:text-white/65">
+                      Set up your creator profile so future intakes can start with your
+                      name, handle, and contact defaults.
                     </p>
+                    <CreatorProfileSetupDialog
+                      configured={profileConfigured}
+                      email={contactDefault}
+                      initialName={initialProfileName}
+                      initialHandle={initialProfileHandle}
+                    />
                   </div>
-                ))}
-                {riskFlags.length === 0 ? (
-                  <div className="rounded-2xl bg-sand/55 p-4 text-sm text-black/60 dark:bg-white/[0.04] dark:text-white/65">
-                    {analysisRunning
-                      ? "Still evaluating creator risk as the extraction completes."
-                      : "No watchouts have been extracted yet."}
-                  </div>
-                ) : null}
-              </div>
-        </section>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
       </div>
     </div>
   );

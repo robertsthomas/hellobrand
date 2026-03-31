@@ -1,4 +1,5 @@
 import { clerkClient } from "@clerk/nextjs/server";
+import { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
 
 import type { AppSettingsRecord } from "@/lib/admin-settings";
@@ -363,6 +364,217 @@ async function syncAdminManagedProfileToClerk(userId: string, user: AdminManaged
   const profile = toProfileRecordForClerk(user);
 
   await client.users.updateUser(userId, buildClerkProfileSyncPayload(profile));
+}
+
+export type AdminUserDetail = AdminManagedUser & {
+  deals: Array<{
+    id: string;
+    brandName: string;
+    campaignName: string;
+    status: string;
+    paymentStatus: string;
+    createdAt: string;
+  }>;
+  billing: {
+    currentPlanTier: string | null;
+    currentPlanInterval: string | null;
+    currentSubscriptionStatus: string | null;
+    currentTrialPlanTier: string | null;
+    currentTrialStartedAt: string | null;
+    currentTrialEndsAt: string | null;
+  } | null;
+  onboarding: {
+    profileOnboardingCompletedAt: string | null;
+    productGuideVersion: number;
+  } | null;
+};
+
+export async function getAdminUserDetail(userId: string): Promise<AdminUserDetail | null> {
+  if (!process.env.DATABASE_URL) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      profile: {
+        select: {
+          id: true,
+          displayName: true,
+          creatorLegalName: true,
+          businessName: true,
+          contactEmail: true,
+          conflictAlertsEnabled: true,
+          paymentRemindersEnabled: true,
+          emailNotificationsEnabled: true,
+          createdAt: true,
+          updatedAt: true
+        }
+      },
+      deals: {
+        select: {
+          id: true,
+          brandName: true,
+          campaignName: true,
+          status: true,
+          paymentStatus: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: "desc" }
+      },
+      billingAccount: {
+        select: {
+          currentPlanTier: true,
+          currentPlanInterval: true,
+          currentSubscriptionStatus: true,
+          currentTrialPlanTier: true,
+          currentTrialStartedAt: true,
+          currentTrialEndsAt: true
+        }
+      },
+      onboardingState: {
+        select: {
+          profileOnboardingCompletedAt: true,
+          productGuideVersion: true
+        }
+      },
+      _count: {
+        select: {
+          deals: true,
+          emailAccounts: true,
+          appNotifications: true
+        }
+      }
+    }
+  });
+
+  if (!user) return null;
+
+  const managed = toManagedUser(user);
+
+  return {
+    ...managed,
+    deals: user.deals.map((deal) => ({
+      id: deal.id,
+      brandName: deal.brandName,
+      campaignName: deal.campaignName,
+      status: deal.status,
+      paymentStatus: deal.paymentStatus,
+      createdAt: deal.createdAt.toISOString()
+    })),
+    billing: user.billingAccount
+      ? {
+          currentPlanTier: user.billingAccount.currentPlanTier,
+          currentPlanInterval: user.billingAccount.currentPlanInterval,
+          currentSubscriptionStatus: user.billingAccount.currentSubscriptionStatus,
+          currentTrialPlanTier: user.billingAccount.currentTrialPlanTier,
+          currentTrialStartedAt: user.billingAccount.currentTrialStartedAt?.toISOString() ?? null,
+          currentTrialEndsAt: user.billingAccount.currentTrialEndsAt?.toISOString() ?? null
+        }
+      : null,
+    onboarding: user.onboardingState
+      ? {
+          profileOnboardingCompletedAt:
+            user.onboardingState.profileOnboardingCompletedAt?.toISOString() ?? null,
+          productGuideVersion: user.onboardingState.productGuideVersion
+        }
+      : null
+  };
+}
+
+export async function resetUserOnboarding(userId: string) {
+  await prisma.userOnboardingState.upsert({
+    where: { userId },
+    update: {
+      profileOnboardingCompletedAt: null,
+      profileOnboardingVersion: 0,
+      profileOnboardingStateJson: Prisma.JsonNull,
+      productGuideVersion: 0,
+      productGuideStateJson: Prisma.JsonNull
+    },
+    create: {
+      userId,
+      profileOnboardingCompletedAt: null,
+      profileOnboardingVersion: 0,
+      profileOnboardingStateJson: Prisma.JsonNull,
+      productGuideVersion: 0,
+      productGuideStateJson: Prisma.JsonNull
+    }
+  });
+}
+
+export async function deleteUserDeal(userId: string, dealId: string) {
+  const deal = await prisma.deal.findFirst({
+    where: { id: dealId, userId }
+  });
+
+  if (!deal) {
+    throw new Error("Deal not found or does not belong to this user.");
+  }
+
+  await prisma.deal.delete({ where: { id: dealId } });
+}
+
+export async function updateUserPlan(
+  userId: string,
+  planTier: "basic" | "standard" | "premium",
+  subscriptionStatus: string
+) {
+  await prisma.billingAccount.upsert({
+    where: { userId },
+    update: {
+      currentPlanTier: planTier,
+      currentSubscriptionStatus: subscriptionStatus as never,
+      lastSyncedAt: new Date()
+    },
+    create: {
+      userId,
+      provider: "stripe",
+      currentPlanTier: planTier,
+      currentSubscriptionStatus: subscriptionStatus as never,
+      lastSyncedAt: new Date()
+    }
+  });
+}
+
+export async function grantUserTrial(
+  userId: string,
+  planTier: "basic" | "standard" | "premium",
+  durationDays: number
+) {
+  const startsAt = new Date();
+  const endsAt = new Date(startsAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+  const billingAccount = await prisma.billingAccount.upsert({
+    where: { userId },
+    update: {
+      currentTrialPlanTier: planTier,
+      currentTrialStartedAt: startsAt,
+      currentTrialEndsAt: endsAt,
+      currentPlanTier: planTier,
+      currentSubscriptionStatus: "trialing",
+      lastSyncedAt: new Date()
+    },
+    create: {
+      userId,
+      provider: "stripe",
+      currentTrialPlanTier: planTier,
+      currentTrialStartedAt: startsAt,
+      currentTrialEndsAt: endsAt,
+      currentPlanTier: planTier,
+      currentSubscriptionStatus: "trialing",
+      lastSyncedAt: new Date()
+    }
+  });
+
+  await prisma.billingTrialLedger.create({
+    data: {
+      billingAccountId: billingAccount.id,
+      planTier,
+      source: "admin_grant",
+      status: "active",
+      startedAt: startsAt,
+      endsAt
+    }
+  });
 }
 
 function toProfileRecordForClerk(user: AdminManagedUser): ProfileRecord {

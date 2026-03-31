@@ -1,10 +1,16 @@
 "use client";
 
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  AlertTriangle,
+  RotateCcw,
+  Trash2,
+  X
+} from "lucide-react";
 
-import type { AdminDashboardSnapshot, AdminManagedUser } from "@/lib/admin-dashboard";
+import type { AdminDashboardSnapshot, AdminManagedUser, AdminUserDetail } from "@/lib/admin-dashboard";
 import type { AppSettingsRecord } from "@/lib/admin-settings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +33,7 @@ type UserEditorState = {
 };
 
 function formatCount(value: number | null | undefined) {
-  if (typeof value !== "number") {
-    return "Unavailable";
-  }
-
+  if (typeof value !== "number") return "Unavailable";
   return new Intl.NumberFormat("en-US").format(value);
 }
 
@@ -98,6 +101,277 @@ function SettingRow({
   );
 }
 
+// ---------------------------------------------------------------------------
+// User Detail Modal
+// ---------------------------------------------------------------------------
+
+function UserDetailModal({
+  user,
+  onClose,
+  onUserUpdated
+}: {
+  user: AdminManagedUser;
+  onClose: () => void;
+  onUserUpdated: (user: AdminManagedUser) => void;
+}) {
+  const router = useRouter();
+  const [detail, setDetail] = useState<AdminUserDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editor, setEditor] = useState<UserEditorState>(toEditorState(user));
+  const [saving, setSaving] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [planForm, setPlanForm] = useState({ tier: "premium", status: "active" });
+  const [trialForm, setTrialForm] = useState({ tier: "premium", days: "14" });
+
+  const loadDetail = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get_detail" })
+      });
+      const data = await res.json();
+      if (data.detail) setDetail(data.detail);
+    } catch {
+      toast.error("Could not load user details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user.id]);
+
+  useEffect(() => {
+    void loadDetail();
+  }, [loadDetail]);
+
+  async function saveUser() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editor)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not save.");
+        return;
+      }
+      toast.success("User saved.");
+      if (data.user) onUserUpdated(data.user);
+      router.refresh();
+    } catch {
+      toast.error("Could not save user.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runAction(body: Record<string, unknown>, successMsg?: string) {
+    const key = String(body.action);
+    setActionLoading(key);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Action failed.");
+        return;
+      }
+      toast.success(data.message ?? successMsg ?? "Done.");
+      void loadDetail();
+      router.refresh();
+    } catch {
+      toast.error("Action failed.");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[5vh]">
+      <div className="relative w-full max-w-3xl border border-neutral-200 bg-white shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 p-1 text-neutral-400 hover:text-neutral-700"
+          aria-label="Close"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="border-b border-neutral-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-neutral-950">{user.displayName}</h2>
+          <p className="text-sm text-neutral-500">{user.email} · Joined {formatDate(user.createdAt)}</p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-sm text-neutral-500">Loading...</div>
+        ) : (
+          <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+            {/* Profile editor */}
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-800">Profile</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-1">
+                  <Label className="text-xs">Display name</Label>
+                  <Input value={editor.displayName} onChange={(e) => setEditor((s) => ({ ...s, displayName: e.target.value }))} />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs">Legal name</Label>
+                  <Input value={editor.creatorLegalName} onChange={(e) => setEditor((s) => ({ ...s, creatorLegalName: e.target.value }))} />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs">Business name</Label>
+                  <Input value={editor.businessName} onChange={(e) => setEditor((s) => ({ ...s, businessName: e.target.value }))} />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs">Contact email</Label>
+                  <Input value={editor.contactEmail} onChange={(e) => setEditor((s) => ({ ...s, contactEmail: e.target.value }))} />
+                </div>
+              </div>
+              <div className="mt-3 grid gap-2">
+                <SettingRow label="Conflict alerts" description="Enable conflict/risk alerting." checked={editor.conflictAlertsEnabled} onCheckedChange={(c) => setEditor((s) => ({ ...s, conflictAlertsEnabled: c }))} />
+                <SettingRow label="Payment reminders" description="Payment reminder nudges." checked={editor.paymentRemindersEnabled} onCheckedChange={(c) => setEditor((s) => ({ ...s, paymentRemindersEnabled: c }))} />
+                <SettingRow label="Email notifications" description="User email notifications." checked={editor.emailNotificationsEnabled} onCheckedChange={(c) => setEditor((s) => ({ ...s, emailNotificationsEnabled: c }))} />
+              </div>
+              <div className="mt-3">
+                <Button disabled={saving} onClick={() => void saveUser()}>
+                  {saving ? "Saving..." : "Save profile"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Plan and billing */}
+            <div className="border-t border-neutral-200 pt-5">
+              <h3 className="text-sm font-semibold text-neutral-800">Plan and billing</h3>
+              {detail?.billing ? (
+                <div className="mt-2 grid grid-cols-3 gap-3">
+                  <div className="border border-neutral-200 px-3 py-2 text-sm">
+                    <div className="text-neutral-500">Plan</div>
+                    <div className="mt-1 font-semibold capitalize">{detail.billing.currentPlanTier ?? "None"}</div>
+                  </div>
+                  <div className="border border-neutral-200 px-3 py-2 text-sm">
+                    <div className="text-neutral-500">Status</div>
+                    <div className="mt-1 font-semibold capitalize">{detail.billing.currentSubscriptionStatus ?? "None"}</div>
+                  </div>
+                  <div className="border border-neutral-200 px-3 py-2 text-sm">
+                    <div className="text-neutral-500">Trial ends</div>
+                    <div className="mt-1 font-semibold">{detail.billing.currentTrialEndsAt ? formatDate(detail.billing.currentTrialEndsAt) : "N/A"}</div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-neutral-500">No billing account.</p>
+              )}
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="border border-neutral-200 p-3">
+                  <div className="text-xs font-semibold text-neutral-700">Set plan</div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <select className="border border-neutral-300 px-2 py-1.5 text-sm" value={planForm.tier} onChange={(e) => setPlanForm((s) => ({ ...s, tier: e.target.value }))}>
+                      <option value="basic">Basic</option>
+                      <option value="standard">Standard</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                    <select className="border border-neutral-300 px-2 py-1.5 text-sm" value={planForm.status} onChange={(e) => setPlanForm((s) => ({ ...s, status: e.target.value }))}>
+                      <option value="active">Active</option>
+                      <option value="trialing">Trialing</option>
+                      <option value="canceled">Canceled</option>
+                      <option value="paused">Paused</option>
+                    </select>
+                  </div>
+                  <Button size="sm" className="mt-2" disabled={actionLoading === "update_plan"} onClick={() => void runAction({ action: "update_plan", planTier: planForm.tier, subscriptionStatus: planForm.status })}>
+                    {actionLoading === "update_plan" ? "Saving..." : "Apply plan"}
+                  </Button>
+                </div>
+
+                <div className="border border-neutral-200 p-3">
+                  <div className="text-xs font-semibold text-neutral-700">Grant trial</div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <select className="border border-neutral-300 px-2 py-1.5 text-sm" value={trialForm.tier} onChange={(e) => setTrialForm((s) => ({ ...s, tier: e.target.value }))}>
+                      <option value="basic">Basic</option>
+                      <option value="standard">Standard</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                    <Input type="number" className="h-auto px-2 py-1.5 text-sm" value={trialForm.days} onChange={(e) => setTrialForm((s) => ({ ...s, days: e.target.value }))} placeholder="Days" />
+                  </div>
+                  <Button size="sm" className="mt-2" disabled={actionLoading === "grant_trial"} onClick={() => void runAction({ action: "grant_trial", planTier: trialForm.tier, durationDays: Number(trialForm.days) || 14 })}>
+                    {actionLoading === "grant_trial" ? "Granting..." : `Grant ${trialForm.days}-day trial`}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Workspaces */}
+            <div className="border-t border-neutral-200 pt-5">
+              <h3 className="text-sm font-semibold text-neutral-800">Workspaces ({detail?.deals.length ?? 0})</h3>
+              {detail?.deals && detail.deals.length > 0 ? (
+                <div className="mt-3 divide-y divide-neutral-100 border border-neutral-200">
+                  {detail.deals.map((deal) => (
+                    <div key={deal.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-neutral-900">{deal.campaignName}</div>
+                        <div className="text-xs text-neutral-500">{deal.brandName} · {deal.status} · {deal.paymentStatus}</div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0 gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        disabled={actionLoading === `delete_deal_${deal.id}`}
+                        onClick={() => {
+                          if (!window.confirm(`Delete "${deal.campaignName}"? This cannot be undone.`)) return;
+                          void runAction({ action: "delete_deal", dealId: deal.id });
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-neutral-500">No workspaces.</p>
+              )}
+            </div>
+
+            {/* Onboarding */}
+            <div className="border-t border-neutral-200 pt-5">
+              <h3 className="text-sm font-semibold text-neutral-800">Onboarding</h3>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div className="border border-neutral-200 px-3 py-2 text-sm">
+                  <div className="text-neutral-500">Profile onboarding</div>
+                  <div className="mt-1 font-semibold">{detail?.onboarding?.profileOnboardingCompletedAt ? "Completed" : "Incomplete"}</div>
+                </div>
+                <div className="border border-neutral-200 px-3 py-2 text-sm">
+                  <div className="text-neutral-500">Guide version</div>
+                  <div className="mt-1 font-semibold">{detail?.onboarding?.productGuideVersion ?? 0}</div>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-3 gap-1"
+                disabled={actionLoading === "reset_onboarding"}
+                onClick={() => void runAction({ action: "reset_onboarding" })}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                {actionLoading === "reset_onboarding" ? "Resetting..." : "Reset onboarding and tooltips"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Admin Dashboard
+// ---------------------------------------------------------------------------
+
 export function AdminDashboardClient({
   snapshot,
   adminUsername
@@ -105,48 +379,30 @@ export function AdminDashboardClient({
   const router = useRouter();
   const [users, setUsers] = useState(snapshot.users);
   const [appSettings, setAppSettings] = useState(snapshot.appSettings);
-  const [selectedUserId, setSelectedUserId] = useState(snapshot.users[0]?.id ?? null);
+  const [modalUserId, setModalUserId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [userEditor, setUserEditor] = useState<UserEditorState>(
-    toEditorState(snapshot.users[0] ?? null)
-  );
-  const [passwordForm, setPasswordForm] = useState({
-    password: "",
-    confirmPassword: ""
-  });
+  const [passwordForm, setPasswordForm] = useState({ password: "", confirmPassword: "" });
   const [savingSettings, setSavingSettings] = useState(false);
-  const [savingUser, setSavingUser] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const deferredQuery = useDeferredValue(query);
 
   const filteredUsers = users.filter((user) => {
-    if (!deferredQuery.trim()) {
-      return true;
-    }
-
-    const normalizedQuery = deferredQuery.trim().toLowerCase();
+    if (!deferredQuery.trim()) return true;
+    const q = deferredQuery.trim().toLowerCase();
     return (
-      user.displayName.toLowerCase().includes(normalizedQuery) ||
-      user.email.toLowerCase().includes(normalizedQuery) ||
-      (user.profile?.businessName ?? "").toLowerCase().includes(normalizedQuery)
+      user.displayName.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      (user.profile?.businessName ?? "").toLowerCase().includes(q)
     );
   });
 
-  const selectedUser = users.find((user) => user.id === selectedUserId) ?? null;
-
-  useEffect(() => {
-    setUserEditor(toEditorState(selectedUser));
-  }, [selectedUserId, selectedUser]);
+  const modalUser = users.find((u) => u.id === modalUserId) ?? null;
 
   async function handleSignOut() {
     setSigningOut(true);
-
     try {
-      await fetch("/api/admin/session", {
-        method: "DELETE"
-      });
-
+      await fetch("/api/admin/session", { method: "DELETE" });
       router.replace("/admin/login");
       router.refresh();
     } finally {
@@ -156,73 +412,24 @@ export function AdminDashboardClient({
 
   async function saveSettings() {
     setSavingSettings(true);
-
     try {
-      const response = await fetch("/api/admin/settings", {
+      const res = await fetch("/api/admin/settings", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(appSettings)
       });
-
-      const payload = (await response.json()) as {
-        error?: string;
-        message?: string;
-        settings?: AppSettingsRecord;
-      };
-
-      if (!response.ok || !payload.settings) {
-        toast.error(payload.error ?? "Could not save app settings.");
+      const data = await res.json() as { error?: string; message?: string; settings?: AppSettingsRecord };
+      if (!res.ok || !data.settings) {
+        toast.error(data.error ?? "Could not save.");
         return;
       }
-
-      setAppSettings(payload.settings);
-      toast.success(payload.message ?? "App settings saved.");
+      setAppSettings(data.settings);
+      toast.success(data.message ?? "Saved.");
       router.refresh();
     } catch {
-      toast.error("Could not save app settings.");
+      toast.error("Could not save.");
     } finally {
       setSavingSettings(false);
-    }
-  }
-
-  async function saveSelectedUser() {
-    if (!selectedUser) {
-      return;
-    }
-
-    setSavingUser(true);
-
-    try {
-      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(userEditor)
-      });
-
-      const payload = (await response.json()) as {
-        error?: string;
-        message?: string;
-        user?: AdminManagedUser;
-      };
-
-      if (!response.ok || !payload.user) {
-        toast.error(payload.error ?? "Could not save user changes.");
-        return;
-      }
-
-      setUsers((currentUsers) =>
-        currentUsers.map((user) => (user.id === payload.user?.id ? payload.user : user))
-      );
-      toast.success(payload.message ?? "User saved.");
-      router.refresh();
-    } catch {
-      toast.error("Could not save user changes.");
-    } finally {
-      setSavingUser(false);
     }
   }
 
@@ -231,43 +438,39 @@ export function AdminDashboardClient({
       toast.error("Passwords do not match.");
       return;
     }
-
     setSavingPassword(true);
-
     try {
-      const response = await fetch("/api/admin/password", {
+      const res = await fetch("/api/admin/password", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(passwordForm)
       });
-
-      const payload = (await response.json()) as {
-        error?: string;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        toast.error(payload.error ?? "Could not update admin password.");
+      const data = await res.json() as { error?: string; message?: string };
+      if (!res.ok) {
+        toast.error(data.error ?? "Failed.");
         return;
       }
-
-      setPasswordForm({
-        password: "",
-        confirmPassword: ""
-      });
-      toast.success(payload.message ?? "Admin password updated.");
+      setPasswordForm({ password: "", confirmPassword: "" });
+      toast.success(data.message ?? "Password updated.");
     } catch {
-      toast.error("Could not update admin password.");
+      toast.error("Failed.");
     } finally {
       setSavingPassword(false);
     }
   }
 
+  function clearLocalStorageItems() {
+    const keys = Object.keys(window.localStorage).filter(
+      (key) => key.startsWith("hellobrand:") || key.startsWith("hb-") || key.startsWith("hb_")
+    );
+    keys.forEach((key) => window.localStorage.removeItem(key));
+    toast.success(`Cleared ${keys.length} localStorage item${keys.length === 1 ? "" : "s"}.`);
+  }
+
   return (
     <div className="min-h-screen bg-neutral-100 px-4 py-4 text-neutral-950">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        {/* Header */}
         <section className="border border-neutral-200 bg-white px-4 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -282,44 +485,32 @@ export function AdminDashboardClient({
           </div>
         </section>
 
+        {/* Overview */}
         <AdminSection title="Overview">
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Users</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.users)}</div>
-            </div>
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Profiles</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.profiles)}</div>
-            </div>
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Deals</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.deals)}</div>
-            </div>
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Intake sessions</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.intakeSessions)}</div>
-            </div>
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Email accounts</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.emailAccounts)}</div>
-            </div>
-            <div className="border border-neutral-200 px-3 py-3 text-sm">
-              <div className="text-neutral-500">Notifications</div>
-              <div className="mt-1 text-xl font-semibold">{formatCount(snapshot.stats?.notifications)}</div>
-            </div>
+            {[
+              { label: "Users", value: snapshot.stats?.users },
+              { label: "Profiles", value: snapshot.stats?.profiles },
+              { label: "Deals", value: snapshot.stats?.deals },
+              { label: "Intake sessions", value: snapshot.stats?.intakeSessions },
+              { label: "Email accounts", value: snapshot.stats?.emailAccounts },
+              { label: "Notifications", value: snapshot.stats?.notifications }
+            ].map((stat) => (
+              <div key={stat.label} className="border border-neutral-200 px-3 py-3 text-sm">
+                <div className="text-neutral-500">{stat.label}</div>
+                <div className="mt-1 text-xl font-semibold">{formatCount(stat.value)}</div>
+              </div>
+            ))}
           </div>
         </AdminSection>
 
         <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <AdminSection
-            title="Users"
-            description="Select a user to edit profile and notification settings."
-          >
+          {/* Users table */}
+          <AdminSection title="Users" description="Click a user to open their management panel.">
             <div className="mb-4">
               <Input
                 value={query}
-                onChange={(event) => setQuery(event.currentTarget.value)}
+                onChange={(e) => setQuery(e.currentTarget.value)}
                 placeholder="Search name, email, or business"
               />
             </div>
@@ -333,78 +524,42 @@ export function AdminDashboardClient({
               </div>
 
               {filteredUsers.length === 0 ? (
-                <div className="px-3 py-6 text-sm text-neutral-600">No users matched this search.</div>
+                <div className="px-3 py-6 text-sm text-neutral-600">No users matched.</div>
               ) : (
                 <div className="divide-y divide-neutral-200">
-                  {filteredUsers.map((user) => {
-                    const isSelected = user.id === selectedUserId;
-                    return (
-                      <button
-                        key={user.id}
-                        type="button"
-                        className={`grid min-w-[720px] w-full grid-cols-[minmax(0,1.5fr)_110px_110px_130px] gap-3 px-3 py-3 text-left text-sm ${
-                          isSelected ? "bg-neutral-100" : "bg-white hover:bg-neutral-50"
-                        }`}
-                        onClick={() =>
-                          startTransition(() => {
-                            setSelectedUserId(user.id);
-                          })
-                        }
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-neutral-900">{user.displayName}</div>
-                          <div className="truncate text-neutral-600">{user.email}</div>
-                          <div className="mt-1 text-xs text-neutral-500">
-                            {user.profile?.businessName ?? "No business name"} ·{" "}
-                            {user.profile?.emailNotificationsEnabled === false ? "Email alerts off" : "Email alerts on"}
-                          </div>
+                  {filteredUsers.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="grid min-w-[720px] w-full grid-cols-[minmax(0,1.5fr)_110px_110px_130px] gap-3 px-3 py-3 text-left text-sm bg-white hover:bg-neutral-50"
+                      onClick={() => startTransition(() => setModalUserId(user.id))}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-neutral-900">{user.displayName}</div>
+                        <div className="truncate text-neutral-600">{user.email}</div>
+                        <div className="mt-1 text-xs text-neutral-500">
+                          {user.profile?.businessName ?? "No business name"} ·{" "}
+                          {user.profile?.emailNotificationsEnabled === false ? "Email off" : "Email on"}
                         </div>
-                        <div>{user.dealCount}</div>
-                        <div>{user.emailAccountCount}</div>
-                        <div>{formatDate(user.createdAt)}</div>
-                      </button>
-                    );
-                  })}
+                      </div>
+                      <div>{user.dealCount}</div>
+                      <div>{user.emailAccountCount}</div>
+                      <div>{formatDate(user.createdAt)}</div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           </AdminSection>
 
           <div className="flex flex-col gap-4">
+            {/* Runtime controls */}
             <AdminSection title="Runtime controls">
               <div className="grid gap-2">
-                <SettingRow
-                  label="App access"
-                  description="Disable the creator app without touching auth."
-                  checked={appSettings.appAccessEnabled}
-                  onCheckedChange={(checked) =>
-                    setAppSettings((current) => ({ ...current, appAccessEnabled: checked }))
-                  }
-                />
-                <SettingRow
-                  label="Public site"
-                  description="Disable landing, upload, sample, and pricing pages."
-                  checked={appSettings.publicSiteEnabled}
-                  onCheckedChange={(checked) =>
-                    setAppSettings((current) => ({ ...current, publicSiteEnabled: checked }))
-                  }
-                />
-                <SettingRow
-                  label="New sign-ups"
-                  description="Hide sign-up while keeping sign-in available."
-                  checked={appSettings.signUpsEnabled}
-                  onCheckedChange={(checked) =>
-                    setAppSettings((current) => ({ ...current, signUpsEnabled: checked }))
-                  }
-                />
-                <SettingRow
-                  label="Notification email delivery"
-                  description="Stop outbound notification emails globally."
-                  checked={appSettings.emailDeliveryEnabled}
-                  onCheckedChange={(checked) =>
-                    setAppSettings((current) => ({ ...current, emailDeliveryEnabled: checked }))
-                  }
-                />
+                <SettingRow label="App access" description="Disable the creator app without touching auth." checked={appSettings.appAccessEnabled} onCheckedChange={(c) => setAppSettings((s) => ({ ...s, appAccessEnabled: c }))} />
+                <SettingRow label="Public site" description="Disable landing, upload, sample, and pricing pages." checked={appSettings.publicSiteEnabled} onCheckedChange={(c) => setAppSettings((s) => ({ ...s, publicSiteEnabled: c }))} />
+                <SettingRow label="New sign-ups" description="Hide sign-up while keeping sign-in available." checked={appSettings.signUpsEnabled} onCheckedChange={(c) => setAppSettings((s) => ({ ...s, signUpsEnabled: c }))} />
+                <SettingRow label="Notification email delivery" description="Stop outbound notification emails globally." checked={appSettings.emailDeliveryEnabled} onCheckedChange={(c) => setAppSettings((s) => ({ ...s, emailDeliveryEnabled: c }))} />
               </div>
               <div className="mt-4">
                 <Button disabled={savingSettings} onClick={() => void saveSettings()}>
@@ -413,150 +568,54 @@ export function AdminDashboardClient({
               </div>
             </AdminSection>
 
-            <AdminSection
-              title="Selected user"
-              description={
-                selectedUser
-                  ? `Editing ${selectedUser.displayName}`
-                  : "Select a user from the list."
-              }
-            >
-              {selectedUser ? (
-                <div className="grid gap-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2 sm:col-span-2">
-                      <Label htmlFor="admin-user-display-name">Display name</Label>
-                      <Input
-                        id="admin-user-display-name"
-                        value={userEditor.displayName}
-                        onChange={(event) =>
-                          setUserEditor((current) => ({
-                            ...current,
-                            displayName: event.currentTarget.value
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="admin-user-legal-name">Legal name</Label>
-                      <Input
-                        id="admin-user-legal-name"
-                        value={userEditor.creatorLegalName}
-                        onChange={(event) =>
-                          setUserEditor((current) => ({
-                            ...current,
-                            creatorLegalName: event.currentTarget.value
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="admin-user-business-name">Business name</Label>
-                      <Input
-                        id="admin-user-business-name"
-                        value={userEditor.businessName}
-                        onChange={(event) =>
-                          setUserEditor((current) => ({
-                            ...current,
-                            businessName: event.currentTarget.value
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="grid gap-2 sm:col-span-2">
-                      <Label htmlFor="admin-user-contact-email">Contact email</Label>
-                      <Input
-                        id="admin-user-contact-email"
-                        value={userEditor.contactEmail}
-                        onChange={(event) =>
-                          setUserEditor((current) => ({
-                            ...current,
-                            contactEmail: event.currentTarget.value
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <SettingRow
-                      label="Contract conflict alerts"
-                      description="Enable or disable conflict/risk alerting."
-                      checked={userEditor.conflictAlertsEnabled}
-                      onCheckedChange={(checked) =>
-                        setUserEditor((current) => ({
-                          ...current,
-                          conflictAlertsEnabled: checked
-                        }))
-                      }
-                    />
-                    <SettingRow
-                      label="Payment reminders"
-                      description="Enable or disable payment reminder nudges."
-                      checked={userEditor.paymentRemindersEnabled}
-                      onCheckedChange={(checked) =>
-                        setUserEditor((current) => ({
-                          ...current,
-                          paymentRemindersEnabled: checked
-                        }))
-                      }
-                    />
-                    <SettingRow
-                      label="Email notifications"
-                      description="User-level email notification preference."
-                      checked={userEditor.emailNotificationsEnabled}
-                      onCheckedChange={(checked) =>
-                        setUserEditor((current) => ({
-                          ...current,
-                          emailNotificationsEnabled: checked
-                        }))
-                      }
-                    />
-                  </div>
-
+            {/* Dev tools */}
+            <AdminSection title="Dev tools" description="Local development utilities.">
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between gap-3 border border-neutral-200 px-3 py-3">
                   <div>
-                    <Button disabled={savingUser} onClick={() => void saveSelectedUser()}>
-                      {savingUser ? "Saving..." : "Save user"}
-                    </Button>
+                    <div className="text-sm font-medium text-neutral-900">Clear HelloBrand localStorage</div>
+                    <div className="text-sm text-neutral-600">Remove all hellobrand:* and hb-* keys from this browser.</div>
                   </div>
+                  <Button variant="outline" size="sm" onClick={clearLocalStorageItems}>Clear</Button>
                 </div>
-              ) : (
-                <div className="text-sm text-neutral-600">Pick a user from the left-hand list.</div>
-              )}
+
+                <div className="flex items-center justify-between gap-3 border border-neutral-200 px-3 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-neutral-900">Clear dismissed banner</div>
+                    <div className="text-sm text-neutral-600">Re-show the profile onboarding banner.</div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    window.localStorage.removeItem("hellobrand:profile-onboarding-banner:dismissed");
+                    toast.success("Banner dismiss cleared.");
+                  }}>Reset</Button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                    <div>
+                      <div className="text-sm font-medium text-neutral-900">Hard refresh all caches</div>
+                      <div className="text-sm text-neutral-600">Force revalidate and reload the page.</div>
+                    </div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    router.refresh();
+                    window.location.reload();
+                  }}>Refresh</Button>
+                </div>
+              </div>
             </AdminSection>
 
-            <AdminSection
-              title="Admin password"
-              description="Update the password used for this admin board."
-            >
+            {/* Admin password */}
+            <AdminSection title="Admin password" description="Update the admin board password.">
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-password-next">New password</Label>
-                  <Input
-                    id="admin-password-next"
-                    type="password"
-                    value={passwordForm.password}
-                    onChange={(event) =>
-                      setPasswordForm((current) => ({
-                        ...current,
-                        password: event.currentTarget.value
-                      }))
-                    }
-                  />
+                  <Label htmlFor="admin-pw">New password</Label>
+                  <Input id="admin-pw" type="password" value={passwordForm.password} onChange={(e) => setPasswordForm((s) => ({ ...s, password: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="admin-password-confirm-next">Confirm password</Label>
-                  <Input
-                    id="admin-password-confirm-next"
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(event) =>
-                      setPasswordForm((current) => ({
-                        ...current,
-                        confirmPassword: event.currentTarget.value
-                      }))
-                    }
-                  />
+                  <Label htmlFor="admin-pw-confirm">Confirm password</Label>
+                  <Input id="admin-pw-confirm" type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm((s) => ({ ...s, confirmPassword: e.target.value }))} />
                 </div>
                 <div>
                   <Button disabled={savingPassword} variant="outline" onClick={() => void savePassword()}>
@@ -568,6 +627,17 @@ export function AdminDashboardClient({
           </div>
         </div>
       </div>
+
+      {/* User modal */}
+      {modalUser ? (
+        <UserDetailModal
+          user={modalUser}
+          onClose={() => setModalUserId(null)}
+          onUserUpdated={(updated) => {
+            setUsers((current) => current.map((u) => (u.id === updated.id ? updated : u)));
+          }}
+        />
+      ) : null}
     </div>
   );
 }
