@@ -253,6 +253,9 @@ function assistantDraftUserPrompt(input: {
       content: promptBullets([
         `Current page: ${input.context.pageTitle} (${input.context.pathname})`,
         input.context.tab ? `Current partnership tab: ${input.context.tab}` : null,
+        input.context.profileLocation
+          ? `Creator location context: ${input.context.profileLocation}`
+          : null,
         input.context.trigger?.label ? `Trigger label: ${input.context.trigger.label}` : null,
         input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null
       ])
@@ -347,6 +350,7 @@ export async function generateAssistantWorkspaceDraft(input: {
         context: {
           pathname: input.context.pathname,
           tab: input.context.tab,
+          profileLocation: input.context.profileLocation,
           tone: input.context.tone,
           trigger: input.context.trigger
         },

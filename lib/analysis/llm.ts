@@ -337,13 +337,24 @@ function extractSectionSystemPrompt() {
         "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven."
     },
     {
+      tag: "document_variety",
+      content: [
+        "Creator documents vary widely in format. Adapt your extraction to the document type:",
+        "- Formal agreements/contracts: Extract from term sheets, SOW schedules, and legal clauses. Look for structured fields like payment amount, net terms, usage rights duration, exclusivity terms, territory, platform, and edit rounds.",
+        "- Campaign briefs: Extract deliverable requirements from creative specs. Map disclosure/labeling requirements (e.g. #ad, verbal mentions, FTC compliance) to disclosureObligations. Map content format specs (e.g. Reel, TikTok, Story) to deliverables with channels.",
+        "- Email threads/pitches: Extract stated terms, proposed compensation, and timeline commitments.",
+        "Do not force fields that don't exist in the document type. A brief without payment terms should have null for paymentAmount, not a guess."
+      ].join("\n")
+    },
+    {
       tag: "rules",
       content: promptNumbered([
         "Return only facts that are explicitly stated in the section.",
         "Do not guess missing values or infer unstated business terms.",
         "Use null, empty arrays, or omission when the section does not support a field.",
         "Evidence snippets must be copied from the section and must be meaningful phrases or full sentences.",
-        "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence."
+        "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence.",
+        "For brandName and campaignName, use the actual brand and campaign names from the document. Never use generic labels like 'Workspace', 'Concept', 'Project', or 'Campaign'."
       ])
     },
     {
@@ -411,8 +422,10 @@ function analyzeRisksSystemPrompt() {
       tag: "rules",
       content: promptNumbered([
         "Only flag risks that are supported by the provided document text or extracted facts.",
-        "Focus on material creator issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, and one-sided termination.",
-        "Do not restate every contract term.",
+        "Focus on material creator issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, one-sided termination, and reshoot/edit obligations.",
+        "For campaign briefs without formal contracts: flag missing payment terms, undefined revision limits, or open-ended content requirements as risks.",
+        "For formal agreements: focus on IP assignment scope, usage rights duration and territory, termination clauses, liability/indemnity, and payment net terms.",
+        "Do not restate every contract term. Only flag items that need creator attention or negotiation.",
         "If a risk is not clearly supported, omit it rather than guessing.",
         "Every evidence snippet must be a real clause or sentence from the document."
       ])
@@ -479,17 +492,18 @@ function summarySystemPrompt(mode: "default" | "rewrite") {
       tag: "role",
       content:
         mode === "rewrite"
-          ? "You rewrite creator contract summaries without changing their meaning."
-          : "You write concise, plain-English creator partnership summaries."
+          ? "You rewrite creator contract summaries into shorter, scannable versions without changing their meaning."
+          : "You write short, scannable creator partnership summaries. The user should be able to understand the deal in under 30 seconds."
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Preserve material obligations, restrictions, payment facts, exclusivity, rights limits, and watchouts.",
+        "Be extremely concise. Each section should be 1-3 short sentences maximum. The entire summary should fit on one phone screen.",
+        "Preserve material obligations, restrictions, payment facts, exclusivity, rights limits, and watchouts, but state each in the fewest words possible.",
         "Keep the language creator-facing and practical, not legalistic.",
-        "Use plain text only.",
+        "Use plain text only. No markdown, no bullets, no heading markers, no asterisks, no underscores.",
         'Use these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts".',
-        "Do not use markdown bullets or heading markers in paragraph content."
+        "If a section has nothing notable, write one sentence saying so rather than padding with generic language."
       ])
     },
     {
@@ -1050,8 +1064,8 @@ export async function generateSimplifiedSummaryWithLlm(input: {
 }) {
   const styleInstruction =
     input.targetType === "plain_language"
-      ? "Rewrite the legal summary in simpler creator-friendly language. Keep all material obligations, payment details, rights limits, exclusivity, and watchouts explicit."
-      : "Compress the summary into a quick-reference version. Use one short paragraph per section, but still keep payment details, deliverables, rights limits, exclusivity, and watchouts explicit.";
+      ? "Rewrite the legal summary in simple, conversational creator language. Keep it short: 1-2 sentences per section. State facts directly without filler. The creator should understand the entire deal in under 20 seconds of reading."
+      : "Compress the summary into the shortest possible quick-reference version. One sentence per section maximum. State only the most critical fact per section: the amount, the deadline, the restriction, the risk. Skip anything generic or obvious.";
 
   const payload = await requestStructured(
     "generate_summary",

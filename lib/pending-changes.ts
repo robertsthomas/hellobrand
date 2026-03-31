@@ -52,6 +52,41 @@ function isEmptyValue(value: unknown): boolean {
   return false;
 }
 
+// Identity fields where the current value should never be replaced with
+// a shorter or more generic extraction result.
+const IDENTITY_FIELDS = new Set(["brandName", "campaignName", "creatorName", "agencyName"]);
+
+const GENERIC_VALUES = new Set([
+  "workspace",
+  "concept",
+  "project",
+  "campaign",
+  "partnership",
+  "untitled",
+  "draft",
+  "document",
+  "contract",
+  "agreement"
+]);
+
+function isWorseIdentityValue(field: string, current: unknown, proposed: unknown): boolean {
+  if (!IDENTITY_FIELDS.has(field)) return false;
+  if (typeof current !== "string" || typeof proposed !== "string") return false;
+
+  const currentTrimmed = current.trim();
+  const proposedTrimmed = proposed.trim();
+
+  if (!currentTrimmed) return false;
+
+  // Proposed is a generic placeholder
+  if (GENERIC_VALUES.has(proposedTrimmed.toLowerCase())) return true;
+
+  // Proposed is significantly shorter than current (likely lost information)
+  if (proposedTrimmed.length < currentTrimmed.length * 0.4 && currentTrimmed.length > 5) return true;
+
+  return false;
+}
+
 function valuesAreDifferent(current: unknown, proposed: unknown): boolean {
   if (isEmptyValue(current) && isEmptyValue(proposed)) return false;
 
@@ -89,6 +124,9 @@ export function computeTermsDiff(
     if (!valuesAreDifferent(currentValue, proposedValue)) continue;
     if (isEmptyValue(proposedValue)) continue;
 
+    // Don't suggest replacing good identity values with generic/worse ones
+    if (isWorseIdentityValue(key, currentValue, proposedValue)) continue;
+
     entries.push({
       field: key,
       label: humanizeToken(key),
@@ -120,6 +158,7 @@ export function hasMeaningfulChanges(
     const proposedValue = mergedExtraction[key];
 
     if (isEmptyValue(proposedValue)) continue;
+    if (isWorseIdentityValue(key, currentValue, proposedValue)) continue;
     if (valuesAreDifferent(currentValue, proposedValue)) return true;
   }
 

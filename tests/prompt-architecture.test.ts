@@ -60,7 +60,8 @@ describe("assistant prompt architecture", () => {
           label: "Negotiate",
           prompt: "Help me push back on paid usage."
         },
-        dealId: "deal-123"
+        dealId: "deal-123",
+        profileLocation: null
       },
       snapshotSummary: "Payment terms are Net 45 and paid usage is broad.",
       userSnapshotSummary: "Creator has 3 active deals."
@@ -160,6 +161,7 @@ describe("assistant workspace draft architecture", () => {
         pageTitle: "Partnership workspace",
         dealId: "deal-1",
         tab: "risks",
+        profileLocation: null,
         tone: "professional",
         trigger: {
           kind: "risk_flag",

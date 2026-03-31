@@ -186,6 +186,7 @@ export const assistantClientContextSchema = z.object({
   pageTitle: z.string().min(1).max(120),
   dealId: z.string().nullable(),
   tab: z.enum(assistantDealTabValues).nullable(),
+  profileLocation: z.string().max(160).nullable(),
   trigger: assistantTriggerSchema.nullable(),
   tone: z.enum(assistantToneValues)
 });

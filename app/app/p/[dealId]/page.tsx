@@ -1,19 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Trash2 } from "lucide-react";
 import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { BriefGenerator } from "@/components/brief-generator";
 import { BriefOverview } from "@/components/brief-overview";
-import { DealContextPanel } from "@/components/deal-context-panel";
 import { DealEmailPanel } from "@/components/deal-email-panel";
+import { DealNotesDrawer } from "@/components/deal-notes-drawer";
 import { DealSummaryPanel } from "@/components/deal-summary-panel";
 import { DeliverableTracker } from "@/components/deliverable-tracker";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
-import { DealNotesPanel } from "@/components/deal-notes-panel";
 import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
@@ -35,6 +34,47 @@ import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from 
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
+
+function daysUntil(date: string | null) {
+  if (!date) return null;
+  const diff = new Date(date).getTime() - Date.now();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function buildNextAction(deal: {
+  status: string;
+  paymentStatus: string;
+  nextDeliverableDate: string | null;
+  riskFlags: Array<{ severity: string }>;
+  pendingExtraction: boolean;
+}) {
+  if (deal.pendingExtraction) {
+    return { label: "Review new changes from re-extraction", tone: "accent" as const, tab: "terms" };
+  }
+  if (deal.paymentStatus === "late") {
+    return { label: "Send payment follow-up", tone: "warning" as const, tab: "deliverables" };
+  }
+  if (deal.riskFlags.some((f) => f.severity === "high")) {
+    return { label: "Review high-risk clauses", tone: "warning" as const, tab: "terms" };
+  }
+  const days = daysUntil(deal.nextDeliverableDate);
+  if (days !== null && days >= 0 && days <= 7) {
+    return { label: "Prepare the next deliverable", tone: "accent" as const, tab: "deliverables" };
+  }
+  if (deal.status === "contract_received") {
+    return { label: "Review contract and confirm terms", tone: "accent" as const, tab: "terms" };
+  }
+  if (deal.paymentStatus === "awaiting_payment" || deal.paymentStatus === "invoiced") {
+    return { label: "Track payout progress", tone: "neutral" as const, tab: "deliverables" };
+  }
+  return { label: "Partnership is on track", tone: "neutral" as const, tab: "overview" };
+}
+
+function nextActionToneClass(tone: "warning" | "accent" | "neutral") {
+  if (tone === "warning") return "border-clay/20 bg-clay/[0.04] dark:border-clay/25";
+  if (tone === "accent") return "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]";
+  return "border-black/8 bg-sand/35 dark:border-white/10 dark:bg-white/[0.04]";
+}
 
 export default function WorkspaceDealDetailPage({
   params,
@@ -97,96 +137,99 @@ async function DealDetailContent({
     normalized?.contractTitle ??
     deriveWorkspaceTitleFromFileNames(documents.map((document) => document.fileName)) ??
     deal.campaignName;
-  const uploadedDate = formatDate(deal.createdAt);
+  const displayBrandName = displayLabels.brandName ?? deal.brandName;
   const nextDeliverableValue = formatDate(deal.nextDeliverableDate);
-  const documentLabel = latestDocument
-    ? `${humanizeToken(latestDocument.documentKind)} • ${humanizeToken(
-        latestDocument.processingStatus
-      )}`
-    : "No documents uploaded yet";
   const riskCount = riskFlags.length;
+  const highRiskCount = riskFlags.filter((f) => f.severity === "high").length;
+  const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
+
+  const VALID_TABS = ["overview", "terms", "deliverables", "emails", "documents"];
   const currentTab =
-    resolvedSearchParams?.tab &&
-    ["overview", "terms", "risks", "deliverables", "brief", "emails", "documents", "invoices", "notes"].includes(
-      resolvedSearchParams.tab
-    )
+    resolvedSearchParams?.tab && VALID_TABS.includes(resolvedSearchParams.tab)
       ? resolvedSearchParams.tab
       : "overview";
-  const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
+
+  const nextAction = buildNextAction({
+    status: deal.status,
+    paymentStatus: deal.paymentStatus,
+    nextDeliverableDate: deal.nextDeliverableDate,
+    riskFlags,
+    pendingExtraction: !!terms?.pendingExtraction
+  });
+
+  const attentionItems: Array<{ id: string; label: string; detail?: string }> = [];
+  if (terms?.pendingExtraction) {
+    attentionItems.push({ id: "pending", label: "New extraction changes ready to review" });
+  }
+  if (highRiskCount > 0) {
+    attentionItems.push({ id: "risks", label: `${highRiskCount} high-risk clause${highRiskCount === 1 ? "" : "s"} flagged` });
+  }
+  if (deal.paymentStatus === "late") {
+    attentionItems.push({ id: "payment", label: "Payment is overdue" });
+  }
+  if ((aggregate.conflictResults?.length ?? 0) > 0) {
+    attentionItems.push({ id: "conflicts", label: `${aggregate.conflictResults.length} cross-partnership conflict${aggregate.conflictResults.length === 1 ? "" : "s"}` });
+  }
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
-      <div className="mx-auto max-w-[1280px] space-y-8">
-        <section className="space-y-6">
-          <Link
-            href="/app/p/history"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            All Partnerships
-          </Link>
+      <div className="mx-auto max-w-[1280px] space-y-6">
+        {/* Header */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/app/p/history"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              All Partnerships
+            </Link>
+            <DealNotesDrawer dealId={deal.id} notes={terms?.notes ?? null} />
+          </div>
 
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-black/8 pb-8 dark:border-white/10">
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
+          <div className="border-b border-black/8 pb-6 dark:border-white/10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1">
                 <h1 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[34px] lg:text-[40px]">
                   {displayCampaignName}
                 </h1>
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#7CB08B]" />
-                  <span className="text-sm font-medium text-foreground">
-                    {humanizeToken(deal.status)}
-                  </span>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {displayBrandName} · {humanizeToken(deal.status)} · {humanizeToken(deal.paymentStatus)}
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Contract uploaded on {uploadedDate} · Reviewed by HelloBrand AI
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#7CB08B]" />
+                <span className="text-sm font-medium text-foreground">
+                  {humanizeToken(deal.status)}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:gap-8 md:grid-cols-2 xl:grid-cols-4">
+          {/* 3 compact metrics */}
+          <div className="grid gap-4 sm:grid-cols-3">
             <div className="border-b border-black/8 pb-3 dark:border-white/10">
               <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment</p>
-              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
                 {formatCurrency(terms?.paymentAmount ?? null, terms?.currency ?? "USD")}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {terms?.paymentTerms ?? "Payment timing not extracted yet"}
               </p>
             </div>
             <div className="border-b border-black/8 pb-3 dark:border-white/10">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Due Date</p>
-              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Next due</p>
+              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
                 {nextDeliverableValue}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Stage: {humanizeToken(deal.status)}
               </p>
             </div>
             <div className="border-b border-black/8 pb-3 dark:border-white/10">
               <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Deliverables</p>
-              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
                 {terms?.deliverables?.length ?? 0} pending
               </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {documents.length} source{documents.length === 1 ? "" : "s"} attached
-              </p>
-            </div>
-            <div className="border-b border-black/8 pb-3 dark:border-white/10">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Risk Flags</p>
-              <p className="mt-2 text-[22px] font-semibold tracking-[-0.03em] text-[#d76742]">
-                {riskCount > 0 ? `${riskCount} flagged` : "No flags"}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">{documentLabel}</p>
             </div>
           </div>
         </section>
 
-        {terms?.pendingExtraction ? (
-          <PendingChangesBanner dealId={deal.id} terms={terms} />
-        ) : null}
-
+        {/* Tabs: 5 instead of 9 */}
         <WorkspaceTabs defaultTab={currentTab}>
           <ScrollableTabsList>
             <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent">
@@ -194,16 +237,15 @@ async function DealDetailContent({
                 Overview
               </TabsTrigger>
               <TabsTrigger value="terms" data-guide="tab-terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
-                Key Terms
-              </TabsTrigger>
-              <TabsTrigger value="risks" data-guide="tab-risks" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
-                Risks
+                Terms
+                {riskCount > 0 ? (
+                  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center bg-clay/10 px-1 text-[11px] font-semibold text-clay">
+                    {riskCount}
+                  </span>
+                ) : null}
               </TabsTrigger>
               <TabsTrigger value="deliverables" data-guide="tab-deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Deliverables
-              </TabsTrigger>
-              <TabsTrigger value="brief" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
-                Brief
               </TabsTrigger>
               <TabsTrigger value="emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Emails
@@ -211,76 +253,83 @@ async function DealDetailContent({
               <TabsTrigger value="documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Documents
               </TabsTrigger>
-              <TabsTrigger value="invoices" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
-                Invoices
-              </TabsTrigger>
-              <TabsTrigger value="notes" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
-                Notes
-              </TabsTrigger>
             </TabsList>
           </ScrollableTabsList>
 
+          {/* ── Overview: "Today" view ── */}
           <TabsContent value="overview" id="tab-overview" className="mt-0 space-y-6">
-            <DealContextPanel terms={terms} />
-            {(aggregate.conflictResults?.length ?? 0) > 0 ? (
-              <ConflictWarnings
-                conflicts={aggregate.conflictResults}
-                title="Cross-partnership conflict warnings"
-                description="These warnings compare this partnership against your other active partnerships."
-              />
+            {/* Pending changes banner */}
+            {terms?.pendingExtraction ? (
+              <PendingChangesBanner dealId={deal.id} terms={terms} />
             ) : null}
+
+            {/* Next action */}
+            <div className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Next step</p>
+                <p className="mt-1 text-sm font-medium text-foreground">{nextAction.label}</p>
+              </div>
+              {nextAction.tab !== "overview" ? (
+                <Link
+                  href={`/app/p/${deal.id}?tab=${nextAction.tab}`}
+                  className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-foreground transition hover:text-primary"
+                >
+                  Go <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : null}
+            </div>
+
+            {/* Needs attention */}
+            {attentionItems.length > 0 ? (
+              <div className="border border-clay/15 bg-clay/[0.04] p-4 dark:border-clay/20">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
+                  <p className="text-sm font-semibold text-ink">Needs attention ({attentionItems.length})</p>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {attentionItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 text-sm text-foreground">
+                      <span className="h-1.5 w-1.5 shrink-0 bg-clay" />
+                      {item.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Partnership snapshot (summary + disclosures) */}
+            <DealSummaryPanel
+              dealId={deal.id}
+              summaries={aggregate.summaries}
+              currentSummary={aggregate.currentSummary}
+            />
+
             {(terms?.disclosureObligations?.length ?? 0) > 0 ? (
               <DisclosureObligations
                 dealId={deal.id}
                 obligations={terms?.disclosureObligations ?? []}
               />
             ) : null}
-            <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
-              <DealSummaryPanel
-                dealId={deal.id}
-                summaries={aggregate.summaries}
-                currentSummary={aggregate.currentSummary}
+
+            {(aggregate.conflictResults?.length ?? 0) > 0 ? (
+              <ConflictWarnings
+                conflicts={aggregate.conflictResults}
+                compact
+                title="Cross-partnership conflicts"
+                description="Overlapping category, exclusivity, or timing signals across active workspaces."
               />
+            ) : null}
 
-              <div className="grid gap-6 border-t border-black/8 pt-6 md:grid-cols-2 dark:border-white/10">
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
-                    Rights
-                  </p>
-                  <p className="text-sm text-foreground">
-                    {terms?.usageRightsPaidAllowed
-                      ? "Paid usage"
-                      : terms?.usageRightsOrganicAllowed
-                        ? "Organic only"
-                        : "Needs review"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {terms?.usageDuration ?? "Duration not clear yet"}
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
-                    Exclusivity
-                  </p>
-                  <p className="text-sm text-foreground">
-                    {terms?.exclusivityDuration ?? "Not detected"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {terms?.exclusivityCategory ??
-                      (terms?.brandCategory
-                        ? dealCategoryLabel(terms.brandCategory)
-                        : "Category not specified")}
-                  </p>
-                </div>
-              </div>
-
-              <p className="text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
-                {deal.legalDisclaimer}
-              </p>
-            </div>
+            <p className="text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
+              {deal.legalDisclaimer}
+            </p>
           </TabsContent>
 
+          {/* ── Terms (includes risks) ── */}
           <TabsContent value="terms" id="tab-terms" className="mt-0 space-y-6">
+            {riskCount > 0 ? (
+              <RiskFlags dealId={deal.id} flags={riskFlags} />
+            ) : null}
             <TermsEditor
               dealId={deal.id}
               terms={terms}
@@ -290,18 +339,14 @@ async function DealDetailContent({
             />
           </TabsContent>
 
-          <TabsContent value="risks" id="tab-risks" className="mt-0 space-y-6">
-            <RiskFlags dealId={deal.id} flags={riskFlags} />
-          </TabsContent>
-
+          {/* ── Deliverables (includes tracker, list, brief, invoices) ── */}
           <TabsContent value="deliverables" id="tab-deliverables" className="mt-0 space-y-6">
             {(terms?.deliverables?.length ?? 0) > 0 ? (
               <DeliverableTracker dealId={deal.id} deliverables={terms?.deliverables ?? []} />
             ) : null}
             <DeliverablesList dealId={deal.id} deliverables={terms?.deliverables ?? []} />
-          </TabsContent>
 
-          <TabsContent value="brief" className="mt-0 space-y-6">
+            {/* Brief section */}
             <BriefOverview
               dealId={deal.id}
               briefData={terms?.briefData}
@@ -321,8 +366,18 @@ async function DealDetailContent({
                 actionLabel="Upgrade for brief generation"
               />
             )}
+
+            {/* Invoices section */}
+            <InvoiceEditorPanel
+              dealId={deal.id}
+              invoice={aggregate.invoiceRecord ?? null}
+              invoiceDocuments={invoiceDocuments}
+              paymentStatus={deal.paymentStatus}
+              paymentTerms={terms?.paymentTerms ?? null}
+            />
           </TabsContent>
 
+          {/* ── Emails ── */}
           <TabsContent value="emails" className="mt-0 space-y-6">
             {hasPremiumInbox ? (
               <DealEmailPanel
@@ -343,26 +398,10 @@ async function DealDetailContent({
             )}
           </TabsContent>
 
+          {/* ── Documents ── */}
           <TabsContent value="documents" className="mt-0 space-y-6">
             <UploadContractForm dealId={deal.id} documents={documents} />
-            <DocumentsPanel
-              dealId={deal.id}
-              documents={documents}
-            />
-          </TabsContent>
-
-          <TabsContent value="invoices" className="mt-0 space-y-6">
-            <InvoiceEditorPanel
-              dealId={deal.id}
-              invoice={aggregate.invoiceRecord ?? null}
-              invoiceDocuments={invoiceDocuments}
-              paymentStatus={deal.paymentStatus}
-              paymentTerms={terms?.paymentTerms ?? null}
-            />
-          </TabsContent>
-
-          <TabsContent value="notes" className="mt-0 space-y-6">
-            <DealNotesPanel dealId={deal.id} notes={terms?.notes ?? null} />
+            <DocumentsPanel dealId={deal.id} documents={documents} />
           </TabsContent>
         </WorkspaceTabs>
 

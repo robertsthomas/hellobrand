@@ -930,7 +930,15 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     const isFirstDocument = latestAggregate.terms === null;
     const existingTerms = latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal);
 
-    if (isFirstDocument) {
+    // Documents uploaded before (or during) intake confirmation should merge
+    // directly into terms, not create pendingExtraction. Only documents
+    // uploaded AFTER confirmation should produce pending changes for review.
+    const isIntakeDocument =
+      latestAggregate.deal.confirmedAt &&
+      document.createdAt <= latestAggregate.deal.confirmedAt;
+    const shouldMergeDirectly = isFirstDocument || isIntakeDocument;
+
+    if (shouldMergeDirectly) {
       const nextTerms = mergeTerms(
         withPreferredCreatorName(existingTerms, preferredCreatorName),
         sanitizedExtraction.data,

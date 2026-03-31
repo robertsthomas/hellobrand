@@ -33,6 +33,9 @@ export function buildAssistantPrompt(input: {
         `Today: ${isoDateContext()}`,
         `Current page: ${input.context.pageTitle} (${input.context.pathname})`,
         input.context.tab ? `Current partnership tab: ${input.context.tab}` : null,
+        input.context.profileLocation
+          ? `Creator location context: ${input.context.profileLocation}`
+          : null,
         input.context.trigger?.label ? `Trigger label: ${input.context.trigger.label}` : null,
         input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null,
         `Scope: ${input.scope}`,

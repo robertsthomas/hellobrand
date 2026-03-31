@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent
+} from "react";
 import { DefaultChatTransport, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { Loader2, Send } from "lucide-react";
@@ -12,6 +20,10 @@ import { AssistantMessageActions } from "@/components/assistant-message-actions"
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { parseAssistantUiBlock } from "@/lib/assistant/blocks";
 import { assistantMessageText } from "@/lib/assistant/messages";
+import {
+  buildAssistantSuggestedPrompts,
+  getAssistantLocationLabel
+} from "@/lib/assistant/suggested-prompts";
 import { cn } from "@/lib/utils";
 import type { AssistantClientContext, AssistantThreadRecord, AssistantTone } from "@/lib/types";
 
@@ -39,10 +51,16 @@ export function AssistantPanel({
   onQueuePrompt: (prompt: string | null) => void;
 }) {
   const router = useRouter();
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [input, setInput] = useState("");
   const [endingSession, setEndingSession] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const suggestedPrompts = useMemo(() => buildAssistantSuggestedPrompts(context), [context]);
+  const locationLabel = useMemo(
+    () => getAssistantLocationLabel(context.profileLocation),
+    [context.profileLocation]
+  );
   const { messages, setMessages, sendMessage, status, error, clearError } = useChat({
     id: thread.id,
     messages: initialMessages,
@@ -181,6 +199,12 @@ export function AssistantPanel({
     [submitMessage]
   );
 
+  const handleSuggestedPromptSelect = useCallback((prompt: string) => {
+    setInput(prompt);
+    clearError();
+    textareaRef.current?.focus();
+  }, [clearError]);
+
   return (
       <div className="relative flex h-full flex-col">
         <AssistantHeader
@@ -199,7 +223,9 @@ export function AssistantPanel({
         <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {messages.length === 0 ? (
             <div className="border border-black/8 bg-white px-4 py-4 text-sm text-black/70 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/75">
-              Ask about risks, payments, deliverables, approvals, or ask for a creator-facing reply.
+              {locationLabel
+                ? `Ask about risks, payments, deliverables, approvals, or use the suggested asks for ${locationLabel}.`
+                : "Ask about risks, payments, deliverables, approvals, or ask for a creator-facing reply."}
             </div>
           ) : null}
 
@@ -297,7 +323,35 @@ export function AssistantPanel({
 
         <div className="border-t border-black/8 px-4 py-4 dark:border-white/10">
           <form onSubmit={handleSubmit} className="space-y-3">
+            {suggestedPrompts.length > 0 ? (
+              <div className="space-y-2 border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+                    Suggested Asks
+                  </p>
+                  {locationLabel ? (
+                    <span className="text-[11px] text-muted-foreground">Based on {locationLabel}</span>
+                  ) : null}
+                </div>
+                <div className="grid gap-2">
+                  {suggestedPrompts.map((suggestion) => (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      onClick={() => handleSuggestedPromptSelect(suggestion.prompt)}
+                      className="border border-black/10 bg-white px-3 py-3 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20"
+                    >
+                      <div className="text-sm font-semibold text-foreground">{suggestion.label}</div>
+                      <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {suggestion.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <textarea
+              ref={textareaRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleInputKeyDown}

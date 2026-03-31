@@ -696,6 +696,7 @@ export interface AssistantClientContext {
   pageTitle: string;
   dealId: string | null;
   tab: AssistantDealTab | null;
+  profileLocation: string | null;
   trigger: AssistantTrigger | null;
   tone: AssistantTone;
 }

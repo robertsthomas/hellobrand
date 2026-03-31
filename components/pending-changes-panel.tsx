@@ -50,16 +50,25 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function stripMarkup(text: string) {
+  return text
+    .replace(/<[^>]*>/g, "")
+    .replace(/#{1,6}\s*/g, "")
+    .replace(/\*{1,2}([^*]*)\*{1,2}/g, "$1")
+    .replace(/_{1,2}([^_]*)_{1,2}/g, "$1")
+    .replace(/`([^`]*)`/g, "$1");
+}
+
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "Not set";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") {
     return Math.abs(value) >= 1000 ? formatCurrency(value) : String(value);
   }
-  if (typeof value === "string") return value.trim() || "Not set";
+  if (typeof value === "string") return stripMarkup(value).trim() || "Not set";
   if (Array.isArray(value)) {
     if (value.length === 0) return "None";
-    if (typeof value[0] === "string") return value.join(", ");
+    if (typeof value[0] === "string") return value.map((v) => stripMarkup(String(v))).join(", ");
     return `${value.length} item${value.length === 1 ? "" : "s"}`;
   }
   if (typeof value === "object") return JSON.stringify(value);

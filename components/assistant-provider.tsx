@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode
 } from "react";
@@ -16,6 +17,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { AssistantPanel } from "@/components/assistant-panel";
 import { assistantPageTitle, isValidAssistantTab } from "@/lib/assistant/app-manual";
 import { assistantRecordToUIMessage } from "@/lib/assistant/messages";
+import { parseProfileMetadata } from "@/lib/profile-metadata";
 import type {
   AssistantClientContext,
   AssistantDealTab,
@@ -75,6 +77,24 @@ async function loadOrCreateThreadWithMode(
   };
 }
 
+async function loadAssistantProfileLocation() {
+  try {
+    const response = await fetch("/api/profile");
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = (await response.json()) as {
+      profile?: { payoutDetails?: string | null } | null;
+    };
+
+    return parseProfileMetadata(payload.profile?.payoutDetails).metadata.location ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,11 +104,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
   const [trigger, setTrigger] = useState<AssistantTrigger | null>(null);
   const [tone, setTone] = useState<AssistantTone>("professional");
+  const [profileLocation, setProfileLocation] = useState<string | null>(null);
   const [threadState, setThreadState] = useState<{
     thread: AssistantThreadRecord;
     messages: UIMessage[];
   } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [threadLoading, setThreadLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [forceNewThread, setForceNewThread] = useState(false);
 
   useEffect(() => {
@@ -114,13 +136,19 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       pageTitle: assistantPageTitle(pathname),
       dealId,
       tab: isValidAssistantTab(currentTab) ? (currentTab as AssistantDealTab) : null,
+      profileLocation,
       trigger,
       tone
     }),
-    [currentTab, dealId, pathname, tone, trigger]
+    [currentTab, dealId, pathname, profileLocation, tone, trigger]
   );
+  const latestContextRef = useRef(context);
 
   const scope = dealId ? "deal" : "user";
+
+  useEffect(() => {
+    latestContextRef.current = context;
+  }, [context]);
 
   useEffect(() => {
     if (!open) {
@@ -128,9 +156,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
-    setLoading(true);
+    setThreadLoading(true);
 
-    void loadOrCreateThreadWithMode(scope, dealId, context, forceNewThread)
+    void loadOrCreateThreadWithMode(scope, dealId, latestContextRef.current, forceNewThread)
       .then((payload) => {
         if (!cancelled) {
           setThreadState(payload);
@@ -139,14 +167,39 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => {
         if (!cancelled) {
-          setLoading(false);
+          setThreadLoading(false);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [context, dealId, forceNewThread, open, scope]);
+  }, [dealId, forceNewThread, open, scope]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+    setProfileLoading(true);
+
+    void loadAssistantProfileLocation()
+      .then((location) => {
+        if (!cancelled) {
+          setProfileLocation(location);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProfileLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const openAssistant = useCallback(
     (options?: { trigger?: AssistantTrigger | null; prompt?: string | null }) => {
@@ -180,6 +233,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setThreadState(null);
     setForceNewThread(true);
   }, [threadState?.thread.id]);
+
+  const loading = threadLoading || profileLoading;
 
   return (
     <AssistantContext.Provider value={{ open, openAssistant, closeAssistant }}>
