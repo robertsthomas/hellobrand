@@ -121,6 +121,12 @@ export async function streamAssistantResponse(input: {
     messages: modelMessages,
     maxOutputTokens: prepared.maxTokens,
     temperature: 0.2,
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "assistant.stream-response",
+      recordInputs: true,
+      recordOutputs: true
+    },
     stopWhen: stepCountIs(5),
     tools: buildAssistantTools({
       viewer: input.viewer,

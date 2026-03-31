@@ -162,7 +162,7 @@ function DiffRow({
         checked ? "bg-emerald-50/40 dark:bg-emerald-500/[0.05]" : "bg-transparent"
       )}
     >
-      <div className="flex items-start gap-4 px-0 py-4">
+      <div className="flex items-start gap-4 px-4 py-4 sm:px-5">
         <input
           id={`field-${entry.field}`}
           type="checkbox"

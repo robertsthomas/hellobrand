@@ -561,6 +561,12 @@ export async function streamEmailReplyDraft(input: {
     prompt: request.userPrompt,
     maxOutputTokens: prepared.maxTokens,
     temperature: request.temperature,
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "email.generate-draft",
+      recordInputs: true,
+      recordOutputs: true
+    },
     onFinish: async ({ totalUsage, model }) => {
       await finalizeAiStreamExecution({
         context: {

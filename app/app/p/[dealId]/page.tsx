@@ -149,11 +149,19 @@ async function DealDetailContent({
       ? `/app/inbox?dealId=${deal.id}&thread=${linkedEmailThreads[0].thread.id}&attachInvoice=1`
       : null;
 
-  const VALID_TABS = ["overview", "terms", "deliverables", "emails", "documents"];
-  const currentTab =
-    resolvedSearchParams?.tab && VALID_TABS.includes(resolvedSearchParams.tab)
-      ? resolvedSearchParams.tab
-      : "overview";
+  const hasInvoice = Boolean(aggregate.invoiceRecord);
+  const VALID_TABS = hasInvoice
+    ? ["overview", "terms", "deliverables", "invoices", "emails", "documents"]
+    : ["overview", "terms", "deliverables", "emails", "documents"];
+  const TAB_REDIRECTS: Record<string, string> = {
+    ...(hasInvoice ? {} : { invoices: "deliverables" }),
+    risks: "terms",
+    brief: "deliverables",
+    notes: "overview"
+  };
+  const rawTab = resolvedSearchParams?.tab ?? "";
+  const resolvedTab = TAB_REDIRECTS[rawTab] ?? rawTab;
+  const currentTab = VALID_TABS.includes(resolvedTab) ? resolvedTab : "overview";
 
   const nextAction = buildNextAction({
     status: deal.status,
@@ -253,6 +261,11 @@ async function DealDetailContent({
               <TabsTrigger value="deliverables" data-guide="tab-deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Deliverables
               </TabsTrigger>
+              {hasInvoice ? (
+                <TabsTrigger value="invoices" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                  Invoices
+                </TabsTrigger>
+              ) : null}
               <TabsTrigger value="emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Emails
               </TabsTrigger>
@@ -373,17 +386,32 @@ async function DealDetailContent({
               />
             )}
 
-            {/* Invoices section */}
-            <InvoiceEditorPanel
-              dealId={deal.id}
-              invoice={aggregate.invoiceRecord ?? null}
-              invoiceDeliveries={invoiceDeliveries}
-              invoiceDocuments={invoiceDocuments}
-              paymentStatus={deal.paymentStatus}
-              paymentTerms={terms?.paymentTerms ?? null}
-              sendViaInboxHref={sendViaInboxHref}
-            />
+            {/* Invoice generation prompt (only when no invoice exists yet) */}
+            {!hasInvoice ? (
+              <InvoiceEditorPanel
+                dealId={deal.id}
+                invoice={null}
+                invoiceDocuments={invoiceDocuments}
+                paymentStatus={deal.paymentStatus}
+                paymentTerms={terms?.paymentTerms ?? null}
+              />
+            ) : null}
           </TabsContent>
+
+          {/* ── Invoices (only when invoice exists) ── */}
+          {hasInvoice ? (
+            <TabsContent value="invoices" className="mt-0 space-y-6">
+              <InvoiceEditorPanel
+                dealId={deal.id}
+                invoice={aggregate.invoiceRecord ?? null}
+                invoiceDeliveries={invoiceDeliveries}
+                invoiceDocuments={invoiceDocuments}
+                paymentStatus={deal.paymentStatus}
+                paymentTerms={terms?.paymentTerms ?? null}
+                sendViaInboxHref={sendViaInboxHref}
+              />
+            </TabsContent>
+          ) : null}
 
           {/* ── Emails ── */}
           <TabsContent value="emails" className="mt-0 space-y-6">

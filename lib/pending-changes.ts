@@ -78,11 +78,20 @@ function isWorseIdentityValue(field: string, current: unknown, proposed: unknown
 
   if (!currentTrimmed) return false;
 
-  // Proposed is a generic placeholder
+  // Proposed is a generic placeholder (exact match)
   if (GENERIC_VALUES.has(proposedTrimmed.toLowerCase())) return true;
 
+  // Proposed is composed entirely of generic words (e.g. "Campaign Concept")
+  const proposedWords = proposedTrimmed.toLowerCase().split(/\s+/);
+  if (proposedWords.length <= 3 && proposedWords.every((word) => GENERIC_VALUES.has(word))) return true;
+
   // Proposed is significantly shorter than current (likely lost information)
-  if (proposedTrimmed.length < currentTrimmed.length * 0.4 && currentTrimmed.length > 5) return true;
+  if (proposedTrimmed.length < currentTrimmed.length * 0.5 && currentTrimmed.length > 5) return true;
+
+  // Proposed drops most of the current value's words (e.g. "Amazon Kids" -> "Alexa+")
+  const currentWords = new Set(currentTrimmed.toLowerCase().split(/\s+/));
+  const overlapCount = proposedWords.filter((word) => currentWords.has(word)).length;
+  if (currentWords.size >= 2 && overlapCount === 0 && proposedTrimmed.length < currentTrimmed.length) return true;
 
   return false;
 }

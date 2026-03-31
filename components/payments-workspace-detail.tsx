@@ -54,10 +54,10 @@ export function PaymentsWorkspaceDetail({
           </div>
 
           <Link
-            href={`/app/p/${deal.id}?tab=invoices`}
+            href={`/app/p/${deal.id}?tab=${invoice ? "invoices" : "deliverables"}`}
             className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
           >
-            Open workspace invoices
+            {invoice ? "Open invoice" : "Generate invoice"}
           </Link>
         </div>
 
