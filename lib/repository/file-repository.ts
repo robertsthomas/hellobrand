@@ -270,6 +270,12 @@ export class FileRepository {
     return store.documents.find((entry) => entry.id === documentId) ?? null;
   }
 
+  async deleteDocument(documentId: string) {
+    const store = await ensureStore();
+    store.documents = store.documents.filter((entry) => entry.id !== documentId);
+    await saveStore(store);
+  }
+
   async listDocuments(userId: string, dealId: string) {
     const store = await ensureStore();
     const deal = store.deals.find((entry) => entry.id === dealId && entry.userId === userId);
@@ -439,6 +445,14 @@ export class FileRepository {
         (record) => record.userId === userId && record.dealId === dealId
       ) ?? null
     );
+  }
+
+  async deleteInvoiceRecord(userId: string, dealId: string) {
+    const store = await ensureStore();
+    store.invoiceRecords = store.invoiceRecords.filter(
+      (record) => !(record.userId === userId && record.dealId === dealId)
+    );
+    await saveStore(store);
   }
 
   async listInvoiceDeliveryRecords(userId: string, dealId: string) {

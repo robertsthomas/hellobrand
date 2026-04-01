@@ -14,6 +14,7 @@ import {
 import { getRepository } from "@/lib/repository";
 import { assistantChatRequestSchema } from "@/lib/validation";
 import { fail } from "@/lib/http";
+import { captureHandledError } from "@/lib/monitoring/sentry";
 
 function lastUserMessage(messages: UIMessage[]) {
   return [...messages].reverse().find((message) => message.role === "user") ?? null;
@@ -100,6 +101,18 @@ export async function POST(request: NextRequest) {
       const message =
         error instanceof Error ? error.message : "Could not stream assistant response.";
 
+      captureHandledError(error, {
+        area: "assistant",
+        name: "stream_chat",
+        viewerId: viewer.id,
+        status: 500,
+        captureExpected: true,
+        extras: {
+          threadId: thread.id,
+          scope: input.scope
+        }
+      });
+
       return fallbackAssistantStream(
         `I ran into a backend issue before I could answer: ${message}`,
         {
@@ -119,6 +132,15 @@ export async function POST(request: NextRequest) {
     if (message === "Unauthorized") {
       return fail(message, 401);
     }
+
+    captureHandledError(error, {
+      area: "assistant",
+      name: "chat_request",
+      status: 400,
+      extras: {
+        hasOriginalMessages: Boolean(originalMessages?.length)
+      }
+    });
 
     return fallbackAssistantStream(message, { originalMessages });
   }

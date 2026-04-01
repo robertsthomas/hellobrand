@@ -37,7 +37,18 @@ export async function POST(request: Request) {
   } catch (error) {
     return fail(
       error instanceof Error ? error.message : "Could not initialize Stripe webhook processing.",
-      500
+      500,
+      {
+        error,
+        area: "billing",
+        name: "stripe_webhook_initialize",
+        tags: {
+          stripeEventType: event.type
+        },
+        extras: {
+          eventId: event.id
+        }
+      }
     );
   }
 
@@ -120,7 +131,19 @@ export async function POST(request: Request) {
 
     return fail(
       message,
-      500
+      500,
+      {
+        error,
+        area: "billing",
+        name: "stripe_webhook_process",
+        tags: {
+          stripeEventType: event.type
+        },
+        extras: {
+          eventId: event.id,
+          finalStatus
+        }
+      }
     );
   }
 }

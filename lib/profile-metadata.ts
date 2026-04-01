@@ -45,6 +45,7 @@ export interface ProfileMetadata {
   primaryPlatform: ProfilePlatform | null;
   contentCategory: string | null;
   taxId: string | null;
+  address: string | null;
   rateCardUrl: string | null;
   payoutNotes: string | null;
   socialHandles: SocialHandleEntry[];
@@ -56,6 +57,7 @@ const EMPTY_METADATA: ProfileMetadata = {
   primaryPlatform: null,
   contentCategory: null,
   taxId: null,
+  address: null,
   rateCardUrl: null,
   payoutNotes: null,
   socialHandles: []
@@ -144,6 +146,7 @@ export function parseProfileMetadata(raw: string | null | undefined) {
         primaryPlatform: normalizePlatform(parsed?.primaryPlatform),
         contentCategory: normalizeNullableString(parsed?.contentCategory),
         taxId: normalizeNullableString(parsed?.taxId),
+        address: normalizeNullableString(parsed?.address),
         rateCardUrl: normalizeNullableString(parsed?.rateCardUrl),
         payoutNotes: normalizeNullableString(parsed?.payoutNotes),
         socialHandles
@@ -172,6 +175,7 @@ export function serializeProfileMetadata(metadata: ProfileMetadata) {
     primaryPlatform: normalizePlatform(metadata.primaryPlatform),
     contentCategory: normalizeNullableString(metadata.contentCategory),
     taxId: normalizeNullableString(metadata.taxId),
+    address: normalizeNullableString(metadata.address),
     rateCardUrl: normalizeNullableString(metadata.rateCardUrl),
     payoutNotes: normalizeNullableString(metadata.payoutNotes),
     socialHandles

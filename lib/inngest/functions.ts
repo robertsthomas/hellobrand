@@ -6,6 +6,7 @@ import {
   sendPendingWorkspaceReminders
 } from "@/lib/notification-email";
 import { runWorkspaceNudgeSweep } from "@/lib/notification-service";
+import { prisma } from "@/lib/prisma";
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document" },
@@ -142,17 +143,11 @@ export const notificationEmailSendFunction = inngest.createFunction(
       // Check if the notification is still active (user hasn't confirmed yet).
       // If the session was confirmed, the notification gets superseded to "resolved".
       const { isStillActive } = await step.run("check-still-pending", async () => {
-        const { PrismaClient } = await import("@prisma/client");
-        const prisma = new PrismaClient();
-        try {
-          const notification = await prisma.appNotification.findUnique({
-            where: { id: appNotificationId },
-            select: { status: true }
-          });
-          return { isStillActive: notification?.status === "active" };
-        } finally {
-          await prisma.$disconnect();
-        }
+        const notification = await prisma.appNotification.findUnique({
+          where: { id: appNotificationId },
+          select: { status: true }
+        });
+        return { isStillActive: notification?.status === "active" };
       });
 
       if (!isStillActive) {

@@ -10,6 +10,7 @@ import {
   createBillingPortalSessionForViewer,
   createCheckoutSessionForViewer
 } from "@/lib/billing/service";
+import { captureHandledError } from "@/lib/monitoring/sentry";
 import { updatePaymentForViewer } from "@/lib/payments";
 import { updateProfileForViewer } from "@/lib/profile";
 import {
@@ -97,6 +98,17 @@ export async function startCheckoutAction(formData: FormData) {
       throw error;
     }
 
+    captureHandledError(error, {
+      area: "billing",
+      name: "start_checkout",
+      viewerId: viewer.id,
+      captureExpected: true,
+      extras: {
+        planTier,
+        interval
+      }
+    });
+
     const message =
       error instanceof Error ? error.message : "Could not start billing checkout.";
     redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
@@ -113,6 +125,13 @@ export async function openBillingPortalAction() {
     if (isNextRedirectError(error)) {
       throw error;
     }
+
+    captureHandledError(error, {
+      area: "billing",
+      name: "open_billing_portal",
+      viewerId: viewer.id,
+      captureExpected: true
+    });
 
     const message =
       error instanceof Error ? error.message : "Could not open Stripe billing portal.";
@@ -142,6 +161,13 @@ export async function cancelSubscriptionAction() {
     if (isNextRedirectError(error)) {
       throw error;
     }
+
+    captureHandledError(error, {
+      area: "billing",
+      name: "cancel_subscription",
+      viewerId: viewer.id,
+      captureExpected: true
+    });
 
     const message =
       error instanceof Error ? error.message : "Could not cancel the subscription.";

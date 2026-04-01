@@ -1,3 +1,5 @@
+import { captureHandledError } from "@/lib/monitoring/sentry";
+
 function shouldLogServerDebug() {
   return (
     process.env.DEBUG_SERVER_REQUESTS === "1" ||
@@ -38,6 +40,16 @@ export function startServerDebug(
       });
     },
     fail(error: unknown, extra?: Record<string, unknown>) {
+      captureHandledError(error, {
+        area: "server_action",
+        name: event,
+        captureExpected: true,
+        extras: {
+          ...details,
+          ...extra,
+          durationMs: Date.now() - startedAt
+        }
+      });
       logServerDebug("error", `${event}_failed`, {
         ...details,
         ...extra,

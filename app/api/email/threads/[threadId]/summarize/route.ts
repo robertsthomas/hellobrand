@@ -23,6 +23,11 @@ export async function POST(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not summarize email thread.";
-    return fail(message, message === "Unauthorized" ? 401 : 400);
+    return fail(message, message === "Unauthorized" ? 401 : 400, {
+      error,
+      capture: true,
+      area: "email",
+      name: "summarize_thread"
+    });
   }
 }

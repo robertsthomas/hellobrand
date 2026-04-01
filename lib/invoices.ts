@@ -275,7 +275,7 @@ async function buildInvoiceDraftPayload(
       viewer.displayName,
     email: profile.contactEmail ?? viewer.email,
     companyName: profile.businessName ?? null,
-    address: null,
+    address: metadata.address ?? null,
     taxId: metadata.taxId ?? null,
     payoutDetails: metadata.payoutNotes ?? null
   };
@@ -575,6 +575,53 @@ export async function voidInvoiceForViewer(viewer: Viewer, dealId: string) {
 
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
   return saved;
+}
+
+export async function deleteInvoiceForViewer(
+  viewer: Viewer,
+  dealId: string,
+  options?: { reuseNumber?: boolean }
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate?.invoiceRecord) {
+    return null;
+  }
+
+  const deletedNumber = aggregate.invoiceRecord.invoiceNumber;
+  const pdfDocumentId = aggregate.invoiceRecord.pdfDocumentId;
+
+  await getRepository().deleteInvoiceRecord(viewer.id, dealId);
+
+  // Clean up the PDF document so it doesn't appear as a stale attachment
+  if (pdfDocumentId) {
+    try {
+      await getRepository().deleteDocument(pdfDocumentId);
+    } catch {
+      // Non-critical: the document may already be gone
+    }
+  }
+
+  // Reset payment status since there's no invoice anymore
+  if (process.env.DATABASE_URL) {
+    await updatePaymentForViewer(viewer, dealId, {
+      amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? null,
+      currency: aggregate.invoiceRecord.currency,
+      invoiceDate: null,
+      dueDate: aggregate.paymentRecord?.dueDate ?? null,
+      paidDate: aggregate.paymentRecord?.paidDate ?? null,
+      status: aggregate.paymentRecord?.paidDate ? "paid" : "not_invoiced",
+      notes: aggregate.paymentRecord?.notes ?? null,
+      source: "invoice_delete"
+    });
+  } else {
+    await getRepository().updateDeal(viewer.id, dealId, {
+      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced"
+    });
+  }
+
+  await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
+
+  return { deletedNumber, reuseNumber: options?.reuseNumber ?? false };
 }
 
 export async function markInvoiceSentForViewer(

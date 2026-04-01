@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireViewer } from "@/lib/auth";
 import { findDuplicateDeals } from "@/lib/duplicate-detection";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
+import { fail } from "@/lib/http";
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +51,10 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not check for duplicates.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return fail(message, 500, {
+      error,
+      area: "intake",
+      name: "check_duplicates"
+    });
   }
 }

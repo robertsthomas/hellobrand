@@ -21,12 +21,14 @@ import {
   uploadDocumentsForViewer as uploadDocumentsFromDeals
 } from "@/lib/deals";
 import {
+  deleteInvoiceForViewer,
   finalizeInvoiceForViewer,
   generateInvoiceDraftForViewer,
   regenerateInvoiceDraftForViewer,
   voidInvoiceForViewer,
   saveInvoiceDraftForViewer
 } from "@/lib/invoices";
+import { captureHandledError } from "@/lib/monitoring/sentry";
 import { startServerDebug } from "@/lib/server-debug";
 import {
   createDealSchema,
@@ -300,6 +302,16 @@ export async function activateSummaryVariantAction(
     invalidateDeals(viewer.id, dealId);
     return { ok: true };
   } catch (error) {
+    captureHandledError(error, {
+      area: "workspace",
+      name: "activate_summary_variant",
+      viewerId: viewer.id,
+      captureExpected: true,
+      extras: {
+        dealId,
+        summaryType
+      }
+    });
     return {
       error:
         error instanceof Error
@@ -319,6 +331,16 @@ export async function restoreSummaryVersionAction(dealId: string, summaryId: str
     invalidateDeals(viewer.id, dealId);
     return { ok: true };
   } catch (error) {
+    captureHandledError(error, {
+      area: "workspace",
+      name: "restore_summary_version",
+      viewerId: viewer.id,
+      captureExpected: true,
+      extras: {
+        dealId,
+        summaryId
+      }
+    });
     return {
       error:
         error instanceof Error
@@ -497,6 +519,7 @@ function parseInvoiceInputFromForm(formData: FormData) {
 
 function invalidateInvoiceSurfaces(viewerId: string, dealId: string) {
   revalidatePath(`/app/p/${dealId}`);
+  revalidatePath(`/app/p/${dealId}/invoice`);
   revalidatePath("/app/payments");
   revalidatePath("/app");
   invalidateDeals(viewerId, dealId);
@@ -568,4 +591,14 @@ export async function voidInvoiceAction(formData: FormData) {
 
   await voidInvoiceForViewer(viewer, dealId);
   invalidateInvoiceSurfaces(viewer.id, dealId);
+}
+
+export async function deleteInvoiceAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+  const reuseNumber = String(formData.get("reuseNumber") ?? "") === "true";
+
+  await deleteInvoiceForViewer(viewer, dealId, { reuseNumber });
+  invalidateInvoiceSurfaces(viewer.id, dealId);
+  redirect(`/app/p/${dealId}?tab=deliverables`);
 }

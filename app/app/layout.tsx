@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
 import { PostHogUserIdentify } from "@/components/posthog-user-identify";
-import { ProfileOnboardingBanner } from "@/components/profile-onboarding-banner";
+
 import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
 import { requireViewer } from "@/lib/auth";
@@ -54,15 +54,6 @@ export default async function WorkspaceLayout({
         displayName={viewer.displayName}
       />
       <AppFrame
-        banner={
-          !isOnboardingComplete ? (
-            <ProfileOnboardingBanner
-              email={viewer.email}
-              initialName={profile.creatorLegalName ?? profile.displayName ?? viewer.displayName}
-              initialHandle={profile.businessName ?? ""}
-            />
-          ) : null
-        }
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}
         notifications={notifications}

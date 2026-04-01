@@ -33,10 +33,21 @@ function hasExpectedDelegates(client: PrismaClient) {
 function buildDatabaseUrl() {
   const base = process.env.DATABASE_URL;
   if (!base) return undefined;
-  // Limit connection pool size to avoid exhausting Supabase session-mode pooler
+
+  // Keep Prisma conservative by default so Next dev/Turbopack workers do not
+  // exhaust Supabase's session-mode pooler.
   const url = new URL(base);
   if (!url.searchParams.has("connection_limit")) {
-    url.searchParams.set("connection_limit", "5");
+    url.searchParams.set(
+      "connection_limit",
+      process.env.PRISMA_CONNECTION_LIMIT?.trim() || "1"
+    );
+  }
+  if (!url.searchParams.has("pool_timeout")) {
+    url.searchParams.set(
+      "pool_timeout",
+      process.env.PRISMA_POOL_TIMEOUT?.trim() || "20"
+    );
   }
   return url.toString();
 }

@@ -32,6 +32,7 @@ export type ProfileEditorDraft = ProfileIdentityDraft & {
   primaryPlatform: ProfilePlatform;
   contentCategory: string;
   taxId: string;
+  address: string;
   rateCardUrl: string;
   payoutNotes: string;
   generalHandles: SocialHandleEntry[];
@@ -105,6 +106,7 @@ export function buildProfileEditorDraft(
     primaryPlatform: metadata.primaryPlatform ?? "instagram",
     contentCategory: metadata.contentCategory ?? PROFILE_CATEGORY_OPTIONS[0],
     taxId: metadata.taxId ?? "",
+    address: metadata.address ?? "",
     rateCardUrl: metadata.rateCardUrl ?? "",
     payoutNotes: metadata.payoutNotes ?? "",
     generalHandles: buildGeneralHandles(splitHandles.generalHandles),
@@ -143,6 +145,7 @@ export function buildProfileEditorPatch(
       primaryPlatform: form.primaryPlatform,
       contentCategory: form.contentCategory.trim() || null,
       taxId: form.taxId.trim() || null,
+      address: form.address.trim() || null,
       rateCardUrl: form.rateCardUrl.trim() || null,
       payoutNotes: form.payoutNotes.trim() || null,
       socialHandles

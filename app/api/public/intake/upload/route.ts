@@ -18,6 +18,7 @@ import {
   resolveAnonymousVisitorIdentity,
   validateAnonymousUploadFile
 } from "@/lib/public-upload-guards";
+import { captureHandledError } from "@/lib/monitoring/sentry";
 
 function attachVisitorCookie(
   response: NextResponse,
@@ -152,15 +153,35 @@ export async function POST(request: NextRequest) {
       identity
     );
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not analyze that document.";
+    const isUserInputError =
+      message.startsWith("Please ") ||
+      message.includes("smaller than") ||
+      message.includes("free uploads");
+    const status = isUserInputError ? 400 : 500;
+
+    if (!isUserInputError) {
+      captureHandledError(error, {
+        area: "public_intake",
+        name: "anonymous_upload",
+        status,
+        captureExpected: true,
+        tags: {
+          visitor: "anonymous"
+        },
+        extras: {
+          visitorId: identity.visitorId
+        }
+      });
+    }
+
     await logPublicFunnelEvent("anonymous_upload_failed", {
-      message: error instanceof Error ? error.message : "Unknown error"
+      message
     });
 
     return attachVisitorCookie(
-      fail(
-        error instanceof Error ? error.message : "Could not analyze that document.",
-        400
-      ),
+      fail(message, status),
       identity
     );
   }

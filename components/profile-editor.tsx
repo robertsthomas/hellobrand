@@ -622,8 +622,8 @@ export function ProfileEditor({
 
       <section className="border-b border-border py-10">
         <SectionHeader
-          title="Business Information"
-          description="These details help when HelloBrand drafts outreach, reminders, and invoice-adjacent copy."
+          title="Business and invoice details"
+          description="These details prefill your invoices and help HelloBrand draft outreach and reminders."
         />
 
         <div className="grid gap-5 md:grid-cols-2">
@@ -654,6 +654,21 @@ export function ProfileEditor({
                 }))
               }
             />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <FieldLabel htmlFor="address">Business address</FieldLabel>
+            <FlatTextarea
+              id="address"
+              value={form.address}
+              placeholder="123 Main St, Suite 100&#10;Los Angeles, CA 90001"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  address: event.currentTarget.value
+                }))
+              }
+            />
+            <p className="text-xs text-muted-foreground">Used as the issuer address on invoices.</p>
           </div>
           <div className="space-y-2 md:col-span-2">
             <FieldLabel htmlFor="rateCardUrl">Rate card link</FieldLabel>

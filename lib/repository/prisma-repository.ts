@@ -738,6 +738,10 @@ export class PrismaRepository {
     return document ? toDocumentRecord(document) : null;
   }
 
+  async deleteDocument(documentId: string) {
+    await prisma.document.delete({ where: { id: documentId } }).catch(() => undefined);
+  }
+
   async listDocuments(userId: string, dealId: string) {
     const deal = await prisma.deal.findFirst({
       where: { id: dealId, userId },
@@ -996,6 +1000,12 @@ export class PrismaRepository {
     });
 
     return toInvoiceRecord(record);
+  }
+
+  async deleteInvoiceRecord(userId: string, dealId: string) {
+    await prisma.invoiceRecord.deleteMany({
+      where: { userId, dealId }
+    });
   }
 
   async createInvoiceDeliveryRecord(
