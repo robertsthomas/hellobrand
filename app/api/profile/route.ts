@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { ZodError } from "zod";
 
 import { requireApiViewer } from "@/lib/auth";
+import { setEmailSubscriptionPreference } from "@/lib/email-subscriptions";
 import { fail, ok } from "@/lib/http";
 import {
   getProfileForViewer,
@@ -26,7 +27,18 @@ export async function PATCH(request: NextRequest) {
   try {
     const viewer = await requireApiViewer();
     const input = profileInputSchema.parse(await request.json());
-    const profile = await updateProfileForViewer(viewer, input);
+    const { productUpdatesEnabled, ...profileInput } = input;
+    const profile = await updateProfileForViewer(viewer, profileInput);
+
+    if (typeof productUpdatesEnabled === "boolean") {
+      await setEmailSubscriptionPreference({
+        email: profile.contactEmail ?? viewer.email,
+        category: "product_updates",
+        isSubscribed: productUpdatesEnabled,
+        source: "settings"
+      });
+    }
+
     const recentChanges = await listProfileAuditForViewer(viewer);
 
     revalidateTag(`user-${viewer.id}-profile`, "max");

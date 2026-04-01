@@ -738,6 +738,24 @@ model Profile {
   auditEvents ProfileAuditEvent[]
 }
 
+enum EmailSubscriptionCategory {
+  product_updates
+}
+
+model EmailSubscriptionPreference {
+  id             String                    @id @default(uuid())
+  email          String
+  category       EmailSubscriptionCategory
+  isSubscribed   Boolean                   @default(true)
+  source         String?
+  unsubscribedAt DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([email, category])
+  @@index([category, isSubscribed])
+}
+
 model ProfileAuditEvent {
   id            String   @id @default(uuid())
   profileId     String

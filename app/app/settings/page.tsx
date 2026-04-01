@@ -8,6 +8,7 @@ import { SettingsEditor } from "@/components/settings-editor";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedProfile } from "@/lib/cached-data";
+import { resolveEmailSubscriptionEnabled } from "@/lib/email-subscriptions";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 
 function emailProviderLabel(provider: string | undefined) {
@@ -46,10 +47,18 @@ async function SettingsContent({
     getCachedProfile(viewer),
     entitlements.features.email_connections ? listEmailAccountsForViewer(viewer) : Promise.resolve([])
   ]);
+  const productUpdatesEnabled = await resolveEmailSubscriptionEnabled(
+    profile.contactEmail ?? viewer.email,
+    "product_updates"
+  );
 
   return (
     <div className="space-y-8">
-      <SettingsEditor initialProfile={profile} initialEmail={viewer.email} />
+      <SettingsEditor
+        initialProfile={profile}
+        initialEmail={viewer.email}
+        initialProductUpdatesEnabled={productUpdatesEnabled}
+      />
       {entitlements.features.email_connections ? (
         <EmailConnectionsPanel
           accounts={emailAccounts.map((account) => ({

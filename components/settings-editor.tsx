@@ -85,14 +85,20 @@ function FlatToggleRow({
 
 export function SettingsEditor({
   initialProfile,
-  initialEmail
+  initialEmail,
+  initialProductUpdatesEnabled
 }: {
   initialProfile: ProfileRecord;
   initialEmail: string;
+  initialProductUpdatesEnabled: boolean;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<ProfileSettingsDraft>(() =>
-    buildProfileSettingsDraft(initialProfile, initialEmail)
+    buildProfileSettingsDraft(
+      initialProfile,
+      initialEmail,
+      initialProductUpdatesEnabled
+    )
   );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -229,6 +235,12 @@ export function SettingsEditor({
             description="Send email only when a workspace is ready for review or fails. Test sends use your approved Resend inbox while onboarding@resend.dev is configured."
             checked={form.emailNotificationsEnabled}
             onChange={(checked) => updateFormField("emailNotificationsEnabled", checked)}
+          />
+          <FlatToggleRow
+            title="Product updates"
+            description="Receive launch notes, feature announcements, and other non-transactional HelloBrand emails. Turning this off also powers one-click unsubscribe links."
+            checked={form.productUpdatesEnabled}
+            onChange={(checked) => updateFormField("productUpdatesEnabled", checked)}
           />
           <FlatToggleRow
             title="Payment reminders"

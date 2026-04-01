@@ -23,6 +23,7 @@ export type ProfileSettingsDraft = ProfileIdentityDraft & {
   conflictAlertsEnabled: boolean;
   paymentRemindersEnabled: boolean;
   emailNotificationsEnabled: boolean;
+  productUpdatesEnabled: boolean;
   accentColor: string;
 };
 
@@ -159,7 +160,8 @@ export function buildProfileEditorPatch(
 
 export function buildProfileSettingsDraft(
   profile: ProfileRecord,
-  initialEmail: string
+  initialEmail: string,
+  initialProductUpdatesEnabled = true
 ): ProfileSettingsDraft {
   return {
     ...buildProfileIdentityDraft(profile, initialEmail),
@@ -168,6 +170,7 @@ export function buildProfileSettingsDraft(
     conflictAlertsEnabled: profile.conflictAlertsEnabled,
     paymentRemindersEnabled: profile.paymentRemindersEnabled,
     emailNotificationsEnabled: profile.emailNotificationsEnabled,
+    productUpdatesEnabled: initialProductUpdatesEnabled,
     accentColor: profile.accentColor ?? ""
   };
 }
@@ -187,6 +190,7 @@ export function buildProfileSettingsPatch(
     conflictAlertsEnabled: form.conflictAlertsEnabled,
     paymentRemindersEnabled: form.paymentRemindersEnabled,
     emailNotificationsEnabled: form.emailNotificationsEnabled,
+    productUpdatesEnabled: form.productUpdatesEnabled,
     accentColor: form.accentColor || null
   };
 }

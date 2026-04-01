@@ -336,6 +336,7 @@ export const profileInputSchema = z.object({
   conflictAlertsEnabled: z.boolean().optional(),
   paymentRemindersEnabled: z.boolean().optional(),
   emailNotificationsEnabled: z.boolean().optional(),
+  productUpdatesEnabled: z.boolean().optional(),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()
 });
 

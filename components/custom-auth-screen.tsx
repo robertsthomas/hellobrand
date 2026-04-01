@@ -107,6 +107,8 @@ export function CustomAuthScreen({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState<string | null>(null);
   const verificationFormRef = useRef<HTMLFormElement>(null);
+  const signInBusy = isSubmitting || signInFetchStatus === "fetching";
+  const signUpBusy = isSubmitting || signUpFetchStatus === "fetching";
 
   useEffect(() => {
     setMode(queryMode);
@@ -261,6 +263,10 @@ export function CustomAuthScreen({
   async function handleSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (signInBusy) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessages([]);
     captureAppEvent(posthog, "auth_sign_in_submitted", {
@@ -298,6 +304,10 @@ export function CustomAuthScreen({
 
   async function handleSignUp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (signUpBusy) {
+      return;
+    }
 
     if (!signUpsEnabled) {
       setErrorMessages(["New sign-ups are paused right now."]);
@@ -348,6 +358,10 @@ export function CustomAuthScreen({
   async function handleSignUpVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (signUpBusy) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessages([]);
     captureAppEvent(posthog, "auth_verification_submitted", {
@@ -380,6 +394,10 @@ export function CustomAuthScreen({
 
   async function handleSignInVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (signInBusy) {
+      return;
+    }
 
     if (!signInSecondFactor) {
       return;
@@ -424,6 +442,10 @@ export function CustomAuthScreen({
   }
 
   async function resendVerificationCode() {
+    if (signUpBusy) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessages([]);
     captureAppEvent(posthog, "auth_verification_resent", {
@@ -446,6 +468,10 @@ export function CustomAuthScreen({
 
   async function resendSignInVerificationCode() {
     if (!signInSecondFactor) {
+      return;
+    }
+
+    if (signInBusy) {
       return;
     }
 
@@ -618,7 +644,7 @@ export function CustomAuthScreen({
                       autoComplete="username"
                       value={signInEmail}
                       onChange={(event) => setSignInEmail(event.currentTarget.value)}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder="Enter your email or username"
                       required
                     />
@@ -637,7 +663,7 @@ export function CustomAuthScreen({
                       autoComplete="current-password"
                       value={signInPassword}
                       onChange={(event) => setSignInPassword(event.currentTarget.value)}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder="Enter your password"
                       required
                     />
@@ -647,10 +673,10 @@ export function CustomAuthScreen({
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={isSubmitting || signInFetchStatus === "fetching"}
-                  className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
+                  disabled={signInBusy}
+                  className="mt-2 h-12 rounded-none bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting || signInFetchStatus === "fetching" ? "Signing in..." : "Log in"}
+                  {signInBusy ? "Signing in..." : "Log in"}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </form>
@@ -668,7 +694,7 @@ export function CustomAuthScreen({
                       autoComplete="email"
                       value={signUpEmail}
                       onChange={(event) => setSignUpEmail(event.currentTarget.value)}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder="Enter your email"
                       required
                     />
@@ -687,7 +713,7 @@ export function CustomAuthScreen({
                       autoComplete="new-password"
                       value={signUpPassword}
                       onChange={(event) => setSignUpPassword(event.currentTarget.value)}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder="Create a password"
                       required
                     />
@@ -706,7 +732,7 @@ export function CustomAuthScreen({
                       autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.currentTarget.value)}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder="Repeat your password"
                       required
                     />
@@ -716,10 +742,10 @@ export function CustomAuthScreen({
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={isSubmitting || signUpFetchStatus === "fetching"}
-                  className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
+                  disabled={signUpBusy}
+                  className="mt-2 h-12 rounded-none bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting || signUpFetchStatus === "fetching"
+                  {signUpBusy
                     ? "Creating account..."
                     : "Create account"}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -758,11 +784,18 @@ export function CustomAuthScreen({
                             ? event.currentTarget.value.replace(/\s/g, "").slice(0, 32)
                             : event.currentTarget.value.replace(/\D/g, "").slice(0, 6);
                         setVerificationCode(value);
-                        if (canAutoSubmitVerification && value.length === 6) {
+                        if (
+                          canAutoSubmitVerification &&
+                          value.length === 6 &&
+                          !isSubmitting &&
+                          !(isSignInVerificationMode
+                            ? signInFetchStatus === "fetching"
+                            : signUpFetchStatus === "fetching")
+                        ) {
                           setTimeout(() => verificationFormRef.current?.requestSubmit(), 0);
                         }
                       }}
-                      className="h-12 rounded-xl border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
+                      className="h-12 rounded-none border-black/10 bg-white pl-11 pr-4 shadow-none dark:border-white/12 dark:bg-white/[0.03]"
                       placeholder={verificationPlaceholder}
                       required
                     />
@@ -773,14 +806,11 @@ export function CustomAuthScreen({
                   type="submit"
                   size="lg"
                   disabled={
-                    isSubmitting ||
-                    (isSignInVerificationMode
-                      ? signInFetchStatus === "fetching"
-                      : signUpFetchStatus === "fetching")
+                    isSignInVerificationMode ? signInBusy : signUpBusy
                   }
-                  className="mt-2 h-12 rounded-xl bg-ocean text-white hover:bg-ocean/90"
+                  className="mt-2 h-12 rounded-none bg-ocean text-white hover:bg-ocean/90"
                 >
-                  {isSubmitting ? "Verifying..." : verificationButtonLabel}
+                  {isSignInVerificationMode ? (signInBusy ? "Verifying..." : verificationButtonLabel) : (signUpBusy ? "Verifying..." : verificationButtonLabel)}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
 
@@ -790,6 +820,7 @@ export function CustomAuthScreen({
                     onClick={() => {
                       resetVerificationState();
                     }}
+                    disabled={isSignInVerificationMode ? signInBusy : signUpBusy}
                     className="font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
                   >
                     Edit details
@@ -801,7 +832,7 @@ export function CustomAuthScreen({
                         ? resendSignInVerificationCode()
                         : resendVerificationCode())
                     }
-                    disabled={isSubmitting}
+                    disabled={isSignInVerificationMode ? signInBusy : signUpBusy}
                     className="font-medium text-black/60 underline underline-offset-4 transition hover:text-black disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
                   >
                     {isSignInVerificationMode &&
