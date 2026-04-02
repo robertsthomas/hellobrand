@@ -5,6 +5,34 @@ import { useSearchParams } from "next/navigation";
 
 import { Tabs } from "@/components/ui/tabs";
 
+function scrollActiveTabIntoView(tab: string) {
+  const panel = document.getElementById(`tab-${tab}`);
+  if (!panel) return;
+
+  const scrollContainer =
+    panel.closest<HTMLElement>("[data-workspace-scroll-container]") ??
+    document.querySelector<HTMLElement>("[data-workspace-scroll-container]");
+
+  if (scrollContainer) {
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const top = scrollContainer.scrollTop + (panelRect.top - containerRect.top) - 24;
+
+    scrollContainer.scrollTo({
+      top: Math.max(0, top),
+      left: 0,
+      behavior: "smooth"
+    });
+
+    return;
+  }
+
+  panel.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
 export function WorkspaceTabs({
   defaultTab,
   children
@@ -19,16 +47,20 @@ export function WorkspaceTabs({
   useEffect(() => {
     const urlTab = searchParams.get("tab");
     if (urlTab && urlTab !== activeTab) {
-      setActiveTab(urlTab);
+      const syncTimer = window.setTimeout(() => {
+        setActiveTab(urlTab);
+      }, 0);
 
-      requestAnimationFrame(() => {
-        document.getElementById(`tab-${urlTab}`)?.scrollIntoView({
-          behavior: "smooth",
-          block: "start"
-        });
+      const frame = window.requestAnimationFrame(() => {
+        scrollActiveTabIntoView(urlTab);
       });
+
+      return () => {
+        window.clearTimeout(syncTimer);
+        window.cancelAnimationFrame(frame);
+      };
     }
-  }, [searchParams]);
+  }, [activeTab, searchParams]);
 
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
@@ -46,10 +78,7 @@ export function WorkspaceTabs({
     window.history.replaceState(null, "", url);
 
     requestAnimationFrame(() => {
-      document.getElementById(`tab-${value}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+      scrollActiveTabIntoView(value);
     });
   }, []);
 

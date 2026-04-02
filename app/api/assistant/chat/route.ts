@@ -3,6 +3,10 @@ import { NextRequest } from "next/server";
 import { ZodError } from "zod";
 
 import { requireApiViewer } from "@/lib/auth";
+import {
+  formatAssistantProviderError,
+  logAssistantProviderDiagnostics
+} from "@/lib/assistant/errors";
 import { assistantMessageText } from "@/lib/assistant/messages";
 import { streamAssistantResponse } from "@/lib/assistant/runtime";
 import { replaceDashesWithCommas } from "@/lib/assistant/text";
@@ -98,8 +102,14 @@ export async function POST(request: NextRequest) {
       await recordViewerUsage(viewer, "assistant_messages_monthly");
       return response;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Could not stream assistant response.";
+      logAssistantProviderDiagnostics({
+        area: "assistant_route",
+        error,
+        threadId: thread.id,
+        scope: input.scope,
+        context: input.context,
+        uiMessages: input.messages as UIMessage[]
+      });
 
       captureHandledError(error, {
         area: "assistant",
@@ -114,7 +124,7 @@ export async function POST(request: NextRequest) {
       });
 
       return fallbackAssistantStream(
-        `I ran into a backend issue before I could answer: ${message}`,
+        formatAssistantProviderError(error),
         {
           originalMessages: input.messages as UIMessage[]
         }

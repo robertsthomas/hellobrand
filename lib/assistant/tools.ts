@@ -15,6 +15,7 @@ import { ensureAssistantSnapshot } from "@/lib/assistant/snapshots";
 import type {
   AssistantClientContext,
   AssistantMessageRecord,
+  DealAggregate,
   DraftIntent,
   Viewer
 } from "@/lib/types";
@@ -46,6 +47,89 @@ function lastUserPrompt(messages: AssistantMessageRecord[]) {
     .reverse()
     .find((message) => message.role === "user")
     ?.content.trim() || null;
+}
+
+function buildKeyTermReviewSummary(aggregate: DealAggregate) {
+  const items: Array<{
+    category: string;
+    title: string;
+    severity: "low" | "medium" | "high";
+    detail: string;
+    suggestedAction: string | null;
+  }> = [];
+
+  for (const flag of aggregate.riskFlags) {
+    items.push({
+      category: flag.category,
+      title: flag.title,
+      severity: flag.severity,
+      detail: flag.detail,
+      suggestedAction: flag.suggestedAction
+    });
+  }
+
+  if (!aggregate.terms?.paymentTerms && aggregate.riskFlags.every((flag) => flag.category !== "payment_terms")) {
+    items.push({
+      category: "payment_terms",
+      title: "Payment terms are still unclear",
+      severity: "medium",
+      detail: "The workspace does not show clear payment timing or net terms yet.",
+      suggestedAction: "Confirm fee, invoicing timing, and payment schedule before moving forward."
+    });
+  }
+
+  if ((!aggregate.terms?.usageRights || !aggregate.terms?.usageDuration || !aggregate.terms?.usageTerritory) &&
+      aggregate.riskFlags.every((flag) => flag.category !== "usage_rights")) {
+    items.push({
+      category: "usage_rights",
+      title: "Usage rights are incomplete",
+      severity: "medium",
+      detail: "At least one of usage scope, duration, or territory is missing from the current workspace.",
+      suggestedAction: "Clarify where the content can be used, for how long, and whether paid usage is included."
+    });
+  }
+
+  if ((aggregate.terms?.deliverables?.length ?? 0) === 0 &&
+      aggregate.riskFlags.every((flag) => flag.category !== "deliverables")) {
+    items.push({
+      category: "deliverables",
+      title: "Deliverables are not fully specified",
+      severity: "medium",
+      detail: "The workspace does not show a complete deliverables list yet.",
+      suggestedAction: "Confirm the exact deliverables, count, platform, and due dates."
+    });
+  }
+
+  if (!aggregate.terms?.termination &&
+      aggregate.riskFlags.every((flag) => flag.category !== "termination")) {
+    items.push({
+      category: "termination",
+      title: "Termination language is missing or unclear",
+      severity: "low",
+      detail: "The workspace does not show clear cancellation or termination terms.",
+      suggestedAction: "Check whether either side can cancel, on what timeline, and what happens after cancellation."
+    });
+  }
+
+  const sorted = [...items].sort((left, right) => {
+    const severityRank = { high: 0, medium: 1, low: 2 } as const;
+    return severityRank[left.severity] - severityRank[right.severity];
+  });
+
+  return {
+    workspace: {
+      dealId: aggregate.deal.id,
+      brandName: aggregate.deal.brandName,
+      campaignName: aggregate.deal.campaignName
+    },
+    reviewItems: sorted.slice(0, 6),
+    counts: {
+      total: sorted.length,
+      high: sorted.filter((item) => item.severity === "high").length,
+      medium: sorted.filter((item) => item.severity === "medium").length,
+      low: sorted.filter((item) => item.severity === "low").length
+    }
+  };
 }
 
 export function buildAssistantTools(input: {
@@ -171,6 +255,35 @@ export function buildAssistantTools(input: {
               evidence: flag.evidence
             }))
         };
+      }
+    },
+    reviewWorkspaceTerms: {
+      description:
+        "Identify the key terms that need review in the current workspace, or ask the user to pick a workspace first if none is active.",
+      inputSchema: z.object({
+        dealId: z.string().optional(),
+        focus: z.string().optional()
+      }),
+      execute: async ({ dealId, focus }: { dealId?: string; focus?: string }) => {
+        const targetDealId = dealId ?? input.threadDealId;
+
+        if (!targetDealId) {
+          return buildWorkspaceSelectionBlock({
+            viewer: input.viewer,
+            prompt: activeUserPrompt ?? focus ?? "Which key terms need review?",
+            tab: input.context.tab ?? "terms",
+            title: "Which workspace should I review?",
+            description:
+              "This review question needs a specific workspace. Pick one and I’ll tell you which terms need review there."
+          });
+        }
+
+        const aggregate = await getDealForViewer(input.viewer, targetDealId);
+        if (!aggregate) {
+          return { error: "Partnership not found." };
+        }
+
+        return buildKeyTermReviewSummary(aggregate);
       }
     },
     navigateTo: {

@@ -15,6 +15,7 @@ function buildFileBackedProfile(viewer: Viewer): ProfileRecord {
     creatorLegalName: null,
     businessName: null,
     contactEmail: viewer.email,
+    timeZone: null,
     preferredSignature: viewer.displayName,
     payoutDetails: null,
     defaultCurrency: "USD",
@@ -44,6 +45,7 @@ function toProfileRecord(profile: {
   creatorLegalName: string | null;
   businessName: string | null;
   contactEmail: string | null;
+  timeZone: string | null;
   preferredSignature: string | null;
   payoutDetails: string | null;
   defaultCurrency: string | null;
@@ -62,6 +64,7 @@ function toProfileRecord(profile: {
     creatorLegalName: profile.creatorLegalName,
     businessName: profile.businessName,
     contactEmail: profile.contactEmail,
+    timeZone: profile.timeZone,
     preferredSignature: profile.preferredSignature,
     payoutDetails: profile.payoutDetails,
     defaultCurrency: profile.defaultCurrency,
@@ -87,6 +90,20 @@ function normalizeNullableString(value: string | null | undefined) {
 function normalizeCurrency(value: string | null | undefined) {
   const normalized = normalizeNullableString(value);
   return normalized ? normalized.toUpperCase() : "USD";
+}
+
+function normalizeTimeZone(value: string | null | undefined) {
+  const normalized = normalizeNullableString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: normalized }).format(new Date());
+    return normalized;
+  } catch {
+    return null;
+  }
 }
 
 function toProfileAuditRecord(event: {
@@ -154,6 +171,7 @@ export async function getProfileForViewer(viewer: Viewer) {
         userId: viewer.id,
         displayName: viewer.displayName,
         contactEmail: viewer.email,
+        timeZone: null,
         defaultCurrency: "USD",
         reminderLeadDays: 3,
         conflictAlertsEnabled: true,
@@ -192,6 +210,7 @@ export async function updateProfileForViewer(
     creatorLegalName: string | null;
     businessName: string | null;
     contactEmail: string | null;
+    timeZone?: string | null;
     preferredSignature: string | null;
     payoutDetails: string | null;
     defaultCurrency?: string | null;
@@ -221,6 +240,8 @@ export async function updateProfileForViewer(
     creatorLegalName: normalizeNullableString(patch.creatorLegalName),
     businessName: normalizeNullableString(patch.businessName),
     contactEmail: normalizeNullableString(patch.contactEmail),
+    timeZone:
+      patch.timeZone !== undefined ? normalizeTimeZone(patch.timeZone) : (existing?.timeZone ?? null),
     preferredSignature: normalizeNullableString(patch.preferredSignature),
     payoutDetails: normalizeNullableString(patch.payoutDetails),
     defaultCurrency: normalizeCurrency(patch.defaultCurrency),
@@ -248,6 +269,7 @@ export async function updateProfileForViewer(
     creatorLegalName: existing?.creatorLegalName ?? null,
     businessName: existing?.businessName ?? null,
     contactEmail: existing?.contactEmail ?? null,
+    timeZone: existing?.timeZone ?? null,
     preferredSignature: existing?.preferredSignature ?? null,
     payoutDetails: existing?.payoutDetails ?? null,
     defaultCurrency: existing?.defaultCurrency ?? "USD",

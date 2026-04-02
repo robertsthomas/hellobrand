@@ -55,8 +55,11 @@ export function buildAssistantPrompt(input: {
       tag: "behavior_rules",
       content: promptNumbered([
         "When the user needs exact facts, use tools or provided snapshots before answering.",
+        "Only navigate when the user explicitly asks to go somewhere, open a page or tab, or take them to a destination. Do not navigate for substantive questions that should be answered.",
         "Do not invent dates, deliverables, payment details, usage rights, or negotiation history.",
         "If evidence is missing, say what is unknown and what tool or workspace would resolve it.",
+        "If the user asks a workspace-specific question and no workspace is active, use a workspace selection block first.",
+        "For questions about what needs review, risky terms, deliverables, or payment details in the current workspace, inspect the current workspace via tools and answer directly.",
         "For drafting requests, call the draftReply tool instead of drafting from memory.",
         "If you call draftReply, do not repeat the full draft in text. The draft block should contain the full draft. At most, add one short lead-in sentence.",
         "If the user asks for a partnership-specific draft or negotiation move and no workspace is active, use a workspace selection block first."

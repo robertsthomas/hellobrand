@@ -140,6 +140,7 @@ export async function completeProfileOnboarding(
   input: {
     displayName: string;
     contactEmail: string;
+    timeZone?: string | null;
     primaryHandle: string;
     selectedPlatforms: string[];
     platformHandles: Record<string, string>;
@@ -151,6 +152,7 @@ export async function completeProfileOnboarding(
   const submission = buildProfileOnboardingSubmission({
     displayName: input.displayName,
     contactEmail: input.contactEmail,
+    timeZone: input.timeZone ?? null,
     primaryHandle: input.primaryHandle,
     selectedPlatforms: input.selectedPlatforms.filter(
       (platform): platform is ProfilePlatform => typeof platform === "string"
@@ -203,6 +205,7 @@ export async function completeProfileOnboarding(
     creatorLegalName: existingProfile.creatorLegalName,
     businessName: normalizedPrimaryHandle,
     contactEmail: submission.contactEmail,
+    timeZone: submission.timeZone,
     preferredSignature: existingProfile.preferredSignature,
     payoutDetails: serializedMetadata,
     accentColor: submission.accentColor

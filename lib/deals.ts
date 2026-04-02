@@ -22,6 +22,10 @@ import {
   generateSummaryWithLlm,
   hasLlmKey
 } from "@/lib/analysis/llm";
+import {
+  extractContractWithLlamaExtract,
+  resolveContractLlamaExtractMode
+} from "@/lib/analysis/llamaextract";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { generateEmailDraft } from "@/lib/email/generate";
 import { inngest } from "@/lib/inngest/client";
@@ -164,6 +168,63 @@ function sanitizeCreatorExtractionResult(
       (fieldPath) => fieldPath !== "creatorName"
     )
   };
+}
+
+const CONTRACT_SHADOW_DIFF_FIELDS = [
+  "paymentAmount",
+  "paymentTerms",
+  "deliverables",
+  "usageRights",
+  "usageRightsPaidAllowed",
+  "whitelistingAllowed",
+  "exclusivityApplies",
+  "termination"
+] as const;
+
+function finalizeDocumentExtraction(
+  text: string,
+  extraction: ExtractionPipelineResult,
+  creatorName: string
+) {
+  const sanitizedExtraction = sanitizeCreatorExtractionResult(extraction, creatorName);
+  const intelligence = buildConflictIntelligencePatch({
+    text,
+    sectionKey: null,
+    fallbackTerms: sanitizedExtraction.data
+  });
+
+  sanitizedExtraction.data = {
+    ...sanitizedExtraction.data,
+    ...mergeConflictIntelligence(sanitizedExtraction.data, intelligence.patch)
+  };
+  sanitizedExtraction.evidence = [
+    ...sanitizedExtraction.evidence,
+    ...intelligence.evidence
+  ];
+
+  return sanitizedExtraction;
+}
+
+function buildContractShadowDiff(
+  baseline: ExtractionPipelineResult["data"],
+  candidate: ExtractionPipelineResult["data"]
+) {
+  return CONTRACT_SHADOW_DIFF_FIELDS.flatMap((fieldPath) => {
+    const before = baseline[fieldPath];
+    const after = candidate[fieldPath];
+
+    if (JSON.stringify(before) === JSON.stringify(after)) {
+      return [];
+    }
+
+    return [
+      {
+        fieldPath,
+        before,
+        after
+      }
+    ];
+  });
 }
 
 async function hydrateProfileBackedCreatorName(
@@ -615,6 +676,19 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
   }
 
   try {
+    let cachedDocumentBuffer: Promise<Buffer> | null = null;
+    const getDocumentBuffer = async () => {
+      if (document.sourceType !== "file") {
+        return null;
+      }
+
+      if (!cachedDocumentBuffer) {
+        cachedDocumentBuffer = readStoredBytes(document.storagePath);
+      }
+
+      return cachedDocumentBuffer;
+    };
+
     const extractionSource = await runStage(
       document.dealId,
       document.id,
@@ -652,6 +726,20 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     });
     logStageDebug("classify_document ✓", { kind: classification.documentKind, confidence: classification.confidence });
 
+    const contractLlamaExtractMode = resolveContractLlamaExtractMode(
+      classification.documentKind,
+      document.sourceType
+    );
+
+    logDocumentPipeline("info", "llamaextract_mode_resolved", {
+      dealId: document.dealId,
+      documentId: document.id,
+      documentKind: classification.documentKind,
+      sourceType: document.sourceType,
+      mode: contractLlamaExtractMode,
+      hasParseJobId: Boolean(extractionSource._llama?.parseJobId)
+    });
+
     checkPipelineTimeout();
     const sections = await runStage(
       document.dealId,
@@ -673,53 +761,103 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     const savedSections = await repository.replaceDocumentSections(document.id, sections);
     logStageDebug("section_document ✓", { sectionCount: sections.length });
 
-    const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
-    const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
+    const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
+    const llamaExtractFallbackTerms = createEmptyTerms(aggregate.deal);
 
-    logDocumentPipeline("info", "llm_section_plan", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
-      fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
-      usingFreeModel: llmPlan.usingFreeModel,
-      selectedSectionCount: llmPlan.selected.length,
-      totalSectionCount: sections.length,
-      concurrency: llmPlan.concurrency,
-      selectedSections: llmPlan.selected.map((section) => ({
-        chunkIndex: section.chunkIndex,
-        title: section.title,
-        chars: section.content.length
-      }))
-    });
+    async function runLegacySectionExtraction() {
+      const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
+      const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
+
+      logDocumentPipeline("info", "llm_section_plan", {
+        dealId: document.dealId,
+        documentId: document.id,
+        fileName: document.fileName,
+        model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
+        fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
+        usingFreeModel: llmPlan.usingFreeModel,
+        selectedSectionCount: llmPlan.selected.length,
+        totalSectionCount: sections.length,
+        concurrency: llmPlan.concurrency,
+        selectedSections: llmPlan.selected.map((section) => ({
+          chunkIndex: section.chunkIndex,
+          title: section.title,
+          chars: section.content.length
+        }))
+      });
+
+      return mapWithConcurrency(sections, llmPlan.concurrency, async (section) => {
+        const fallback = extractStructuredTerms(
+          section.content,
+          [section],
+          classification.documentKind
+        );
+
+        if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
+          return fallback;
+        }
+
+        try {
+          return await extractSectionWithLlm(
+            section,
+            classification.documentKind,
+            fallback
+          );
+        } catch {
+          return fallback;
+        }
+      });
+    }
 
     checkPipelineTimeout();
+    let extractionRoute = "legacy";
+    let llamaExtractInputSource: "parse_job" | "file_upload" | null = null;
     const partialExtractions = await runStage(
       document.dealId,
       document.id,
       "extract_fields",
-      async () =>
-        mapWithConcurrency(sections, llmPlan.concurrency, async (section) => {
-            const fallback = extractStructuredTerms(
-              section.content,
-              [section],
-              classification.documentKind
-            );
+      async () => {
+        if (contractLlamaExtractMode !== "primary") {
+          return runLegacySectionExtraction();
+        }
 
-            if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
-              return fallback;
-            }
+        try {
+          const llamaExtract = await extractContractWithLlamaExtract({
+            document,
+            fallbackData: llamaExtractFallbackTerms,
+            parseJobId: extractionSource._llama?.parseJobId ?? null,
+            projectId: extractionSource._llama?.projectId ?? null,
+            buffer: extractionSource._llama?.parseJobId
+              ? null
+              : await getDocumentBuffer()
+          });
+          extractionRoute = "llamaextract_primary";
+          llamaExtractInputSource = llamaExtract.inputSource;
 
-            try {
-              return await extractSectionWithLlm(
-                section,
-                classification.documentKind,
-                fallback
-              );
-            } catch {
-              return fallback;
-            }
-          })
+          logDocumentPipeline("info", "llamaextract_primary_complete", {
+            dealId: document.dealId,
+            documentId: document.id,
+            fileName: document.fileName,
+            inputSource: llamaExtract.inputSource,
+            projectId: llamaExtract.projectId,
+            parseJobId: extractionSource._llama?.parseJobId ?? null
+          });
+
+          return [llamaExtract.extraction];
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : "LlamaExtract primary extraction failed.";
+          extractionRoute = "llamaextract_primary_fallback";
+
+          logDocumentPipeline("error", "llamaextract_primary_failed", {
+            dealId: document.dealId,
+            documentId: document.id,
+            fileName: document.fileName,
+            error: message
+          });
+
+          return runLegacySectionExtraction();
+        }
+      }
     );
 
     logDocumentPipeline("info", "field_extraction_complete", {
@@ -728,9 +866,28 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       fileName: document.fileName,
       sectionCount: sections.length,
       extractionCount: partialExtractions.length,
-      usedLlm: hasLlmKey()
+      usedLlm:
+        extractionRoute === "legacy" || extractionRoute === "llamaextract_primary_fallback"
+          ? hasLlmKey()
+          : true,
+      extractionRoute,
+      llamaExtractInputSource
     });
-    logStageDebug("extract_fields ✓", { extractionCount: partialExtractions.length, usedLlm: hasLlmKey(), model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic" });
+    logStageDebug("extract_fields ✓", {
+      extractionCount: partialExtractions.length,
+      extractionRoute,
+      llamaExtractInputSource,
+      usedLlm:
+        extractionRoute === "legacy" || extractionRoute === "llamaextract_primary_fallback"
+          ? hasLlmKey()
+          : true,
+      model:
+        extractionRoute === "llamaextract_primary"
+          ? `llamaextract:${process.env.LLAMA_EXTRACT_TIER ?? "agentic"}`
+          : hasLlmKey()
+            ? getLlmRoute("extract_section").primary
+            : "heuristic"
+    });
 
     checkPipelineTimeout();
     const extraction = await runStage(
@@ -739,25 +896,11 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       "merge_results",
       async () => mergeExtractionResults(partialExtractions as ExtractionPipelineResult[])
     );
-    const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
-    const sanitizedExtraction = sanitizeCreatorExtractionResult(
+    const sanitizedExtraction = finalizeDocumentExtraction(
+      extractionSource.normalizedText,
       extraction,
       preferredCreatorName
     );
-
-    const intelligence = buildConflictIntelligencePatch({
-      text: extractionSource.normalizedText,
-      sectionKey: null,
-      fallbackTerms: sanitizedExtraction.data
-    });
-    sanitizedExtraction.data = {
-      ...sanitizedExtraction.data,
-      ...mergeConflictIntelligence(sanitizedExtraction.data, intelligence.patch)
-    };
-    sanitizedExtraction.evidence = [
-      ...sanitizedExtraction.evidence,
-      ...intelligence.evidence
-    ];
     const extractionEvidence = Array.isArray(sanitizedExtraction.evidence)
       ? sanitizedExtraction.evidence
       : [];
@@ -774,6 +917,50 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       hasBrandName: Boolean(sanitizedExtraction.data.brandName),
       hasCampaignName: Boolean(sanitizedExtraction.data.campaignName)
     });
+
+    if (contractLlamaExtractMode === "shadow") {
+      try {
+        const shadowExtraction = await extractContractWithLlamaExtract({
+          document,
+          fallbackData: llamaExtractFallbackTerms,
+          parseJobId: extractionSource._llama?.parseJobId ?? null,
+          projectId: extractionSource._llama?.projectId ?? null,
+          buffer: extractionSource._llama?.parseJobId
+            ? null
+            : await getDocumentBuffer()
+        });
+        const finalizedShadowExtraction = finalizeDocumentExtraction(
+          extractionSource.normalizedText,
+          shadowExtraction.extraction,
+          preferredCreatorName
+        );
+        const diffs = buildContractShadowDiff(
+          sanitizedExtraction.data,
+          finalizedShadowExtraction.data
+        );
+
+        logDocumentPipeline("info", "llamaextract_shadow_complete", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          inputSource: shadowExtraction.inputSource,
+          projectId: shadowExtraction.projectId,
+          parseJobId: extractionSource._llama?.parseJobId ?? null,
+          diffCount: diffs.length,
+          diffs
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "LlamaExtract shadow extraction failed.";
+
+        logDocumentPipeline("error", "llamaextract_shadow_failed", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          error: message
+        });
+      }
+    }
 
     if (
       classification.documentKind === "campaign_brief" ||

@@ -30,6 +30,7 @@ import {
 } from "@/lib/invoices";
 import { captureHandledError } from "@/lib/monitoring/sentry";
 import { startServerDebug } from "@/lib/server-debug";
+import { sanitizePlainTextInput } from "@/lib/utils";
 import {
   createDealSchema,
   dealTermsInputSchema,
@@ -235,7 +236,11 @@ export async function saveTermsAction(formData: FormData) {
       formData.get("terminationConditions")
     ),
     governingLaw: parseNullableString(formData.get("governingLaw")),
-    notes: parseNullableString(formData.get("notes"))
+    notes: (() => {
+      const rawNotes = parseNullableString(formData.get("notes"));
+      const sanitizedNotes = sanitizePlainTextInput(rawNotes);
+      return sanitizedNotes || null;
+    })()
   });
 
   await updateTermsFromDeals(viewer, dealId, {
@@ -251,8 +256,10 @@ export async function saveTermsAction(formData: FormData) {
 export async function saveDealNotesAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
+  const rawNotes = parseNullableString(formData.get("notes"));
+  const sanitizedNotes = sanitizePlainTextInput(rawNotes);
 
-  await updateDealNotesFromDeals(viewer, dealId, parseNullableString(formData.get("notes")));
+  await updateDealNotesFromDeals(viewer, dealId, sanitizedNotes || null);
 
   revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app");

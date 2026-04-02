@@ -134,12 +134,12 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     taskKey: "assistant_chat",
     featureKey: "assistant_chat",
     routeClass: "balanced",
-    primary: "google/gemini-2.5-flash",
-    fallbacks: ["openai/gpt-5-mini"],
+    primary: "openai/gpt-5-mini",
+    fallbacks: ["google/gemini-2.5-flash"],
     maxTokens: 4096,
     cacheTtlSeconds: null,
     cachePromptVersion: "assistant.v2",
-    routeVersion: "assistant.route.v1",
+    routeVersion: "assistant.route.v2",
     throttle: true
   },
   extract_section: {

@@ -5,6 +5,10 @@ import {
   finalizeAiStreamExecution,
   prepareAiStreamExecution
 } from "@/lib/ai/gateway";
+import {
+  formatAssistantProviderError,
+  logAssistantProviderDiagnostics
+} from "@/lib/assistant/errors";
 import { assistantMessageText, assistantRecordsToUIMessages } from "@/lib/assistant/messages";
 import { buildAssistantPrompt } from "@/lib/assistant/prompt";
 import { assistantProvider } from "@/lib/assistant/provider";
@@ -99,6 +103,13 @@ export async function streamAssistantResponse(input: {
     }))
   });
 
+  const systemPrompt = buildAssistantPrompt({
+    scope: input.scope,
+    context: input.context,
+    snapshotSummary: dealSnapshot?.summary ?? null,
+    userSnapshotSummary: userSnapshot?.summary ?? null
+  });
+
   const result = streamText({
     model: provider.chat(prepared.requestedModel, {
       user: input.viewer.id,
@@ -112,12 +123,7 @@ export async function streamAssistantResponse(input: {
         ttl: "5m"
       }
     }),
-    system: buildAssistantPrompt({
-      scope: input.scope,
-      context: input.context,
-      snapshotSummary: dealSnapshot?.summary ?? null,
-      userSnapshotSummary: userSnapshot?.summary ?? null
-    }),
+    system: systemPrompt,
     messages: modelMessages,
     maxOutputTokens: prepared.maxTokens,
     temperature: 0.2,
@@ -138,6 +144,21 @@ export async function streamAssistantResponse(input: {
 
   return result.toUIMessageStreamResponse({
     originalMessages: uiMessages,
+    onError: (error) => {
+      logAssistantProviderDiagnostics({
+        area: "assistant_stream",
+        error,
+        threadId: input.thread.id,
+        scope: input.scope,
+        context: input.context,
+        persistedMessages: input.persistedMessages,
+        snapshotSummary: dealSnapshot?.summary ?? null,
+        userSnapshotSummary: userSnapshot?.summary ?? null,
+        systemPrompt
+      });
+
+      return formatAssistantProviderError(error);
+    },
     onFinish: async ({ messages }) => {
       const [usage, response] = await Promise.all([
         result.totalUsage,

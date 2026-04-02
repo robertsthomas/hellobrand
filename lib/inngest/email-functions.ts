@@ -1,6 +1,4 @@
 import { inngest } from "@/lib/inngest/client";
-import { renewExpiringEmailSubscriptions, syncEmailAccount } from "@/lib/email/service";
-import { listUpcomingActionItemDeadlines } from "@/lib/email/repository";
 
 export const emailInitialSyncFunction = inngest.createFunction(
   { id: "email-account-initial-sync" },
@@ -12,15 +10,16 @@ export const emailInitialSyncFunction = inngest.createFunction(
       throw new Error("Missing accountId.");
     }
 
-    await step.run("sync-email-account-initial", async () =>
-      syncEmailAccount(accountId, {
+    await step.run("sync-email-account-initial", async () => {
+      const { syncEmailAccount } = await import("@/lib/email/service");
+      return syncEmailAccount(accountId, {
         mode: "initial",
         recentLimit:
           typeof event.data.recentLimit === "number"
             ? event.data.recentLimit
             : undefined
-      })
-    );
+      });
+    });
 
     return { ok: true, accountId };
   }
@@ -36,8 +35,9 @@ export const emailIncrementalSyncFunction = inngest.createFunction(
       throw new Error("Missing accountId.");
     }
 
-    await step.run("sync-email-account-incremental", async () =>
-      syncEmailAccount(accountId, {
+    await step.run("sync-email-account-incremental", async () => {
+      const { syncEmailAccount } = await import("@/lib/email/service");
+      return syncEmailAccount(accountId, {
         mode: "incremental",
         gmailHistoryId:
           typeof event.data.gmailHistoryId === "string"
@@ -47,8 +47,8 @@ export const emailIncrementalSyncFunction = inngest.createFunction(
           ? event.data.outlookMessageIds
               .filter((entry: unknown): entry is string => typeof entry === "string")
           : []
-      })
-    );
+      });
+    });
 
     return { ok: true, accountId };
   }
@@ -58,8 +58,14 @@ export const emailRenewalSweepFunction = inngest.createFunction(
   { id: "email-renewal-sweep" },
   { cron: "*/15 * * * *" },
   async ({ step }) => {
-    const renewedCount = await step.run("renew-expiring-email-subscriptions", async () =>
-      renewExpiringEmailSubscriptions()
+    const renewedCount = await step.run(
+      "renew-expiring-email-subscriptions",
+      async () => {
+        const { renewExpiringEmailSubscriptions } = await import(
+          "@/lib/email/service"
+        );
+        return renewExpiringEmailSubscriptions();
+      }
     );
 
     return { ok: true, renewedCount };
@@ -71,9 +77,12 @@ export const emailActionItemDeadlineCheckFunction = inngest.createFunction(
   { cron: "0 9 * * *" },
   async ({ step }) => {
     const upcomingDeadline = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-    const items = await step.run("check-upcoming-deadlines", async () =>
-      listUpcomingActionItemDeadlines(upcomingDeadline)
-    );
+    const items = await step.run("check-upcoming-deadlines", async () => {
+      const { listUpcomingActionItemDeadlines } = await import(
+        "@/lib/email/repository"
+      );
+      return listUpcomingActionItemDeadlines(upcomingDeadline);
+    });
 
     return { ok: true, upcomingCount: items.length, items: items.map((i) => ({ id: i.id, action: i.action, dueDate: i.dueDate })) };
   }

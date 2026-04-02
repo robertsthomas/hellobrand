@@ -43,17 +43,17 @@ export function AssistantSettings({
   }
 
   return (
-    <div className="absolute right-0 top-full z-20 mt-2 w-[320px] border border-black/10 bg-[#f7f5f1] p-4 shadow-[0_18px_50px_rgba(15,23,42,0.14)] dark:border-white/10 dark:bg-[#121419]">
+    <div className="absolute right-0 top-full z-20 mt-2 w-[260px] border border-black/10 bg-[#f7f5f1] p-3 shadow-[0_18px_50px_rgba(15,23,42,0.14)] dark:border-white/10 dark:bg-[#121419]">
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-foreground">Assistant settings</h3>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Change how the assistant writes. More settings can live here later.
+        <p className="text-[11px] leading-4.5 text-muted-foreground">
+          Change how the assistant writes
         </p>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-1.5">
         <p className="text-[11px] uppercase tracking-[0.16em] text-[#98a2b3]">Tone</p>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {toneOptions.map((option) => (
             <button
               key={option.value}
@@ -68,8 +68,8 @@ export function AssistantSettings({
                   : "border-black/10 bg-white hover:border-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20"
               }`}
             >
-              <p className="text-sm font-semibold text-foreground">{option.label}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{option.description}</p>
+              <p className="text-[13px] font-semibold text-foreground">{option.label}</p>
+              <p className="mt-0.5 text-[11px] leading-4.5 text-muted-foreground">{option.description}</p>
             </button>
           ))}
         </div>

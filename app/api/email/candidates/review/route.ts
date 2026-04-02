@@ -10,11 +10,16 @@ export async function POST(request: NextRequest) {
     const viewer = await requireApiViewer();
     await assertViewerHasFeature(viewer, "premium_inbox");
     const body = (await request.json()) as {
+      primaryCandidateId?: string | null;
+      referenceIds?: string[];
       confirmIds?: string[];
       rejectIds?: string[];
     };
 
     const result = await reviewDealEmailCandidatesForViewer(viewer, {
+      primaryCandidateId:
+        typeof body.primaryCandidateId === "string" ? body.primaryCandidateId : null,
+      referenceIds: Array.isArray(body.referenceIds) ? body.referenceIds : [],
       confirmIds: Array.isArray(body.confirmIds) ? body.confirmIds : [],
       rejectIds: Array.isArray(body.rejectIds) ? body.rejectIds : []
     });

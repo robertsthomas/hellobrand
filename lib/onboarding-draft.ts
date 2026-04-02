@@ -3,6 +3,7 @@ import { PROFILE_PLATFORM_OPTIONS, type ProfilePlatform } from "@/lib/profile-me
 export type ProfileOnboardingDraft = {
   displayName: string;
   contactEmail: string;
+  timeZone?: string | null;
   primaryHandle: string;
   selectedPlatforms: ProfilePlatform[];
   platformHandles: Record<string, string>;
@@ -37,6 +38,7 @@ export function buildProfileOnboardingSubmission(input: ProfileOnboardingDraft) 
   return {
     displayName: input.displayName.trim(),
     contactEmail: input.contactEmail.trim(),
+    timeZone: input.timeZone?.trim() || null,
     primaryHandle: normalizedPrimaryHandle,
     selectedPlatforms,
     platformHandles: Object.fromEntries(

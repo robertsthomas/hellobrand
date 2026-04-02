@@ -6,6 +6,7 @@ import type {
   DealRecord,
   DealEmailLinkRecord,
   EmailActionItemRecord,
+  EmailLinkRole,
   EmailDealCandidateMatchRecord,
   EmailDealCandidateMatchView,
   EmailDealEventRecord,
@@ -14,10 +15,13 @@ import type {
   EmailMessageRecord,
   EmailParticipant,
   EmailSyncStateRecord,
+  EmailThreadDraftRecord,
   EmailThreadDetail,
   EmailThreadListItem,
   EmailThreadLinkView,
+  EmailThreadNoteRecord,
   EmailThreadRecord,
+  EmailThreadWorkflowState,
   BrandContactRecord
 } from "@/lib/types";
 
@@ -151,6 +155,8 @@ function toThreadRecord(thread: {
   isContractRelated: boolean;
   aiSummary: string | null;
   aiSummaryUpdatedAt: Date | null;
+  workflowState: string;
+  draftUpdatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): EmailThreadRecord {
@@ -167,6 +173,8 @@ function toThreadRecord(thread: {
     isContractRelated: thread.isContractRelated,
     aiSummary: thread.aiSummary,
     aiSummaryUpdatedAt: iso(thread.aiSummaryUpdatedAt),
+    workflowState: thread.workflowState as EmailThreadWorkflowState,
+    draftUpdatedAt: iso(thread.draftUpdatedAt),
     createdAt: iso(thread.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(thread.updatedAt) ?? new Date().toISOString()
   };
@@ -285,6 +293,7 @@ function toLinkView(link: {
   dealId: string;
   threadId: string;
   linkSource: string;
+  role: string;
   confidence: number | null;
   createdAt: Date;
   deal: {
@@ -300,8 +309,60 @@ function toLinkView(link: {
     brandName: link.deal.brandName,
     campaignName: link.deal.campaignName,
     linkSource: link.linkSource as EmailThreadLinkView["linkSource"],
+    role: link.role as EmailLinkRole,
     confidence: link.confidence,
     createdAt: iso(link.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toDraftRecord(draft: {
+  id: string;
+  userId: string;
+  threadId: string;
+  subject: string;
+  body: string;
+  status: string;
+  source: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): EmailThreadDraftRecord {
+  return {
+    id: draft.id,
+    userId: draft.userId,
+    threadId: draft.threadId,
+    subject: draft.subject,
+    body: draft.body,
+    status: draft.status as EmailThreadDraftRecord["status"],
+    source: draft.source as EmailThreadDraftRecord["source"],
+    createdAt: iso(draft.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(draft.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toNoteRecord(note: {
+  id: string;
+  userId: string;
+  threadId: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): EmailThreadNoteRecord {
+  return {
+    id: note.id,
+    userId: note.userId,
+    threadId: note.threadId,
+    body: note.body,
+    createdAt: iso(note.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(note.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function splitThreadLinks(links: EmailThreadLinkView[]) {
+  const primaryLink = links.find((link) => link.role === "primary") ?? null;
+  const referenceLinks = links.filter((link) => link.role !== "primary");
+  return {
+    primaryLink,
+    referenceLinks
   };
 }
 
@@ -494,6 +555,7 @@ export async function getEmailAttachmentForUser(userId: string, attachmentId: st
     },
     select: {
       id: true,
+      messageId: true,
       filename: true,
       mimeType: true,
       sizeBytes: true,
@@ -504,6 +566,7 @@ export async function getEmailAttachmentForUser(userId: string, attachmentId: st
           providerMessageId: true,
           thread: {
             select: {
+              id: true,
               account: true
             }
           }
@@ -518,6 +581,8 @@ export async function getEmailAttachmentForUser(userId: string, attachmentId: st
 
   return {
     id: attachment.id,
+    messageId: attachment.messageId,
+    threadId: attachment.message.thread.id,
     filename: attachment.filename,
     mimeType: attachment.mimeType,
     sizeBytes: attachment.sizeBytes,
@@ -870,6 +935,31 @@ export async function getEmailSyncState(accountId: string) {
   return state ? toSyncStateRecord(state) : null;
 }
 
+export async function listExistingEmailMessageProviderIdsForAccount(
+  accountId: string,
+  providerMessageIds: string[]
+) {
+  if (providerMessageIds.length === 0) {
+    return [];
+  }
+
+  const rows = await prisma.emailMessage.findMany({
+    where: {
+      providerMessageId: {
+        in: providerMessageIds
+      },
+      thread: {
+        accountId
+      }
+    },
+    select: {
+      providerMessageId: true
+    }
+  });
+
+  return rows.map((row) => row.providerMessageId);
+}
+
 export async function upsertEmailSyncState(
   accountId: string,
   patch: Partial<
@@ -967,6 +1057,42 @@ export async function saveSyncedEmailThread(
   }
 ) {
   const result = await prisma.$transaction(async (tx) => {
+    const existingThread = await tx.emailThread.findUnique({
+      where: {
+        accountId_providerThreadId: {
+          accountId,
+          providerThreadId: payload.providerThreadId
+        }
+      },
+      select: {
+        id: true,
+        workflowState: true,
+        lastMessageAt: true,
+        dealLinks: {
+          select: {
+            role: true
+          }
+        }
+      }
+    });
+    const hasPrimaryLink = existingThread?.dealLinks.some((link) => link.role === "primary") ?? false;
+    const latestInboundAt = payload.messages
+      .filter((message) => message.direction === "inbound")
+      .map((message) => message.receivedAt ?? message.sentAt)
+      .filter((value): value is string => Boolean(value))
+      .sort((left, right) => right.localeCompare(left))[0] ?? null;
+    const hasNewInboundActivity =
+      !existingThread ||
+      (latestInboundAt
+        ? new Date(latestInboundAt).getTime() > existingThread.lastMessageAt.getTime()
+        : false);
+    const nextWorkflowState =
+      hasNewInboundActivity && existingThread?.workflowState !== "closed"
+        ? hasPrimaryLink
+          ? "needs_review"
+          : "unlinked"
+        : existingThread?.workflowState ?? (hasPrimaryLink ? "needs_review" : "unlinked");
+
     const thread = await tx.emailThread.upsert({
       where: {
         accountId_providerThreadId: {
@@ -981,7 +1107,8 @@ export async function saveSyncedEmailThread(
         participantsJson: toJsonValue(payload.participants),
         lastMessageAt: new Date(payload.lastMessageAt),
         messageCount: payload.messages.length,
-        isContractRelated: payload.isContractRelated
+        isContractRelated: payload.isContractRelated,
+        workflowState: nextWorkflowState
       },
       create: {
         accountId,
@@ -992,7 +1119,8 @@ export async function saveSyncedEmailThread(
         participantsJson: toJsonValue(payload.participants),
         lastMessageAt: new Date(payload.lastMessageAt),
         messageCount: payload.messages.length,
-        isContractRelated: payload.isContractRelated
+        isContractRelated: payload.isContractRelated,
+        workflowState: nextWorkflowState
       }
     });
 
@@ -1063,6 +1191,35 @@ export async function saveSyncedEmailThread(
   return toThreadRecord(result);
 }
 
+export async function deleteSyncedEmailThread(
+  accountId: string,
+  providerThreadId: string
+) {
+  const existing = await prisma.emailThread.findUnique({
+    where: {
+      accountId_providerThreadId: {
+        accountId,
+        providerThreadId
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  await prisma.emailThread.delete({
+    where: {
+      id: existing.id
+    }
+  });
+
+  return existing.id;
+}
+
 export async function listEmailThreadsForUser(
   userId: string,
   filters?: {
@@ -1071,6 +1228,7 @@ export async function listEmailThreadsForUser(
     accountId?: string | null;
     linkedDealId?: string | null;
     linkedOnly?: boolean;
+    workflowState?: string | null;
     limit?: number;
   }
 ) {
@@ -1082,9 +1240,11 @@ export async function listEmailThreadsForUser(
         provider: filters?.provider ?? undefined,
         id: filters?.accountId ?? undefined
       },
+      workflowState: filters?.workflowState ?? undefined,
       dealLinks: filters?.linkedOnly
         ? {
             some: {
+              role: "primary",
               deal: {
                 userId
               }
@@ -1095,6 +1255,7 @@ export async function listEmailThreadsForUser(
     include: {
       account: true,
       dealLinks: {
+        orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         include: {
           deal: {
             select: {
@@ -1140,6 +1301,20 @@ export async function listEmailThreadsForUser(
           updatedAt: true
         },
         take: 20
+      },
+      drafts: {
+        where: {
+          userId
+        },
+        orderBy: {
+          updatedAt: "desc"
+        },
+        take: 1
+      },
+      _count: {
+        select: {
+          notes: true
+        }
       }
     },
     orderBy: {
@@ -1151,23 +1326,32 @@ export async function listEmailThreadsForUser(
   const query = filters?.query?.trim().toLowerCase() || null;
 
   return rows
-    .map((row) => ({
-      thread: toThreadRecord(row),
-      account: toAccountRecord(row.account),
-      links: row.dealLinks.map(toLinkView),
-      importantEventCount: row.dealEvents.length + row.termSuggestions.length,
-      latestImportantEventAt:
-        [...row.dealEvents, ...row.termSuggestions]
-          .map((event) => iso(event.updatedAt))
-          .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
-          .find((value): value is string => Boolean(value)) ?? null,
-      pendingTermSuggestionCount: row.termSuggestions.length,
-      pendingActionItemCount: row.actionItems.length,
-      latestPendingActionItemAt:
-        row.actionItems
-          .map((item) => iso(item.updatedAt))
-          .find((value): value is string => Boolean(value)) ?? null
-    }))
+    .map((row) => {
+      const links = row.dealLinks.map(toLinkView);
+      const { primaryLink, referenceLinks } = splitThreadLinks(links);
+
+      return {
+        thread: toThreadRecord(row),
+        account: toAccountRecord(row.account),
+        links,
+        primaryLink,
+        referenceLinks,
+        importantEventCount: row.dealEvents.length + row.termSuggestions.length,
+        latestImportantEventAt:
+          [...row.dealEvents, ...row.termSuggestions]
+            .map((event) => iso(event.updatedAt))
+            .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
+            .find((value): value is string => Boolean(value)) ?? null,
+        pendingTermSuggestionCount: row.termSuggestions.length,
+        pendingActionItemCount: row.actionItems.length,
+        latestPendingActionItemAt:
+          row.actionItems
+            .map((item) => iso(item.updatedAt))
+            .find((value): value is string => Boolean(value)) ?? null,
+        savedDraft: row.drafts[0] ? toDraftRecord(row.drafts[0]) : null,
+        noteCount: row._count.notes
+      };
+    })
     .filter((row) => {
       if (filters?.linkedDealId && !row.links.some((link) => link.dealId === filters.linkedDealId)) {
         return false;
@@ -1209,6 +1393,7 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
         orderBy: [{ receivedAt: "asc" }, { createdAt: "asc" }]
       },
       dealLinks: {
+        orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         include: {
           deal: {
             select: {
@@ -1235,6 +1420,29 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
         },
         orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
         take: 20
+      },
+      drafts: {
+        where: {
+          userId
+        },
+        orderBy: {
+          updatedAt: "desc"
+        },
+        take: 1
+      },
+      notes: {
+        where: {
+          userId
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 20
+      },
+      _count: {
+        select: {
+          notes: true
+        }
       }
     }
   });
@@ -1243,16 +1451,24 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
     return null;
   }
 
+  const links = row.dealLinks.map(toLinkView);
+  const { primaryLink, referenceLinks } = splitThreadLinks(links);
+
   return {
     thread: toThreadRecord(row),
     account: toAccountRecord(row.account),
     messages: row.messages.map(toMessageRecord),
-    links: row.dealLinks.map(toLinkView),
+    links,
+    primaryLink,
+    referenceLinks,
     importantEvents: row.dealEvents.map(toDealEventRecord),
     termSuggestions: row.termSuggestions.map(toTermSuggestionRecord),
     actionItems: row.actionItems.map(toActionItemRecord),
     promiseDiscrepancies: [],
-    crossDealConflicts: []
+    crossDealConflicts: [],
+    savedDraft: row.drafts[0] ? toDraftRecord(row.drafts[0]) : null,
+    notes: row.notes.map(toNoteRecord),
+    noteCount: row._count.notes
   };
 }
 
@@ -1306,6 +1522,7 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
             take: 20
           },
           dealLinks: {
+            orderBy: [{ role: "asc" }, { createdAt: "asc" }],
             include: {
               deal: {
                 select: {
@@ -1313,6 +1530,21 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
                   campaignName: true
                 }
               }
+            }
+          }
+          ,
+          drafts: {
+            where: {
+              userId
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            take: 1
+          },
+          _count: {
+            select: {
+              notes: true
             }
           }
         }
@@ -1323,23 +1555,32 @@ export async function listLinkedEmailThreadsForDeal(userId: string, dealId: stri
     }
   });
 
-  return rows.map((row) => ({
-    thread: toThreadRecord(row.thread),
-    account: toAccountRecord(row.thread.account),
-    links: row.thread.dealLinks.map(toLinkView),
-    importantEventCount: row.thread.dealEvents.length + row.thread.termSuggestions.length,
-    latestImportantEventAt:
-      [...row.thread.dealEvents, ...row.thread.termSuggestions]
-        .map((event) => iso(event.updatedAt))
-        .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
-        .find((value): value is string => Boolean(value)) ?? null,
-    pendingTermSuggestionCount: row.thread.termSuggestions.length,
-    pendingActionItemCount: row.thread.actionItems.length,
-    latestPendingActionItemAt:
-      row.thread.actionItems
-        .map((item) => iso(item.updatedAt))
-        .find((value): value is string => Boolean(value)) ?? null
-  })) satisfies EmailThreadListItem[];
+  return rows.map((row) => {
+    const links = row.thread.dealLinks.map(toLinkView);
+    const { primaryLink, referenceLinks } = splitThreadLinks(links);
+
+    return {
+      thread: toThreadRecord(row.thread),
+      account: toAccountRecord(row.thread.account),
+      links,
+      primaryLink,
+      referenceLinks,
+      importantEventCount: row.thread.dealEvents.length + row.thread.termSuggestions.length,
+      latestImportantEventAt:
+        [...row.thread.dealEvents, ...row.thread.termSuggestions]
+          .map((event) => iso(event.updatedAt))
+          .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
+          .find((value): value is string => Boolean(value)) ?? null,
+      pendingTermSuggestionCount: row.thread.termSuggestions.length,
+      pendingActionItemCount: row.thread.actionItems.length,
+      latestPendingActionItemAt:
+        row.thread.actionItems
+          .map((item) => iso(item.updatedAt))
+          .find((value): value is string => Boolean(value)) ?? null,
+      savedDraft: row.thread.drafts[0] ? toDraftRecord(row.thread.drafts[0]) : null,
+      noteCount: row.thread._count.notes
+    };
+  }) satisfies EmailThreadListItem[];
 }
 
 export async function linkEmailThreadToDeal(
@@ -1347,6 +1588,7 @@ export async function linkEmailThreadToDeal(
   threadId: string,
   dealId: string,
   source: DealEmailLinkRecord["linkSource"] = "manual",
+  role: DealEmailLinkRecord["role"] = "reference",
   confidence: number | null = null
 ) {
   const thread = await prisma.emailThread.findFirst({
@@ -1370,23 +1612,48 @@ export async function linkEmailThreadToDeal(
     return null;
   }
 
-  const link = await prisma.dealEmailLink.upsert({
-    where: {
-      dealId_threadId: {
-        dealId,
-        threadId
-      }
-    },
-    update: {
-      linkSource: source,
-      confidence
-    },
-    create: {
-      dealId,
-      threadId,
-      linkSource: source,
-      confidence
+  const link = await prisma.$transaction(async (tx) => {
+    if (role === "primary") {
+      await tx.dealEmailLink.updateMany({
+        where: {
+          threadId,
+          role: "primary"
+        },
+        data: {
+          role: "reference"
+        }
+      });
     }
+
+    const nextLink = await tx.dealEmailLink.upsert({
+      where: {
+        dealId_threadId: {
+          dealId,
+          threadId
+        }
+      },
+      update: {
+        linkSource: source,
+        role,
+        confidence
+      },
+      create: {
+        dealId,
+        threadId,
+        linkSource: source,
+        role,
+        confidence
+      }
+    });
+
+    await tx.emailThread.update({
+      where: { id: threadId },
+      data: {
+        workflowState: role === "primary" ? "needs_review" : undefined
+      }
+    });
+
+    return nextLink;
   });
 
   return {
@@ -1394,6 +1661,7 @@ export async function linkEmailThreadToDeal(
     dealId: link.dealId,
     threadId: link.threadId,
     linkSource: link.linkSource as DealEmailLinkRecord["linkSource"],
+    role: link.role as DealEmailLinkRecord["role"],
     confidence: link.confidence,
     createdAt: iso(link.createdAt) ?? new Date().toISOString()
   } satisfies DealEmailLinkRecord;
@@ -1413,17 +1681,226 @@ export async function unlinkEmailThreadFromDeal(userId: string, threadId: string
         }
       }
     },
-    select: { id: true }
+    select: { id: true, role: true }
   });
 
   if (!existing) {
     return false;
   }
 
-  await prisma.dealEmailLink.delete({
-    where: { id: existing.id }
+  await prisma.$transaction(async (tx) => {
+    await tx.dealEmailLink.delete({
+      where: { id: existing.id }
+    });
+
+    const hasPrimaryLink = await tx.dealEmailLink.findFirst({
+      where: {
+        threadId,
+        role: "primary"
+      },
+      select: { id: true }
+    });
+
+    await tx.emailThread.update({
+      where: { id: threadId },
+      data: {
+        workflowState: hasPrimaryLink ? undefined : "unlinked"
+      }
+    });
   });
   return true;
+}
+
+export async function saveEmailThreadDraftForUser(input: {
+  userId: string;
+  threadId: string;
+  subject: string;
+  body: string;
+  status: EmailThreadDraftRecord["status"];
+  source: EmailThreadDraftRecord["source"];
+}) {
+  const thread = await prisma.emailThread.findFirst({
+    where: {
+      id: input.threadId,
+      account: {
+        userId: input.userId
+      }
+    },
+    select: { id: true }
+  });
+
+  if (!thread) {
+    return null;
+  }
+
+  const workflowState: EmailThreadWorkflowState =
+    input.status === "ready" ? "draft_ready" : "needs_reply";
+
+  const saved = await prisma.$transaction(async (tx) => {
+    const draft = await tx.emailThreadDraft.upsert({
+      where: {
+        userId_threadId: {
+          userId: input.userId,
+          threadId: input.threadId
+        }
+      },
+      update: {
+        subject: input.subject,
+        body: input.body,
+        status: input.status,
+        source: input.source
+      },
+      create: {
+        userId: input.userId,
+        threadId: input.threadId,
+        subject: input.subject,
+        body: input.body,
+        status: input.status,
+        source: input.source
+      }
+    });
+
+    await tx.emailThread.update({
+      where: { id: input.threadId },
+      data: {
+        workflowState,
+        draftUpdatedAt: new Date()
+      }
+    });
+
+    return draft;
+  });
+
+  return toDraftRecord(saved);
+}
+
+export async function getEmailThreadDraftForUser(userId: string, threadId: string) {
+  const draft = await prisma.emailThreadDraft.findFirst({
+    where: {
+      userId,
+      threadId,
+      thread: {
+        account: {
+          userId
+        }
+      }
+    },
+    orderBy: {
+      updatedAt: "desc"
+    }
+  });
+
+  return draft ? toDraftRecord(draft) : null;
+}
+
+export async function deleteEmailThreadDraftForUser(userId: string, threadId: string) {
+  const existing = await prisma.emailThreadDraft.findFirst({
+    where: {
+      userId,
+      threadId,
+      thread: {
+        account: {
+          userId
+        }
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!existing) {
+    return false;
+  }
+
+  await prisma.emailThreadDraft.delete({
+    where: {
+      id: existing.id
+    }
+  });
+
+  return true;
+}
+
+export async function listEmailThreadNotesForUser(userId: string, threadId: string) {
+  const notes = await prisma.emailThreadNote.findMany({
+    where: {
+      userId,
+      threadId,
+      thread: {
+        account: {
+          userId
+        }
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    },
+    take: 50
+  });
+
+  return notes.map(toNoteRecord);
+}
+
+export async function createEmailThreadNoteForUser(input: {
+  userId: string;
+  threadId: string;
+  body: string;
+}) {
+  const thread = await prisma.emailThread.findFirst({
+    where: {
+      id: input.threadId,
+      account: {
+        userId: input.userId
+      }
+    },
+    select: { id: true }
+  });
+
+  if (!thread) {
+    return null;
+  }
+
+  const note = await prisma.emailThreadNote.create({
+    data: {
+      userId: input.userId,
+      threadId: input.threadId,
+      body: input.body
+    }
+  });
+
+  return toNoteRecord(note);
+}
+
+export async function updateEmailThreadWorkflowForUser(input: {
+  userId: string;
+  threadId: string;
+  workflowState: EmailThreadWorkflowState;
+}) {
+  const thread = await prisma.emailThread.findFirst({
+    where: {
+      id: input.threadId,
+      account: {
+        userId: input.userId
+      }
+    },
+    select: { id: true }
+  });
+
+  if (!thread) {
+    return null;
+  }
+
+  const saved = await prisma.emailThread.update({
+    where: {
+      id: input.threadId
+    },
+    data: {
+      workflowState: input.workflowState
+    }
+  });
+
+  return toThreadRecord(saved);
 }
 
 export async function saveEmailThreadSummary(userId: string, threadId: string, summary: string) {

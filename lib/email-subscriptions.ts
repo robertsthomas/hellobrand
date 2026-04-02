@@ -9,6 +9,8 @@ export const EMAIL_SUBSCRIPTION_CATEGORIES = ["product_updates"] as const;
 export type EmailSubscriptionCategory =
   (typeof EMAIL_SUBSCRIPTION_CATEGORIES)[number];
 
+let hasWarnedAboutMissingSubscriptionTable = false;
+
 function normalizeEmailAddress(value: string | null | undefined) {
   if (typeof value !== "string") {
     return null;
@@ -33,6 +35,36 @@ function getEmailSubscriptionSecret() {
   }
 
   return secret;
+}
+
+function isMissingEmailSubscriptionTableError(error: unknown) {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const code =
+    "code" in error && typeof error.code === "string" ? error.code : null;
+  const message =
+    "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+
+  return (
+    code === "P2021" ||
+    message.includes("EmailSubscriptionPreference") ||
+    message.includes("does not exist in the current database")
+  );
+}
+
+function warnAboutMissingSubscriptionTable() {
+  if (hasWarnedAboutMissingSubscriptionTable) {
+    return;
+  }
+
+  hasWarnedAboutMissingSubscriptionTable = true;
+  console.warn(
+    "Email subscription preferences table is missing. Run `pnpm prisma migrate dev --name add_email_subscription_preferences` to enable unsubscribe preferences."
+  );
 }
 
 function signPayload(encodedPayload: string) {
@@ -71,14 +103,25 @@ export async function resolveEmailSubscriptionEnabled(
     return true;
   }
 
-  const existing = await prisma.emailSubscriptionPreference.findUnique({
-    where: {
-      email_category: {
-        email: normalizedEmail,
-        category
+  let existing = null;
+
+  try {
+    existing = await prisma.emailSubscriptionPreference.findUnique({
+      where: {
+        email_category: {
+          email: normalizedEmail,
+          category
+        }
       }
+    });
+  } catch (error) {
+    if (!isMissingEmailSubscriptionTableError(error)) {
+      throw error;
     }
-  });
+
+    warnAboutMissingSubscriptionTable();
+    return true;
+  }
 
   return existing?.isSubscribed ?? true;
 }
@@ -96,26 +139,35 @@ export async function setEmailSubscriptionPreference(input: {
 
   const unsubscribedAt = input.isSubscribed ? null : new Date();
 
-  return prisma.emailSubscriptionPreference.upsert({
-    where: {
-      email_category: {
+  try {
+    return await prisma.emailSubscriptionPreference.upsert({
+      where: {
+        email_category: {
+          email: normalizedEmail,
+          category: input.category
+        }
+      },
+      create: {
         email: normalizedEmail,
-        category: input.category
+        category: input.category,
+        isSubscribed: input.isSubscribed,
+        source: input.source ?? null,
+        unsubscribedAt
+      },
+      update: {
+        isSubscribed: input.isSubscribed,
+        source: input.source ?? null,
+        unsubscribedAt
       }
-    },
-    create: {
-      email: normalizedEmail,
-      category: input.category,
-      isSubscribed: input.isSubscribed,
-      source: input.source ?? null,
-      unsubscribedAt
-    },
-    update: {
-      isSubscribed: input.isSubscribed,
-      source: input.source ?? null,
-      unsubscribedAt
+    });
+  } catch (error) {
+    if (!isMissingEmailSubscriptionTableError(error)) {
+      throw error;
     }
-  });
+
+    warnAboutMissingSubscriptionTable();
+    return null;
+  }
 }
 
 export function createEmailSubscriptionToken(input: {

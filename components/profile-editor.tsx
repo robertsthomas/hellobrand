@@ -33,6 +33,14 @@ import {
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import type { ProfileAuditRecord, ProfileRecord } from "@/lib/types";
 
+function getBrowserTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 function presentDateTime(value: string) {
   try {
     return new Intl.DateTimeFormat("en-US", {
@@ -222,7 +230,10 @@ export function ProfileEditor({
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify(buildProfileEditorPatch(form, initialProfile))
+        body: JSON.stringify({
+          ...buildProfileEditorPatch(form, initialProfile),
+          timeZone: getBrowserTimeZone()
+        })
       });
 
       const payload = await response.json();

@@ -585,6 +585,7 @@ function toProfileRecordForClerk(user: AdminManagedUser): ProfileRecord {
     creatorLegalName: user.profile?.creatorLegalName ?? null,
     businessName: user.profile?.businessName ?? null,
     contactEmail: user.profile?.contactEmail ?? user.email,
+    timeZone: null,
     preferredSignature: user.profile?.displayName ?? user.displayName,
     payoutDetails: null,
     defaultCurrency: "USD",

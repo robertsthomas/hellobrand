@@ -1,5 +1,6 @@
 import { saveDealNotesAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
+import { sanitizePlainTextInput } from "@/lib/utils";
 
 export function DealNotesPanel({
   dealId,
@@ -8,6 +9,8 @@ export function DealNotesPanel({
   dealId: string;
   notes: string | null;
 }) {
+  const sanitizedNotes = sanitizePlainTextInput(notes);
+
   return (
     <form
       action={saveDealNotesAction}
@@ -26,7 +29,7 @@ export function DealNotesPanel({
       <textarea
         className="min-h-40 border border-black/10 bg-white px-4 py-4 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20"
         name="notes"
-        defaultValue={notes ?? ""}
+        defaultValue={sanitizedNotes}
         placeholder="Add creator-side notes, open questions, negotiated updates, or payment reminders."
       />
 

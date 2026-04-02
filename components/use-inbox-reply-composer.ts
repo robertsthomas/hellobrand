@@ -5,6 +5,7 @@ import {
   useEffect,
   useReducer,
   useRef,
+  useState,
   type RefObject
 } from "react";
 import { useCompletion } from "@ai-sdk/react";
@@ -35,6 +36,10 @@ type ReplyComposerState = {
 
 type ReplyComposerAction =
   | { type: "reset_for_thread" }
+  | {
+      type: "load_saved_draft";
+      draft: { subject: string; body: string; source: "manual" | "ai" };
+    }
   | { type: "set_body_input"; value: string }
   | { type: "set_draft_instructions"; value: string }
   | { type: "set_prompt_command_open"; value: boolean }
@@ -66,6 +71,51 @@ const initialState: ReplyComposerState = {
   openRefinementPopover: null
 };
 
+function stripReplySubjectHeader(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/^\s*subject:\s*[^\n]*\n+/i, "")
+    .trimStart();
+}
+
+function extractReplyBodyFromJson(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidate = fencedMatch ? fencedMatch[1]!.trim() : trimmed;
+
+  if (!candidate.startsWith("{") || !candidate.endsWith("}")) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(candidate) as { body?: unknown };
+    if (typeof parsed.body === "string" && parsed.body.trim()) {
+      return parsed.body;
+    }
+  } catch {
+    return value;
+  }
+
+  return value;
+}
+
+function normalizeGeneratedReply(value: string) {
+  return stripReplySubjectHeader(extractReplyBodyFromJson(value))
+    .replace(
+      /\n{2,}I kept your note in mind:\s*[\s\S]*$/i,
+      ""
+    )
+    .replace(
+      /\n{2,}I kept (?:your|the) (?:note|prompt|instruction)s? in mind:\s*[\s\S]*$/i,
+      ""
+    )
+    .trim();
+}
+
 function reducer(
   state: ReplyComposerState,
   action: ReplyComposerAction
@@ -83,12 +133,36 @@ function reducer(
         draftInstructions: "",
         openRefinementPopover: null
       };
+    case "load_saved_draft":
+      return {
+        ...state,
+        draft: {
+          subject: action.draft.subject,
+          body: action.draft.body
+        },
+        replySubject: action.draft.subject,
+        replyBody: action.draft.body,
+        replyJourney: action.draft.source === "ai" ? "ai_generated" : "user_set",
+        isDrafting: false,
+        isPromptCommandOpen: false,
+        draftInstructions: "",
+        openRefinementPopover: null
+      };
     case "set_body_input":
       if (state.replyJourney === "ai_set") {
         return {
           ...state,
           replyBody: action.value,
           draftInstructions: action.value
+        };
+      }
+
+      if (state.replyJourney === "ai_generated") {
+        return {
+          ...state,
+          draft: action.value.trim().length > 0 ? state.draft : null,
+          replyBody: action.value,
+          replyJourney: action.value.trim().length > 0 ? "user_set" : "idle"
         };
       }
 
@@ -168,14 +242,14 @@ function reducer(
         ...state,
         draft: {
           subject: state.draft?.subject ?? action.subject,
-          body: action.body
+          body: normalizeGeneratedReply(action.body)
         },
         isDrafting: false
       };
     case "stream_progress":
       return {
         ...state,
-        replyBody: action.value,
+        replyBody: normalizeGeneratedReply(action.value),
         replyJourney: "ai_generated"
       };
     case "draft_failed":
@@ -237,6 +311,7 @@ export function useInboxReplyComposer({
   canRefineGeneratedReply: boolean;
   canClearReplyText: boolean;
   canSendReply: boolean;
+  isSavingDraft: boolean;
   replyBodyRef: RefObject<HTMLTextAreaElement | null>;
   setReplyStance: (value: NegotiationStance | "") => void;
   setPromptCommandOpen: (value: boolean) => void;
@@ -245,6 +320,7 @@ export function useInboxReplyComposer({
   handleReplyBodyChange: (value: string, element?: HTMLTextAreaElement | null) => void;
   applyPromptToNextDraft: () => void;
   clearPromptDialog: () => void;
+  saveDraft: (status?: "in_progress" | "ready") => Promise<void>;
   draftReply: (
     overrideInstructions?: string | null,
     revisionTarget?: DraftRevisionTarget | null
@@ -259,6 +335,8 @@ export function useInboxReplyComposer({
   const replyBodyRef = useRef<HTMLTextAreaElement | null>(null);
   const stopRef = useRef<() => void>(() => {});
   const setCompletionRef = useRef<(value: string) => void>(() => {});
+  const lastSavedSnapshotRef = useRef<string>("");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const selectedThreadId = selectedThread?.thread.id ?? "";
 
   const {
@@ -310,7 +388,22 @@ export function useInboxReplyComposer({
     stopRef.current();
     setCompletionRef.current("");
     dispatch({ type: "reset_for_thread" });
-  }, [selectedThreadId]);
+    const savedDraft = selectedThread?.savedDraft;
+    if (savedDraft) {
+      const snapshot = `${savedDraft.subject}\n${savedDraft.body}\n${savedDraft.status}\n${savedDraft.source}`;
+      lastSavedSnapshotRef.current = snapshot;
+      dispatch({
+        type: "load_saved_draft",
+        draft: {
+          subject: savedDraft.subject,
+          body: savedDraft.body,
+          source: savedDraft.source
+        }
+      });
+      return;
+    }
+    lastSavedSnapshotRef.current = "";
+  }, [selectedThread, selectedThreadId]);
 
   useEffect(() => {
     if (!completion) {
@@ -415,7 +508,7 @@ export function useInboxReplyComposer({
     [
       complete,
       selectedDealId,
-      selectedThread?.thread.subject,
+      selectedThread,
       selectedThreadId,
       setCompletion,
       setErrorMessage
@@ -437,6 +530,59 @@ export function useInboxReplyComposer({
     resetCompletionState();
     dispatch({ type: "clear_draft" });
   }, [resetCompletionState]);
+
+  const saveDraft = useCallback(
+    async (status: "in_progress" | "ready" = "in_progress") => {
+      if (!selectedThreadId) {
+        return;
+      }
+
+      const currentState = stateRef.current;
+      const fallbackSubject =
+        selectedThread?.thread.subject
+          ? (selectedThread.thread.subject.startsWith("Re:")
+              ? selectedThread.thread.subject
+              : `Re: ${selectedThread.thread.subject}`)
+          : "";
+      const subject = currentState.replySubject.trim() || fallbackSubject;
+      const body = currentState.replyBody.trim();
+      if (!subject || !body) {
+        return;
+      }
+
+      const source = currentState.replyJourney === "ai_generated" ? "ai" : "manual";
+      const snapshot = `${subject}\n${body}\n${status}\n${source}`;
+      if (lastSavedSnapshotRef.current === snapshot) {
+        return;
+      }
+
+      setIsSavingDraft(true);
+      try {
+        const response = await fetch(`/api/email/threads/${selectedThreadId}/draft`, {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            subject,
+            body,
+            status,
+            source
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not save draft.");
+        }
+        lastSavedSnapshotRef.current = snapshot;
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "Could not save draft.");
+      } finally {
+        setIsSavingDraft(false);
+      }
+    },
+    [selectedThread, selectedThreadId, setErrorMessage]
+  );
 
   const refineGeneratedDraft = useCallback(
     async (instruction: string) => {
@@ -478,6 +624,7 @@ export function useInboxReplyComposer({
       !state.isDrafting &&
       state.replyBody.trim().length > 0 &&
       (state.replyJourney === "user_set" || state.replyJourney === "ai_generated"),
+    isSavingDraft,
     replyBodyRef,
     setReplyStance: (value) =>
       dispatch({
@@ -502,6 +649,7 @@ export function useInboxReplyComposer({
     handleReplyBodyChange,
     applyPromptToNextDraft,
     clearPromptDialog,
+    saveDraft,
     draftReply,
     usePromptForDraft,
     cancelDraftReply,

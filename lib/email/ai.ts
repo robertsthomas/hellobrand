@@ -18,7 +18,14 @@ import {
 } from "@/lib/ai/gateway";
 import { assistantProvider } from "@/lib/assistant/provider";
 import { buildEmailThreadVersion } from "@/lib/email/reply-suggestion-version";
-import type { DealAggregate, EmailThreadDetail, NegotiationStance, ProfileRecord, Viewer } from "@/lib/types";
+import type {
+  DealAggregate,
+  EmailThreadDetail,
+  EmailThreadNoteRecord,
+  NegotiationStance,
+  ProfileRecord,
+  Viewer
+} from "@/lib/types";
 
 const emailDraftSchema = z.object({
   subject: z.string().trim().min(1),
@@ -98,8 +105,10 @@ function emailDraftSystemPrompt(stance?: NegotiationStance | null) {
         "Never invent commitments, approvals, dates, deliverables, usage rights, payment terms, legal positions, or who agreed to what.",
         "If workspace facts and the custom prompt conflict, preserve the workspace facts and adapt the language rather than fabricating alignment.",
         "Revise the current draft when one is provided, unless the draft is so off-base that a rewrite is clearly safer.",
+        "When the custom prompt asks for a change in length, tone, focus, or structure, make that change noticeable, not subtle.",
         "Write plain email prose only, not markdown.",
         "Do not use bold, bullets, numbered lists, headings, or placeholder names like [Brand Name] or [Agency Name].",
+        "Do not mention the custom prompt, the user's note, your revision process, or that you kept anything in mind.",
         "If the recipient name is unknown, use a normal greeting like Hi there,.",
         "Keep the draft concise, specific, and creator-professional."
       ])
@@ -138,6 +147,7 @@ function emailDraftUserPrompt(input: {
   workspaceSummary: string;
   discrepancyContext: string;
   actionContext: string;
+  noteContext: string;
   currentDraftContext: string;
   instructionContext: string;
   signature: string;
@@ -155,6 +165,10 @@ function emailDraftUserPrompt(input: {
     {
       tag: "thread_action_items",
       content: input.actionContext
+    },
+    {
+      tag: "private_notes",
+      content: input.noteContext
     },
     {
       tag: "current_draft",
@@ -358,17 +372,14 @@ function fallbackDraft(
   const intro = partnership
     ? `Thanks for the note on ${partnership.deal.campaignName}.`
     : "Thanks for the note.";
-  const extraGuidance = instructions?.trim()
-    ? `\n\nI kept your note in mind: ${instructions.trim()}`
-    : "";
 
   return {
     subject: baseSubject || (thread.thread.subject.startsWith("Re:")
       ? thread.thread.subject
       : `Re: ${thread.thread.subject}`),
     body: baseBody
-      ? `${baseBody}${extraGuidance}`
-      : `${intro}\n\nI reviewed the thread and I’m aligned on the next steps. If there are any updates on timing, deliverables, or contract details, send them over and I’ll keep things moving.${extraGuidance}\n\nBest,\n${signoff}`
+      ? baseBody
+      : `${intro}\n\nI reviewed the thread and I’m aligned on the next steps. If there are any updates on timing, deliverables, or contract details, send them over and I’ll keep things moving.\n\nBest,\n${signoff}`
   };
 }
 
@@ -378,7 +389,8 @@ function buildEmailReplyDraftRequest(
   profile: ProfileRecord,
   stance?: NegotiationStance | null,
   instructions?: string | null,
-  currentDraft?: { subject: string; body: string } | null
+  currentDraft?: { subject: string; body: string } | null,
+  notes?: EmailThreadNoteRecord[]
 ) {
   const fallback = fallbackDraft(thread, partnership, profile, instructions, currentDraft);
   const discrepancyContext = thread.promiseDiscrepancies.length > 0
@@ -387,6 +399,9 @@ function buildEmailReplyDraftRequest(
 
   const actionContext = thread.actionItems.length > 0
     ? thread.actionItems.map((a) => `- ${a.action}${a.dueDate ? ` (due: ${a.dueDate})` : ""}`).join("\n")
+    : "- None";
+  const noteContext = notes && notes.length > 0
+    ? notes.slice(0, 10).map((note) => `- ${note.body}`).join("\n")
     : "- None";
 
   const stanceInstruction = stance === "firm"
@@ -417,6 +432,7 @@ function buildEmailReplyDraftRequest(
       input: {
         discrepancyContext,
         actionContext,
+        noteContext,
         currentDraftContext,
         instructionContext,
         stance: stanceInstruction,
@@ -430,6 +446,7 @@ function buildEmailReplyDraftRequest(
       workspaceSummary,
       discrepancyContext,
       actionContext,
+      noteContext,
       currentDraftContext,
       instructionContext,
       signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
@@ -467,7 +484,8 @@ export async function generateEmailReplyDraft(
   profile: ProfileRecord,
   stance?: NegotiationStance | null,
   instructions?: string | null,
-  currentDraft?: { subject: string; body: string } | null
+  currentDraft?: { subject: string; body: string } | null,
+  notes?: EmailThreadNoteRecord[]
 ) {
   const request = buildEmailReplyDraftRequest(
     thread,
@@ -475,7 +493,8 @@ export async function generateEmailReplyDraft(
     profile,
     stance,
     instructions,
-    currentDraft
+    currentDraft,
+    notes
   );
 
   const result = await runStructuredOpenRouterTask({
@@ -506,6 +525,7 @@ export async function streamEmailReplyDraft(input: {
   stance?: NegotiationStance | null;
   instructions?: string | null;
   currentDraft?: { subject: string; body: string } | null;
+  notes?: EmailThreadNoteRecord[];
 }) {
   const request = buildEmailReplyDraftRequest(
     input.thread,
@@ -513,7 +533,8 @@ export async function streamEmailReplyDraft(input: {
     input.profile,
     input.stance ?? null,
     input.instructions ?? null,
-    input.currentDraft ?? null
+    input.currentDraft ?? null,
+    input.notes ?? []
   );
   const prepared = await prepareAiStreamExecution({
     userId: input.viewer.id,

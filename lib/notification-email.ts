@@ -39,6 +39,7 @@ type NotificationWithEmailContext = {
     profile: {
       id: string;
       contactEmail: string | null;
+      timeZone: string | null;
       emailNotificationsEnabled: boolean;
       createdAt: Date;
     } | null;
@@ -56,6 +57,81 @@ function normalizeEmail(value: string | null | undefined) {
 
   const normalized = value.trim().toLowerCase();
   return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeTimeZone(value: string | null | undefined) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+function getZonedDateParts(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    hourCycle: "h23"
+  });
+
+  const values = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second)
+  };
+}
+
+export function getNotificationEmailLocalSendDelayMs(
+  timeZone: string | null | undefined,
+  now = new Date()
+) {
+  const normalized = normalizeTimeZone(timeZone);
+  if (!normalized) {
+    return 0;
+  }
+
+  const parts = getZonedDateParts(now, normalized);
+  if (parts.hour >= 9) {
+    return 0;
+  }
+
+  const nowLocalMs = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second
+  );
+  const targetLocalMs = Date.UTC(parts.year, parts.month - 1, parts.day, 9, 0, 0);
+
+  return Math.max(0, targetLocalMs - nowLocalMs);
+}
+
+export async function getNotificationEmailSendDelayMs(appNotificationId: string) {
+  const notification = await loadNotificationWithEmailContext(appNotificationId);
+  return getNotificationEmailLocalSendDelayMs(notification?.user.profile?.timeZone ?? null);
 }
 
 export function resolveNotificationRecipient(
@@ -293,6 +369,7 @@ async function loadNotificationWithEmailContext(appNotificationId: string) {
             select: {
               id: true,
               contactEmail: true,
+              timeZone: true,
               emailNotificationsEnabled: true,
               createdAt: true
             }
@@ -508,6 +585,14 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
           ? "Missing RESEND_TEST_TO_EMAIL for resend.dev test mode."
           : "Recipient is not allowed while resend.dev test mode is enabled."
     });
+  }
+
+  const notificationWithContext = await loadNotificationWithEmailContext(appNotificationId);
+  const localSendDelayMs = getNotificationEmailLocalSendDelayMs(
+    notificationWithContext?.user.profile?.timeZone ?? null
+  );
+  if (localSendDelayMs > 0) {
+    return delivery;
   }
 
   const resend = new Resend(config.apiKey);

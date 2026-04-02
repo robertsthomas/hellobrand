@@ -518,6 +518,7 @@ export function AppFrame({
             {banner ? <div className="shrink-0">{banner}</div> : null}
             <div
               ref={mainRef}
+              data-workspace-scroll-container
               className={cn(
                 "flex min-h-0 flex-1 flex-col overflow-x-hidden",
                 isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"

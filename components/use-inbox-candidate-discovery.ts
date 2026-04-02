@@ -21,6 +21,7 @@ export function useInboxCandidateDiscovery({
     []
   );
   const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [primaryCandidateId, setPrimaryCandidateId] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -38,6 +39,14 @@ export function useInboxCandidateDiscovery({
         ? current.filter((id) => id !== candidateId)
         : [...current, candidateId]
     );
+    setPrimaryCandidateId((current) => (current === candidateId ? null : current));
+  }, []);
+
+  const choosePrimaryCandidate = useCallback((candidateId: string) => {
+    setSelectedCandidateIds((current) =>
+      current.includes(candidateId) ? current : [candidateId, ...current]
+    );
+    setPrimaryCandidateId(candidateId);
   }, []);
 
   const discoverCandidates = useCallback(async () => {
@@ -59,9 +68,11 @@ export function useInboxCandidateDiscovery({
 
       const groups = (payload.candidates ?? []) as EmailDealCandidateMatchGroup[];
       setCandidateGroups(groups);
-      setSelectedCandidateIds(
-        groups.flatMap((group) => group.matches.map((match) => match.candidate.id))
+      const nextSelectedIds = groups.flatMap((group) =>
+        group.matches.map((match) => match.candidate.id)
       );
+      setSelectedCandidateIds(nextSelectedIds);
+      setPrimaryCandidateId(nextSelectedIds[0] ?? null);
       setIsCandidateModalOpen(true);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -101,6 +112,7 @@ export function useInboxCandidateDiscovery({
       setIsCandidateModalOpen(false);
       setCandidateGroups([]);
       setSelectedCandidateIds([]);
+      setPrimaryCandidateId(null);
 
       try {
         const response = await fetch("/api/email/candidates/review", {
@@ -109,7 +121,12 @@ export function useInboxCandidateDiscovery({
             "content-type": "application/json"
           },
           body: JSON.stringify({
-            confirmIds,
+            primaryCandidateId:
+              action === "confirm" ? primaryCandidateId ?? confirmIds[0] ?? null : null,
+            referenceIds:
+              action === "confirm"
+                ? confirmIds.filter((candidateId) => candidateId !== (primaryCandidateId ?? confirmIds[0] ?? null))
+                : [],
             rejectIds
           })
         });
@@ -129,7 +146,7 @@ export function useInboxCandidateDiscovery({
         setIsReviewingCandidates(false);
       }
     },
-    [candidateGroups, onErrorMessage, onRefresh, selectedCandidateIds]
+    [candidateGroups, onErrorMessage, onRefresh, primaryCandidateId, selectedCandidateIds]
   );
 
   const dismissCandidate = useCallback(
@@ -145,6 +162,7 @@ export function useInboxCandidateDiscovery({
           .filter((group) => group.matches.length > 0)
       );
       setSelectedCandidateIds((current) => current.filter((id) => id !== candidateId));
+      setPrimaryCandidateId((current) => (current === candidateId ? null : current));
 
       try {
         const response = await fetch("/api/email/candidates/review", {
@@ -180,6 +198,8 @@ export function useInboxCandidateDiscovery({
     isDiscovering,
     isReviewingCandidates,
     reviewCandidates,
+    choosePrimaryCandidate,
+    primaryCandidateId,
     selectedCandidateIds,
     toggleCandidate
   };

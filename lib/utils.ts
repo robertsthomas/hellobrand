@@ -77,6 +77,30 @@ export function stripHtmlTags(value: string) {
     .trim();
 }
 
+export function sanitizePlainTextInput(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return decodeHtmlEntities(value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<(ul|ol)[^>]*>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<\/(p|div|tr|li|table|ul|ol|section|article)>/gi, "\n")
+    .replace(/<(td|th)[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 export function normalizeEvidenceSnippet(value: string | null | undefined) {
   if (!value) {
     return null;

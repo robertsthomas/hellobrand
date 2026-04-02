@@ -70,6 +70,8 @@ describe("assistant prompt architecture", () => {
     expect(prompt).toContain("<runtime_context>");
     expect(prompt).toContain("<behavior_rules>");
     expect(prompt).toContain("When the user needs exact facts");
+    expect(prompt).toContain("Only navigate when the user explicitly asks to go somewhere");
+    expect(prompt).toContain("If the user asks a workspace-specific question and no workspace is active");
     expect(prompt).toContain("Current partnership snapshot");
   });
 });

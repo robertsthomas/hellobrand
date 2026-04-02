@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import type {
   EmailThreadDetail,
-  EmailThreadPreviewStateRecord
+  EmailThreadPreviewStateRecord,
+  EmailThreadWorkflowState
 } from "@/lib/types";
 
 type PreviewSection = "updates" | "actionItems";
@@ -29,7 +30,10 @@ export function useInboxThreadDetailState({
   selectedThreadId
 }: UseInboxThreadDetailStateOptions) {
   const [selectedDealId, setSelectedDealId] = useState<string>(
-    initialSelectedThread?.links[0]?.dealId ?? ""
+    initialSelectedThread?.primaryLink?.dealId ?? ""
+  );
+  const [selectedLinkRole, setSelectedLinkRole] = useState<"primary" | "reference">(
+    "primary"
   );
   const [summary, setSummary] = useState<string | null>(
     initialSelectedThread?.thread.aiSummary ?? null
@@ -37,6 +41,7 @@ export function useInboxThreadDetailState({
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
+  const [isUpdatingWorkflow, setIsUpdatingWorkflow] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [arePreviewUpdatesOpen, setArePreviewUpdatesOpen] = useState(false);
   const [areActionItemsOpen, setAreActionItemsOpen] = useState(false);
@@ -51,7 +56,8 @@ export function useInboxThreadDetailState({
   useEffect(() => {
     setSummary(selectedThread?.thread.aiSummary ?? null);
     setIsSummaryDialogOpen(false);
-    setSelectedDealId(selectedThread?.links[0]?.dealId ?? "");
+    setSelectedDealId(selectedThread?.primaryLink?.dealId ?? "");
+    setSelectedLinkRole("primary");
     setIsLinkModalOpen(false);
     setArePreviewUpdatesOpen(false);
     setAreActionItemsOpen(false);
@@ -216,7 +222,8 @@ export function useInboxThreadDetailState({
           "content-type": "application/json"
         },
         body: JSON.stringify({
-          dealId: selectedDealId
+          dealId: selectedDealId,
+          role: selectedLinkRole
         })
       });
       const payload = await response.json();
@@ -232,7 +239,42 @@ export function useInboxThreadDetailState({
     } finally {
       setIsLinking(false);
     }
-  }, [linkedDealIds, onErrorMessage, onRefresh, selectedDealId, selectedThreadId]);
+  }, [linkedDealIds, onErrorMessage, onRefresh, selectedDealId, selectedLinkRole, selectedThreadId]);
+
+  const updateWorkflowState = useCallback(
+    async (workflowState: EmailThreadWorkflowState) => {
+      if (!selectedThreadId) {
+        return;
+      }
+
+      setIsUpdatingWorkflow(true);
+      onErrorMessage(null);
+
+      try {
+        const response = await fetch(`/api/email/threads/${selectedThreadId}/workflow`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            workflowState
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not update thread workflow.");
+        }
+        onRefresh();
+      } catch (error) {
+        onErrorMessage(
+          error instanceof Error ? error.message : "Could not update thread workflow."
+        );
+      } finally {
+        setIsUpdatingWorkflow(false);
+      }
+    },
+    [onErrorMessage, onRefresh, selectedThreadId]
+  );
 
   return {
     areActionItemsOpen,
@@ -244,13 +286,17 @@ export function useInboxThreadDetailState({
     isLinking,
     isSummarizing,
     isSummaryDialogOpen,
+    isUpdatingWorkflow,
     linkSelectedDeal,
     selectedDealId,
+    selectedLinkRole,
     setLinkModalOpen: setIsLinkModalOpen,
     setSelectedDealId,
+    setSelectedLinkRole,
     setSummaryDialogOpen: setIsSummaryDialogOpen,
     summarizeThread,
     summary,
-    threadPreviewStates
+    threadPreviewStates,
+    updateWorkflowState
   };
 }

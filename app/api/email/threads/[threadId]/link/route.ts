@@ -13,13 +13,17 @@ export async function POST(
     const viewer = await requireApiViewer();
     await assertViewerHasFeature(viewer, "premium_inbox");
     const { threadId } = await params;
-    const body = (await request.json()) as { dealId?: string };
+    const body = (await request.json()) as {
+      dealId?: string;
+      role?: "primary" | "reference";
+    };
 
     if (!body.dealId) {
       return fail("Missing dealId.", 400);
     }
 
-    const link = await linkThreadToDealForViewer(viewer, threadId, body.dealId);
+    const role = body.role === "reference" ? "reference" : "primary";
+    const link = await linkThreadToDealForViewer(viewer, threadId, body.dealId, role);
     if (!link) {
       return fail("Thread or deal not found.", 404);
     }

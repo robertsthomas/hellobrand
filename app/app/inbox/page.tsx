@@ -12,6 +12,7 @@ import {
   listInboxThreadsForViewer
 } from "@/lib/email/service";
 import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
+import { getProfileForViewer } from "@/lib/profile";
 
 export default function InboxPage({
   searchParams
@@ -21,6 +22,7 @@ export default function InboxPage({
     provider?: string;
     accountId?: string;
     dealId?: string;
+    workflowState?: string;
     thread?: string;
     attachInvoice?: string;
   }>;
@@ -40,6 +42,7 @@ async function InboxContent({
     provider?: string;
     accountId?: string;
     dealId?: string;
+    workflowState?: string;
     thread?: string;
     attachInvoice?: string;
   }>;
@@ -56,17 +59,25 @@ async function InboxContent({
   }
 
   const resolved = searchParams ? await searchParams : {};
-  const [threads, deals, emailAccounts] = await Promise.all([
+  const [threads, deals, emailAccounts, profile] = await Promise.all([
     listInboxThreadsForViewer(viewer, {
       query: resolved.q ?? null,
       provider: resolved.provider ?? null,
       accountId: resolved.accountId ?? null,
       linkedDealId: resolved.dealId ?? null,
-      linkedOnly: true,
+      workflowState: (resolved.workflowState as
+        | "unlinked"
+        | "needs_review"
+        | "needs_reply"
+        | "draft_ready"
+        | "waiting_on_them"
+        | "closed"
+        | undefined) ?? null,
       limit: 100
     }),
     listDealsForViewer(viewer),
-    listEmailAccountsForViewer(viewer)
+    listEmailAccountsForViewer(viewer),
+    getProfileForViewer(viewer)
   ]);
   const connectedProviders = [...new Set(emailAccounts.map((account) => account.provider))];
   const selectedProvider =
@@ -125,13 +136,15 @@ async function InboxContent({
       deals={deals}
       hasConnectedAccounts={emailAccounts.length > 0}
       connectedProviders={connectedProviders}
+      profile={profile}
       invoiceAttachmentsByDealId={invoiceAttachmentsByDealId}
       autoAttachInvoice={resolved.attachInvoice === "1"}
       selectedFilters={{
         q: resolved.q ?? "",
         provider: selectedProvider,
         accountId: resolved.accountId ?? "",
-        dealId: resolved.dealId ?? ""
+        dealId: resolved.dealId ?? "",
+        workflowState: resolved.workflowState ?? ""
       }}
     />
   );

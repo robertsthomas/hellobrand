@@ -129,12 +129,11 @@ async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
   );
 
   const tier = llamaParseTier();
-  const result = await withTimeout(
-    client.parsing.parse({
+  const job = await withTimeout(
+    client.parsing.create({
       file_id: file.id,
       tier,
       version: llamaParseVersion(),
-      expand: ["markdown"],
       ...(tier === "agentic" || tier === "agentic_plus"
         ? {
             agentic_options: {
@@ -143,6 +142,21 @@ async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
           }
         : {})
     }),
+    LLAMA_PARSE_TIMEOUT_MS,
+    "LlamaParse job creation"
+  );
+
+  const result = await withTimeout(
+    client.parsing.waitForCompletion(
+      job.id,
+      {
+        expand: ["markdown"],
+        project_id: job.project_id
+      },
+      {
+        pollingInterval: 2000
+      }
+    ),
     LLAMA_PARSE_TIMEOUT_MS,
     "LlamaParse parsing"
   );
@@ -163,7 +177,11 @@ async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
 
   return {
     rawText,
-    normalizedText: normalizeDocumentText(rawText)
+    normalizedText: normalizeDocumentText(rawText),
+    _llama: {
+      parseJobId: result.job.id,
+      projectId: result.job.project_id
+    }
   };
 }
 
@@ -243,6 +261,10 @@ export function normalizeDocumentText(value: string) {
 export type ExtractionResult = {
   rawText: string;
   normalizedText: string;
+  _llama?: {
+    parseJobId: string;
+    projectId: string | null;
+  };
   _debug?: {
     parser: string;
     durationMs: number;

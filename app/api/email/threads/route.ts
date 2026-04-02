@@ -16,6 +16,14 @@ export async function GET(request: NextRequest) {
       accountId: searchParams.get("accountId"),
       linkedDealId: searchParams.get("dealId"),
       linkedOnly: searchParams.get("linkedOnly") === "1",
+      workflowState: searchParams.get("workflowState") as
+        | "unlinked"
+        | "needs_review"
+        | "needs_reply"
+        | "draft_ready"
+        | "waiting_on_them"
+        | "closed"
+        | null,
       limit: Number(searchParams.get("limit") ?? 100)
     });
 

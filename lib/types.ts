@@ -69,6 +69,7 @@ export type EmailAccountStatus =
   | "disconnected";
 export type EmailDirection = "inbound" | "outbound";
 export type EmailLinkSource = "manual" | "ai_suggested" | "rule_based";
+export type EmailLinkRole = "primary" | "reference";
 export type EmailCandidateStatus = "suggested" | "confirmed" | "rejected";
 export type EmailDealEventCategory =
   | "payment"
@@ -83,6 +84,15 @@ export type EmailActionItemStatus = "pending" | "completed" | "dismissed";
 export type EmailActionItemUrgency = "low" | "medium" | "high";
 export type NegotiationStance = "firm" | "collaborative" | "exploratory";
 export type RiskFlagSourceType = "document" | "email";
+export type EmailThreadWorkflowState =
+  | "unlinked"
+  | "needs_review"
+  | "needs_reply"
+  | "draft_ready"
+  | "waiting_on_them"
+  | "closed";
+export type EmailThreadDraftStatus = "in_progress" | "ready";
+export type EmailThreadDraftSource = "manual" | "ai";
 
 export interface EmailParticipant {
   name: string | null;
@@ -126,7 +136,7 @@ export interface DocumentRecord {
   normalizedText: string | null;
   documentKind: DocumentKind;
   classificationConfidence: number | null;
-  sourceType: "file" | "pasted_text";
+  sourceType: "file" | "pasted_text" | "email_attachment";
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
@@ -396,6 +406,8 @@ export interface EmailThreadRecord {
   isContractRelated: boolean;
   aiSummary: string | null;
   aiSummaryUpdatedAt: string | null;
+  workflowState: EmailThreadWorkflowState;
+  draftUpdatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -454,6 +466,7 @@ export interface DealEmailLinkRecord {
   dealId: string;
   threadId: string;
   linkSource: EmailLinkSource;
+  role: EmailLinkRole;
   confidence: number | null;
   createdAt: string;
 }
@@ -547,19 +560,45 @@ export interface EmailThreadLinkView {
   brandName: string;
   campaignName: string;
   linkSource: EmailLinkSource;
+  role: EmailLinkRole;
   confidence: number | null;
   createdAt: string;
+}
+
+export interface EmailThreadDraftRecord {
+  id: string;
+  userId: string;
+  threadId: string;
+  subject: string;
+  body: string;
+  status: EmailThreadDraftStatus;
+  source: EmailThreadDraftSource;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailThreadNoteRecord {
+  id: string;
+  userId: string;
+  threadId: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EmailThreadListItem {
   thread: EmailThreadRecord;
   account: ConnectedEmailAccountRecord;
   links: EmailThreadLinkView[];
+  primaryLink: EmailThreadLinkView | null;
+  referenceLinks: EmailThreadLinkView[];
   importantEventCount: number;
   latestImportantEventAt: string | null;
   pendingTermSuggestionCount: number;
   pendingActionItemCount: number;
   latestPendingActionItemAt: string | null;
+  savedDraft: EmailThreadDraftRecord | null;
+  noteCount: number;
 }
 
 export interface EmailThreadDetail {
@@ -567,11 +606,16 @@ export interface EmailThreadDetail {
   account: ConnectedEmailAccountRecord;
   messages: EmailMessageRecord[];
   links: EmailThreadLinkView[];
+  primaryLink: EmailThreadLinkView | null;
+  referenceLinks: EmailThreadLinkView[];
   importantEvents: EmailDealEventRecord[];
   termSuggestions: EmailDealTermSuggestionRecord[];
   actionItems: EmailActionItemRecord[];
   promiseDiscrepancies: PromiseDiscrepancy[];
   crossDealConflicts: ConflictResult[];
+  savedDraft: EmailThreadDraftRecord | null;
+  notes: EmailThreadNoteRecord[];
+  noteCount: number;
 }
 
 export interface EmailThreadPreviewStateRecord {
@@ -828,6 +872,7 @@ export interface ProfileRecord {
   creatorLegalName: string | null;
   businessName: string | null;
   contactEmail: string | null;
+  timeZone: string | null;
   preferredSignature: string | null;
   payoutDetails: string | null;
   defaultCurrency: string | null;

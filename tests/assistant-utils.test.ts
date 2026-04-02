@@ -14,6 +14,35 @@ describe("assistant app manual helpers", () => {
     );
   });
 
+  test("maps common app route aliases", () => {
+    expect(buildAssistantHref("analytics")).toBe("/app/analytics");
+    expect(buildAssistantHref("payments page")).toBe("/app/payments");
+    expect(buildAssistantHref("profile")).toBe("/app/settings/profile");
+    expect(buildAssistantHref("billing")).toBe("/app/settings/billing");
+    expect(buildAssistantHref("notifications")).toBe("/app/settings/notifications");
+    expect(buildAssistantHref("search")).toBe("/app/search");
+    expect(buildAssistantHref("new workspace")).toBe("/app/intake");
+    expect(buildAssistantHref("all partnerships")).toBe("/app/p/history");
+  });
+
+  test("maps common partnership tab aliases", () => {
+    expect(buildAssistantHref("email tab", { dealId: "deal-123" })).toBe(
+      "/app/p/deal-123?tab=emails"
+    );
+    expect(buildAssistantHref("documents", { dealId: "deal-123" })).toBe(
+      "/app/p/deal-123?tab=documents"
+    );
+    expect(buildAssistantHref("risk", { dealId: "deal-123" })).toBe(
+      "/app/p/deal-123?tab=risks"
+    );
+    expect(buildAssistantHref("briefs", { dealId: "deal-123" })).toBe(
+      "/app/p/deal-123?tab=brief"
+    );
+    expect(buildAssistantHref("notes", { dealId: "deal-123" })).toBe(
+      "/app/p/deal-123?tab=notes"
+    );
+  });
+
   test("rejects invalid partnership tabs", () => {
     expect(buildAssistantHref("deal-tab:not-real", { dealId: "deal-123" })).toBeNull();
     expect(isValidAssistantTab("not-real")).toBe(false);

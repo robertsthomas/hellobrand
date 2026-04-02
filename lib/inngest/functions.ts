@@ -1,12 +1,4 @@
 import { inngest } from "@/lib/inngest/client";
-import { processDocumentById } from "@/lib/deals";
-import { runInvoiceReminderSweep } from "@/lib/invoices";
-import {
-  sendNotificationEmailDelivery,
-  sendPendingWorkspaceReminders
-} from "@/lib/notification-email";
-import { runWorkspaceNudgeSweep } from "@/lib/notification-service";
-import { prisma } from "@/lib/prisma";
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document" },
@@ -18,9 +10,10 @@ export const processContractFunction = inngest.createFunction(
       throw new Error("Missing documentId.");
     }
 
-    const aggregate = await step.run("process-document", async () =>
-      processDocumentById(documentId)
-    );
+    const aggregate = await step.run("process-document", async () => {
+      const { processDocumentById } = await import("@/lib/deals");
+      return processDocumentById(documentId);
+    });
 
     return {
       ok: true,
@@ -143,6 +136,7 @@ export const notificationEmailSendFunction = inngest.createFunction(
       // Check if the notification is still active (user hasn't confirmed yet).
       // If the session was confirmed, the notification gets superseded to "resolved".
       const { isStillActive } = await step.run("check-still-pending", async () => {
+        const { prisma } = await import("@/lib/prisma");
         const notification = await prisma.appNotification.findUnique({
           where: { id: appNotificationId },
           select: { status: true }
@@ -155,9 +149,24 @@ export const notificationEmailSendFunction = inngest.createFunction(
       }
     }
 
-    const delivery = await step.run("send-notification-email", async () =>
-      sendNotificationEmailDelivery(appNotificationId)
-    );
+    const localSendDelayMs = await step.run("check-local-send-window", async () => {
+      const { getNotificationEmailSendDelayMs } = await import(
+        "@/lib/notification-email"
+      );
+      return getNotificationEmailSendDelayMs(appNotificationId);
+    });
+
+    if (localSendDelayMs > 0) {
+      const waitMinutes = Math.max(1, Math.ceil(localSendDelayMs / (60 * 1000)));
+      await step.sleep("wait-until-local-morning", `${waitMinutes}m`);
+    }
+
+    const delivery = await step.run("send-notification-email", async () => {
+      const { sendNotificationEmailDelivery } = await import(
+        "@/lib/notification-email"
+      );
+      return sendNotificationEmailDelivery(appNotificationId);
+    });
 
     return {
       ok: true,
@@ -171,9 +180,12 @@ export const workspaceReminderSweepFunction = inngest.createFunction(
   { id: "workspace-reminder-sweep" },
   { cron: "0 10 * * *" },
   async ({ step }) => {
-    const result = await step.run("send-pending-workspace-reminders", async () =>
-      sendPendingWorkspaceReminders()
-    );
+    const result = await step.run("send-pending-workspace-reminders", async () => {
+      const { sendPendingWorkspaceReminders } = await import(
+        "@/lib/notification-email"
+      );
+      return sendPendingWorkspaceReminders();
+    });
 
     return { ok: true, ...result };
   }
@@ -183,9 +195,10 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
   { id: "invoice-reminder-sweep" },
   { cron: "0 9 * * *" },
   async ({ step }) => {
-    const result = await step.run("run-invoice-reminder-sweep", async () =>
-      runInvoiceReminderSweep()
-    );
+    const result = await step.run("run-invoice-reminder-sweep", async () => {
+      const { runInvoiceReminderSweep } = await import("@/lib/invoices");
+      return runInvoiceReminderSweep();
+    });
 
     return {
       ok: true,
@@ -198,9 +211,12 @@ export const workspaceNudgeSweepFunction = inngest.createFunction(
   { id: "workspace-nudge-sweep" },
   { cron: "0 11 * * *" },
   async ({ step }) => {
-    const result = await step.run("run-workspace-nudge-sweep", async () =>
-      runWorkspaceNudgeSweep()
-    );
+    const result = await step.run("run-workspace-nudge-sweep", async () => {
+      const { runWorkspaceNudgeSweep } = await import(
+        "@/lib/notification-service"
+      );
+      return runWorkspaceNudgeSweep();
+    });
 
     return { ok: true, ...result };
   }

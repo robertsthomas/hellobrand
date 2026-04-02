@@ -76,7 +76,9 @@ import type {
   EmailThreadDetail,
   EmailThreadListItem,
   EmailThreadPreviewStateRecord,
-  NegotiationStance
+  EmailThreadWorkflowState,
+  NegotiationStance,
+  ProfileRecord
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
 
@@ -90,6 +92,44 @@ function providerLabel(provider: string) {
       return "Yahoo";
     default:
       return provider;
+  }
+}
+
+function workflowStateLabel(state: EmailThreadWorkflowState) {
+  switch (state) {
+    case "unlinked":
+      return "Needs linking";
+    case "needs_review":
+      return "Needs review";
+    case "needs_reply":
+      return "Needs reply";
+    case "draft_ready":
+      return "Draft ready";
+    case "waiting_on_them":
+      return "Waiting";
+    case "closed":
+      return "Closed";
+    default:
+      return state;
+  }
+}
+
+function workflowBadgeClass(state: EmailThreadWorkflowState) {
+  switch (state) {
+    case "unlinked":
+      return "bg-[#f5f3ff] text-[#5b21b6]";
+    case "needs_review":
+      return "bg-[#fff7ed] text-[#9a3412]";
+    case "needs_reply":
+      return "bg-[#eff6ff] text-[#1d4ed8]";
+    case "draft_ready":
+      return "bg-[#ecfdf3] text-[#047857]";
+    case "waiting_on_them":
+      return "bg-secondary/50 text-muted-foreground";
+    case "closed":
+      return "bg-secondary/40 text-muted-foreground";
+    default:
+      return "bg-secondary/40 text-muted-foreground";
   }
 }
 
@@ -109,6 +149,68 @@ function threadSearchText(item: EmailThreadListItem) {
     .toLowerCase();
 }
 
+function threadPreviewText(item: EmailThreadListItem) {
+  return item.thread.snippet || "No preview available.";
+}
+
+function cleanWorkspaceText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function removeReplyPrefixes(subject: string) {
+  return cleanWorkspaceText(subject.replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi, ""));
+}
+
+function stripWorkspaceSuffixes(subject: string) {
+  return cleanWorkspaceText(
+    removeReplyPrefixes(subject).replace(/\b(partnership|collaboration|campaign)\b/gi, "")
+  );
+}
+
+function inferBrandNameFromParticipant(participant: EmailParticipant | null | undefined) {
+  if (!participant) {
+    return null;
+  }
+
+  const participantName = cleanWorkspaceText((participant.name ?? "").replace(/[<>]/g, ""));
+  if (participantName && !participantName.includes("@")) {
+    return participantName;
+  }
+
+  const domain = participant.email.split("@")[1] ?? "";
+  const root = domain.split(".")[0] ?? "";
+  if (!root) {
+    return null;
+  }
+
+  return root
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function inferWorkspaceDraftFromThread(item: EmailThreadListItem) {
+  const externalParticipant =
+    item.thread.participants.find(
+      (participant) =>
+        participant.email.toLowerCase() !== item.account.emailAddress.toLowerCase()
+    ) ?? item.thread.participants[0] ?? null;
+  const brandName = (inferBrandNameFromParticipant(externalParticipant) ?? "Inbox lead").slice(
+    0,
+    120
+  );
+  const cleanedSubject = stripWorkspaceSuffixes(item.thread.subject);
+  const campaignName =
+    (cleanedSubject.length >= 2 ? cleanedSubject : `${brandName} partnership`).slice(0, 120);
+
+  return {
+    brandName,
+    campaignName,
+    notes: `Created from inbox thread: ${item.thread.subject}`.slice(0, 5000)
+  };
+}
+
 function latestUpdatedAt(items: Array<{ updatedAt: string }>) {
   return items.reduce<string | null>((latest, item) => {
     if (!latest || item.updatedAt > latest) {
@@ -117,6 +219,18 @@ function latestUpdatedAt(items: Array<{ updatedAt: string }>) {
 
     return latest;
   }, null);
+}
+
+function missingReplySignatureFields(profile: ProfileRecord | null) {
+  if (!profile) {
+    return ["creator name", "business name or handle", "default sign-off"];
+  }
+
+  return [
+    !profile.creatorLegalName?.trim() && "creator name",
+    !profile.businessName?.trim() && "business name or handle",
+    !profile.preferredSignature?.trim() && "default sign-off"
+  ].filter(Boolean) as string[];
 }
 
 function hasUnseenPreviewSection(latestAt: string | null, seenAt: string | null | undefined) {
@@ -144,6 +258,44 @@ type PreviewUpdateEntry = {
   ctaLabel?: string;
 };
 
+function normalizePreviewUpdateBody(body: string) {
+  return cleanWorkspaceText(body).toLowerCase();
+}
+
+function combineEventUpdateTitles(titles: string[]) {
+  const uniqueTitles = Array.from(new Set(titles));
+  if (uniqueTitles.length <= 1) {
+    return uniqueTitles[0] ?? "Email update";
+  }
+
+  const labels = uniqueTitles.map((title) => {
+    switch (title) {
+      case "Action requested from the creator":
+        return "asks";
+      case "Usage rights or exclusivity update":
+        return "usage rights";
+      case "Deliverable-related update":
+        return "deliverables";
+      case "Timeline or scheduling update":
+        return "timeline";
+      case "Payment-related update":
+        return "payment";
+      case "Approval status update":
+        return "approval";
+      case "New attachment added to linked thread":
+        return "attachments";
+      default:
+        return title.toLowerCase();
+    }
+  });
+
+  if (labels.length === 2) {
+    return `Email mentions ${labels[0]} and ${labels[1]}`;
+  }
+
+  return `Email mentions ${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}`;
+}
+
 type DraftPromptSuggestion = {
   id: string;
   label: string;
@@ -153,6 +305,23 @@ type DraftPromptSuggestion = {
 type DraftPromptSuggestionCacheEntry = {
   version: string;
   suggestions: DraftPromptSuggestion[];
+};
+
+type ThreadCopilotInsightCacheEntry = {
+  risks: RiskSuggestion[];
+  documents: DocumentSuggestion[];
+};
+
+type RiskSuggestion = {
+  id: string;
+  label: string;
+  detail: string;
+};
+
+type DocumentSuggestion = {
+  id: string;
+  fileName: string;
+  documentKind: string;
 };
 
 type ThreadInvoiceAttachment = {
@@ -167,45 +336,49 @@ const DRAFT_REFINEMENT_OPTIONS = {
   length: [
     {
       label: "Shorter",
-      instruction: "Revise the current draft to be shorter and tighter while preserving the same intent and asks."
+      instruction: "Revise the current draft to be materially shorter and tighter while preserving the same intent and asks. Cut roughly 25 to 40 percent of the length, remove repetition, and keep only the strongest points."
     },
     {
       label: "Longer",
-      instruction: "Revise the current draft to be a bit fuller and more detailed while preserving the same intent and asks."
+      instruction: "Revise the current draft to be materially longer and more detailed while preserving the same intent and asks. Expand it by roughly 30 to 60 percent, add 2 to 4 meaningful sentences, and make the added detail specific and useful rather than filler."
     }
   ],
   tone: [
     {
       label: "Formal",
-      instruction: "Revise the current draft to sound more formal and polished while keeping the same message."
+      instruction: "Revise the current draft to sound noticeably more formal and polished while keeping the same message. Use more precise business language, tighten casual phrasing, and make the tonal shift obvious."
     },
     {
       label: "Relaxed",
-      instruction: "Revise the current draft to sound more relaxed and conversational while keeping it professional."
+      instruction: "Revise the current draft to sound noticeably more relaxed and conversational while keeping it professional. Soften stiff phrasing and make the tone shift obvious."
     },
     {
       label: "Warm",
-      instruction: "Revise the current draft to feel warmer and more personable while keeping the same core message."
+      instruction: "Revise the current draft to feel noticeably warmer and more personable while keeping the same core message. Add more human warmth and appreciation so the change is easy to feel."
     }
   ],
   focus: [
     {
       label: "Clarify asks",
-      instruction: "Revise the current draft to focus more clearly on the questions or clarifications you need from the brand."
+      instruction: "Revise the current draft to focus much more clearly on the questions or clarifications you need from the brand. Make the asks explicit, easy to scan, and hard to miss."
     },
     {
       label: "Protect terms",
-      instruction: "Revise the current draft to focus more on protecting boundaries, scope, timing, and commercial terms."
+      instruction: "Revise the current draft to focus much more on protecting boundaries, scope, timing, and commercial terms. Make the protection of the creator's position noticeably stronger."
     },
     {
       label: "Close next steps",
-      instruction: "Revise the current draft to end with clearer next steps and a stronger call to action."
+      instruction: "Revise the current draft to end with much clearer next steps and a stronger call to action. The close should feel noticeably more decisive and action-oriented."
     }
   ]
 } as const;
 
 const DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY =
   "hellobrand:inbox:draft-prompt-suggestions";
+const THREAD_ACTION_BUTTON_CLASS =
+  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap border border-black/10 px-3.5 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60";
+const INBOX_SIGNATURE_BANNER_DISMISS_KEY =
+  "hellobrand:inbox:signature-banner:dismissed";
 
 function loadDraftPromptSuggestionCache() {
   if (typeof window === "undefined") {
@@ -381,6 +554,98 @@ function messagePreview(message: EmailMessageRecord) {
   return body.replace(/\s+/g, " ").slice(0, 140);
 }
 
+function sanitizeEmailHtml(html: string) {
+  if (typeof window === "undefined") {
+    return html;
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(html, "text/html");
+  const blockedSelectors = [
+    "script",
+    "style",
+    "iframe",
+    "frame",
+    "frameset",
+    "object",
+    "embed",
+    "applet",
+    "form",
+    "input",
+    "button",
+    "select",
+    "textarea",
+    "link",
+    "meta",
+    "base"
+  ];
+
+  for (const selector of blockedSelectors) {
+    document.querySelectorAll(selector).forEach((node) => node.remove());
+  }
+
+  document.querySelectorAll("img").forEach((node) => node.remove());
+
+  document.querySelectorAll("*").forEach((element) => {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+
+      if (name.startsWith("on")) {
+        element.removeAttribute(attribute.name);
+        continue;
+      }
+
+      if (name === "srcdoc") {
+        element.removeAttribute(attribute.name);
+        continue;
+      }
+
+      if (name === "href") {
+        if (!/^(https?:|mailto:|tel:|#)/i.test(value)) {
+          element.removeAttribute(attribute.name);
+        } else if (element.tagName.toLowerCase() === "a") {
+          element.setAttribute("target", "_blank");
+          element.setAttribute("rel", "noreferrer noopener");
+        }
+        continue;
+      }
+
+      if (name === "src") {
+        if (!/^https?:/i.test(value)) {
+          element.removeAttribute(attribute.name);
+        }
+        continue;
+      }
+    }
+  });
+
+  return document.body.innerHTML.trim();
+}
+
+function EmailMessageBody({ message }: { message: EmailMessageRecord }) {
+  const sanitizedHtml = useMemo(
+    () => (message.htmlBody?.trim() ? sanitizeEmailHtml(message.htmlBody) : null),
+    [message.htmlBody]
+  );
+  const textBody = message.textBody?.trim();
+
+  if (sanitizedHtml) {
+    return (
+      <div
+        className="max-w-none text-[13px] leading-6 text-foreground [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-black/12 [&_blockquote]:pl-4 [&_br]:leading-6 [&_div]:max-w-full [&_hr]:my-5 [&_li]:my-1 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_table]:my-4 [&_table]:w-full [&_td]:align-top [&_th]:align-top [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6"
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
+    );
+  }
+
+  return (
+    <div className="whitespace-pre-wrap text-[13px] leading-7 text-foreground">
+      {textBody || "No text body available."}
+    </div>
+  );
+}
+
 function attachmentPreviewMode(attachment: EmailAttachmentRecord) {
   if (attachment.mimeType.startsWith("image/")) {
     return "image" as const;
@@ -407,7 +672,15 @@ function attachmentPreviewMode(attachment: EmailAttachmentRecord) {
   return "download" as const;
 }
 
-function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[] }) {
+function AttachmentShelf({
+  attachments,
+  onImportAttachment,
+  importingAttachmentId
+}: {
+  attachments: EmailAttachmentRecord[];
+  onImportAttachment?: (attachmentId: string) => void;
+  importingAttachmentId?: string | null;
+}) {
   const [previewAttachment, setPreviewAttachment] = useState<EmailAttachmentRecord | null>(null);
 
   if (attachments.length === 0) {
@@ -438,27 +711,45 @@ function AttachmentShelf({ attachments }: { attachments: EmailAttachmentRecord[]
           const Icon = attachmentIcon(attachment);
 
           return (
-            <button
+            <div
               key={attachment.id}
-              type="button"
-              onClick={() => setPreviewAttachment(attachment)}
-              className="border border-black/8 bg-white p-3 text-left shadow-[0_1px_0_rgba(17,24,39,0.04)] transition hover:border-black/20 hover:bg-secondary/20 dark:border-white/10 dark:bg-[#161a20] dark:hover:border-white/20"
+              className="border border-black/8 bg-white p-3 shadow-[0_1px_0_rgba(17,24,39,0.04)] dark:border-white/10 dark:bg-[#161a20]"
             >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-secondary/50 text-foreground dark:bg-white/10 dark:text-white">
-                  <Icon className="h-5 w-5" />
+              <button
+                type="button"
+                onClick={() => setPreviewAttachment(attachment)}
+                className="w-full text-left transition hover:bg-secondary/20"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-secondary/50 text-foreground dark:bg-white/10 dark:text-white">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-semibold text-foreground">
+                      {attachment.filename}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
+                      {attachment.mimeType.split("/")[1] || "file"}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-foreground">
-                    {attachment.filename}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
-                    {attachment.mimeType.split("/")[1] || "file"}
-                  </p>
+              </button>
+              {onImportAttachment ? (
+                <div className="mt-3 border-t border-black/6 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => onImportAttachment(attachment.id)}
+                    disabled={importingAttachmentId === attachment.id}
+                    className="inline-flex h-8 items-center border border-black/10 px-3 text-[11px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
+                  >
+                    {importingAttachmentId === attachment.id
+                      ? "Importing..."
+                      : "Import to workspace"}
+                  </button>
                 </div>
-              </div>
-            </button>
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -565,10 +856,14 @@ function AttachmentPreviewDialog({
 
 function MessageStrip({
   message,
-  isOutbound
+  isOutbound,
+  onImportAttachment,
+  importingAttachmentId
 }: {
   message: EmailMessageRecord;
   isOutbound: boolean;
+  onImportAttachment?: (attachmentId: string) => void;
+  importingAttachmentId?: string | null;
 }) {
   return (
     <div className="border border-black/8 bg-white px-4 py-3 shadow-[0_4px_16px_rgba(17,24,39,0.03)] dark:border-white/10 dark:bg-white/[0.02]">
@@ -597,6 +892,13 @@ function MessageStrip({
           {formatDate(message.receivedAt || message.sentAt)}
         </p>
       </div>
+      {message.attachments.length > 0 ? (
+        <AttachmentShelf
+          attachments={message.attachments}
+          onImportAttachment={onImportAttachment}
+          importingAttachmentId={importingAttachmentId}
+        />
+      ) : null}
     </div>
   );
 }
@@ -680,6 +982,7 @@ export function InboxWorkspace({
   deals,
   hasConnectedAccounts,
   connectedProviders,
+  profile,
   invoiceAttachmentsByDealId,
   autoAttachInvoice,
   selectedFilters
@@ -690,6 +993,7 @@ export function InboxWorkspace({
   deals: DealRecord[];
   hasConnectedAccounts: boolean;
   connectedProviders: string[];
+  profile: ProfileRecord | null;
   invoiceAttachmentsByDealId: Record<string, ThreadInvoiceAttachment>;
   autoAttachInvoice: boolean;
   selectedFilters: {
@@ -697,6 +1001,7 @@ export function InboxWorkspace({
     provider: string;
     accountId: string;
     dealId: string;
+    workflowState: string;
   };
 }) {
   const router = useRouter();
@@ -706,12 +1011,27 @@ export function InboxWorkspace({
   const promptActionControlRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
+  const [isManualAddModalOpen, setIsManualAddModalOpen] = useState(false);
+  const [manualAddDealId, setManualAddDealId] = useState(selectedFilters.dealId);
+  const [manualAddQuery, setManualAddQuery] = useState("");
+  const [manualAddThreads, setManualAddThreads] = useState<EmailThreadListItem[]>([]);
+  const [manualAddSelectedThreadIds, setManualAddSelectedThreadIds] = useState<string[]>([]);
+  const [isManualAddLoading, setIsManualAddLoading] = useState(false);
+  const [isManualAddSubmitting, setIsManualAddSubmitting] = useState(false);
+  const [isManualAddCreatingWorkspace, setIsManualAddCreatingWorkspace] = useState(false);
+  const [isReplySignatureBannerVisible, setIsReplySignatureBannerVisible] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(!!initialSelectedThread);
+  const [noteBody, setNoteBody] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [importingAttachmentId, setImportingAttachmentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [aiSuggestionCache, setAiSuggestionCache] = useState<
     Record<string, DraftPromptSuggestionCacheEntry>
   >(loadDraftPromptSuggestionCache);
+  const [threadCopilotInsightCache, setThreadCopilotInsightCache] = useState<
+    Record<string, ThreadCopilotInsightCacheEntry>
+  >({});
   const [loadingSuggestionThreadIds, setLoadingSuggestionThreadIds] = useState<
     Record<string, true>
   >({});
@@ -730,6 +1050,8 @@ export function InboxWorkspace({
     isCandidateModalOpen,
     isDiscovering,
     isReviewingCandidates,
+    choosePrimaryCandidate,
+    primaryCandidateId,
     reviewCandidates,
     selectedCandidateIds,
     toggleCandidate
@@ -753,6 +1075,10 @@ export function InboxWorkspace({
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
     [selectedThread]
   );
+  const linkableDeals = useMemo(
+    () => deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid"),
+    [deals]
+  );
   const {
     areActionItemsOpen,
     arePreviewUpdatesOpen,
@@ -763,14 +1089,18 @@ export function InboxWorkspace({
     isLinking,
     isSummarizing,
     isSummaryDialogOpen,
+    isUpdatingWorkflow,
     linkSelectedDeal,
     selectedDealId,
+    selectedLinkRole,
     setLinkModalOpen,
     setSelectedDealId,
+    setSelectedLinkRole,
     setSummaryDialogOpen,
     summarizeThread,
     summary,
-    threadPreviewStates
+    threadPreviewStates,
+    updateWorkflowState
   } = useInboxThreadDetailState({
     initialSelectedThread,
     initialThreadPreviewStates,
@@ -795,6 +1125,7 @@ export function InboxWorkspace({
     canRefineGeneratedReply,
     canClearReplyText,
     canSendReply,
+    isSavingDraft,
     replyBodyRef,
     setReplyStance,
     setPromptCommandOpen,
@@ -803,8 +1134,9 @@ export function InboxWorkspace({
     handleReplyBodyChange,
     applyPromptToNextDraft,
     clearPromptDialog,
+    saveDraft,
     draftReply,
-    usePromptForDraft,
+    usePromptForDraft: runPromptForDraft,
     cancelDraftReply,
     clearDraftComposer,
     refineGeneratedDraft
@@ -817,7 +1149,21 @@ export function InboxWorkspace({
   useEffect(() => {
     setErrorMessage(null);
     setIsActionMenuOpen(false);
+    setNoteBody("");
   }, [selectedThread]);
+
+  useEffect(() => {
+    if (!isManualAddModalOpen) {
+      return;
+    }
+
+    if (selectedFilters.dealId) {
+      setManualAddDealId(selectedFilters.dealId);
+      return;
+    }
+
+    setManualAddDealId((current) => current || linkableDeals[0]?.id || "");
+  }, [isManualAddModalOpen, linkableDeals, selectedFilters.dealId]);
 
   useEffect(() => {
     const control = aiReplyControlRef.current;
@@ -914,9 +1260,15 @@ export function InboxWorkspace({
   }, [normalizedQuery, threads]);
   const selectedThreadDeals = useMemo(() => {
     const byId = new Map(deals.map((deal) => [deal.id, deal]));
-    return selectedThread?.links
-      .map((link) => byId.get(link.dealId))
-      .filter((entry): entry is DealRecord => Boolean(entry)) ?? [];
+    return selectedThread
+      ? [
+          selectedThread.primaryLink,
+          ...selectedThread.referenceLinks
+        ]
+          .filter((link): link is NonNullable<typeof selectedThread.primaryLink> => Boolean(link))
+          .map((link) => byId.get(link.dealId))
+          .filter((entry): entry is DealRecord => Boolean(entry))
+      : [];
   }, [deals, selectedThread]);
   const selectedThreadInvoiceAttachment = useMemo(() => {
     if (!selectedThread) {
@@ -927,7 +1279,11 @@ export function InboxWorkspace({
       return invoiceAttachmentsByDealId[selectedDealId] ?? null;
     }
 
-    for (const link of selectedThread.links) {
+    for (const link of [selectedThread.primaryLink, ...selectedThread.referenceLinks]) {
+      if (!link) {
+        continue;
+      }
+
       const attachment = invoiceAttachmentsByDealId[link.dealId];
       if (attachment) {
         return attachment;
@@ -953,9 +1309,40 @@ export function InboxWorkspace({
       return [];
     }
 
-    const eventUpdates = selectedThread.importantEvents.map((event) => ({
-      id: `event:${event.id}`,
-      title: event.title,
+    const eventGroups = new Map<
+      string,
+      {
+        id: string;
+        titles: string[];
+        body: string;
+        updatedAt: string;
+      }
+    >();
+
+    for (const event of selectedThread.importantEvents) {
+      const body = cleanWorkspaceText(event.body);
+      const dedupeKey = `${event.messageId}:${normalizePreviewUpdateBody(body)}`;
+      const existing = eventGroups.get(dedupeKey);
+
+      if (existing) {
+        existing.titles.push(event.title);
+        if (event.updatedAt > existing.updatedAt) {
+          existing.updatedAt = event.updatedAt;
+        }
+        continue;
+      }
+
+      eventGroups.set(dedupeKey, {
+        id: `event:${event.id}`,
+        titles: [event.title],
+        body,
+        updatedAt: event.updatedAt
+      });
+    }
+
+    const eventUpdates = Array.from(eventGroups.values()).map((event) => ({
+      id: event.id,
+      title: combineEventUpdateTitles(event.titles),
       body: event.body,
       updatedAt: event.updatedAt
     }));
@@ -995,8 +1382,31 @@ export function InboxWorkspace({
     latestActionItemAt,
     selectedThreadPreviewState?.actionItemsSeenAt
   );
+  const replySignatureMissingFields = useMemo(
+    () => missingReplySignatureFields(profile),
+    [profile]
+  );
+  const replySignatureBannerStateKey = useMemo(
+    () => replySignatureMissingFields.join("|"),
+    [replySignatureMissingFields]
+  );
   const canAttachInvoice =
     Boolean(selectedThreadInvoiceAttachment) && selectedThreadInvoiceAttachment?.status !== "voided";
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!replySignatureBannerStateKey) {
+      setIsReplySignatureBannerVisible(false);
+      window.localStorage.removeItem(INBOX_SIGNATURE_BANNER_DISMISS_KEY);
+      return;
+    }
+
+    const dismissedState = window.localStorage.getItem(INBOX_SIGNATURE_BANNER_DISMISS_KEY);
+    setIsReplySignatureBannerVisible(dismissedState !== replySignatureBannerStateKey);
+  }, [replySignatureBannerStateKey]);
 
   useEffect(() => {
     setIsInvoiceAttached(Boolean(autoAttachInvoice && canAttachInvoice));
@@ -1054,6 +1464,77 @@ export function InboxWorkspace({
     selectedThreadInvoiceAttachment
   ]);
 
+  const markDraftReady = useCallback(async () => {
+    await saveDraft("ready");
+    router.refresh();
+  }, [router, saveDraft]);
+
+  const savePrivateNote = useCallback(async () => {
+    if (!selectedThread || !noteBody.trim()) {
+      return;
+    }
+
+    setIsSavingNote(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/email/threads/${selectedThread.thread.id}/notes`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          body: noteBody.trim()
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not save note.");
+      }
+      setNoteBody("");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not save note.");
+    } finally {
+      setIsSavingNote(false);
+    }
+  }, [noteBody, router, selectedThread]);
+
+  const importAttachmentToWorkspace = useCallback(
+    async (attachmentId: string) => {
+      if (!selectedThread || !selectedThread.primaryLink?.dealId) {
+        return;
+      }
+
+      setImportingAttachmentId(attachmentId);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetch(`/api/email/attachments/${attachmentId}/import`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            dealId: selectedThread.primaryLink.dealId
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not import attachment.");
+        }
+        router.refresh();
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Could not import attachment."
+        );
+      } finally {
+        setImportingAttachmentId(null);
+      }
+    },
+    [router, selectedThread]
+  );
+
   const prefetchThreadSuggestions = useCallback(
     async (
       thread: Pick<
@@ -1100,6 +1581,17 @@ export function InboxWorkspace({
             }
           };
         });
+        setThreadCopilotInsightCache((current) => ({
+          ...current,
+          [thread.id]: {
+            risks: Array.isArray(payload.riskSuggestions)
+              ? (payload.riskSuggestions as RiskSuggestion[])
+              : [],
+            documents: Array.isArray(payload.documentSuggestions)
+              ? (payload.documentSuggestions as DocumentSuggestion[])
+              : []
+          }
+        }));
       } catch {
         // Keep fallback suggestions when prefetch fails.
       } finally {
@@ -1182,10 +1674,233 @@ export function InboxWorkspace({
     return cached.suggestions;
   }, [aiSuggestionCache, selectedThread, selectedThreadSuggestionVersion]);
 
-  const linkableDeals = useMemo(
-    () => deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid"),
-    [deals]
+  const currentCopilotInsights = useMemo(() => {
+    if (!selectedThread) {
+      return {
+        risks: [] as RiskSuggestion[],
+        documents: [] as DocumentSuggestion[]
+      };
+    }
+
+    return (
+      threadCopilotInsightCache[selectedThread.thread.id] ?? {
+        risks: [],
+        documents: []
+      }
+    );
+  }, [selectedThread, threadCopilotInsightCache]);
+
+  const selectedManualThreadIdSet = useMemo(
+    () => new Set(manualAddSelectedThreadIds),
+    [manualAddSelectedThreadIds]
   );
+  const selectedManualThreads = useMemo(
+    () =>
+      manualAddSelectedThreadIds
+        .map((threadId) => manualAddThreads.find((entry) => entry.thread.id === threadId) ?? null)
+        .filter((entry): entry is EmailThreadListItem => entry !== null),
+    [manualAddSelectedThreadIds, manualAddThreads]
+  );
+
+  const fetchManualAddThreads = useCallback(
+    async (nextQuery: string) => {
+      if (!isManualAddModalOpen) {
+        return;
+      }
+
+      setIsManualAddLoading(true);
+      setErrorMessage(null);
+      try {
+        const params = new URLSearchParams();
+        const trimmed = nextQuery.trim();
+        if (trimmed) {
+          params.set("q", trimmed);
+          params.set("limit", "1000");
+        } else {
+          params.set("limit", "20");
+        }
+
+        const response = await fetch(`/api/email/threads?${params.toString()}`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Could not load inbox threads.");
+        }
+
+        const nextThreads = (payload.threads ?? []) as EmailThreadListItem[];
+        setManualAddThreads(nextThreads);
+        setManualAddSelectedThreadIds((current) =>
+          current.filter((threadId) => nextThreads.some((thread) => thread.thread.id === threadId))
+        );
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Could not load inbox threads."
+        );
+      } finally {
+        setIsManualAddLoading(false);
+      }
+    },
+    [isManualAddModalOpen]
+  );
+
+  useEffect(() => {
+    if (!isManualAddModalOpen) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void fetchManualAddThreads(manualAddQuery);
+    }, manualAddQuery.trim() ? 250 : 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchManualAddThreads, isManualAddModalOpen, manualAddQuery]);
+
+  const toggleManualAddThread = useCallback((threadId: string) => {
+    setManualAddSelectedThreadIds((current) =>
+      current.includes(threadId)
+        ? current.filter((id) => id !== threadId)
+        : [...current, threadId]
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!manualAddDealId) {
+      return;
+    }
+
+    setManualAddSelectedThreadIds((current) =>
+      current.filter((threadId) => {
+        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
+        return !thread?.links.some((link) => link.dealId === manualAddDealId);
+      })
+    );
+  }, [manualAddDealId, manualAddThreads]);
+
+  const submitManualAddThreads = useCallback(async () => {
+    if (!manualAddDealId || manualAddSelectedThreadIds.length === 0) {
+      return;
+    }
+
+    setIsManualAddSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const threadIdsToLink = manualAddSelectedThreadIds.filter((threadId) => {
+        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
+        return !thread?.links.some((link) => link.dealId === manualAddDealId);
+      });
+
+      if (threadIdsToLink.length === 0) {
+        setIsManualAddModalOpen(false);
+        setManualAddQuery("");
+        setManualAddSelectedThreadIds([]);
+        return;
+      }
+
+      const responses = await Promise.all(
+        threadIdsToLink.map(async (threadId) => {
+          const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
+          const response = await fetch(`/api/email/threads/${threadId}/link`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({
+              dealId: manualAddDealId,
+              role: thread?.primaryLink ? "reference" : "primary"
+            })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Could not link email thread.");
+          }
+
+          return payload;
+        })
+      );
+
+      if (responses.length > 0) {
+        setIsManualAddModalOpen(false);
+        setManualAddQuery("");
+        setManualAddSelectedThreadIds([]);
+        router.refresh();
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not link email threads."
+      );
+    } finally {
+      setIsManualAddSubmitting(false);
+    }
+  }, [manualAddDealId, manualAddSelectedThreadIds, manualAddThreads, router]);
+
+  const createWorkspaceFromSelectedThreads = useCallback(async () => {
+    const seedThread = selectedManualThreads[0];
+    if (!seedThread) {
+      return;
+    }
+
+    setIsManualAddCreatingWorkspace(true);
+    setErrorMessage(null);
+
+    try {
+      const createResponse = await fetch("/api/p", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify(inferWorkspaceDraftFromThread(seedThread))
+      });
+      const createPayload = await createResponse.json().catch(() => ({}));
+
+      if (!createResponse.ok || !createPayload.deal?.id) {
+        throw new Error(createPayload.error ?? "Could not create workspace.");
+      }
+
+      const nextDealId = createPayload.deal.id as string;
+      const threadIdsToLink = manualAddSelectedThreadIds.filter((threadId) => {
+        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
+        return !thread?.links.some((link) => link.dealId === nextDealId);
+      });
+
+      const responses = await Promise.all(
+        threadIdsToLink.map(async (threadId) => {
+          const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
+          const response = await fetch(`/api/email/threads/${threadId}/link`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json"
+            },
+            body: JSON.stringify({
+              dealId: nextDealId,
+              role: thread?.primaryLink ? "reference" : "primary"
+            })
+          });
+
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Could not link email thread.");
+          }
+
+          return payload;
+        })
+      );
+
+      if (responses.length > 0 || threadIdsToLink.length === 0) {
+        setManualAddDealId(nextDealId);
+        setIsManualAddModalOpen(false);
+        setManualAddQuery("");
+        setManualAddSelectedThreadIds([]);
+        router.refresh();
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not create workspace."
+      );
+    } finally {
+      setIsManualAddCreatingWorkspace(false);
+    }
+  }, [manualAddSelectedThreadIds, manualAddThreads, router, selectedManualThreads]);
 
   const isLoadingSuggestions = Boolean(
     selectedThread && loadingSuggestionThreadIds[selectedThread.thread.id]
@@ -1294,23 +2009,33 @@ export function InboxWorkspace({
 
               <div className="flex items-center gap-3">
                 {hasConnectedAccounts && hasLinkedThreads ? (
-                  <AppTooltip
-                    content="Find emails"
-                    sideOffset={8}
-                  >
+                  <>
+                    <AppTooltip
+                      content="Find emails"
+                      sideOffset={8}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void discoverCandidates()}
+                        disabled={isDiscovering}
+                        aria-label={isDiscovering ? "Finding emails" : "Find emails"}
+                        className="inline-flex h-11 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
+                      >
+                        <MailSearch
+                          strokeWidth={1.5}
+                          className={`h-5 w-5 shrink-0 ${isDiscovering ? "animate-pulse" : ""}`}
+                        />
+                      </button>
+                    </AppTooltip>
                     <button
                       type="button"
-                      onClick={() => void discoverCandidates()}
-                      disabled={isDiscovering}
-                      aria-label={isDiscovering ? "Finding emails" : "Find emails"}
-                      className="inline-flex h-11 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
+                      onClick={() => setIsManualAddModalOpen(true)}
+                      className={`${THREAD_ACTION_BUTTON_CLASS} min-w-[8.75rem] shrink-0`}
                     >
-                      <MailSearch
-                        strokeWidth={1.5}
-                        className={`h-5 w-5 shrink-0 ${isDiscovering ? "animate-pulse" : ""}`}
-                      />
+                      <Plus className="h-4 w-4 shrink-0" />
+                      Add threads
                     </button>
-                  </AppTooltip>
+                  </>
                 ) : null}
                 <div className="w-full max-w-sm">
                   <Input
@@ -1346,21 +2071,31 @@ export function InboxWorkspace({
 
                 <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                   {hasConnectedAccounts ? (
-                    <AppTooltip
-                      content="We search recent synced mail first, then keep expanding in the background."
-                      sideOffset={8}
-                    >
+                    <>
+                      <AppTooltip
+                        content="We search recent synced mail first, then keep expanding in the background."
+                        sideOffset={8}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void discoverCandidates()}
+                          disabled={isDiscovering}
+                          aria-label="Find emails"
+                          className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
+                          <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                        </button>
+                      </AppTooltip>
                       <button
                         type="button"
-                        onClick={() => void discoverCandidates()}
-                        disabled={isDiscovering}
-                        aria-label="Find emails"
-                        className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => setIsManualAddModalOpen(true)}
+                        className={`${THREAD_ACTION_BUTTON_CLASS} min-w-[10rem]`}
                       >
-                        <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
-                        <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                        <Plus className="h-4 w-4 shrink-0" />
+                        Add threads manually
                       </button>
-                    </AppTooltip>
+                    </>
                   ) : (
                     <a
                       href="/app/settings"
@@ -1382,7 +2117,7 @@ export function InboxWorkspace({
               <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${mobileDetailOpen ? "hidden xl:flex" : ""}`}>
                 <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
                   <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-[17px] font-semibold text-foreground">Linked Threads</h2>
+                    <h2 className="text-[17px] font-semibold text-foreground">Inbox</h2>
                     <span className="bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
                       {filteredThreads.length}
                     </span>
@@ -1392,7 +2127,7 @@ export function InboxWorkspace({
                     onSubmit={(event) => {
                       event.preventDefault();
                     }}
-                    className="mt-4 grid gap-3 sm:grid-cols-2"
+                    className="mt-4 grid gap-3 sm:grid-cols-3"
                   >
                     <InboxSelect
                       value={selectedFilters.provider}
@@ -1418,13 +2153,25 @@ export function InboxWorkspace({
                         );
                       })}
                     </InboxSelect>
+                    <InboxSelect
+                      value={selectedFilters.workflowState}
+                      onChange={(value) => applyFilters({ workflowState: value, thread: "" })}
+                    >
+                      <option value="">All states</option>
+                      <option value="unlinked">Needs linking</option>
+                      <option value="needs_review">Needs review</option>
+                      <option value="needs_reply">Needs reply</option>
+                      <option value="draft_ready">Draft ready</option>
+                      <option value="waiting_on_them">Waiting</option>
+                      <option value="closed">Closed</option>
+                    </InboxSelect>
                   </form>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-transparent">
                   {filteredThreads.length === 0 ? (
                     <div className="px-5 py-8 text-sm text-muted-foreground">
-                      No linked emails match your search.
+                      No inbox threads match your search.
                     </div>
                   ) : filteredThreads.map((item) => {
                     const active = item.thread.id === activeThreadId;
@@ -1483,6 +2230,19 @@ export function InboxWorkspace({
                               <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
                                 {providerLabel(item.account.provider)}
                               </span>
+                              <span className={`px-2.5 py-1 text-[10px] font-medium ${workflowBadgeClass(item.thread.workflowState)}`}>
+                                {workflowStateLabel(item.thread.workflowState)}
+                              </span>
+                              {item.savedDraft ? (
+                                <span className="bg-[#ecfdf3] px-2.5 py-1 text-[10px] font-medium text-[#047857]">
+                                  {item.savedDraft.status === "ready" ? "Draft ready" : "Draft saved"}
+                                </span>
+                              ) : null}
+                              {item.noteCount > 0 ? (
+                                <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                  {item.noteCount} note{item.noteCount === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
                               {item.importantEventCount > 0 ? (
                                 <span className="inline-flex items-center gap-1.5 bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
                                   {threadHasUnseenUpdates ? (
@@ -1540,6 +2300,9 @@ export function InboxWorkspace({
                             </span>
                             <span className="bg-white px-3 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
                               {selectedThread.account.emailAddress}
+                            </span>
+                            <span className={`px-3 py-1 text-[10px] font-medium ${workflowBadgeClass(selectedThread.thread.workflowState)}`}>
+                              {workflowStateLabel(selectedThread.thread.workflowState)}
                             </span>
                           </div>
                           <h2 className="mt-3 max-w-4xl text-[22px] font-semibold tracking-[-0.04em] text-foreground">
@@ -1601,6 +2364,41 @@ export function InboxWorkspace({
                                 >
                                 Link partnership
                               </button>
+                              <div className="border-t border-black/6 pt-1 mt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    void updateWorkflowState("needs_review");
+                                  }}
+                                  disabled={isUpdatingWorkflow}
+                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
+                                >
+                                  Mark needs review
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    void updateWorkflowState("waiting_on_them");
+                                  }}
+                                  disabled={isUpdatingWorkflow}
+                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
+                                >
+                                  Mark waiting
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    void updateWorkflowState("closed");
+                                  }}
+                                  disabled={isUpdatingWorkflow}
+                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
+                                >
+                                  Mark closed
+                                </button>
+                              </div>
                             </div>
                           ) : null}
                         </div>
@@ -1615,6 +2413,56 @@ export function InboxWorkspace({
                                 Loading thread...
                               </div>
                             ) : null}
+
+                            <section className="border border-black/6 px-4 py-3">
+                              <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                Workspace context
+                              </p>
+                              <div className="mt-3 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-[12px] font-semibold text-foreground">
+                                      Primary workspace
+                                    </p>
+                                    <p className="mt-1 text-[12px] text-muted-foreground">
+                                      {selectedThread.primaryLink
+                                        ? `${selectedThread.primaryLink.campaignName} · ${selectedThread.primaryLink.brandName}`
+                                        : "No primary workspace linked yet."}
+                                    </p>
+                                  </div>
+                                  {selectedThread.primaryLink ? (
+                                    <span className="bg-[#eff6ff] px-2.5 py-1 text-[10px] font-medium text-[#1d4ed8]">
+                                      Primary
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {selectedThread.referenceLinks.length > 0 ? (
+                                  <div>
+                                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                      References
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {selectedThread.referenceLinks.map((link) => (
+                                        <span
+                                          key={link.id}
+                                          className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
+                                        >
+                                          {link.campaignName}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null}
+                                {selectedThread.savedDraft ? (
+                                  <div className="border-t border-black/6 pt-3 text-[12px] text-muted-foreground">
+                                    Saved draft status:{" "}
+                                    <span className="font-medium text-foreground">
+                                      {selectedThread.savedDraft.status === "ready" ? "Ready" : "In progress"}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </section>
 
                             {shouldShowPreviewUpdates ? (
                               <Collapsible
@@ -1777,6 +2625,91 @@ export function InboxWorkspace({
                               </section>
                             ) : null}
 
+                            {(currentCopilotInsights.risks.length > 0 ||
+                              currentCopilotInsights.documents.length > 0) ? (
+                              <section className="border border-black/6 px-4 py-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                  Copilot context
+                                </p>
+                                {currentCopilotInsights.risks.length > 0 ? (
+                                  <div className="mt-3 space-y-2">
+                                    {currentCopilotInsights.risks.map((risk) => (
+                                      <div key={risk.id} className="border-l-2 border-black/8 pl-3">
+                                        <p className="text-[12px] font-medium text-foreground">{risk.label}</p>
+                                        <p className="text-[11px] text-muted-foreground">{risk.detail}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                                {currentCopilotInsights.documents.length > 0 ? (
+                                  <div className="mt-3 border-t border-black/6 pt-3">
+                                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                      Suggested documents
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {currentCopilotInsights.documents.map((document) => (
+                                        <span
+                                          key={document.id}
+                                          className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
+                                        >
+                                          {document.fileName}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </section>
+                            ) : null}
+
+                            <section className="border border-black/6 px-4 py-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                                  Private notes
+                                </p>
+                                {selectedThread.noteCount > 0 ? (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {selectedThread.noteCount}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="mt-3 space-y-3">
+                                {selectedThread.notes.length > 0 ? (
+                                  <div className="space-y-2">
+                                    {selectedThread.notes.map((note) => (
+                                      <div key={note.id} className="border-l-2 border-black/8 pl-3">
+                                        <p className="text-[12px] text-foreground">{note.body}</p>
+                                        <p className="mt-1 text-[11px] text-muted-foreground">
+                                          {formatDate(note.createdAt)}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[12px] text-muted-foreground">
+                                    No private notes yet.
+                                  </p>
+                                )}
+                                <div className="space-y-2 border-t border-black/6 pt-3">
+                                  <Textarea
+                                    value={noteBody}
+                                    onChange={(event) => setNoteBody(event.currentTarget.value)}
+                                    placeholder="Capture guidance, risks, or follow-up notes for yourself..."
+                                    className="min-h-[88px] rounded-none border-black/10 bg-white text-[12px] shadow-none"
+                                  />
+                                  <div className="flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() => void savePrivateNote()}
+                                      disabled={!noteBody.trim() || isSavingNote}
+                                      className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
+                                    >
+                                      {isSavingNote ? "Saving..." : "Save note"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </section>
+
                             {earlierMessages.length > 0 ? (
                               <section className="space-y-3">
                                 {earlierMessages.map((message) => (
@@ -1784,6 +2717,12 @@ export function InboxWorkspace({
                                     key={message.id}
                                     message={message}
                                     isOutbound={message.direction === "outbound"}
+                                    onImportAttachment={
+                                      selectedThread.primaryLink && message.direction === "inbound"
+                                        ? importAttachmentToWorkspace
+                                        : undefined
+                                    }
+                                    importingAttachmentId={importingAttachmentId}
                                   />
                                 ))}
                               </section>
@@ -1825,11 +2764,17 @@ export function InboxWorkspace({
                                 </div>
 
                                 <div className="px-8 py-7">
-                                  <div className="whitespace-pre-wrap text-[13px] leading-8 text-foreground">
-                                    {latestMessage.textBody || "No text body available."}
-                                  </div>
+                                  <EmailMessageBody message={latestMessage} />
 
-                                  <AttachmentShelf attachments={latestMessage.attachments} />
+                                  <AttachmentShelf
+                                    attachments={latestMessage.attachments}
+                                    onImportAttachment={
+                                      selectedThread.primaryLink && latestMessage.direction === "inbound"
+                                        ? importAttachmentToWorkspace
+                                        : undefined
+                                    }
+                                    importingAttachmentId={importingAttachmentId}
+                                  />
                                 </div>
                               </section>
                             ) : null}
@@ -1839,6 +2784,39 @@ export function InboxWorkspace({
                         {/* Reply composer — pinned to bottom */}
                         <div className="border-t border-black/8 bg-white px-5 py-4">
                           <div className="space-y-3">
+                            {replyJourney === "ai_generated" &&
+                            replySignatureMissingFields.length > 0 &&
+                            isReplySignatureBannerVisible ? (
+                              <div className="flex items-start justify-between gap-3 border border-black/8 bg-[#f7f4ed] px-3 py-2">
+                                <p className="text-[12px] leading-5 text-foreground">
+                                  <span className="font-semibold">
+                                    Missing {replySignatureMissingFields.join(", ")}
+                                  </span>{" "}
+                                  in your creator profile.{" "}
+                                  <Link
+                                    href="/app/settings/profile"
+                                    className="font-medium underline underline-offset-4 transition hover:text-primary"
+                                  >
+                                    Set up your creator profile
+                                  </Link>{" "}
+                                  to improve your email signature.
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    window.localStorage.setItem(
+                                      INBOX_SIGNATURE_BANNER_DISMISS_KEY,
+                                      replySignatureBannerStateKey
+                                    );
+                                    setIsReplySignatureBannerVisible(false);
+                                  }}
+                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-black/8 bg-white text-muted-foreground transition hover:bg-secondary"
+                                  aria-label="Dismiss inbox signature reminder"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : null}
                             <div className="border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground">
                               <div>
                                 <Textarea
@@ -1856,7 +2834,7 @@ export function InboxWorkspace({
                                       ? 'Refine your prompt, then click "Generate"...'
                                       : 'Type a reply or click "AI Reply" to generate one...'
                                   }
-                                  className="h-6 min-h-0 overflow-hidden border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
+                                  className="h-6 min-h-0 overflow-hidden rounded-none border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
                                 />
                                 {isDrafting ? (
                                   <span className="mt-2 flex items-center gap-2 text-[11px] text-primary">
@@ -2040,6 +3018,22 @@ export function InboxWorkspace({
                                 ) : null}
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void saveDraft("in_progress")}
+                                  disabled={isSavingDraft || !replyBody.trim()}
+                                  className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
+                                >
+                                  {isSavingDraft ? "Saving..." : "Save draft"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void markDraftReady()}
+                                  disabled={isSavingDraft || !replyBody.trim()}
+                                  className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
+                                >
+                                  Mark ready
+                                </button>
                                 {canAttachInvoice ? (
                                   <button
                                     type="button"
@@ -2177,7 +3171,7 @@ export function InboxWorkspace({
                   className="rounded-none border-black/10 p-0"
                 >
                   <DropdownMenuItem
-                    onSelect={() => void usePromptForDraft()}
+                    onSelect={() => void runPromptForDraft()}
                     className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
                   >
                     Use prompt
@@ -2260,6 +3254,7 @@ export function InboxWorkspace({
                         <div className="divide-y divide-black/6">
                           {group.matches.map((match) => {
                             const isSelected = selectedCandidateIds.includes(match.candidate.id);
+                            const isPrimary = primaryCandidateId === match.candidate.id;
 
                             return (
                               <div key={match.candidate.id} className="flex items-start gap-3 px-4 py-3">
@@ -2286,6 +3281,19 @@ export function InboxWorkspace({
                                       {match.thread.snippet}
                                     </p>
                                   ) : null}
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => choosePrimaryCandidate(match.candidate.id)}
+                                      className={`px-2.5 py-1 text-[10px] font-medium transition ${
+                                        isPrimary
+                                          ? "bg-[#eff6ff] text-[#1d4ed8]"
+                                          : "bg-secondary/40 text-muted-foreground hover:bg-secondary/60"
+                                      }`}
+                                    >
+                                      {isPrimary ? "Primary workspace" : "Set as primary"}
+                                    </button>
+                                  </div>
                                 </div>
                                 <button
                                   type="button"
@@ -2381,13 +3389,17 @@ export function InboxWorkspace({
             </div>
 
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Choose an active workspace to link or unlink this thread from the preview context.
+              Choose a primary workspace owner or add a reference workspace for this thread.
             </p>
 
             <div className="mt-5 space-y-4">
               <InboxSelect
                 value={selectedDealId}
-                onChange={setSelectedDealId}
+                onChange={(value) => {
+                  setSelectedDealId(value);
+                  const existingLink = selectedThread.links.find((link) => link.dealId === value);
+                  setSelectedLinkRole(existingLink?.role === "reference" ? "reference" : "primary");
+                }}
               >
                 <option value="">Select a workspace</option>
                 {linkableDeals.map((deal) => {
@@ -2399,6 +3411,16 @@ export function InboxWorkspace({
                     </option>
                   );
                 })}
+              </InboxSelect>
+
+              <InboxSelect
+                value={selectedLinkRole}
+                onChange={(value) =>
+                  setSelectedLinkRole(value === "reference" ? "reference" : "primary")
+                }
+              >
+                <option value="primary">Primary workspace</option>
+                <option value="reference">Reference workspace</option>
               </InboxSelect>
 
               {linkableDeals.length === 0 ? (
@@ -2425,13 +3447,186 @@ export function InboxWorkspace({
                     ? "Updating..."
                     : linkedDealIds.has(selectedDealId)
                       ? "Unlink workspace"
-                      : "Link workspace"}
+                      : selectedLinkRole === "primary"
+                        ? "Set primary workspace"
+                        : "Add reference"}
                 </button>
               </div>
             </div>
           </div>
         </div>
       ) : null}
+
+      <Dialog
+        open={isManualAddModalOpen}
+        onOpenChange={(open) => {
+          setIsManualAddModalOpen(open);
+          if (!open) {
+            setManualAddQuery("");
+            setManualAddSelectedThreadIds([]);
+            setManualAddThreads([]);
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-[920px] overflow-hidden rounded-none p-0 sm:max-w-[920px] [&>button]:rounded-none">
+          <DialogHeader className="gap-3 border-b border-black/8 px-6 py-5 pr-12">
+            <DialogTitle>Add threads manually</DialogTitle>
+            <DialogDescription>
+              Browse the latest 20 synced emails by default. Search scans up to the first 1000 synced emails and lets you link the threads you want to a workspace.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 px-6 py-5">
+            <div className="grid gap-3 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+              <InboxSelect
+                value={manualAddDealId}
+                onChange={setManualAddDealId}
+                className="w-full min-w-0"
+              >
+                <option value="">Select a workspace</option>
+                {linkableDeals.map((deal) => {
+                  const labels = getDisplayDealLabels(deal);
+
+                  return (
+                    <option key={deal.id} value={deal.id}>
+                      {labels.campaignName ?? deal.campaignName}
+                    </option>
+                  );
+                })}
+              </InboxSelect>
+
+              <Input
+                value={manualAddQuery}
+                onChange={(event) => setManualAddQuery(event.currentTarget.value)}
+                placeholder="Search synced emails"
+                aria-label="Search synced emails"
+                className="h-11 w-full min-w-0 rounded-none border-black/10 bg-white shadow-none"
+              />
+            </div>
+
+            <div className="border border-black/8 rounded-none">
+              <div className="flex items-center justify-between border-b border-black/8 px-4 py-3 text-[12px] text-muted-foreground">
+                <span>
+                  {manualAddQuery.trim()
+                    ? `Search results from up to 1000 synced emails`
+                    : "Latest 20 synced emails"}
+                </span>
+                <span>{manualAddThreads.length}</span>
+              </div>
+
+              <div className="max-h-[440px] min-h-[320px] overflow-y-auto">
+                {isManualAddLoading ? (
+                  <div className="px-4 py-8 text-sm text-muted-foreground">
+                    Loading emails...
+                  </div>
+                ) : manualAddThreads.length === 0 ? (
+                  <div className="px-4 py-8 text-sm text-muted-foreground">
+                    No synced emails match this search.
+                  </div>
+                ) : (
+                  manualAddThreads.map((item) => {
+                    const alreadyLinkedToSelectedDeal = Boolean(
+                      manualAddDealId &&
+                        item.links.some((link) => link.dealId === manualAddDealId)
+                    );
+
+                    return (
+                      <label
+                        key={item.thread.id}
+                        className="flex cursor-pointer items-start gap-3 border-b border-black/6 px-4 py-3 last:border-b-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedManualThreadIdSet.has(item.thread.id)}
+                          disabled={alreadyLinkedToSelectedDeal}
+                          onChange={() => toggleManualAddThread(item.thread.id)}
+                          className="mt-1 h-4 w-4 rounded border-border"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[13px] font-semibold text-foreground">
+                                {participantLabel(item.thread.participants[0])}
+                              </p>
+                              <p className="truncate text-[12px] text-foreground/90">
+                                {item.thread.subject}
+                              </p>
+                            </div>
+                            <p className="shrink-0 text-[11px] text-muted-foreground">
+                              {formatDate(item.thread.lastMessageAt)}
+                            </p>
+                          </div>
+                          <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
+                            {threadPreviewText(item)}
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                              {providerLabel(item.account.provider)}
+                            </span>
+                            {alreadyLinkedToSelectedDeal ? (
+                              <span className="bg-secondary/60 px-2.5 py-1 text-[10px] font-medium text-foreground">
+                                Already linked
+                              </span>
+                            ) : null}
+                            {item.links.length > 0 ? (
+                              <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                {item.links.length} workspace{item.links.length === 1 ? "" : "s"}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 border-t border-black/8 pt-4 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-1">
+                <p className="text-[12px] text-muted-foreground">
+                  {manualAddSelectedThreadIds.length} thread{manualAddSelectedThreadIds.length === 1 ? "" : "s"} selected
+                </p>
+                {selectedManualThreads.length > 0 ? (
+                  <p className="text-[12px] text-muted-foreground">
+                    Or create a new workspace from the first selected email.
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddModalOpen(false)}
+                  className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[8.75rem] md:w-auto`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void createWorkspaceFromSelectedThreads()}
+                  disabled={selectedManualThreads.length === 0 || isManualAddSubmitting || isManualAddCreatingWorkspace}
+                  className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[8.75rem] md:w-auto`}
+                >
+                  {isManualAddCreatingWorkspace ? "Creating..." : "Create workspace"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitManualAddThreads()}
+                  disabled={
+                    !manualAddDealId ||
+                    manualAddSelectedThreadIds.length === 0 ||
+                    isManualAddSubmitting ||
+                    isManualAddCreatingWorkspace
+                  }
+                  className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[9.75rem] md:w-auto`}
+                >
+                  {isManualAddSubmitting ? "Adding..." : "Add selected threads"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -78,6 +78,8 @@ model User {
   emailTermSuggestions        EmailDealTermSuggestion[]
   emailActionItems            EmailActionItem[]
   emailThreadPreviewStates    EmailThreadPreviewState[]
+  emailThreadDrafts           EmailThreadDraft[]
+  emailThreadNotes            EmailThreadNote[]
   brandContacts               BrandContact[]
   assistantThreads            AssistantThread[]
   assistantSnapshots          AssistantContextSnapshot[]
@@ -472,6 +474,8 @@ model EmailThread {
   isContractRelated  Boolean   @default(false)
   aiSummary          String?
   aiSummaryUpdatedAt DateTime?
+  workflowState      String    @default("unlinked")
+  draftUpdatedAt     DateTime?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -483,9 +487,12 @@ model EmailThread {
   termSuggestions  EmailDealTermSuggestion[]
   actionItems      EmailActionItem[]
   previewStates    EmailThreadPreviewState[]
+  drafts           EmailThreadDraft[]
+  notes            EmailThreadNote[]
 
   @@unique([accountId, providerThreadId])
   @@index([accountId, lastMessageAt])
+  @@index([accountId, workflowState, lastMessageAt])
 }
 
 model EmailMessage {
@@ -557,6 +564,7 @@ model DealEmailLink {
   dealId     String
   threadId   String
   linkSource String
+  role       String   @default("reference")
   confidence Float?
   createdAt  DateTime @default(now())
 
@@ -565,6 +573,40 @@ model DealEmailLink {
 
   @@unique([dealId, threadId])
   @@index([threadId])
+  @@index([threadId, role])
+}
+
+model EmailThreadDraft {
+  id        String   @id @default(uuid())
+  userId    String
+  threadId  String
+  subject   String
+  body      String
+  status    String
+  source    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@index([threadId, updatedAt])
+}
+
+model EmailThreadNote {
+  id        String   @id @default(uuid())
+  userId    String
+  threadId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([userId, threadId, createdAt])
 }
 
 model EmailDealCandidateMatch {
@@ -723,6 +765,7 @@ model Profile {
   creatorLegalName          String?
   businessName              String?
   contactEmail              String?
+  timeZone                  String?
   preferredSignature        String?
   payoutDetails             String?
   defaultCurrency           String?

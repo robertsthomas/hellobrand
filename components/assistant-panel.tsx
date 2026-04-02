@@ -11,7 +11,7 @@ import {
 } from "react";
 import { DefaultChatTransport, isTextUIPart, isToolUIPart, type UIMessage } from "ai";
 import { useChat } from "@ai-sdk/react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { AssistantBlock } from "@/components/assistant-blocks";
@@ -31,6 +31,8 @@ export function AssistantPanel({
   thread,
   initialMessages,
   context,
+  suggestedPromptsDismissed,
+  onDismissSuggestedPrompts,
   queuedPrompt,
   onPromptConsumed,
   tone,
@@ -42,6 +44,8 @@ export function AssistantPanel({
   thread: AssistantThreadRecord;
   initialMessages: UIMessage[];
   context: AssistantClientContext;
+  suggestedPromptsDismissed: boolean;
+  onDismissSuggestedPrompts: () => void;
   queuedPrompt: string | null;
   onPromptConsumed: () => void;
   tone: AssistantTone;
@@ -61,7 +65,7 @@ export function AssistantPanel({
     () => getAssistantLocationLabel(context.profileLocation),
     [context.profileLocation]
   );
-  const { messages, setMessages, sendMessage, status, error, clearError } = useChat({
+  const { messages, setMessages, sendMessage, status, error, clearError, stop } = useChat({
     id: thread.id,
     messages: initialMessages,
     transport: new DefaultChatTransport({
@@ -83,9 +87,10 @@ export function AssistantPanel({
       }
 
       clearError();
+      onDismissSuggestedPrompts();
       await sendMessage({ text: next });
     },
-    [clearError, sendMessage]
+    [clearError, onDismissSuggestedPrompts, sendMessage]
   );
 
   useEffect(() => {
@@ -171,6 +176,15 @@ export function AssistantPanel({
   }, [onEndSession]);
 
   const busy = status === "submitted" || status === "streaming" || endingSession;
+  const assistantResponding = status === "submitted" || status === "streaming";
+
+  const handleCancelResponse = useCallback(() => {
+    if (!assistantResponding) {
+      return;
+    }
+
+    stop();
+  }, [assistantResponding, stop]);
 
   const handleShortenResponse = useCallback(
     async (text: string) => {
@@ -323,15 +337,25 @@ export function AssistantPanel({
 
         <div className="border-t border-black/8 px-4 py-4 dark:border-white/10">
           <form onSubmit={handleSubmit} className="space-y-3">
-            {suggestedPrompts.length > 0 ? (
-              <div className="space-y-2 border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            {suggestedPrompts.length > 0 && !suggestedPromptsDismissed ? (
+              <div className="space-y-2 border border-black/8 bg-white/70 p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
                     Suggested Asks
                   </p>
-                  {locationLabel ? (
-                    <span className="text-[11px] text-muted-foreground">Based on {locationLabel}</span>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {locationLabel ? (
+                      <span className="text-[11px] text-muted-foreground">Based on {locationLabel}</span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={onDismissSuggestedPrompts}
+                      className="inline-flex h-6 w-6 items-center justify-center border border-black/8 bg-white text-muted-foreground transition hover:border-black/20 hover:text-foreground dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20"
+                      aria-label="Dismiss suggested asks"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="grid gap-2">
                   {suggestedPrompts.map((suggestion) => (
@@ -339,10 +363,10 @@ export function AssistantPanel({
                       key={suggestion.id}
                       type="button"
                       onClick={() => handleSuggestedPromptSelect(suggestion.prompt)}
-                      className="border border-black/10 bg-white px-3 py-3 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20"
+                      className="border border-black/10 bg-white px-2.5 py-2 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-white/20"
                     >
-                      <div className="text-sm font-semibold text-foreground">{suggestion.label}</div>
-                      <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                      <div className="text-[13px] font-semibold text-foreground">{suggestion.label}</div>
+                      <div className="mt-0.5 text-[11px] leading-4.5 text-muted-foreground">
                         {suggestion.description}
                       </div>
                     </button>
@@ -363,14 +387,25 @@ export function AssistantPanel({
               <span className="text-xs text-muted-foreground">
                 Grounded in your saved workspace data. Not legal advice.
               </span>
-              <button
-                type="submit"
-                disabled={busy}
-                className="inline-flex items-center gap-2 bg-ocean px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                <Send className="h-4 w-4" />
-                Send
-              </button>
+              {assistantResponding ? (
+                <button
+                  type="button"
+                  onClick={handleCancelResponse}
+                  className="inline-flex items-center gap-2 border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                  Cancel
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="inline-flex items-center gap-2 bg-ocean px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  <Send className="h-4 w-4" />
+                  Send
+                </button>
+              )}
             </div>
           </form>
         </div>

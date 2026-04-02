@@ -11,6 +11,14 @@ import {
 } from "@/lib/profile-draft";
 import type { ProfileRecord } from "@/lib/types";
 
+function getBrowserTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 const ACCENT_PRESETS = [
   { label: "Forest", hex: "#1a4d3e" },
   { label: "Ocean", hex: "#1a5276" },
@@ -126,7 +134,10 @@ export function SettingsEditor({
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify(buildProfileSettingsPatch(form, initialProfile))
+        body: JSON.stringify({
+          ...buildProfileSettingsPatch(form, initialProfile),
+          timeZone: getBrowserTimeZone()
+        })
       });
 
       const payload = await response.json();

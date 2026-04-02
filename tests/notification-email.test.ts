@@ -14,6 +14,7 @@ type NotificationRecord = {
     profile: {
       id: string;
       contactEmail: string | null;
+      timeZone: string | null;
       emailNotificationsEnabled: boolean;
       createdAt: Date;
     } | null;
@@ -56,6 +57,7 @@ const {
       profile: {
         id: string;
         contactEmail: string | null;
+        timeZone: string | null;
         emailNotificationsEnabled: boolean;
         createdAt: Date;
       } | null;
@@ -215,6 +217,7 @@ import {
   buildNotificationEmailPayload,
   canSendNotificationEmailInCurrentMode,
   enqueueNotificationEmailDelivery,
+  getNotificationEmailLocalSendDelayMs,
   resolveNotificationEmailCopy,
   resolveNotificationRecipient,
   sendNotificationEmailDelivery
@@ -235,6 +238,7 @@ function seedWorkspaceNotification(input?: Partial<NotificationRecord>) {
       profile: {
         id: "profile-1",
         contactEmail: "owner@example.com",
+        timeZone: null,
         emailNotificationsEnabled: true,
         createdAt: new Date("2026-03-30T00:00:00.000Z")
       }
@@ -271,6 +275,24 @@ describe("notification email helpers", () => {
       })
     ).toBe(false);
   });
+
+  it("defers notification emails until 9am in the recipient timezone", () => {
+    const delayMs = getNotificationEmailLocalSendDelayMs(
+      "America/Los_Angeles",
+      new Date("2026-04-02T14:00:00.000Z")
+    );
+
+    expect(delayMs).toBe(2 * 60 * 60 * 1000);
+  });
+
+  it("does not defer notification emails after 9am in the recipient timezone", () => {
+    const delayMs = getNotificationEmailLocalSendDelayMs(
+      "America/New_York",
+      new Date("2026-04-02T14:00:00.000Z")
+    );
+
+    expect(delayMs).toBe(0);
+  });
 });
 
 describe("notification email queueing", () => {
@@ -300,6 +322,7 @@ describe("notification email queueing", () => {
         profile: {
           id: "profile-1",
           contactEmail: "owner@example.com",
+          timeZone: null,
           emailNotificationsEnabled: false,
           createdAt: new Date("2026-03-01T00:00:00.000Z")
         }
@@ -336,6 +359,7 @@ describe("notification email queueing", () => {
         profile: {
           id: "profile-1",
           contactEmail: "owner@example.com",
+          timeZone: null,
           emailNotificationsEnabled: false,
           createdAt: new Date("2026-03-01T00:00:00.000Z")
         }
@@ -440,6 +464,7 @@ describe("notification email sending", () => {
         profile: {
           id: "profile-1",
           contactEmail: "other@example.com",
+          timeZone: null,
           emailNotificationsEnabled: true,
           createdAt: new Date("2026-03-30T00:00:00.000Z")
         }

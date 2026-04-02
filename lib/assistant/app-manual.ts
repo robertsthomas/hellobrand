@@ -1,6 +1,49 @@
 import { appNavItems, getAppRouteMeta } from "@/lib/app-shell";
 import type { AssistantDealTab } from "@/lib/types";
 
+function normalizeRouteTarget(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^\/+/, "")
+    .replace(/^app\//, "")
+    .replace(/\b(tab|page|screen|route)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const assistantAppRouteAliases = new Map<string, string>([
+  ["dashboard", "/app"],
+  ["home", "/app"],
+  ["all partnerships", "/app/p/history"],
+  ["partnerships", "/app/p/history"],
+  ["history", "/app/p/history"],
+  ["inbox", "/app/inbox"],
+  ["payments", "/app/payments"],
+  ["analytics", "/app/analytics"],
+  ["help", "/app/help"],
+  ["search", "/app/search"],
+  ["new workspace", "/app/intake"],
+  ["workspace intake", "/app/intake"],
+  ["intake", "/app/intake"],
+  ["profile", "/app/settings/profile"],
+  ["settings", "/app/settings"],
+  ["billing", "/app/settings/billing"],
+  ["notifications", "/app/settings/notifications"]
+]);
+
+for (const item of appNavItems) {
+  assistantAppRouteAliases.set(normalizeRouteTarget(item.label), item.href);
+  assistantAppRouteAliases.set(normalizeRouteTarget(item.href), item.href);
+
+  const hrefParts = item.href.split("/").filter(Boolean);
+  const lastPart = hrefParts[hrefParts.length - 1];
+
+  if (lastPart) {
+    assistantAppRouteAliases.set(normalizeRouteTarget(lastPart), item.href);
+  }
+}
+
 export const assistantDealTabs: AssistantDealTab[] = [
   "overview",
   "terms",
@@ -11,6 +54,24 @@ export const assistantDealTabs: AssistantDealTab[] = [
   "documents",
   "notes"
 ];
+
+const assistantDealTabAliases = new Map<string, AssistantDealTab>([
+  ["overview", "overview"],
+  ["summary", "overview"],
+  ["terms", "terms"],
+  ["risk", "risks"],
+  ["risks", "risks"],
+  ["deliverable", "deliverables"],
+  ["deliverables", "deliverables"],
+  ["brief", "brief"],
+  ["briefs", "brief"],
+  ["email", "emails"],
+  ["emails", "emails"],
+  ["document", "documents"],
+  ["documents", "documents"],
+  ["note", "notes"],
+  ["notes", "notes"]
+]);
 
 export const assistantRouteTargets = [
   ...appNavItems.map((item) => ({
@@ -51,7 +112,7 @@ export function buildAssistantHref(
   target: string,
   options?: { dealId?: string | null; tab?: AssistantDealTab | null }
 ) {
-  if (target.startsWith("/app/")) {
+  if (target === "/app" || target.startsWith("/app/")) {
     return target;
   }
 
@@ -68,8 +129,16 @@ export function buildAssistantHref(
     return `/app/p/${options.dealId}?tab=${tab}`;
   }
 
-  if (options?.dealId && isValidAssistantTab(target)) {
-    return `/app/p/${options.dealId}?tab=${target}`;
+  const normalizedTarget = normalizeRouteTarget(target);
+  const tabTarget = assistantDealTabAliases.get(normalizedTarget) ?? (isValidAssistantTab(target) ? target : null);
+
+  if (options?.dealId && tabTarget) {
+    return `/app/p/${options.dealId}?tab=${tabTarget}`;
+  }
+
+  const appHref = assistantAppRouteAliases.get(normalizedTarget);
+  if (appHref) {
+    return appHref;
   }
 
   return null;

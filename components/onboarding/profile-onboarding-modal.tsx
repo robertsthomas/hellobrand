@@ -201,6 +201,13 @@ export function ProfileOnboardingModal({
         const payload = buildProfileOnboardingSubmission({
           displayName,
           contactEmail,
+          timeZone: (() => {
+            try {
+              return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+            } catch {
+              return null;
+            }
+          })(),
           primaryHandle,
           selectedPlatforms,
           platformHandles,

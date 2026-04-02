@@ -309,6 +309,7 @@ export const invoiceRecordInputSchema = z.object({
 export const onboardingProfileSubmitSchema = z.object({
   displayName: z.string().min(1, "Name is required.").max(120),
   contactEmail: z.string().email("Valid email is required."),
+  timeZone: z.string().max(100).nullable().optional(),
   primaryHandle: z.string().min(1, "Handle is required.").max(120),
   selectedPlatforms: z
     .array(z.string().min(1))
@@ -329,6 +330,7 @@ export const profileInputSchema = z.object({
   creatorLegalName: z.string().max(120).nullable(),
   businessName: z.string().max(120).nullable(),
   contactEmail: z.string().email().nullable(),
+  timeZone: z.string().max(100).nullable().optional(),
   preferredSignature: z.string().max(200).nullable(),
   payoutDetails: z.string().max(5000).nullable(),
   defaultCurrency: z.string().max(12).nullable().optional(),

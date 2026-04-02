@@ -112,6 +112,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [threadLoading, setThreadLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [forceNewThread, setForceNewThread] = useState(false);
+  const [dismissedSuggestedPromptsByThread, setDismissedSuggestedPromptsByThread] = useState<
+    Record<string, boolean>
+  >({});
 
   useEffect(() => {
     const storedTone = window.localStorage.getItem(assistantToneStorageKey);
@@ -155,6 +158,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (
+      threadState &&
+      !forceNewThread &&
+      threadState.thread.scope === scope &&
+      threadState.thread.dealId === dealId
+    ) {
+      return;
+    }
+
     let cancelled = false;
     setThreadLoading(true);
 
@@ -174,10 +186,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [dealId, forceNewThread, open, scope]);
+  }, [dealId, forceNewThread, open, scope, threadState]);
 
   useEffect(() => {
     if (!open) {
+      return;
+    }
+
+    if (profileLocation !== null) {
       return;
     }
 
@@ -199,7 +215,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, profileLocation]);
 
   const openAssistant = useCallback(
     (options?: { trigger?: AssistantTrigger | null; prompt?: string | null }) => {
@@ -231,6 +247,13 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setQueuedPrompt(null);
     setTrigger(null);
     setThreadState(null);
+    if (threadId) {
+      setDismissedSuggestedPromptsByThread((current) => {
+        const next = { ...current };
+        delete next[threadId];
+        return next;
+      });
+    }
     setForceNewThread(true);
   }, [threadState?.thread.id]);
 
@@ -268,6 +291,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
               thread={threadState.thread}
               initialMessages={threadState.messages}
               context={context}
+              suggestedPromptsDismissed={Boolean(
+                dismissedSuggestedPromptsByThread[threadState.thread.id]
+              )}
+              onDismissSuggestedPrompts={() =>
+                setDismissedSuggestedPromptsByThread((current) => ({
+                  ...current,
+                  [threadState.thread.id]: true
+                }))
+              }
               queuedPrompt={queuedPrompt}
               onPromptConsumed={() => setQueuedPrompt(null)}
               tone={tone}
