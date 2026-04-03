@@ -1,5 +1,9 @@
 import { fail, ok } from "@/lib/http";
 import { isE2EAuthEnabled } from "@/lib/e2e-auth";
+import {
+  completeFallbackOnboardingStateCookie,
+  resetFallbackOnboardingStateCookie
+} from "@/lib/onboarding";
 import { prisma } from "@/lib/prisma";
 
 type Payload = {
@@ -26,9 +30,25 @@ export async function POST(request: Request) {
 
   const userId = payload.userId?.trim() || "demo-user";
   const action = payload.action ?? "reset";
+  const viewer = {
+    id: userId,
+    email: `${userId}@hellobrand.app`,
+    displayName: "Demo Creator",
+    mode: "demo" as const
+  };
 
   if (!process.env.DATABASE_URL) {
-    return ok({ message: `Onboarding ${action} skipped (no DB).`, userId });
+    if (action === "reset") {
+      await resetFallbackOnboardingStateCookie(viewer);
+      return ok({ message: "Onboarding state reset.", userId });
+    }
+
+    if (action === "complete") {
+      await completeFallbackOnboardingStateCookie(viewer);
+      return ok({ message: "Onboarding marked complete.", userId });
+    }
+
+    return fail("Invalid action.", 400);
   }
 
   if (action === "reset") {

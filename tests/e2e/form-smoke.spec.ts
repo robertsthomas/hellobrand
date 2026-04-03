@@ -30,9 +30,14 @@ test.describe("form smoke", () => {
 
     try {
       await gotoAuthed(page, "/app/settings/profile");
-      const mainArea = page.getByRole("main");
-      const interactions = await exerciseVisibleFormControls(mainArea);
-      expect(interactions).toBeGreaterThanOrEqual(0);
+      await expect(
+        page.getByRole("heading", { name: "Profile", exact: true })
+      ).toBeVisible();
+      await page.locator("#displayName").fill("Smoke Test Creator");
+      await page.locator("#bio").fill("Smoke test creator bio for runtime form coverage.");
+      await page.locator("#primaryPlatform").selectOption("tiktok");
+      await page.locator("#contentCategory").selectOption("Lifestyle");
+      await page.locator("#location").fill("New York, NY");
       await runtime.assertNoRuntimeErrors();
     } finally {
       runtime.dispose();

@@ -361,12 +361,13 @@ export function ProfileEditor({
               id="displayName"
               value={form.displayName}
               placeholder="Sarah Miller"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  displayName: event.currentTarget.value
-                }))
-              }
+                  displayName: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -375,12 +376,13 @@ export function ProfileEditor({
               id="creatorLegalName"
               value={form.creatorLegalName}
               placeholder="Sarah Miller"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  creatorLegalName: event.currentTarget.value
-                }))
-              }
+                  creatorLegalName: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -389,12 +391,13 @@ export function ProfileEditor({
               id="businessName"
               value={form.businessName}
               placeholder="@sarahmiller"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  businessName: event.currentTarget.value
-                }))
-              }
+                  businessName: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -404,12 +407,13 @@ export function ProfileEditor({
               type="email"
               value={form.contactEmail}
               placeholder={initialEmail}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  contactEmail: event.currentTarget.value
-                }))
-              }
+                  contactEmail: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -418,12 +422,13 @@ export function ProfileEditor({
               id="bio"
               value={form.bio}
               placeholder="What kind of creator are you, what do you cover, and what should brands understand quickly?"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  bio: event.currentTarget.value
-                }))
-              }
+                  bio: value
+                }));
+              }}
             />
           </div>
         </div>
@@ -452,9 +457,10 @@ export function ProfileEditor({
                   id={`${entry.id}-handle`}
                   value={entry.handle}
                   placeholder="@handle"
-                  onChange={(event) =>
-                    updateGeneralHandle(entry.id, "handle", event.currentTarget.value)
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateGeneralHandle(entry.id, "handle", value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -463,13 +469,10 @@ export function ProfileEditor({
                   id={`${entry.id}-audience`}
                   value={entry.audienceLabel ?? ""}
                   placeholder="245K"
-                  onChange={(event) =>
-                    updateGeneralHandle(
-                      entry.id,
-                      "audienceLabel",
-                      event.currentTarget.value
-                    )
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateGeneralHandle(entry.id, "audienceLabel", value);
+                  }}
                 />
               </div>
             </div>
@@ -495,13 +498,10 @@ export function ProfileEditor({
                   id={`${entry.id}-context`}
                   value={entry.partnershipContext ?? ""}
                   placeholder="Beauty brand partnerships, paid TikTok campaigns, parenthood content"
-                  onChange={(event) =>
-                    updateDealHandle(
-                      entry.id,
-                      "partnershipContext",
-                      event.currentTarget.value
-                    )
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateDealHandle(entry.id, "partnershipContext", value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -510,13 +510,10 @@ export function ProfileEditor({
                   id={`${entry.id}-platform`}
                   value={entry.platform}
                   options={[...PROFILE_PLATFORM_OPTIONS]}
-                  onChange={(event) =>
-                    updateDealHandle(
-                      entry.id,
-                      "platform",
-                      event.currentTarget.value
-                    )
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateDealHandle(entry.id, "platform", value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -525,9 +522,10 @@ export function ProfileEditor({
                   id={`${entry.id}-handle`}
                   value={entry.handle}
                   placeholder="@handle"
-                  onChange={(event) =>
-                    updateDealHandle(entry.id, "handle", event.currentTarget.value)
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateDealHandle(entry.id, "handle", value);
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -536,13 +534,10 @@ export function ProfileEditor({
                   id={`${entry.id}-audience`}
                   value={entry.audienceLabel ?? ""}
                   placeholder="1.2M"
-                  onChange={(event) =>
-                    updateDealHandle(
-                      entry.id,
-                      "audienceLabel",
-                      event.currentTarget.value
-                    )
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    updateDealHandle(entry.id, "audienceLabel", value);
+                  }}
                 />
               </div>
               <div className="flex items-end">
@@ -592,12 +587,13 @@ export function ProfileEditor({
               id="primaryPlatform"
               value={form.primaryPlatform}
               options={[...PROFILE_PLATFORM_OPTIONS]}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value as ProfilePlatform;
                 setForm((current) => ({
                   ...current,
-                  primaryPlatform: event.currentTarget.value as ProfilePlatform
-                }))
-              }
+                  primaryPlatform: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -606,12 +602,13 @@ export function ProfileEditor({
               id="contentCategory"
               value={form.contentCategory}
               options={[...PROFILE_CATEGORY_OPTIONS]}
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  contentCategory: event.currentTarget.value
-                }))
-              }
+                  contentCategory: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -620,12 +617,13 @@ export function ProfileEditor({
               id="location"
               value={form.location}
               placeholder="Los Angeles, CA"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  location: event.currentTarget.value
-                }))
-              }
+                  location: value
+                }));
+              }}
             />
           </div>
         </div>
@@ -644,12 +642,13 @@ export function ProfileEditor({
               id="businessNameInline"
               value={form.businessName}
               placeholder="Sarah Miller Media LLC"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  businessName: event.currentTarget.value
-                }))
-              }
+                  businessName: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -658,12 +657,13 @@ export function ProfileEditor({
               id="taxId"
               value={form.taxId}
               placeholder="XX-XXXXXXX"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  taxId: event.currentTarget.value
-                }))
-              }
+                  taxId: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -672,12 +672,13 @@ export function ProfileEditor({
               id="address"
               value={form.address}
               placeholder="123 Main St, Suite 100&#10;Los Angeles, CA 90001"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  address: event.currentTarget.value
-                }))
-              }
+                  address: value
+                }));
+              }}
             />
             <p className="text-xs text-muted-foreground">Used as the issuer address on invoices.</p>
           </div>
@@ -687,12 +688,13 @@ export function ProfileEditor({
               id="rateCardUrl"
               value={form.rateCardUrl}
               placeholder="https://yourdomain.com/rates"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  rateCardUrl: event.currentTarget.value
-                }))
-              }
+                  rateCardUrl: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -701,12 +703,13 @@ export function ProfileEditor({
               id="preferredSignature"
               value={form.preferredSignature}
               placeholder="Best, Sarah"
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  preferredSignature: event.currentTarget.value
-                }))
-              }
+                  preferredSignature: value
+                }));
+              }}
             />
           </div>
           <div className="space-y-2 md:col-span-2">
@@ -715,12 +718,13 @@ export function ProfileEditor({
               id="payoutNotes"
               value={form.payoutNotes}
               placeholder="Share invoice instructions, preferred payout platform, or finance details you want to reuse."
-              onChange={(event) =>
+              onChange={(event) => {
+                const value = event.currentTarget.value;
                 setForm((current) => ({
                   ...current,
-                  payoutNotes: event.currentTarget.value
-                }))
-              }
+                  payoutNotes: value
+                }));
+              }}
             />
           </div>
         </div>

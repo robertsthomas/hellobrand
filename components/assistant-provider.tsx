@@ -324,3 +324,7 @@ export function useAssistant() {
 
   return context;
 }
+
+export function useOptionalAssistant() {
+  return useContext(AssistantContext);
+}

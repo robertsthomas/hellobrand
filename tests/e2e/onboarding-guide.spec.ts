@@ -91,28 +91,25 @@ test.describe("onboarding guide tooltips", () => {
   }) => {
     if (await isRateLimited(page)) return;
 
-    // Navigate to a deal page (if any exist for the demo user)
-    const dealLink = page.locator('a[href*="/app/p/"]').first();
-    const hasDeal = await dealLink.isVisible({ timeout: 2000 }).catch(() => false);
+    const response = await page.goto("/app/p/demo-deal", {
+      waitUntil: "domcontentloaded",
+      timeout: 10000
+    });
 
-    if (hasDeal) {
-      await dealLink.click();
+    if ((response?.status() ?? 0) !== 200) return;
 
-      // Wait for deal page to load
-      await expect(page.locator('[data-guide="workspace-tabs"]')).toBeVisible({
-        timeout: 5000
-      });
+    await expect(page.locator('[data-guide="workspace-tabs"]')).toBeVisible({
+      timeout: 10000
+    });
 
-      // A workspace-specific guide tooltip may appear
-      const workspaceTooltip = page.getByText("Explore your workspace tabs");
-      const tooltipVisible = await workspaceTooltip
-        .isVisible({ timeout: 3000 })
-        .catch(() => false);
+    const workspaceTooltip = page.getByText("Explore your workspace tabs");
+    const tooltipVisible = await workspaceTooltip
+      .isVisible({ timeout: 1500 })
+      .catch(() => false);
 
-      if (tooltipVisible) {
-        await expect(workspaceTooltip).toBeVisible();
-        await expect(page.getByRole("button", { name: "Got it" })).toBeVisible();
-      }
+    if (tooltipVisible) {
+      await expect(workspaceTooltip).toBeVisible();
+      await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
     }
   });
 });

@@ -167,11 +167,11 @@ export function InboxPreviewInteraction({
                 <button
                   type="button"
                   onClick={handleSend}
-                  disabled={!generatedReply || isGenerating}
+                  disabled={!generatedReply}
                   className={cn(
                     buttonVariants({ size: "sm" }),
                     "gap-2",
-                    !generatedReply || isGenerating
+                    !generatedReply
                       ? "cursor-not-allowed opacity-40"
                       : ""
                   )}

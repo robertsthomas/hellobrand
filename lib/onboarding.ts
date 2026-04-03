@@ -1,4 +1,5 @@
 import { buildProfileOnboardingSubmission } from "@/lib/onboarding-draft";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import {
   parseProfileMetadata,
@@ -20,6 +21,8 @@ const EMPTY_GUIDE_STATE: ProductGuideState = {
   dismissedStepIds: [],
   completedStepIds: []
 };
+
+const FALLBACK_ONBOARDING_COOKIE_NAME = "hellobrand_onboarding_state";
 
 function normalizeGuideState(raw: unknown): ProductGuideState {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -79,6 +82,120 @@ function buildFallbackState(viewer: Viewer): OnboardingStateRecord {
   };
 }
 
+type FallbackOnboardingCookiePayload = {
+  userId: string;
+  profileOnboardingCompletedAt: string | null;
+  profileOnboardingVersion: number;
+  profileOnboardingStateJson: unknown;
+  productGuideVersion: number;
+  productGuideStateJson: ProductGuideState;
+  createdAt: string;
+  updatedAt: string;
+};
+
+async function getFallbackOnboardingStateFromCookie(
+  viewer: Viewer
+): Promise<OnboardingStateRecord | null> {
+  const cookieStore = await cookies();
+  const raw = cookieStore.get(FALLBACK_ONBOARDING_COOKIE_NAME)?.value;
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(raw) as Partial<FallbackOnboardingCookiePayload>;
+
+    if (payload.userId !== viewer.id) {
+      return null;
+    }
+
+    const base = buildFallbackState(viewer);
+
+    return {
+      ...base,
+      profileOnboardingCompletedAt:
+        typeof payload.profileOnboardingCompletedAt === "string"
+          ? payload.profileOnboardingCompletedAt
+          : null,
+      profileOnboardingVersion:
+        typeof payload.profileOnboardingVersion === "number"
+          ? payload.profileOnboardingVersion
+          : base.profileOnboardingVersion,
+      profileOnboardingStateJson:
+        payload.profileOnboardingStateJson ?? base.profileOnboardingStateJson,
+      productGuideVersion:
+        typeof payload.productGuideVersion === "number"
+          ? payload.productGuideVersion
+          : base.productGuideVersion,
+      productGuideStateJson: normalizeGuideState(payload.productGuideStateJson),
+      createdAt:
+        typeof payload.createdAt === "string" ? payload.createdAt : base.createdAt,
+      updatedAt:
+        typeof payload.updatedAt === "string" ? payload.updatedAt : base.updatedAt
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function setFallbackOnboardingStateCookie(
+  viewer: Viewer,
+  patch: Partial<OnboardingStateRecord>
+) {
+  const cookieStore = await cookies();
+  const existing =
+    (await getFallbackOnboardingStateFromCookie(viewer)) ?? buildFallbackState(viewer);
+  const next: OnboardingStateRecord = {
+    ...existing,
+    ...patch,
+    id: existing.id,
+    userId: viewer.id,
+    productGuideStateJson: patch.productGuideStateJson
+      ? normalizeGuideState(patch.productGuideStateJson)
+      : existing.productGuideStateJson,
+    updatedAt: new Date().toISOString()
+  };
+
+  cookieStore.set({
+    name: FALLBACK_ONBOARDING_COOKIE_NAME,
+    value: JSON.stringify({
+      userId: next.userId,
+      profileOnboardingCompletedAt: next.profileOnboardingCompletedAt,
+      profileOnboardingVersion: next.profileOnboardingVersion,
+      profileOnboardingStateJson: next.profileOnboardingStateJson,
+      productGuideVersion: next.productGuideVersion,
+      productGuideStateJson: next.productGuideStateJson,
+      createdAt: next.createdAt,
+      updatedAt: next.updatedAt
+    } satisfies FallbackOnboardingCookiePayload),
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    secure: false,
+    maxAge: 60 * 60 * 24 * 7
+  });
+
+  return next;
+}
+
+export async function resetFallbackOnboardingStateCookie(viewer: Viewer) {
+  return setFallbackOnboardingStateCookie(viewer, {
+    profileOnboardingCompletedAt: null,
+    profileOnboardingVersion: 0,
+    profileOnboardingStateJson: null,
+    productGuideVersion: 0,
+    productGuideStateJson: { ...EMPTY_GUIDE_STATE }
+  });
+}
+
+export async function completeFallbackOnboardingStateCookie(viewer: Viewer) {
+  return setFallbackOnboardingStateCookie(viewer, {
+    profileOnboardingCompletedAt: new Date().toISOString(),
+    profileOnboardingVersion: 1
+  });
+}
+
 function isUniqueConstraintError(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
@@ -91,7 +208,10 @@ export async function getOnboardingStateForViewer(
   viewer: Viewer
 ): Promise<OnboardingStateRecord> {
   if (!process.env.DATABASE_URL) {
-    return buildFallbackState(viewer);
+    return (
+      (await getFallbackOnboardingStateFromCookie(viewer)) ??
+      buildFallbackState(viewer)
+    );
   }
 
   const existing = await prisma.userOnboardingState.findUnique({
@@ -211,6 +331,11 @@ export async function completeProfileOnboarding(
     accentColor: submission.accentColor
   });
 
+  if (!process.env.DATABASE_URL) {
+    await completeFallbackOnboardingStateCookie(viewer);
+    return profile;
+  }
+
   // Mark onboarding as complete
   await prisma.userOnboardingState.upsert({
     where: { userId: viewer.id },
@@ -256,6 +381,15 @@ export async function updateGuideStep(
     if (!guideState.completedStepIds.includes(stepId)) {
       guideState.completedStepIds.push(stepId);
     }
+  }
+
+  if (!process.env.DATABASE_URL) {
+    const nextState = await setFallbackOnboardingStateCookie(viewer, {
+      productGuideVersion: Math.max(state.productGuideVersion, 1),
+      productGuideStateJson: { ...guideState }
+    });
+
+    return nextState.productGuideStateJson;
   }
 
   await prisma.userOnboardingState.upsert({

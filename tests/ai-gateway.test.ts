@@ -60,8 +60,8 @@ describe("ai gateway", () => {
       featureKey: "assistant_chat"
     });
 
-    expect(prepared.requestedModel).toBe("google/gemini-2.5-flash");
-    expect(prepared.fallbacks).toEqual(["openai/gpt-5-mini"]);
+    expect(prepared.requestedModel).toBe("openai/gpt-5-mini");
+    expect(prepared.fallbacks).toEqual(["google/gemini-2.5-flash"]);
     expect(prepared.budgetDecision).toBe("normal");
   });
 

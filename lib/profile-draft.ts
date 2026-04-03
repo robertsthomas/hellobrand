@@ -70,7 +70,7 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
 
     return (
       existing ?? {
-        id: createClientRowId(platform),
+        id: `general-${platform}`,
         platform,
         handle: "",
         audienceLabel: "",
@@ -80,12 +80,14 @@ function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
   });
 }
 
-export function emptyDealHandle(): SocialHandleEntry & {
+export function emptyDealHandle(
+  id = createClientRowId("deal")
+): SocialHandleEntry & {
   audienceLabel: string;
   partnershipContext: string;
 } {
   return {
-    id: createClientRowId("deal"),
+    id,
     platform: "instagram",
     handle: "",
     audienceLabel: "",
@@ -118,7 +120,7 @@ export function buildProfileEditorDraft(
             audienceLabel: entry.audienceLabel ?? "",
             partnershipContext: entry.partnershipContext ?? ""
           }))
-        : [emptyDealHandle()]
+        : [emptyDealHandle("deal-default")]
   };
 }
 

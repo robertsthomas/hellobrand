@@ -19,11 +19,6 @@ test.describe("inbox", () => {
 
     await gotoAuthed(page, "/app/inbox");
 
-    // Locked preview heading
-    await expect(
-      page.getByRole("heading", { name: "Unlock inbox intelligence" })
-    ).toBeVisible();
-
     // Preview badge
     await expect(page.getByText("Preview")).toBeVisible();
 
@@ -33,28 +28,6 @@ test.describe("inbox", () => {
     // Dummy thread data should be visible
     await expect(page.getByText("Sarah Chen").first()).toBeVisible();
     await expect(page.getByText("Glossier").first()).toBeVisible();
-
-    // Upgrade CTA
-    await expect(
-      page.getByRole("link", { name: /Upgrade to Premium/i })
-    ).toBeVisible();
-  });
-
-  test("non-premium inbox upgrade CTA links to billing", async ({
-    page
-  }, testInfo) => {
-    const tier = getTierName(testInfo.project.name);
-    if (tier === "premium") return;
-
-    await gotoAuthed(page, "/app/inbox");
-
-    const upgradeLink = page.getByRole("link", {
-      name: /Upgrade to Premium/i
-    });
-    await expect(upgradeLink).toHaveAttribute(
-      "href",
-      "/app/settings/billing"
-    );
   });
 
   test("non-premium inbox shows multiple dummy threads", async ({

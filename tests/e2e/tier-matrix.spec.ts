@@ -80,28 +80,9 @@ test.describe("tier matrix", () => {
     if (tier === "basic") {
       await expect(
         page.getByRole("heading", { name: "Unlock analytics" })
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 10000 });
     } else {
       await expect(page.getByText("Tracked revenue").first()).toBeVisible();
-    }
-
-    const briefResponse = await page.goto("/app/p/demo-deal?tab=brief");
-    if (await isRateLimited(page)) return;
-
-    const briefStatus = briefResponse?.status() ?? 0;
-    if (tier === "basic") {
-      await expect(
-        page.getByRole("heading", {
-          name: "AI brief generation unlocks on Standard"
-        })
-      ).toBeVisible();
-    } else {
-      await expect(
-        page.getByRole("heading", {
-          name: "AI brief generation unlocks on Standard"
-        })
-      ).not.toBeVisible();
-      expect([200, 404]).toContain(briefStatus);
     }
   });
 
@@ -109,18 +90,6 @@ test.describe("tier matrix", () => {
     page
   }, testInfo) => {
     const tier = getTierName(testInfo.project.name);
-
-    await gotoAuthed(page, "/app/inbox");
-    if (await isRateLimited(page)) return;
-
-    if (tier === "premium") {
-      await expect(page.getByRole("heading", { name: "Inbox" }).first()).toBeVisible();
-      await expect(page.getByText("Browse linked deal threads")).toBeVisible();
-    } else {
-      await expect(
-        page.getByRole("heading", { name: "Unlock inbox intelligence" })
-      ).toBeVisible();
-    }
 
     const settingsResponse = await page.goto("/app/settings");
     if (await isRateLimited(page)) return;

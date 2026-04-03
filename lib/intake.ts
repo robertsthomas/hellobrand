@@ -641,6 +641,10 @@ export async function updateIntakeDraftForViewer(
 export async function listIntakeDraftsForViewer(
   viewer: Viewer
 ): Promise<IntakeDraftListItem[]> {
+  if (!process.env.DATABASE_URL) {
+    return [];
+  }
+
   const sessions = await prisma.intakeSession.findMany({
     where: {
       userId: viewer.id,

@@ -80,10 +80,6 @@ export async function getCachedProfile(viewer: Viewer) {
 }
 
 export async function getCachedOnboardingState(viewer: Viewer) {
-  "use cache";
-  cacheLife("minutes");
-  cacheTag(`user-${viewer.id}-onboarding`);
-
   const { getOnboardingStateForViewer } = await import("@/lib/onboarding");
   return getOnboardingStateForViewer(viewer);
 }

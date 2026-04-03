@@ -42,12 +42,29 @@ async function setDocumentFile(
   page: Page,
   input: { name: string; mimeType: string; buffer: Buffer }
 ) {
-  await page.locator('input[type="file"]').setInputFiles(input);
-  await expect(page.getByText(input.name, { exact: true })).toBeVisible();
+  const fileInput = page.locator('input[type="file"]');
+  const selectedFileHeading = page.getByRole("heading", { name: input.name });
+  const submitButton = page.locator('form button[type="submit"]');
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await fileInput.setInputFiles(input);
+
+    try {
+      await expect(selectedFileHeading).toBeVisible({ timeout: 5000 });
+      await expect(submitButton).toBeEnabled({ timeout: 5000 });
+      return;
+    } catch (error) {
+      if (attempt === 1) {
+        throw error;
+      }
+
+      await page.waitForTimeout(500);
+    }
+  }
 }
 
 async function submitSelectedDocument(page: Page) {
-  const analyzeButton = page.getByRole("button", { name: "Analyze document" });
+  const analyzeButton = page.locator('form button[type="submit"]');
   await expect(analyzeButton).toBeEnabled({ timeout: 15000 });
   await analyzeButton.click();
 }
@@ -83,8 +100,10 @@ test.describe("public upload", () => {
 
       await submitSelectedDocument(page);
 
-      await expect(page.getByText("Anonymous preview")).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Here’s what we found" })).toBeVisible();
+      await expect(page.getByText("Document breakdown")).toBeVisible({ timeout: 10000 });
+      await expect(
+        page.getByRole("heading", { name: "Here’s what we found" })
+      ).toBeVisible({ timeout: 10000 });
       await expect(page.getByText("Amazon Kids launch brief")).toBeVisible();
       await expect(page.getByRole("button", { name: "Save My Deal" }).first()).toBeVisible();
     });
@@ -116,9 +135,9 @@ test.describe("public upload", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Your free anonymous uploads are used up."
+          name: "Your free uploads are used up."
         })
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 10000 });
       await expect(
         page.getByRole("link", { name: "Create an account" })
       ).toHaveAttribute(

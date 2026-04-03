@@ -168,7 +168,7 @@ async function fillVisibleInputs(inputs: Locator) {
 
     await input.scrollIntoViewIfNeeded();
     await input.fill(await buildInputSample(input, index));
-    await input.press("Tab");
+    await input.evaluate((node: HTMLInputElement) => node.blur());
     interactions += 1;
   }
 
@@ -190,7 +190,7 @@ async function fillVisibleTextareas(textareas: Locator) {
 
     await textarea.scrollIntoViewIfNeeded();
     await textarea.fill(`Smoke test notes ${index + 1}`);
-    await textarea.press("Tab");
+    await textarea.evaluate((node: HTMLTextAreaElement) => node.blur());
     interactions += 1;
   }
 
