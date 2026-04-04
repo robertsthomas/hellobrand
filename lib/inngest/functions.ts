@@ -1,24 +1,7 @@
 import { NonRetriableError } from "inngest";
 
+import { isPermanentDocumentProcessingError } from "@/lib/document-processing";
 import { inngest } from "@/lib/inngest/client";
-
-function isNonRetriableDocumentError(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : typeof error === "string" ? error : "";
-
-  if (!message) {
-    return false;
-  }
-
-  return (
-    message === "Document not found." ||
-    message.includes("pipeline: extract_text:") ||
-    message.includes("We could not reliably parse this file.") ||
-    message.includes("Only PDF, DOCX, and pasted text are supported") ||
-    message.includes("invalid top-level pages dictionary") ||
-    message.includes("bad XRef entry")
-  );
-}
 
 export const processContractFunction = inngest.createFunction(
   { id: "process-deal-document", retries: 0 },
@@ -40,7 +23,7 @@ export const processContractFunction = inngest.createFunction(
         dealId: aggregate?.deal.id ?? null
       };
     } catch (error) {
-      if (isNonRetriableDocumentError(error)) {
+      if (isPermanentDocumentProcessingError(error)) {
         throw new NonRetriableError(
           error instanceof Error ? error.message : "Document processing failed."
         );

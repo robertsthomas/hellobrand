@@ -26,6 +26,10 @@ import {
   extractContractWithLlamaExtract,
   resolveContractLlamaExtractMode
 } from "@/lib/analysis/llamaextract";
+import {
+  getDocumentProcessingBackend,
+  sendDocumentProcessingMessage
+} from "@/lib/document-processing";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { generateEmailDraft } from "@/lib/email/generate";
 import { inngest } from "@/lib/inngest/client";
@@ -1315,7 +1319,44 @@ function hasInngestEventKey() {
 }
 
 export async function enqueueDocumentProcessing(documentId: string) {
-  if (hasInngestEventKey()) {
+  const backend = getDocumentProcessingBackend();
+
+  if (backend === "vercel-queue") {
+    try {
+      await sendDocumentProcessingMessage(documentId);
+      logDocumentPipeline("info", "queue_enqueued", {
+        documentId,
+        mode: "queue"
+      });
+      return { mode: "queue" as const };
+    } catch (error) {
+      const repository = getRepository();
+      const document = await repository.getDocument(documentId);
+      const message =
+        error instanceof Error ? error.message : "Unable to queue document processing.";
+
+      if (document) {
+        await repository.updateDocument(document.id, {
+          processingStatus: "failed",
+          errorMessage: `queue: ${message}`
+        });
+
+        if (process.env.DATABASE_URL) {
+          await syncIntakeSessionForDealId(document.dealId);
+        }
+      }
+
+      logDocumentPipeline("error", "queue_failed", {
+        documentId,
+        mode: "queue",
+        error: message
+      });
+
+      return { mode: "failed" as const };
+    }
+  }
+
+  if (backend === "inngest" && hasInngestEventKey()) {
     try {
       await inngest.send({
         name: "documents/process.requested",

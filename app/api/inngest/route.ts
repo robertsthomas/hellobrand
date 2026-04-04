@@ -1,5 +1,6 @@
 import { serve } from "inngest/next";
 
+import { getDocumentProcessingBackend } from "@/lib/document-processing";
 import { inngest } from "@/lib/inngest/client";
 import {
   emailActionItemDeadlineCheckFunction,
@@ -17,10 +18,12 @@ import {
   workspaceReminderSweepFunction
 } from "@/lib/inngest/functions";
 
+const documentProcessingBackend = getDocumentProcessingBackend();
+
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
-    processContractFunction,
+    ...(documentProcessingBackend === "inngest" ? [processContractFunction] : []),
     checkWorkspaceDuplicatesFunction,
     notificationEmailSendFunction,
     invoiceReminderSweepFunction,
