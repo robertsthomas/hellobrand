@@ -7,12 +7,15 @@ import {
   Receipt
 } from "lucide-react";
 
-import { ConflictWarnings } from "@/components/conflict-warnings";
-import { DashboardGreeting } from "@/components/dashboard-greeting";
-import { DisclosureObligations } from "@/components/disclosure-obligations";
-import { QuickActionsPanel, type QuickActionItem } from "@/components/quick-actions-panel";
-import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
-import { DashboardSkeleton } from "@/components/skeletons";
+import {
+  ConflictWarnings,
+  DashboardGreeting,
+  DashboardSkeleton,
+  DisclosureObligations,
+  QuickActionsPanel,
+  RecentDealCardMenu,
+  type QuickActionItem,
+} from "@/components/dashboard";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { requireViewer } from "@/lib/auth";

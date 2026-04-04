@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 
 import { generateInvoiceDraftAction } from "@/app/actions";
-import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
-import { InvoiceEditorFullPage } from "@/components/invoice-editor-full-page";
+import {
+  AssistantTriggerButton,
+  InvoiceEditorFullPage,
+  InvoiceGenerationEmptyState,
+} from "@/components/invoice";
 import { SubmitButton } from "@/components/submit-button";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
@@ -88,15 +91,7 @@ async function InvoiceEditorContent({
             Back to workspace
           </Link>
 
-          <div className="flex flex-col items-center py-16 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground/40" />
-            <h1 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
-              Generate a workspace invoice
-            </h1>
-            <p className="mt-3 max-w-lg text-sm text-muted-foreground">
-              HelloBrand will prefill the invoice from your workspace amount, dates, and
-              deliverables. Review it, edit anything you need, and finalize when ready.
-            </p>
+          <InvoiceGenerationEmptyState>
             <form action={generateInvoiceDraftAction} className="mt-6">
               <input type="hidden" name="dealId" value={deal.id} />
               <div className="flex flex-wrap items-center justify-center gap-3">
@@ -117,7 +112,7 @@ async function InvoiceEditorContent({
                 />
               </div>
             </form>
-          </div>
+          </InvoiceGenerationEmptyState>
         </div>
       </div>
     );

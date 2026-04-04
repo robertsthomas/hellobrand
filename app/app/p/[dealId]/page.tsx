@@ -1,30 +1,32 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, ArrowRight, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Trash2 } from "lucide-react";
 import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
-import { PendingChangesBanner } from "@/components/pending-changes-banner";
-import { BriefGenerator } from "@/components/brief-generator";
-import { BriefOverview } from "@/components/brief-overview";
-import { DealEmailPanel } from "@/components/deal-email-panel";
-import { DealNotesDrawer } from "@/components/deal-notes-drawer";
-import { DealSummaryPanel } from "@/components/deal-summary-panel";
-import { DeliverableTracker } from "@/components/deliverable-tracker";
-import { ConflictWarnings } from "@/components/conflict-warnings";
-import { DeleteDealDialog } from "@/components/delete-deal-dialog";
-import { DeliverablesList } from "@/components/deliverables-list";
-import { DisclosureObligations } from "@/components/disclosure-obligations";
-import { DocumentsPanel } from "@/components/documents-panel";
-import { FeatureUpgradeCard } from "@/components/feature-locked-state";
-
-import { RiskFlags } from "@/components/risk-flags";
+import {
+  BriefGenerator,
+  BriefOverview,
+  ConflictWarnings,
+  DealEmailPanel,
+  DealNotesDrawer,
+  DealSummaryPanel,
+  DeleteDealDialog,
+  DeliverablesList,
+  DeliverableTracker,
+  DisclosureObligations,
+  DocumentsPanel,
+  FeatureUpgradeCard,
+  PendingChangesBanner,
+  RiskFlags,
+  ScrollableTabsList,
+  TermsEditor,
+  UploadContractForm,
+  WorkspaceDetailHeader,
+  WorkspaceTabs,
+} from "@/components/workspace";
 import { DealDetailSkeleton } from "@/components/skeletons";
-import { TermsEditor } from "@/components/terms-editor";
-import { UploadContractForm } from "@/components/upload-contract-form";
-import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { WorkspaceTabs } from "@/components/workspace-tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
@@ -183,60 +185,19 @@ async function DealDetailContent({
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
       <div className="mx-auto max-w-[1280px] space-y-6">
-        {/* Header */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/app/p/history"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              All Partnerships
-            </Link>
-            <DealNotesDrawer dealId={deal.id} notes={terms?.notes ?? null} />
-          </div>
-
-          <div className="border-b border-black/8 pb-6 dark:border-white/10">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-1">
-                <h1 className="text-2xl font-semibold tracking-[-0.05em] text-foreground sm:text-[34px] lg:text-[40px]">
-                  {displayCampaignName}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {displayBrandName} · {humanizeToken(deal.status)} · {humanizeToken(deal.paymentStatus)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#7CB08B]" />
-                <span className="text-sm font-medium text-foreground">
-                  {humanizeToken(deal.status)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 3 compact metrics */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="border-b border-black/8 pb-3 dark:border-white/10">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment</p>
-              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
-                {formatCurrency(terms?.paymentAmount ?? null, terms?.currency ?? "USD")}
-              </p>
-            </div>
-            <div className="border-b border-black/8 pb-3 dark:border-white/10">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Next due</p>
-              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
-                {nextDeliverableValue}
-              </p>
-            </div>
-            <div className="border-b border-black/8 pb-3 dark:border-white/10">
-              <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Deliverables</p>
-              <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
-                {terms?.deliverables?.length ?? 0} pending
-              </p>
-            </div>
-          </div>
-        </section>
+        <WorkspaceDetailHeader
+          backHref="/app/p/history"
+          backLabel="All Partnerships"
+          action={<DealNotesDrawer dealId={deal.id} notes={terms?.notes ?? null} />}
+          campaignName={displayCampaignName}
+          brandName={displayBrandName}
+          status={deal.status}
+          paymentStatus={deal.paymentStatus}
+          paymentAmount={terms?.paymentAmount ?? null}
+          currency={terms?.currency ?? "USD"}
+          nextDeliverableValue={nextDeliverableValue}
+          deliverableCount={terms?.deliverables?.length ?? 0}
+        />
 
         {/* Tabs: 5 instead of 9 */}
         <WorkspaceTabs defaultTab={currentTab}>

@@ -4,13 +4,15 @@ import { Suspense } from "react";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
-import { IntakeAutoRefresh } from "@/components/intake-auto-refresh";
-import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { IntakeDuplicateWarning } from "@/components/intake-duplicate-warning";
-import { IntakePendingUpload } from "@/components/intake-pending-upload";
-import { IntakeProcessingState } from "@/components/intake-processing-state";
+import {
+  DeleteDraftButton,
+  IntakeAutoRefresh,
+  IntakeDuplicateWarning,
+  IntakePendingUpload,
+  IntakeProcessingState,
+  StartQueuedAnalysisButton,
+} from "@/components/intake-flow";
 import { PostHogActionLink } from "@/components/posthog-action-link";
-import { StartQueuedAnalysisButton } from "@/components/start-queued-analysis-button";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 

@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
-import { ChevronRight, Trash2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Suspense } from "react";
 
 import { FormInput, FormSelect, FormTextarea } from "@/components/generic/form";
-import { IntakeFieldGuideDialog } from "@/components/intake-field-guide-dialog";
-import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
+import {
+  CreatorProfileSetupDialog,
+  IntakeGeneratedFieldsEditor,
+  IntakeReviewLiveStatus,
+  WorkspaceCreationOverlay,
+} from "@/components/intake-flow";
 import {
   IntakeField,
   IntakeHelperSpacer,
@@ -12,15 +16,13 @@ import {
   IntakeInlineEvidence,
   IntakeSectionCard,
 } from "@/components/intake";
-import { IntakeSummaryCards } from "@/components/patterns/intake";
-import { IntakeReviewLiveStatus } from "@/components/intake-review-live-status";
-import { PostHogSubmitButton } from "@/components/posthog-submit-button";
-import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
-import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { WorkspaceCreationOverlay } from "@/components/workspace-creation-overlay";
+import {
+  IntakeReviewFooter,
+  IntakeReviewHeader,
+  IntakeSummaryCards,
+} from "@/components/patterns/intake";
 import {
   confirmIntakeSessionAction,
-  deleteIntakeDraftAction
 } from "@/app/actions";
 import { requireViewer } from "@/lib/auth";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
@@ -28,7 +30,7 @@ import { CURRENCY_OPTIONS } from "@/lib/deal-terms-constants";
 import { cleanDisplayText } from "@/lib/display-text";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-import { formatCurrency, humanizeToken } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 function presentText(value: string | null | undefined) {
   if (!value) {
@@ -224,35 +226,7 @@ async function IntakeReviewContent({
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        {/* Header */}
-        <section className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl space-y-3">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                Confirm workspace
-              </h1>
-              <IntakeFieldGuideDialog />
-            </div>
-            <p className="text-[15px] leading-7 text-black/60 dark:text-white/65 sm:text-[17px] sm:leading-8">
-              Review the extracted details, fix anything that looks off, then create the workspace.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-black/5 px-4 py-2 text-sm font-semibold text-black/65 dark:bg-white/10 dark:text-white/70">
-              {humanizeToken(session.status)}
-            </div>
-            <form action={deleteIntakeDraftAction}>
-              <input type="hidden" name="sessionId" value={session.id} />
-              <input type="hidden" name="redirectTo" value="/app" />
-              <DeleteDraftButton
-                className="inline-flex items-center gap-2 border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete draft
-              </DeleteDraftButton>
-            </form>
-          </div>
-        </section>
+        <IntakeReviewHeader sessionId={session.id} status={session.status} />
 
         {session.errorMessage ? (
           <section className="border border-clay/20 bg-clay/8 p-5 text-sm text-clay shadow-panel dark:border-clay/25">
@@ -559,24 +533,10 @@ async function IntakeReviewContent({
                   </IntakeField>
                 </IntakeSectionCard>
 
-                <div className="sticky bottom-4 z-20">
-                  <div className="flex w-full items-center justify-between gap-3 border border-black/8 bg-white/92 px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur dark:border-white/10 dark:bg-[#11161c]/92">
-                    <span className="text-sm text-black/55 dark:text-white/55">
-                      {attentionItems.length > 0
-                        ? `${attentionItems.length} item${attentionItems.length === 1 ? "" : "s"} to review`
-                        : "Ready to confirm"}
-                    </span>
-                    <PostHogSubmitButton
-                      eventName="intake_confirmation_submitted"
-                      payload={{ source: "intake_review" }}
-                      pendingLabel="Generating workspace..."
-                      className="bg-ocean px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={!showConfirmation}
-                    >
-                      Create workspace
-                    </PostHogSubmitButton>
-                  </div>
-                </div>
+                <IntakeReviewFooter
+                  attentionCount={attentionItems.length}
+                  disabled={!showConfirmation}
+                />
               </form>
         </section>
 

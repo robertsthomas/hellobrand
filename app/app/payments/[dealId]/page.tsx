@@ -1,16 +1,16 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
-import { PaymentsWorkspaceDetail } from "@/components/payments-workspace-detail";
-import { PaymentsSkeleton } from "@/components/skeletons";
+import {
+  PaymentsSkeleton,
+  PaymentsWorkspaceDetail,
+  PaymentsWorkspaceHeader,
+} from "@/components/payments";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
 import { buildInvoiceLineItems } from "@/lib/invoices";
-import { formatCurrency, formatDate } from "@/lib/utils";
-
 export default function PaymentWorkspacePage({
   params
 }: {
@@ -81,26 +81,13 @@ async function PaymentWorkspaceContent({
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-8">
-        <section className="space-y-5 border-b border-black/8 pb-8">
-          <Link
-            href="/app/payments"
-            className="inline-flex border-b border-black/20 pb-1 text-sm font-medium text-foreground transition hover:border-black/50"
-          >
-            Back to payments
-          </Link>
-
-          <div className="max-w-4xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
-              Payments
-            </p>
-            <h1 className="mt-3 text-[40px] font-semibold tracking-[-0.06em] text-foreground">
-              {displayDeal.campaignName}
-            </h1>
-            <p className="mt-2 text-base text-muted-foreground">
-              {displayDeal.brandName} · Total {formatCurrency(payment.amount, payment.currency ?? "USD")} · Due {formatDate(payment.dueDate)}
-            </p>
-          </div>
-        </section>
+        <PaymentsWorkspaceHeader
+          campaignName={displayDeal.campaignName}
+          brandName={displayDeal.brandName}
+          amount={payment.amount}
+          currency={payment.currency}
+          dueDate={payment.dueDate}
+        />
 
         <PaymentsWorkspaceDetail
           deal={displayDeal}

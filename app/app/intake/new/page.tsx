@@ -3,10 +3,12 @@ import { Suspense } from "react";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
+import {
+  DeleteDraftButton,
+  EmptyDashboardUpload,
+  IntakeDraftEditor,
+} from "@/components/intake-flow";
 import { CardSkeleton } from "@/components/skeletons";
-import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { EmptyDashboardUpload } from "@/components/empty-dashboard-upload";
-import { IntakeDraftEditor } from "@/components/intake-draft-editor";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer, listIntakeDraftsForViewer } from "@/lib/intake";
 
