@@ -46,4 +46,21 @@ describe("brief fallback analysis", () => {
     expect(result.summary.body).toContain("Stories with Alexa");
     expect(result.summary.body).toContain("Key messaging includes");
   });
+
+  test("skips generic brief headings and uses the first real brand line", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Campaign Brief
+NimbusPM
+Summer Push
+Overview: Create content for the NimbusPM summer push.
+`,
+      {
+        fileName: "campaign_brief_nimbuspm.pdf"
+      }
+    );
+
+    expect(result.extraction.data.brandName).toBe("NimbusPM");
+    expect(result.extraction.data.campaignName).toBe("Summer Push");
+  });
 });

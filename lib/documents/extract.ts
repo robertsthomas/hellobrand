@@ -22,177 +22,6 @@ export class UnreadableDocumentError extends Error {
   }
 }
 
-const LLAMA_PARSE_EXTENSIONS = new Set([
-  "pdf",
-  "docx",
-  "doc",
-  "pptx",
-  "ppt",
-  "xlsx",
-  "xls",
-  "csv",
-  "rtf",
-  "txt",
-  "html",
-  "htm",
-  "xml",
-  "eml",
-  "msg",
-  "jpg",
-  "jpeg",
-  "png",
-  "webp",
-  "gif",
-  "bmp",
-  "tiff"
-]);
-
-function fileExtension(fileName: string) {
-  const match = fileName.toLowerCase().match(/\.([a-z0-9]+)$/);
-  return match?.[1] ?? null;
-}
-
-function hasLlamaParseKey() {
-  return Boolean(process.env.LLAMA_CLOUD_API_KEY);
-}
-
-function shouldTryLlamaParse(mimeType: string, fileName: string) {
-  const extension = fileExtension(fileName);
-  if (!extension) {
-    return false;
-  }
-
-  if (mimeType === "text/plain") {
-    return false;
-  }
-
-  return LLAMA_PARSE_EXTENSIONS.has(extension);
-}
-
-function llamaParsePrompt() {
-  return [
-    "Extract the document into clean markdown for downstream creator-partnership artifact analysis.",
-    "Preserve section headings, numbered clause boundaries, lists, dates, tables, signature blocks, email headers, invoice fields, deliverable trackers, report metrics, slide text, storyboard text, moodboard labels, and OCR-visible image text exactly as written.",
-    "Do not summarize, paraphrase, normalize away legal or operational wording, or omit repeated clause language when it is part of the source structure.",
-    "Keep adjacent lines from the same clause, table row, email message, checklist, or feedback block together so downstream extraction can recover evidence snippets accurately."
-  ].join(" ");
-}
-
-function llamaParseTier(): "cost_effective" | "fast" | "agentic" | "agentic_plus" {
-  const value = process.env.LLAMA_PARSE_TIER;
-  if (
-    value === "cost_effective" ||
-    value === "fast" ||
-    value === "agentic" ||
-    value === "agentic_plus"
-  ) {
-    return value;
-  }
-
-  return "cost_effective";
-}
-
-function llamaParseVersion() {
-  return process.env.LLAMA_PARSE_VERSION || "latest";
-}
-
-function parseTimeoutMs(value: string | undefined, fallbackMs: number) {
-  if (!value) {
-    return fallbackMs;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
-}
-
-const LLAMA_PARSE_TIMEOUT_MS = parseTimeoutMs(
-  process.env.LLAMA_PARSE_TIMEOUT_MS,
-  180_000
-);
-
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
-      ms
-    );
-    promise.then(resolve, reject).finally(() => clearTimeout(timer));
-  });
-}
-
-async function extractWithLlamaParse(buffer: Buffer, fileName: string) {
-  const { default: LlamaCloud } = await import("@llamaindex/llama-cloud");
-  const client = new LlamaCloud({
-    apiKey: process.env.LLAMA_CLOUD_API_KEY
-  });
-  const bytes = new Uint8Array(buffer);
-
-  const file = await withTimeout(
-    client.files.create({
-      file: new File([bytes], fileName),
-      purpose: "parse"
-    }),
-    LLAMA_PARSE_TIMEOUT_MS,
-    "LlamaParse file upload"
-  );
-
-  const tier = llamaParseTier();
-  const job = await withTimeout(
-    client.parsing.create({
-      file_id: file.id,
-      tier,
-      version: llamaParseVersion(),
-      ...(tier === "agentic" || tier === "agentic_plus"
-        ? {
-            agentic_options: {
-              custom_prompt: llamaParsePrompt()
-            }
-          }
-        : {})
-    }),
-    LLAMA_PARSE_TIMEOUT_MS,
-    "LlamaParse job creation"
-  );
-
-  const result = await withTimeout(
-    client.parsing.waitForCompletion(
-      job.id,
-      {
-        expand: ["markdown"],
-        project_id: job.project_id
-      },
-      {
-        pollingInterval: 2000
-      }
-    ),
-    LLAMA_PARSE_TIMEOUT_MS,
-    "LlamaParse parsing"
-  );
-
-  const rawText = Array.isArray(result?.markdown?.pages)
-    ? result.markdown.pages
-        .map((page) =>
-          page && typeof page === "object" && "markdown" in page
-            ? page.markdown ?? ""
-            : ""
-        )
-        .join("\n\n")
-    : "";
-
-  if (!rawText.trim()) {
-    throw new UnreadableDocumentError("LlamaParse returned empty content.");
-  }
-
-  return {
-    rawText,
-    normalizedText: normalizeDocumentText(rawText),
-    _llama: {
-      parseJobId: result.job.id,
-      projectId: result.job.project_id
-    }
-  };
-}
-
 function normalizeLine(line: string) {
   return line
     .replace(/\u0000/g, "")
@@ -356,10 +185,6 @@ async function extractPdfTextWithPdfJs(buffer: Buffer) {
 export type ExtractionResult = {
   rawText: string;
   normalizedText: string;
-  _llama?: {
-    parseJobId: string;
-    projectId: string | null;
-  };
   _debug?: {
     parser: string;
     durationMs: number;
@@ -380,20 +205,6 @@ export async function extractDocumentText(
     const durationMs = Date.now() - startedAt;
     console.info(`[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`);
     return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
-  }
-
-  if (hasLlamaParseKey() && shouldTryLlamaParse(mimeType, fileName)) {
-    try {
-      const result = await extractWithLlamaParse(buffer, fileName);
-      return { ...result, _debug: debugMeta("llamaparse", result.rawText) };
-    } catch (error) {
-      const durationMs = Date.now() - startedAt;
-      console.warn(`[extract] llamaparse FAILED after ${durationMs}ms, falling back to local`, {
-        fileName,
-        mimeType,
-        error: error instanceof Error ? error.message : String(error)
-      });
-    }
   }
 
   if (

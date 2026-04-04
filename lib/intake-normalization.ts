@@ -118,8 +118,17 @@ function isGenericIntakeLabel(value: string | null | undefined) {
     normalized === "pasted context" ||
     normalized === "email thread" ||
     normalized === "campaign brief" ||
+    normalized === "campaign" ||
+    normalized === "project" ||
+    normalized === "workspace" ||
+    normalized === "overview" ||
+    normalized === "concept" ||
     normalized === "contract" ||
     normalized === "context" ||
+    normalized === "influencer" ||
+    normalized === "creator" ||
+    normalized === "content creator" ||
+    normalized === "talent" ||
     normalized === "partnership"
   );
 }
@@ -212,6 +221,15 @@ function scoreContactLine(line: string) {
 function sanitizeContactName(value: string | null | undefined) {
   const normalized = presentText(value);
   if (!normalized) {
+    return null;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (
+    /\b(manager|director|lead|specialist|executive|strategist|partnerships?|campaign|marketing|media|talent|agent|coordinator|producer|contact|email|phone|agency|brand|team)\b/.test(
+      lower
+    )
+  ) {
     return null;
   }
 
@@ -423,7 +441,7 @@ function inferBrandName(aggregate: DealAggregate) {
   }
 
   const termsBrand = sanitizePartyName(aggregate.terms?.brandName, "brand");
-  if (termsBrand && !/^client\b/i.test(termsBrand)) {
+  if (termsBrand && !/^client\b/i.test(termsBrand) && !isGenericIntakeLabel(termsBrand)) {
     return termsBrand;
   }
 
@@ -903,7 +921,8 @@ function inferContractTitle(
   if (
     normalizedCampaign &&
     !/\bname\b/i.test(aggregate.terms?.campaignName ?? "") &&
-    !isGenericIntakeLabel(normalizedCampaign)
+    !isGenericIntakeLabel(normalizedCampaign) &&
+    !/^(campaign|project|workspace|concept|overview)$/i.test(normalizedCampaign)
   ) {
     return brandName &&
       !normalizedCampaign.toLowerCase().includes(brandName.toLowerCase())

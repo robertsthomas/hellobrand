@@ -17,11 +17,25 @@ type AttentionItem = {
   tone: "warning" | "neutral";
 };
 
+function dedupeAttentionItems(items: AttentionItem[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = `${item.label.trim().toLowerCase()}::${(item.detail ?? "").trim().toLowerCase()}`;
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 function buildAttentionItems(
   conflictResults: ConflictResult[],
   riskFlags: RiskFlagRecord[]
 ): AttentionItem[] {
-  return [
+  return dedupeAttentionItems([
     ...conflictResults.map((conflict) => ({
       id: `conflict-${conflict.type}-${conflict.title}`,
       label: conflict.title,
@@ -34,7 +48,7 @@ function buildAttentionItems(
       detail: flag.detail,
       tone: (flag.severity === "high" ? "warning" : "neutral") as "warning" | "neutral"
     }))
-  ];
+  ]);
 }
 
 function getStageState(

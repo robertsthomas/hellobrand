@@ -1,4 +1,8 @@
 import { inngest } from "@/lib/inngest/client";
+import {
+  getIncrementalEmailSyncBatchConfig,
+  runIncrementalEmailSync
+} from "@/lib/email/service";
 
 export const emailInitialSyncFunction = inngest.createFunction(
   { id: "email-account-initial-sync" },
@@ -24,18 +28,21 @@ export const emailInitialSyncFunction = inngest.createFunction(
 );
 
 export const emailIncrementalSyncFunction = inngest.createFunction(
-  { id: "email-account-incremental-sync" },
-  { event: "email/account.incremental_sync.requested" },
-  async ({ event }) => {
-    const accountId = String(event.data.accountId ?? "");
-
-    if (!accountId) {
-      throw new Error("Missing accountId.");
+  {
+    id: "email-account-incremental-sync",
+    concurrency: {
+      limit: 1,
+      key: "event.data.accountId"
+    },
+    batchEvents: {
+      key: "event.data.accountId",
+      ...getIncrementalEmailSyncBatchConfig()
     }
-
-    const { syncEmailAccount } = await import("@/lib/email/service");
-    await syncEmailAccount(accountId, {
-      mode: "incremental",
+  },
+  { event: "email/account.incremental_sync.requested" },
+  async ({ events }) => {
+    const requests = events.map((event) => ({
+      accountId: String(event.data.accountId ?? ""),
       gmailHistoryId:
         typeof event.data.gmailHistoryId === "string"
           ? event.data.gmailHistoryId
@@ -44,9 +51,14 @@ export const emailIncrementalSyncFunction = inngest.createFunction(
         ? event.data.outlookMessageIds
             .filter((entry: unknown): entry is string => typeof entry === "string")
         : []
-    });
+    }));
+    const accountId = String(requests[0]?.accountId ?? "");
 
-    return { ok: true, accountId };
+    if (!accountId) {
+      throw new Error("Missing accountId.");
+    }
+
+    return runIncrementalEmailSync(requests);
   }
 );
 

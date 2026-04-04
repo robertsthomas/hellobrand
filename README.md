@@ -51,22 +51,17 @@ doppler secrets upload .env --project hellobrand --config dev
    - `OPENROUTER_MODEL_SUMMARY` for creator-facing summaries
    - optional `*_FALLBACKS` secrets for per-task failover
    If the task-specific model is unset, it falls back to `OPENROUTER_MODEL`. If no provider is configured, the fallback parser is used.
-7. Optional contract extraction pilot: set `LLAMA_CLOUD_API_KEY` for LlamaParse / LlamaExtract, then control the contract-only rollout with:
-   - `LLAMA_EXTRACT_CONTRACTS_MODE=off|shadow|primary`
-   - `LLAMA_EXTRACT_TIER=agentic|cost_effective`
-   - `LLAMA_EXTRACT_TIMEOUT_MS` in milliseconds
-   `shadow` keeps the existing contract extractor canonical and logs field-level diffs against LlamaExtract. `primary` makes LlamaExtract canonical for file-backed contracts and falls back to the legacy extractor on failure.
-8. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
-9. For Stripe-backed billing flows, set:
+7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
+8. For Stripe-backed billing flows, set:
    - `STRIPE_SECRET_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `STRIPE_PRICE_BASIC_MONTHLY`
    - `STRIPE_PRICE_STANDARD_MONTHLY`
    - `STRIPE_PRICE_PREMIUM_MONTHLY`
    - optional yearly price IDs if annual billing is enabled later
-10. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=basic|standard|premium` in a non-production environment to override the effective tier.
-11. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
-12. Install dependencies:
+9. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=basic|standard|premium` in a non-production environment to override the effective tier.
+10. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
+11. Install dependencies:
 
 ```bash
 pnpm install
@@ -99,8 +94,8 @@ pnpm run start:prd
 - Phase 1 app routes are authenticated and DB-backed. Marketing routes stay public.
 - Uploaded files use Supabase Storage when configured, otherwise local `.runtime/uploads`.
 - The app enqueues document processing. With Inngest credentials it uses the worker route under `/api/inngest`; without them it falls back to local fire-and-forget execution.
-- The extraction pipeline remains section-based by default: extract text -> classify -> split sections -> section extraction -> merge -> risk analysis -> summary.
-- When `LLAMA_EXTRACT_CONTRACTS_MODE` is enabled, file-backed contract documents can reuse the LlamaParse job and run through a contract-only LlamaExtract v2 path while keeping section persistence, risk analysis, summary generation, and term merge behavior unchanged.
+- The extraction pipeline uses local parsers first: `pdfjs-dist` for PDFs, `mammoth` for DOCX, plain text decoding for TXT, and `pdf-parse` only as a secondary PDF fallback.
+- The downstream analysis pipeline remains section-based: extract text -> classify -> split sections -> section extraction -> merge -> risk analysis -> summary.
 - Billing entitlements resolve from Prisma/Postgres. Stripe drives checkout, subscriptions, invoices, and the customer portal.
 - When `DATABASE_URL` is unset, the app falls back to the local file-backed seed store. The Playwright tier matrix uses this mode together with `HELLOBRAND_DEV_PLAN` and the non-production E2E auth cookie.
 

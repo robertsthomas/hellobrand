@@ -188,6 +188,47 @@ describe("intake normalization", () => {
     expect(normalized?.contractTitle).toBe("Amazon Kids - Stories with Alexa");
   });
 
+  test("does not keep generic influencer labels as the brand name", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Workspace";
+    aggregate.deal.campaignName = "New workspace";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "NimbusPM_influencer_brief.pdf",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Influencer Brief
+          NimbusPM
+          Overview: Create content for the NimbusPM summer push.
+        `,
+        rawText: `
+          Influencer Brief
+          NimbusPM
+          Overview: Create content for the NimbusPM summer push.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Influencer",
+      agencyName: null,
+      campaignName: null
+    };
+    aggregate.extractionEvidence = [
+      {
+        ...aggregate.extractionEvidence[0],
+        fieldPath: "brandName",
+        snippet: "Influencer"
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("NimbusPM");
+  });
+
   test("does not treat campaign brief bullets as a primary contact title", () => {
     const aggregate = createAggregate();
     aggregate.documents = [
@@ -222,6 +263,60 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.name).toBeNull();
     expect(normalized?.primaryContact.title).toBeNull();
     expect(normalized?.primaryContact.email).toBeNull();
+  });
+
+  test("does not treat a role title as the primary contact name", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "offer-email.txt",
+        documentKind: "email_thread",
+        normalizedText: `
+          NimbusPM
+          Let's move forward on this partnership.
+
+          --
+          Campaign Manager
+          Partnerships Team
+          team@nimbuspm.com
+        `,
+        rawText: `
+          NimbusPM
+          Let's move forward on this partnership.
+
+          --
+          Campaign Manager
+          Partnerships Team
+          team@nimbuspm.com
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "NimbusPM",
+      agencyName: null,
+      campaignName: "Campaign"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.primaryContact.name).toBeNull();
+    expect(normalized?.primaryContact.email).toBe("team@nimbuspm.com");
+  });
+
+  test("does not use a generic campaign label as the contract title", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "NimbusPM",
+      campaignName: "Campaign"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.contractTitle).not.toBe("NimbusPM - Campaign");
   });
 
   test("filters boilerplate contract delivery clauses out of timeline items", () => {

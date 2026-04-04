@@ -361,7 +361,7 @@ function extractSectionSystemPrompt() {
         "Do not let invoices, reports, decks, or updates override contractual rights or commercial terms unless the section itself explicitly states the operative term.",
         "Evidence snippets must be copied from the section and must be meaningful phrases or full sentences.",
         "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence.",
-        "For brandName and campaignName, use the actual brand and campaign names from the document. Never use generic labels like 'Workspace', 'Concept', 'Project', or 'Campaign'."
+        "For brandName and campaignName, use the actual brand and campaign names from the document. Never use generic labels like 'Workspace', 'Concept', 'Project', 'Campaign', 'Brief', or 'Overview'. If the section does not name a real brand or campaign, return null."
       ])
     },
     {
@@ -645,6 +645,19 @@ function asString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function sanitizeCampaignName(value: unknown) {
+  const normalized = asString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return /^(campaign|project|workspace|concept|campaign concept|brief|overview)$/i.test(
+    normalized
+  )
+    ? null
+    : normalized;
+}
+
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -775,7 +788,7 @@ function normalizeTerms(
     brandName: llmBrandName ?? fallbackData.brandName,
     agencyName: llmAgencyName ?? fallbackData.agencyName,
     creatorName: asString(input.creatorName) ?? fallbackData.creatorName,
-    campaignName: asString(input.campaignName) ?? fallbackData.campaignName,
+    campaignName: sanitizeCampaignName(input.campaignName) ?? fallbackData.campaignName,
     paymentAmount: asNumber(input.paymentAmount) ?? fallbackData.paymentAmount,
     currency: asString(input.currency) ?? fallbackData.currency,
     paymentTerms: asString(input.paymentTerms) ?? fallbackData.paymentTerms,

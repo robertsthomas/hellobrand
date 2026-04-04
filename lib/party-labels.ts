@@ -79,7 +79,7 @@ export function sanitizePartyName(
 
   if (
     kind === "brand" &&
-    /^(brand|brand name|client|client name|campaign brief|partnership)$/i.test(
+    /^(brand|brand name|client|client name|campaign|project|workspace|concept|overview|campaign brief|partnership|influencer|creator|content creator|talent|brand contact)$/i.test(
       normalized
     )
   ) {

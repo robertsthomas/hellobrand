@@ -73,7 +73,7 @@ function supportText({
 }) {
   if (analysisRunning && !hasValue) {
     return (
-      <span className="inline-flex items-center gap-2 text-xs font-normal text-black/50 dark:text-white/50">
+      <span className="inline-flex min-h-[18px] items-center gap-2 text-xs font-normal text-black/50 dark:text-white/50">
         <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
         {pendingLabel}
       </span>
@@ -81,10 +81,14 @@ function supportText({
   }
 
   return (
-    <span className="text-xs font-normal text-black/50 dark:text-white/50">
+    <span className="inline-flex min-h-[18px] items-center text-xs font-normal text-black/50 dark:text-white/50">
       {emptyLabel}
     </span>
   );
+}
+
+function supportTextSpacer() {
+  return <span aria-hidden="true" className="min-h-[18px]" />;
 }
 
 function SectionCard({
@@ -193,6 +197,10 @@ function intakeConflictMessagesByField(conflicts: Array<{ type: string; title: s
   return messages;
 }
 
+function dedupeAttentionIds(ids: string[]) {
+  return Array.from(new Set(ids));
+}
+
 export default function IntakeSessionPage({
   params
 }: {
@@ -278,6 +286,8 @@ async function IntakeReviewContent({
     "w-full rounded-none border border-black/10 bg-sand/25 px-4 py-3 text-base transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
   const textareaClassName =
     "min-h-32 w-full rounded-none border border-black/10 bg-sand/25 px-4 py-4 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ocean/20 dark:border-white/12 dark:bg-white/[0.04]";
+  const selectClassName = `${inputClassName} h-[50px] appearance-none pr-10`;
+  const alignedFieldClassName = `${inputClassName} h-[50px]`;
 
   const contactType =
     normalized?.primaryContact?.organizationType ??
@@ -320,14 +330,14 @@ async function IntakeReviewContent({
     }
   ];
 
-  const attentionItems = [
+  const attentionItems = dedupeAttentionIds([
     ...conflictResults.map((conflict) => ({
       id: `conflict-${conflict.type}-${conflict.title}`
     })),
     ...riskFlags.slice(0, 4).map((flag) => ({
-      id: flag.id
+      id: `${flag.title.trim().toLowerCase()}::${(flag.detail ?? "").trim().toLowerCase()}`
     }))
-  ];
+  ].map((item) => item.id));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
@@ -472,7 +482,7 @@ async function IntakeReviewContent({
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                       Contact type
                       <select
-                        className={inputClassName}
+                        className={selectClassName}
                         name="primaryContactOrganizationType"
                         defaultValue={contactType}
                         disabled={analysisRunning}
@@ -489,7 +499,7 @@ async function IntakeReviewContent({
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                       Contact name
                       <input
-                        className={inputClassName}
+                        className={alignedFieldClassName}
                         name="primaryContactName"
                         defaultValue={normalized?.primaryContact?.name ?? ""}
                         placeholder="Primary contact name"
@@ -507,20 +517,20 @@ async function IntakeReviewContent({
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                       Contact title
                       <input
-                        className={inputClassName}
+                        className={alignedFieldClassName}
                         name="primaryContactTitle"
                         defaultValue={normalized?.primaryContact?.title ?? ""}
                         placeholder="Campaign manager, partnerships lead, agent..."
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
-
+                      {supportTextSpacer()}
                     </label>
 
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
                       Contact email
                       <input
-                        className={inputClassName}
+                        className={alignedFieldClassName}
                         name="primaryContactEmail"
                         type="email"
                         defaultValue={normalized?.primaryContact?.email ?? ""}
@@ -528,12 +538,13 @@ async function IntakeReviewContent({
                         readOnly={analysisRunning}
                         aria-disabled={analysisRunning}
                       />
+                      {supportTextSpacer()}
                     </label>
 
                     <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75 md:col-span-2">
                       Contact phone
                       <input
-                        className={inputClassName}
+                        className={alignedFieldClassName}
                         name="primaryContactPhone"
                         defaultValue={normalized?.primaryContact?.phone ?? ""}
                         placeholder="Phone number"

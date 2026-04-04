@@ -565,7 +565,10 @@ export function AppFrame({
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
-                <NotificationsCenter notifications={notifications ?? []} />
+                <NotificationsCenter
+                  notifications={notifications ?? []}
+                  hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? false}
+                />
                 <ThemeSwitch iconOnly />
               </div>
             </div>

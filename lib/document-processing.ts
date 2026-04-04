@@ -4,7 +4,7 @@ export const DOCUMENT_PROCESSING_TOPIC = "document-processing";
 
 const DEFAULT_DOCUMENT_PROCESSING_CONSUMER_GROUP = "document-processing-worker";
 
-export type DocumentProcessingBackend = "vercel-queue" | "inngest" | "local";
+export type DocumentProcessingBackend = "vercel-queue" | "local";
 
 export type DocumentProcessingMessage = {
   documentId: string;
@@ -12,7 +12,6 @@ export type DocumentProcessingMessage = {
 
 const DOCUMENT_PROCESSING_BACKENDS = new Set<DocumentProcessingBackend>([
   "vercel-queue",
-  "inngest",
   "local"
 ]);
 
@@ -30,10 +29,6 @@ export function getDocumentProcessingBackend(): DocumentProcessingBackend {
 
   if (process.env.DOCUMENT_PROCESSING_QUEUE_REGION?.trim()) {
     return "vercel-queue";
-  }
-
-  if (process.env.INNGEST_EVENT_KEY) {
-    return "inngest";
   }
 
   return "local";
@@ -60,6 +55,9 @@ export function getDocumentProcessingQueueClient() {
   if (!queueClient) {
     queueClient = new PollingQueueClient({
       region: getDocumentProcessingQueueRegion(),
+      // Document jobs are intentionally consumed by a separate worker, so do not
+      // pin them to the current Vercel deployment.
+      deploymentId: null,
       ...(process.env.VERCEL_QUEUE_API_TOKEN
         ? { token: process.env.VERCEL_QUEUE_API_TOKEN }
         : {})

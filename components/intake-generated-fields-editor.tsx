@@ -67,7 +67,42 @@ function toDateInputValue(value: string | null | undefined) {
     return "";
   }
 
-  return value.slice(0, 10);
+  const normalized = value.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  const candidate =
+    normalized.match(
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:,\s*\d{4})?/i
+    )?.[0] ??
+    normalized.match(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/)?.[0] ??
+    null;
+  if (!candidate) {
+    return "";
+  }
+
+  const withYear =
+    /^\d{1,2}\/\d{1,2}$/.test(candidate) ||
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}$/i.test(
+      candidate
+    )
+      ? `${candidate}${candidate.includes("/") ? "/" : ", "}${new Date().getFullYear()}`
+      : candidate;
+
+  const parsed = new Date(withYear);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeDeliverables(deliverables: DeliverableItem[]) {
@@ -133,6 +168,7 @@ export function IntakeGeneratedFieldsEditor({
   initialAnalytics: IntakeAnalyticsRecord | null;
   conflictMessagesByField?: Partial<Record<ConflictFieldId, string[]>>;
 }) {
+  const selectClassName = `${inputClassName} h-[50px] appearance-none pr-10`;
   const [brandCategory, setBrandCategory] = useState<DealCategory | "">(
     initialBrandCategory ?? ""
   );
@@ -301,7 +337,7 @@ export function IntakeGeneratedFieldsEditor({
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Brand category
               <select
-                className={`${inputClassName} ${fieldClass("brandCategory")}`}
+                className={`${selectClassName} ${fieldClass("brandCategory")}`}
                 name="brandCategory"
                 value={brandCategory}
                 onChange={(event) =>
@@ -703,7 +739,7 @@ export function IntakeGeneratedFieldsEditor({
                     placeholder="Source"
                   />
                   <select
-                    className={inputClassName}
+                    className={selectClassName}
                     value={item.status}
                     onChange={(event) =>
                       setTimelineItems((current) =>

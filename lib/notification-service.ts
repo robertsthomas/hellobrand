@@ -1,4 +1,5 @@
 import { revalidatePath, revalidateTag } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { getProfileForViewer } from "@/lib/profile";
@@ -136,8 +137,30 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
     });
   }
 
-  return prisma.appNotification.create({
-    data: {
+  return prisma.appNotification.upsert({
+    where: {
+      userId_dedupeKey: {
+        userId,
+        dedupeKey: seed.dedupeKey
+      }
+    },
+    update: {
+      category: seed.category,
+      eventType: seed.eventType,
+      entityType: seed.entityType,
+      entityId: seed.entityId,
+      sessionId: seed.sessionId ?? null,
+      dealId: seed.dealId ?? null,
+      title: seed.title,
+      body: seed.description,
+      href: seed.href,
+      status: "active",
+      clearedAt: null,
+      supersededAt: null,
+      readAt: null,
+      createdAt: normalizedCreatedAt
+    },
+    create: {
       userId,
       category: seed.category,
       eventType: seed.eventType,

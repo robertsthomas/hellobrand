@@ -96,6 +96,8 @@ const YAHOO_POLL_INTERVAL_MS = 15 * 60 * 1000;
 const EMAIL_DISCOVERY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 const EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT = 25;
 const OUTLOOK_WEBHOOK_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
+const EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW = "5s";
+const EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE = 50;
 const DEFAULT_TRANSACTIONAL_MAILBOX_SENDER = "onboarding@resend.dev";
 const HELLOBRAND_TRANSACTIONAL_MARKERS = [
   "you're receiving this because you have email notifications enabled in hellobrand",
@@ -302,6 +304,147 @@ function compareHistoryIds(left: string, right: string) {
   }
 }
 
+export type IncrementalEmailSyncRequest = {
+  accountId: string;
+  gmailHistoryId?: string | null;
+  outlookMessageIds?: string[];
+};
+
+export function coalesceIncrementalEmailSyncRequests(
+  requests: IncrementalEmailSyncRequest[]
+) {
+  const accountId = String(requests[0]?.accountId ?? "");
+  const filtered = requests.filter((request) => String(request.accountId) === accountId);
+
+  let gmailHistoryId: string | null = null;
+  for (const request of filtered) {
+    const candidate =
+      typeof request.gmailHistoryId === "string" && request.gmailHistoryId.trim().length > 0
+        ? request.gmailHistoryId.trim()
+        : null;
+
+    if (!candidate) {
+      continue;
+    }
+
+    if (!gmailHistoryId || compareHistoryIds(candidate, gmailHistoryId) > 0) {
+      gmailHistoryId = candidate;
+    }
+  }
+
+  const outlookMessageIds = [
+    ...new Set(
+      filtered.flatMap((request) =>
+        Array.isArray(request.outlookMessageIds)
+          ? request.outlookMessageIds.filter(
+              (messageId): messageId is string =>
+                typeof messageId === "string" && messageId.trim().length > 0
+            )
+          : []
+      )
+    )
+  ];
+
+  return {
+    accountId,
+    gmailHistoryId,
+    outlookMessageIds,
+    batchSize: filtered.length
+  };
+}
+
+export function getIncrementalEmailSyncBatchConfig(): {
+  maxSize: number;
+  timeout: typeof EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW;
+} {
+  return {
+    maxSize: EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE,
+    timeout: EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW
+  };
+}
+
+export async function runIncrementalEmailSync(
+  requests: IncrementalEmailSyncRequest[]
+) {
+  const merged = coalesceIncrementalEmailSyncRequests(requests);
+  if (!merged.accountId) {
+    throw new Error("Missing accountId.");
+  }
+
+  const account = await getConnectedEmailAccount(merged.accountId);
+  if (!account || account.status === "disconnected") {
+    return {
+      ok: true,
+      accountId: merged.accountId,
+      status: "skipped" as const,
+      reason: "account_unavailable" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  const syncState = await getEmailSyncState(account.id);
+
+  if (
+    account.provider === "gmail" &&
+    merged.gmailHistoryId &&
+    syncState?.lastHistoryId &&
+    compareHistoryIds(merged.gmailHistoryId, syncState.lastHistoryId) <= 0
+  ) {
+    return {
+      ok: true,
+      accountId: account.id,
+      status: "skipped" as const,
+      reason: "stale_history_id" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  let outlookMessageIds = merged.outlookMessageIds;
+  if (account.provider === "outlook" && outlookMessageIds.length > 0) {
+    const existingMessageIds = new Set(
+      await listExistingEmailMessageProviderIdsForAccount(account.id, outlookMessageIds)
+    );
+    outlookMessageIds = outlookMessageIds.filter(
+      (messageId) => !existingMessageIds.has(messageId)
+    );
+
+    if (outlookMessageIds.length === 0) {
+      return {
+        ok: true,
+        accountId: account.id,
+        status: "skipped" as const,
+        reason: "known_message_ids" as const,
+        batchSize: merged.batchSize
+      };
+    }
+  }
+
+  const syncedAccount = await syncEmailAccount(account.id, {
+    mode: "incremental",
+    gmailHistoryId: merged.gmailHistoryId,
+    outlookMessageIds
+  });
+
+  if (syncedAccount?.status === "syncing") {
+    return {
+      ok: true,
+      accountId: account.id,
+      status: "skipped" as const,
+      reason: "sync_in_progress" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  return {
+    ok: true,
+    accountId: account.id,
+    status: "synced" as const,
+    batchSize: merged.batchSize,
+    gmailHistoryId: merged.gmailHistoryId,
+    outlookMessageCount: outlookMessageIds.length
+  };
+}
+
 async function assertPremiumInboxAccess(viewer: Viewer) {
   await assertViewerHasFeature(viewer, "premium_inbox");
 }
@@ -397,14 +540,18 @@ async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
         typeof data.recentLimit === "number" ? data.recentLimit : undefined
     });
   } else if (name === "email/account.incremental_sync.requested") {
-    await syncEmailAccount(String(data.accountId), {
-      mode: "incremental",
-      gmailHistoryId:
-        typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
-      outlookMessageIds: Array.isArray(data.outlookMessageIds)
-        ? data.outlookMessageIds.filter((entry): entry is string => typeof entry === "string")
-        : []
-    });
+    await runIncrementalEmailSync([
+      {
+        accountId: String(data.accountId),
+        gmailHistoryId:
+          typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
+        outlookMessageIds: Array.isArray(data.outlookMessageIds)
+          ? data.outlookMessageIds.filter(
+              (entry): entry is string => typeof entry === "string"
+            )
+          : []
+      }
+    ]);
   }
 
   return { mode: "local" as const };

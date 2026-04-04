@@ -278,9 +278,17 @@ export function EmptyDashboardUpload({
     }
   }
 
-  async function startAnalysisInBackground(optimisticNotificationId: string) {
+  async function startAnalysisInBackground(
+    optimisticNotificationId: string,
+    initialSessionId: string | null
+  ) {
     try {
       const createdSessionIds: string[] = [];
+      let navigatedToSessionId = initialSessionId;
+
+      if (navigatedToSessionId) {
+        router.push(`/app/intake/${navigatedToSessionId}?starting=1`);
+      }
 
       for (const workspace of localWorkspaces) {
         const payload = await loadLocalWorkspace(workspace.localId);
@@ -313,6 +321,10 @@ export function EmptyDashboardUpload({
         }
 
         createdSessionIds.push(sessionId);
+        if (!navigatedToSessionId) {
+          navigatedToSessionId = sessionId;
+          router.push(`/app/intake/${sessionId}?starting=1`);
+        }
         await deleteLocalWorkspace(workspace.localId);
       }
 
@@ -393,13 +405,15 @@ export function EmptyDashboardUpload({
       });
     }
 
-    captureAppEvent(posthog, "workspace_analysis_started", {
-      queuedCount,
-      localWorkspaceCount: localWorkspaces.length,
-      serverQueuedCount: serverQueuedWorkspaces.length
-    });
-    router.push("/app");
-    void startAnalysisInBackground(optimisticNotificationId);
+      captureAppEvent(posthog, "workspace_analysis_started", {
+        queuedCount,
+        localWorkspaceCount: localWorkspaces.length,
+        serverQueuedCount: serverQueuedWorkspaces.length
+      });
+    void startAnalysisInBackground(
+      optimisticNotificationId,
+      serverQueuedWorkspaces[0]?.sessionId ?? null
+    );
   }
 
   return (
