@@ -803,15 +803,28 @@ function extractAnalytics(aggregate: DealAggregate) {
     return persisted;
   }
 
-  const highlights = new Set<string>();
+  const highlights: string[] = [];
+  const highlightSet = new Set<string>();
   const analyticsDocumentPattern =
-    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|performance|viewers)\b/i;
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|performance|performance summary|topline metrics|analyst notes|viewers|impressions|clicks|ctr|conversions|saves|comments)\b/i;
   const analyticsLinePattern =
-    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|for you|following|personal profile|female|male|18-24|25-34|35-44|45-54|55\+)\b/i;
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|for you|following|personal profile|female|male|18-24|25-34|35-44|45-54|55\+|impressions|clicks|ctr|conversions|attributed conversions|saves|comments|engagement rate)\b/i;
   const analyticsMetricPattern =
-    /(?:\b\d+(?:\.\d+)?%\b|\b\d+(?:\.\d+)?s\b|\b\d+(?:\.\d+)?[kKmM]\b|\b\d{1,3}(?:,\d{3})+\b)/;
+    /(?:\b\d+(?:\.\d+)?%|\b\d+(?:\.\d+)?s\b|\b\d+(?:\.\d+)?[kKmM]\b|\b\d{1,4}(?:,\d{3})*(?:\.\d+)?\b)/;
   const analyticsBoilerplatePattern =
     /\b(manager\/agency|agreement|term of agreement|usage term|usage platforms|document ref|company|talent manager|services and deliverables)\b/i;
+  const analyticsTableLabelPattern =
+    /^(impressions|clicks|ctr|saves|comments|attributed conversions|conversions|engagement rate|average watch time|total viewers|new followers|retention rate)$/i;
+
+  function pushHighlight(value: string | null | undefined) {
+    const normalized = presentText(value)?.replace(/\s{2,}/g, " ");
+    if (!normalized || highlightSet.has(normalized)) {
+      return;
+    }
+
+    highlightSet.add(normalized);
+    highlights.push(normalized);
+  }
 
   for (const document of aggregate.documents) {
     const text = document.normalizedText ?? document.rawText ?? "";
@@ -828,27 +841,49 @@ function extractAnalytics(aggregate: DealAggregate) {
       continue;
     }
 
-    const lines = text.split(/\r?\n/);
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim());
 
-    for (const line of lines) {
-      const trimmed = line.replace(/\s+/g, " ").trim();
+    for (let index = 0; index < lines.length; index += 1) {
+      const trimmed = lines[index] ?? "";
       if (!trimmed || trimmed.length > 120) {
         continue;
       }
       if (analyticsBoilerplatePattern.test(trimmed)) {
         continue;
       }
+
+      const nextLine = lines
+        .slice(index + 1)
+        .find((candidate) => candidate.length > 0) ?? null;
+
+      if (
+        analyticsTableLabelPattern.test(trimmed) &&
+        nextLine &&
+        nextLine.length <= 40 &&
+        analyticsMetricPattern.test(nextLine)
+      ) {
+        pushHighlight(`${trimmed}: ${nextLine}`);
+        continue;
+      }
+
+      if (/^[•*-]\s*/.test(trimmed) || /^(note|insight):/i.test(trimmed)) {
+        pushHighlight(trimmed.replace(/^[•*-]\s*/, ""));
+        continue;
+      }
+
       if (
         analyticsLinePattern.test(trimmed) &&
         (analyticsMetricPattern.test(trimmed) ||
           /\b(gender|age|traffic sources|top locations|retention rate)\b/i.test(trimmed))
       ) {
-        highlights.add(trimmed.replace(/\s{2,}/g, " "));
+        pushHighlight(trimmed);
       }
     }
   }
 
-  return highlights.size > 0 ? { highlights: Array.from(highlights).slice(0, 5) } : null;
+  return highlights.length > 0 ? { highlights: highlights.slice(0, 6) } : null;
 }
 
 function inferContractTitle(

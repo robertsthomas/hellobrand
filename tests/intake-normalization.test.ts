@@ -305,4 +305,56 @@ describe("intake normalization", () => {
 
     expect(normalized?.analytics).toBeNull();
   });
+
+  test("extracts analytics highlights from performance reports", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "performance_report.pdf",
+        documentKind: "unknown",
+        normalizedText: `
+          LumaSkin Performance Summary
+          Topline Metrics
+          Impressions
+          400,327
+          Clicks
+          5,766
+          CTR
+          1.44%
+          Attributed conversions
+          334
+          Analyst Notes
+          • Strongest retention typically came from direct problem-solution intros.
+          • Assets with visible product demo outperformed talking-head-only variants.
+        `,
+        rawText: `
+          LumaSkin Performance Summary
+          Topline Metrics
+          Impressions
+          400,327
+          Clicks
+          5,766
+          CTR
+          1.44%
+          Attributed conversions
+          334
+          Analyst Notes
+          • Strongest retention typically came from direct problem-solution intros.
+          • Assets with visible product demo outperformed talking-head-only variants.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.analytics?.highlights).toContain("Impressions: 400,327");
+    expect(normalized?.analytics?.highlights).toContain("Clicks: 5,766");
+    expect(normalized?.analytics?.highlights).toContain("CTR: 1.44%");
+    expect(normalized?.analytics?.highlights).toContain("Attributed conversions: 334");
+    expect(normalized?.analytics?.highlights).toContain(
+      "Strongest retention typically came from direct problem-solution intros."
+    );
+  });
 });

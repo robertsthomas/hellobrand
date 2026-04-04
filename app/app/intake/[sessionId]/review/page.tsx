@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { AlertTriangle, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
+import { ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
 import { Suspense, type ReactNode } from "react";
 
 import { IntakeFieldGuideDialog } from "@/components/intake-field-guide-dialog";
 import { IntakeGeneratedFieldsEditor } from "@/components/intake-generated-fields-editor";
+import { IntakeReviewLiveStatus } from "@/components/intake-review-live-status";
 import { PostHogSubmitButton } from "@/components/posthog-submit-button";
 import { CreatorProfileSetupDialog } from "@/components/creator-profile-setup-dialog";
 import { DeleteDraftButton } from "@/components/delete-draft-button";
@@ -226,7 +227,7 @@ async function IntakeReviewContent({
     throw error;
   }
 
-  const { session, aggregate, profileDefaults } = sessionData;
+  const { session, aggregate, processing, profileDefaults } = sessionData;
 
   if (session.status === "completed" && aggregate) {
     redirect(`/app/p/${aggregate.deal.id}`);
@@ -321,15 +322,10 @@ async function IntakeReviewContent({
 
   const attentionItems = [
     ...conflictResults.map((conflict) => ({
-      id: `conflict-${conflict.type}-${conflict.title}`,
-      label: conflict.title,
-      tone: "warning" as const
+      id: `conflict-${conflict.type}-${conflict.title}`
     })),
     ...riskFlags.slice(0, 4).map((flag) => ({
-      id: flag.id,
-      label: flag.title,
-      detail: flag.detail,
-      tone: (flag.severity === "high" ? "warning" : "neutral") as "warning" | "neutral"
+      id: flag.id
     }))
   ];
 
@@ -372,36 +368,13 @@ async function IntakeReviewContent({
           </section>
         ) : null}
 
-        {/* Needs attention: merged conflicts + risk watchouts */}
-        {attentionItems.length > 0 ? (
-          <section className="border border-clay/15 bg-clay/[0.04] p-5 dark:border-clay/20 dark:bg-clay/[0.06]">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
-              <h2 className="text-sm font-semibold text-ink">
-                Needs attention ({attentionItems.length})
-              </h2>
-            </div>
-            <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-              Review these before confirming. You can edit any value in the form below.
-            </p>
-            <div className="mt-4 grid gap-2">
-              {attentionItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-3 bg-white/60 px-4 py-3 dark:bg-white/[0.03]"
-                >
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 ${item.tone === "warning" ? "bg-clay" : "bg-black/20 dark:bg-white/20"}`} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-ink">{item.label}</p>
-                    {"detail" in item && item.detail ? (
-                      <p className="mt-1 text-sm text-black/55 dark:text-white/55">{item.detail}</p>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <IntakeReviewLiveStatus
+          sessionId={session.id}
+          initialStatus={session.status}
+          initialProcessing={processing}
+          conflictResults={conflictResults}
+          initialRiskFlags={riskFlags}
+        />
 
         {session.errorMessage ? (
           <details className="border border-black/5 bg-black/[0.02] p-4 text-xs text-black/60 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/60">

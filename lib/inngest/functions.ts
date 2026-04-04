@@ -1,25 +1,53 @@
+import { NonRetriableError } from "inngest";
+
 import { inngest } from "@/lib/inngest/client";
 
+function isNonRetriableDocumentError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+
+  if (!message) {
+    return false;
+  }
+
+  return (
+    message === "Document not found." ||
+    message.includes("pipeline: extract_text:") ||
+    message.includes("We could not reliably parse this file.") ||
+    message.includes("Only PDF, DOCX, and pasted text are supported") ||
+    message.includes("invalid top-level pages dictionary") ||
+    message.includes("bad XRef entry")
+  );
+}
+
 export const processContractFunction = inngest.createFunction(
-  { id: "process-deal-document" },
+  { id: "process-deal-document", retries: 0 },
   { event: "documents/process.requested" },
-  async ({ event, step }) => {
+  async ({ event }) => {
     const documentId = String(event.data.documentId ?? "");
 
     if (!documentId) {
       throw new Error("Missing documentId.");
     }
 
-    const aggregate = await step.run("process-document", async () => {
-      const { processDocumentById } = await import("@/lib/deals");
-      return processDocumentById(documentId);
-    });
+    const { processDocumentById } = await import("@/lib/deals");
+    try {
+      const aggregate = await processDocumentById(documentId);
 
-    return {
-      ok: true,
-      documentId,
-      dealId: aggregate?.deal.id ?? null
-    };
+      return {
+        ok: true,
+        documentId,
+        dealId: aggregate?.deal.id ?? null
+      };
+    } catch (error) {
+      if (isNonRetriableDocumentError(error)) {
+        throw new NonRetriableError(
+          error instanceof Error ? error.message : "Document processing failed."
+        );
+      }
+
+      throw error;
+    }
   }
 );
 
@@ -179,13 +207,11 @@ export const notificationEmailSendFunction = inngest.createFunction(
 export const workspaceReminderSweepFunction = inngest.createFunction(
   { id: "workspace-reminder-sweep" },
   { cron: "0 10 * * *" },
-  async ({ step }) => {
-    const result = await step.run("send-pending-workspace-reminders", async () => {
-      const { sendPendingWorkspaceReminders } = await import(
-        "@/lib/notification-email"
-      );
-      return sendPendingWorkspaceReminders();
-    });
+  async () => {
+    const { sendPendingWorkspaceReminders } = await import(
+      "@/lib/notification-email"
+    );
+    const result = await sendPendingWorkspaceReminders();
 
     return { ok: true, ...result };
   }
@@ -194,11 +220,9 @@ export const workspaceReminderSweepFunction = inngest.createFunction(
 export const invoiceReminderSweepFunction = inngest.createFunction(
   { id: "invoice-reminder-sweep" },
   { cron: "0 9 * * *" },
-  async ({ step }) => {
-    const result = await step.run("run-invoice-reminder-sweep", async () => {
-      const { runInvoiceReminderSweep } = await import("@/lib/invoices");
-      return runInvoiceReminderSweep();
-    });
+  async () => {
+    const { runInvoiceReminderSweep } = await import("@/lib/invoices");
+    const result = await runInvoiceReminderSweep();
 
     return {
       ok: true,
@@ -210,13 +234,11 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
 export const workspaceNudgeSweepFunction = inngest.createFunction(
   { id: "workspace-nudge-sweep" },
   { cron: "0 11 * * *" },
-  async ({ step }) => {
-    const result = await step.run("run-workspace-nudge-sweep", async () => {
-      const { runWorkspaceNudgeSweep } = await import(
-        "@/lib/notification-service"
-      );
-      return runWorkspaceNudgeSweep();
-    });
+  async () => {
+    const { runWorkspaceNudgeSweep } = await import(
+      "@/lib/notification-service"
+    );
+    const result = await runWorkspaceNudgeSweep();
 
     return { ok: true, ...result };
   }

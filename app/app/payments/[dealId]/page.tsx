@@ -69,11 +69,13 @@ async function PaymentWorkspaceContent({
       : null;
   const breakdownItems =
     invoice?.lineItems.length
-        ? invoice.lineItems
+      ? invoice.lineItems
         : buildInvoiceLineItems({
             deliverables: aggregate.terms?.deliverables ?? [],
             amount: aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? null,
-            fallbackTitle: displayDeal.campaignName
+            fallbackTitle: displayDeal.campaignName,
+            paymentStructure: aggregate.terms?.paymentStructure ?? null,
+            revisionRounds: aggregate.terms?.revisionRounds ?? null
           });
 
   return (

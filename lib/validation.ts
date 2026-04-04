@@ -342,6 +342,15 @@ export const profileInputSchema = z.object({
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional()
 });
 
+export const feedbackSubmissionSchema = z.object({
+  score: z.number().int().min(1).max(5),
+  message: z.string().max(2000).nullable(),
+  pagePath: z.string().min(1).max(500),
+  pageTitle: z.string().min(1).max(120),
+  dealId: z.string().max(120).nullable().optional(),
+  requestedFollowUp: z.boolean().optional().default(false)
+});
+
 export const publicFunnelEventNames = [
   "landing_upload_cta_clicked",
   "landing_sample_cta_clicked",

@@ -24,7 +24,10 @@ export const appActionEventNames = [
   "billing_cancel_clicked",
   "email_connection_started",
   "email_disconnect_clicked",
-  "intake_confirmation_submitted"
+  "intake_confirmation_submitted",
+  "feedback_widget_opened",
+  "feedback_widget_dismissed",
+  "feedback_followup_requested"
 ] as const;
 
 export type AppActionEventName = (typeof appActionEventNames)[number];

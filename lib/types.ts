@@ -858,6 +858,7 @@ export interface IntakeProcessingSnapshot {
   activeLabel: string;
   activeDescription: string;
   completedStages: IntakeProcessingStageId[];
+  isRunning: boolean;
 }
 
 export interface IntakeDraftListItem {
@@ -902,6 +903,7 @@ export interface NotificationEmailDeliveryRecord {
 export interface ProductGuideState {
   dismissedStepIds: string[];
   completedStepIds: string[];
+  hasEverCreatedWorkspace: boolean;
 }
 
 export interface OnboardingStateRecord {

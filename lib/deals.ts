@@ -1053,65 +1053,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       brand: sanitizedExtraction.data.brandName
     });
 
-    checkPipelineTimeout();
-    const risks = await runStage(
-      document.dealId,
-      document.id,
-      "analyze_risks",
-      async () => {
-        const fallbackRisks = analyzeCreatorRisks(
-          extractionSource.normalizedText,
-          document.id,
-          sanitizedExtraction
-        );
-
-        if (!hasLlmKey()) {
-          return fallbackRisks;
-        }
-
-        try {
-          return await analyzeRisksWithLlm(
-            extractionSource.normalizedText,
-            classification.documentKind,
-            sanitizedExtraction,
-            fallbackRisks,
-            document.id
-          );
-        } catch {
-          return fallbackRisks;
-        }
-      }
-    );
-
-    await repository.replaceRiskFlagsForDocument(document.dealId, document.id, risks);
-    logStageDebug("analyze_risks ✓", { riskCount: risks.length, usedLlm: hasLlmKey(), model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic" });
-
-    checkPipelineTimeout();
-    const summary = await runStage(
-      document.dealId,
-      document.id,
-      "generate_summary",
-      async () => {
-        const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
-
-        if (!hasLlmKey()) {
-          return fallbackSummary;
-        }
-
-        try {
-          return await generateSummaryWithLlm(
-            sanitizedExtraction,
-            risks,
-            fallbackSummary
-          );
-        } catch {
-          return fallbackSummary;
-        }
-      }
-    );
-
-    await repository.saveSummary(document.dealId, document.id, summary);
-
     const latestAggregate =
       (await repository.getDealAggregate(viewer.id, document.dealId)) ?? aggregate;
     const isFirstDocument = latestAggregate.terms === null;
@@ -1146,7 +1087,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       });
 
       await repository.updateDeal(viewer.id, document.dealId, {
-        summary: summary.body,
         analyzedAt: new Date().toISOString(),
         nextDeliverableDate: earliestDeliverableDate(nextTerms),
         brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
@@ -1186,7 +1126,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         });
 
         await repository.updateDeal(viewer.id, document.dealId, {
-          summary: summary.body,
           analyzedAt: new Date().toISOString(),
           nextDeliverableDate: earliestDeliverableDate(existingTerms),
           brandName: existingTerms.brandName ?? latestAggregate.deal.brandName,
@@ -1215,18 +1154,123 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         });
 
         await repository.updateDeal(viewer.id, document.dealId, {
-          summary: summary.body,
           analyzedAt: new Date().toISOString()
         });
       }
     }
 
+    // At this point the intake form can be fully prefilled from persisted
+    // terms, sections, evidence, and normalized document text. Mark the
+    // document/session review-ready before kicking off non-blocking enrichments
+    // like risk review and summary generation.
     if (process.env.DATABASE_URL) {
       await syncIntakeSessionForDealId(document.dealId);
     }
 
+    let risks: ReturnType<typeof analyzeCreatorRisks> = [];
+
+    try {
+      const nextRisks = await runStage(
+        document.dealId,
+        document.id,
+        "analyze_risks",
+        async () => {
+          const fallbackRisks = analyzeCreatorRisks(
+            extractionSource.normalizedText,
+            document.id,
+            sanitizedExtraction
+          );
+
+          if (!hasLlmKey()) {
+            return fallbackRisks;
+          }
+
+          try {
+            return await analyzeRisksWithLlm(
+              extractionSource.normalizedText,
+              classification.documentKind,
+              sanitizedExtraction,
+              fallbackRisks,
+              document.id
+            );
+          } catch {
+            return fallbackRisks;
+          }
+        }
+      );
+
+      await repository.replaceRiskFlagsForDocument(
+        document.dealId,
+        document.id,
+        nextRisks
+      );
+      risks = nextRisks;
+      logStageDebug("analyze_risks ✓", {
+        riskCount: risks.length,
+        usedLlm: hasLlmKey(),
+        model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic"
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Risk analysis failed after review became available.";
+
+      logDocumentPipeline("error", "post_ready_risk_analysis_failed", {
+        dealId: document.dealId,
+        documentId: document.id,
+        fileName: document.fileName,
+        error: message
+      });
+    }
+
+    let summary: Awaited<ReturnType<typeof buildCreatorSummary>> | null = null;
+
+    try {
+      const nextSummary = await runStage(
+        document.dealId,
+        document.id,
+        "generate_summary",
+        async () => {
+          const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
+
+          if (!hasLlmKey()) {
+            return fallbackSummary;
+          }
+
+          try {
+            return await generateSummaryWithLlm(
+              sanitizedExtraction,
+              risks,
+              fallbackSummary
+            );
+          } catch {
+            return fallbackSummary;
+          }
+        }
+      );
+
+      await repository.saveSummary(document.dealId, document.id, nextSummary);
+      await repository.updateDeal(viewer.id, document.dealId, {
+        summary: nextSummary.body,
+        analyzedAt: new Date().toISOString()
+      });
+      summary = nextSummary;
+      logStageDebug("generate_summary ✓", {
+        summaryLength: nextSummary.body.length,
+        usedLlm: hasLlmKey()
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Summary generation failed after review became available.";
+
+      logDocumentPipeline("error", "post_ready_summary_failed", {
+        dealId: document.dealId,
+        documentId: document.id,
+        fileName: document.fileName,
+        error: message
+      });
+    }
+
     const totalDurationMs = Date.now() - pipelineStartedAt;
-    logStageDebug("generate_summary ✓", { summaryLength: summary.body.length, usedLlm: hasLlmKey() });
     logStageDebug(`PIPELINE COMPLETE | total ${(totalDurationMs / 1000).toFixed(1)}s`);
 
     logDocumentPipeline("info", "pipeline_complete", {
@@ -1235,7 +1279,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       fileName: document.fileName,
       durationMs: totalDurationMs,
       riskCount: risks.length,
-      summaryLength: summary.body.length,
+      summaryLength: summary?.body.length ?? 0,
       deliverablesCount: sanitizedExtraction.data.deliverables?.length ?? 0
     });
 

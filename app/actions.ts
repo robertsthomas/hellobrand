@@ -35,3 +35,5 @@ export { saveProfileAction } from "@/app/server-actions/account-actions";
 export { startCheckoutAction } from "@/app/server-actions/account-actions";
 export { openBillingPortalAction } from "@/app/server-actions/account-actions";
 export { cancelSubscriptionAction } from "@/app/server-actions/account-actions";
+
+export { submitFeedbackAction } from "@/app/server-actions/feedback-actions";

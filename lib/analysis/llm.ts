@@ -341,8 +341,12 @@ function extractSectionSystemPrompt() {
       content: [
         "Creator documents vary widely in format. Adapt your extraction to the document type:",
         "- Formal agreements/contracts: Extract from term sheets, SOW schedules, and legal clauses. Look for structured fields like payment amount, net terms, usage rights duration, exclusivity terms, territory, platform, and edit rounds.",
-        "- Campaign briefs: Extract deliverable requirements from creative specs. Map disclosure/labeling requirements (e.g. #ad, verbal mentions, FTC compliance) to disclosureObligations. Map content format specs (e.g. Reel, TikTok, Story) to deliverables with channels.",
+        "- Campaign briefs and deliverables docs: Extract deliverable requirements from creative specs, trackers, schedules, and timelines. Map disclosure or labeling requirements (e.g. #ad, verbal mentions, FTC compliance) to disclosureObligations. Map content format specs (e.g. Reel, TikTok, Story, livestream, blog, Discord post) to deliverables with channels when stated.",
         "- Email threads/pitches: Extract stated terms, proposed compensation, and timeline commitments.",
+        "- Invoices and finance documents: Extract payment amount, payment terms, payment trigger, currency, creator, brand, and campaign references only when explicit. Treat them as payment evidence, not as a substitute for missing contract rights language.",
+        "- Status updates, creative feedback, and revision notes: Extract concrete dates, approval requirements, disclosure reminders, revision limits, deliverable changes, and operational constraints. Put artifact-specific context that does not map to a first-class field into notes.",
+        "- Decks, moodboards, storyboards, and other OCR-able creative assets: Extract campaign framing, product names, CTAs, target audience, talking points, prohibited claims, visual instructions, and disclosure reminders only when explicit. Use notes for visual or performance context that does not fit the structured schema.",
+        "- Performance reports and post-campaign recaps: Do not invent analytics fields. Only carry forward operationally relevant facts, such as status, outcome notes, or post-campaign observations, into notes when explicit.",
         "Do not force fields that don't exist in the document type. A brief without payment terms should have null for paymentAmount, not a guess."
       ].join("\n")
     },
@@ -352,6 +356,9 @@ function extractSectionSystemPrompt() {
         "Return only facts that are explicitly stated in the section.",
         "Do not guess missing values or infer unstated business terms.",
         "Use null, empty arrays, or omission when the section does not support a field.",
+        "Do not resolve cross-document conflicts or choose a source of truth here. Section extraction is single-document grounding only.",
+        "If a fact is useful but does not map cleanly to the creator_deal_terms schema, place it in notes instead of inventing a new field.",
+        "Do not let invoices, reports, decks, or updates override contractual rights or commercial terms unless the section itself explicitly states the operative term.",
         "Evidence snippets must be copied from the section and must be meaningful phrases or full sentences.",
         "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence.",
         "For brandName and campaignName, use the actual brand and campaign names from the document. Never use generic labels like 'Workspace', 'Concept', 'Project', or 'Campaign'."
@@ -369,6 +376,11 @@ function extractSectionSystemPrompt() {
         "<example>",
         'Section text: Creator grants Brand the right to use the content in paid social advertisements for 90 days.',
         'Extract usage-rights facts only from that sentence. Do not invent territory, ownership, or whitelisting if they are not stated.',
+        "</example>",
+        "",
+        "<example>",
+        'Section text: Keep disclosure visible and natural, not hidden in tiny text.',
+        'Map that to disclosureObligations or notes. Do not invent payment, rights, or legal fields from creative feedback.',
         "</example>"
       ].join("\n")
     },
@@ -425,6 +437,8 @@ function analyzeRisksSystemPrompt() {
         "Focus on material creator issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, one-sided termination, and reshoot/edit obligations.",
         "For campaign briefs without formal contracts: flag missing payment terms, undefined revision limits, or open-ended content requirements as risks.",
         "For formal agreements: focus on IP assignment scope, usage rights duration and territory, termination clauses, liability/indemnity, and payment net terms.",
+        "For invoices, trackers, status updates, or email threads: flag operational creator risks such as delayed payment triggers, unresolved approval blockers, hidden scope creep, or missing acceptance criteria, but do not invent legal rights that are not stated.",
+        "Decks, moodboards, storyboards, and performance reports usually provide context rather than standalone legal risk. Only flag them when they reveal a concrete creator risk, such as undisclosed disclosure requirements, vague deliverable expansion, or pressure to create unpaid extra assets.",
         "Do not restate every contract term. Only flag items that need creator attention or negotiation.",
         "If a risk is not clearly supported, omit it rather than guessing.",
         "Every evidence snippet must be a real clause or sentence from the document."
@@ -499,11 +513,13 @@ function summarySystemPrompt(mode: "default" | "rewrite") {
       tag: "rules",
       content: promptNumbered([
         "Be extremely concise. Each section should be 1-3 short sentences maximum. The entire summary should fit on one phone screen.",
+        "Answer the creator's practical questions first: what they need to post, when it is due, how they get paid, and anything risky or unusual.",
         "Preserve material obligations, restrictions, payment facts, exclusivity, rights limits, and watchouts, but state each in the fewest words possible.",
         "Keep the language creator-facing and practical, not legalistic.",
         "Use plain text only. No markdown, no bullets, no heading markers, no asterisks, no underscores.",
         'Use these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts".',
-        "If a section has nothing notable, write one sentence saying so rather than padding with generic language."
+        "If a section has nothing notable, write one sentence saying so rather than padding with generic language.",
+        "If a key fact is missing, say Not specified briefly instead of filling space with generic language."
       ])
     },
     {
@@ -571,11 +587,22 @@ function briefExtractionSystemPrompt() {
         "You extract campaign-brief fields from creator partnership documents. You are strict and only capture what is explicitly stated."
     },
     {
+      tag: "document_variety",
+      content: [
+        "These fields can come from more than a formal campaign brief.",
+        "- Campaign briefs and deliverables briefs: primary source for messaging, audience, approvals, and timelines.",
+        "- Pitch decks and kickoff decks: good source for campaign overview, product, CTA, audience, and expected document package.",
+        "- Storyboards, moodboards, creative feedback, and status updates: good source for talking points, visual direction, approval requirements, and do-not-mention guidance when those facts are explicit."
+      ].join("\n")
+    },
+    {
       tag: "rules",
       content: promptNumbered([
         "Only include information explicitly present in the document.",
         "Return null or empty arrays for anything not found.",
-        "Do not merge or invent missing messaging, approvals, or audience details."
+        "Do not merge or invent missing messaging, approvals, or audience details.",
+        "Use doNotMention for prohibited claims, banned phrasing, or explicit avoid lists.",
+        "Ignore payment, invoicing, and legal clause details unless they directly shape the creator brief experience."
       ])
     },
     {

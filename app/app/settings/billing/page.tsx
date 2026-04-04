@@ -30,7 +30,7 @@ function StatusBanner({
     <div
       role={tone === "critical" ? "alert" : "status"}
       aria-live="polite"
-      className={`rounded-lg border px-4 py-3 text-sm ${toneClassName}`}
+      className={`border px-4 py-3 text-sm ${toneClassName}`}
     >
       {children}
     </div>
@@ -149,7 +149,7 @@ export default async function BillingSettingsPage({
       )}
 
       {/* Current plan + usage */}
-      <section className="rounded-2xl border border-black/[0.06] bg-white shadow-panel">
+      <section className="border border-black/[0.06] bg-white shadow-panel">
         <div className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -287,7 +287,7 @@ export default async function BillingSettingsPage({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-black/[0.06] bg-white shadow-panel">
+      <section className="border border-black/[0.06] bg-white shadow-panel">
         <div className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
@@ -309,7 +309,7 @@ export default async function BillingSettingsPage({
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-2xl border border-black/[0.06] bg-[#faf8f4] px-5 py-4">
+            <div className="border border-black/[0.06] bg-[#faf8f4] px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Paid from brands
               </p>
@@ -325,7 +325,7 @@ export default async function BillingSettingsPage({
               </p>
             </div>
 
-            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+            <div className="border border-black/[0.06] bg-white px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Outstanding from brands
               </p>
@@ -341,7 +341,7 @@ export default async function BillingSettingsPage({
               </p>
             </div>
 
-            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+            <div className="border border-black/[0.06] bg-white px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 HelloBrand cost
               </p>
@@ -362,7 +362,7 @@ export default async function BillingSettingsPage({
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+            <div className="border border-black/[0.06] bg-white px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 This month
               </p>
@@ -396,7 +396,7 @@ export default async function BillingSettingsPage({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-black/[0.06] bg-white px-5 py-4">
+            <div className="border border-black/[0.06] bg-white px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
                 Year view
               </p>
@@ -477,7 +477,7 @@ export default async function BillingSettingsPage({
             return (
               <article
                 key={plan.tier}
-                className={`flex flex-col rounded-2xl border bg-white p-6 shadow-panel ${
+                className={`flex flex-col border bg-white p-6 shadow-panel ${
                   isCurrentPlan ? "border-foreground/20 ring-1 ring-foreground/10" : "border-black/[0.06]"
                 }`}
               >

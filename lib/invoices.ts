@@ -35,6 +35,25 @@ function normalizeNullableString(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function formatInvoiceDateLabel(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return normalizeNullableString(value);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(parsed);
+}
+
 function startOfDayIso(value: string | Date) {
   const date =
     typeof value === "string"
@@ -130,13 +149,14 @@ function sendReminderAnchorDate(aggregate: DealAggregate) {
 function createFallbackLineItems(input: {
   campaignName: string;
   amount: number;
+  paymentStructure?: string | null;
 }) {
   return [
     {
       id: randomUUID(),
       deliverableId: null,
       title: input.campaignName,
-      description: "Partnership invoice",
+      description: input.paymentStructure ?? "Partnership invoice",
       channel: null,
       quantity: 1,
       unitRate: amountFromCents(input.amount),
@@ -149,6 +169,8 @@ export function buildInvoiceLineItems(input: {
   deliverables: DeliverableItem[];
   amount: number | null;
   fallbackTitle: string;
+  paymentStructure?: string | null;
+  revisionRounds?: number | null;
 }) {
   const totalAmount = input.amount ?? 0;
   const deliverables = input.deliverables.filter((item) => {
@@ -159,7 +181,8 @@ export function buildInvoiceLineItems(input: {
   if (deliverables.length === 0) {
     return createFallbackLineItems({
       campaignName: input.fallbackTitle,
-      amount: cents(totalAmount)
+      amount: cents(totalAmount),
+      paymentStructure: input.paymentStructure
     });
   }
 
@@ -199,13 +222,116 @@ export function buildInvoiceLineItems(input: {
       id: item.id || randomUUID(),
       deliverableId: item.id,
       title: item.title,
-      description: item.description ?? null,
+      description: [
+        normalizeNullableString(item.description),
+        formatInvoiceDateLabel(item.dueDate) ? `Due ${formatInvoiceDateLabel(item.dueDate)}` : null,
+        input.revisionRounds && input.revisionRounds > 0
+          ? input.revisionRounds === 1
+            ? "Includes 1 revision round"
+            : `Includes ${input.revisionRounds} revision rounds`
+          : null
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join(" · ") || null,
       channel: item.channel ?? null,
       quantity,
       unitRate: amountFromCents(baseRateCents),
       amount: amountFromCents(amountCents)
     } satisfies InvoiceLineItem;
   });
+}
+
+function buildDeliverablesInvoiceNote(deliverables: DeliverableItem[]) {
+  if (deliverables.length === 0) {
+    return null;
+  }
+
+  const summary = deliverables
+    .map((item) => {
+      const title = normalizeNullableString(item.title);
+      if (!title) {
+        return null;
+      }
+
+      const quantity = Math.max(item.quantity ?? 1, 1);
+      return quantity > 1 ? `${quantity} ${title}` : title;
+    })
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 6);
+
+  if (summary.length === 0) {
+    return null;
+  }
+
+  return `Services rendered: ${summary.join(", ")}.`;
+}
+
+function buildPaymentTermsInvoiceNote(input: {
+  paymentTerms?: string | null;
+  paymentTrigger?: string | null;
+  paymentStructure?: string | null;
+}) {
+  const paymentTerms = normalizeNullableString(input.paymentTerms);
+  const paymentTrigger = normalizeNullableString(input.paymentTrigger);
+  const paymentStructure = normalizeNullableString(input.paymentStructure);
+
+  const parts = [paymentStructure, paymentTerms, paymentTrigger].filter(
+    (value): value is string => Boolean(value)
+  );
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return `Payment terms: ${parts.join(", ")}.`;
+}
+
+function buildRevisionInvoiceNote(input: {
+  revisions?: string | null;
+  revisionRounds?: number | null;
+}) {
+  const revisions = normalizeNullableString(input.revisions);
+  if (revisions) {
+    return revisions;
+  }
+
+  if (!input.revisionRounds || input.revisionRounds <= 0) {
+    return null;
+  }
+
+  return input.revisionRounds === 1
+    ? "Includes 1 revision round."
+    : `Includes ${input.revisionRounds} revision rounds.`;
+}
+
+export function buildInvoiceDraftNotes(input: {
+  existingNotes?: string | null;
+  deliverables: DeliverableItem[];
+  paymentTerms?: string | null;
+  paymentTrigger?: string | null;
+  paymentStructure?: string | null;
+  revisions?: string | null;
+  revisionRounds?: number | null;
+}) {
+  const existingNotes = normalizeNullableString(input.existingNotes);
+  if (existingNotes) {
+    return existingNotes;
+  }
+
+  const lines = [
+    buildDeliverablesInvoiceNote(input.deliverables),
+    buildRevisionInvoiceNote({
+      revisions: input.revisions,
+      revisionRounds: input.revisionRounds
+    }),
+    buildPaymentTermsInvoiceNote({
+      paymentTerms: input.paymentTerms,
+      paymentTrigger: input.paymentTrigger,
+      paymentStructure: input.paymentStructure
+    })
+  ].filter((value): value is string => Boolean(value));
+
+  return lines.length > 0 ? lines.join("\n") : null;
 }
 
 function computeSubtotal(lineItems: InvoiceLineItem[]) {
@@ -302,7 +428,9 @@ async function buildInvoiceDraftPayload(
       : buildInvoiceLineItems({
           deliverables: aggregate.terms?.deliverables ?? [],
           amount: paymentAmount,
-          fallbackTitle: aggregate.deal.campaignName
+          fallbackTitle: aggregate.deal.campaignName,
+          paymentStructure: aggregate.terms?.paymentStructure ?? null,
+          revisionRounds: aggregate.terms?.revisionRounds ?? null
         });
 
   return {
@@ -315,11 +443,15 @@ async function buildInvoiceDraftPayload(
     dueDate,
     currency,
     subtotal: computeSubtotal(lineItems),
-    notes:
-      existingInvoice?.notes ??
-      aggregate.terms?.paymentTrigger ??
-      metadata.payoutNotes ??
-      null,
+    notes: buildInvoiceDraftNotes({
+      existingNotes: existingInvoice?.notes,
+      deliverables: aggregate.terms?.deliverables ?? [],
+      paymentTerms: aggregate.terms?.paymentTerms,
+      paymentTrigger: aggregate.terms?.paymentTrigger,
+      paymentStructure: aggregate.terms?.paymentStructure,
+      revisions: aggregate.terms?.revisions,
+      revisionRounds: aggregate.terms?.revisionRounds
+    }),
     billTo,
     issuer,
     lineItems,

@@ -7,6 +7,14 @@ import pdfParse from "pdf-parse";
 import { getRuntimePath } from "@/lib/runtime-path";
 import { slugify } from "@/lib/utils";
 
+declare global {
+  var pdfjsWorker:
+    | {
+        WorkerMessageHandler?: unknown;
+      }
+    | undefined;
+}
+
 export class UnreadableDocumentError extends Error {
   constructor(message = "We could not reliably parse this file.") {
     super(message);
@@ -63,10 +71,10 @@ function shouldTryLlamaParse(mimeType: string, fileName: string) {
 
 function llamaParsePrompt() {
   return [
-    "Extract the document into clean markdown for downstream contract and brief analysis.",
-    "Preserve section headings, numbered clause boundaries, lists, dates, tables, signature blocks, payment language, deliverable language, and usage-rights language exactly as written.",
-    "Do not summarize, paraphrase, normalize away legal wording, or omit repeated clause language when it is part of the contract structure.",
-    "Keep adjacent lines from the same clause together so downstream extraction can recover evidence snippets accurately."
+    "Extract the document into clean markdown for downstream creator-partnership artifact analysis.",
+    "Preserve section headings, numbered clause boundaries, lists, dates, tables, signature blocks, email headers, invoice fields, deliverable trackers, report metrics, slide text, storyboard text, moodboard labels, and OCR-visible image text exactly as written.",
+    "Do not summarize, paraphrase, normalize away legal or operational wording, or omit repeated clause language when it is part of the source structure.",
+    "Keep adjacent lines from the same clause, table row, email message, checklist, or feedback block together so downstream extraction can recover evidence snippets accurately."
   ].join(" ");
 }
 
@@ -258,6 +266,93 @@ export function normalizeDocumentText(value: string) {
   return normalized;
 }
 
+function pdfJsStandardFontDataUrl() {
+  return `${path.join(
+    process.cwd(),
+    "node_modules",
+    "pdfjs-dist",
+    "standard_fonts"
+  )}/`;
+}
+
+let pdfJsMainThreadWorkerPromise: Promise<void> | null = null;
+
+async function ensurePdfJsMainThreadWorker() {
+  if (globalThis.pdfjsWorker?.WorkerMessageHandler) {
+    return;
+  }
+
+  if (!pdfJsMainThreadWorkerPromise) {
+    pdfJsMainThreadWorkerPromise = import("pdfjs-dist/legacy/build/pdf.worker.mjs")
+      .then((workerModule) => {
+        globalThis.pdfjsWorker = workerModule;
+      })
+      .catch((error) => {
+        pdfJsMainThreadWorkerPromise = null;
+        throw error;
+      });
+  }
+
+  await pdfJsMainThreadWorkerPromise;
+}
+
+async function extractPdfTextWithPdfJs(buffer: Buffer) {
+  await ensurePdfJsMainThreadWorker();
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const document = await pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    stopAtErrors: false,
+    isEvalSupported: false,
+    standardFontDataUrl: pdfJsStandardFontDataUrl()
+  }).promise;
+
+  const pages: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const content = await page.getTextContent();
+    const lines: string[] = [];
+    let currentLineY: number | null = null;
+    let currentLine: string[] = [];
+
+    for (const item of content.items) {
+      if (!("str" in item)) {
+        continue;
+      }
+
+      const text = String(item.str ?? "").trim();
+      if (!text) {
+        continue;
+      }
+
+      const y = Array.isArray(item.transform) ? Number(item.transform[5]) : NaN;
+
+      if (
+        currentLine.length > 0 &&
+        Number.isFinite(y) &&
+        currentLineY !== null &&
+        Math.abs(y - currentLineY) > 2
+      ) {
+        lines.push(currentLine.join(" "));
+        currentLine = [];
+      }
+
+      currentLine.push(text);
+      if (Number.isFinite(y)) {
+        currentLineY = y;
+      }
+    }
+
+    if (currentLine.length > 0) {
+      lines.push(currentLine.join(" "));
+    }
+
+    pages.push(lines.join("\n"));
+  }
+
+  return pages.join("\n\n");
+}
+
 export type ExtractionResult = {
   rawText: string;
   normalizedText: string;
@@ -305,12 +400,30 @@ export async function extractDocumentText(
     mimeType === "application/pdf" ||
     fileName.toLowerCase().endsWith(".pdf")
   ) {
-    const result = await pdfParse(buffer);
-    return {
-      rawText: result.text,
-      normalizedText: normalizeDocumentText(result.text),
-      _debug: debugMeta("pdf-parse", result.text)
-    };
+    try {
+      const rawText = await extractPdfTextWithPdfJs(buffer);
+      return {
+        rawText,
+        normalizedText: normalizeDocumentText(rawText),
+        _debug: debugMeta("pdfjs-dist", rawText)
+      };
+    } catch (pdfJsError) {
+      try {
+        const result = await pdfParse(buffer);
+        return {
+          rawText: result.text,
+          normalizedText: normalizeDocumentText(result.text),
+          _debug: debugMeta("pdf-parse", result.text)
+        };
+      } catch (pdfParseError) {
+        const messages = [pdfJsError, pdfParseError]
+          .map((error) => (error instanceof Error ? error.message : String(error)))
+          .filter(Boolean)
+          .join(" | ");
+
+        throw new UnreadableDocumentError(messages || "We could not reliably parse this PDF.");
+      }
+    }
   }
 
   if (

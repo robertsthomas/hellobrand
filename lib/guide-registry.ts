@@ -14,6 +14,7 @@ export interface GuideContext {
   pathname: string;
   hasActiveWorkspace: boolean;
   hasWorkspaceNotification: boolean;
+  hasEverCreatedWorkspace: boolean;
   isMobile: boolean;
   dismissedStepIds: Set<string>;
   completedStepIds: Set<string>;
@@ -53,7 +54,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     anchorSelector: '[data-guide="header-notifications"]',
     routeMatch: /^\/app$/,
     side: "bottom",
-    eligibility: (ctx) => ctx.hasWorkspaceNotification
+    eligibility: (ctx) =>
+      ctx.hasWorkspaceNotification && !ctx.hasEverCreatedWorkspace
   },
 
   // ── Phase 2b: Nudge to open workspace (dashboard, has workspaces) ──

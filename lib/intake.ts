@@ -6,6 +6,7 @@ import { getRepository } from "@/lib/repository";
 import { createPersistedIntakeRecord } from "@/lib/intake-normalization";
 import { startNextQueuedIntakeSessionForUser, startQueuedIntakeSessionById } from "@/lib/intake-queue";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
+import { markWorkspaceCreatedForViewer } from "@/lib/onboarding";
 import {
   getDealForViewer,
   reprocessDocumentForViewer,
@@ -345,6 +346,10 @@ function deriveProcessingSnapshot(
   }
 
   const stageMeta = activeStage ? STAGE_META[activeStage] : null;
+  const isRunning =
+    Boolean(processingJob) ||
+    session.status === "processing" ||
+    session.status === "uploading";
 
   return {
     currentStage: activeStage,
@@ -352,7 +357,8 @@ function deriveProcessingSnapshot(
     activeLabel: stageMeta?.label ?? "Preparing intake",
     activeDescription:
       stageMeta?.description ?? "Waiting for the next document processing step.",
-    completedStages
+    completedStages,
+    isRunning
   };
 }
 
@@ -489,6 +495,8 @@ export async function createDraftIntakeSessionForViewer(
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
     }
   });
+
+  await markWorkspaceCreatedForViewer(viewer);
 
   return toIntakeSessionRecord(session);
 }

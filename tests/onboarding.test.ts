@@ -11,6 +11,7 @@ function makeContext(overrides: Partial<GuideContext> = {}): GuideContext {
     pathname: "/app",
     hasActiveWorkspace: false,
     hasWorkspaceNotification: false,
+    hasEverCreatedWorkspace: false,
     isMobile: false,
     dismissedStepIds: new Set(),
     completedStepIds: new Set(),

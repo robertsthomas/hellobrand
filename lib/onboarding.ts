@@ -19,7 +19,8 @@ import type {
 
 const EMPTY_GUIDE_STATE: ProductGuideState = {
   dismissedStepIds: [],
-  completedStepIds: []
+  completedStepIds: [],
+  hasEverCreatedWorkspace: false
 };
 
 const FALLBACK_ONBOARDING_COOKIE_NAME = "hellobrand_onboarding_state";
@@ -37,7 +38,8 @@ function normalizeGuideState(raw: unknown): ProductGuideState {
       : [],
     completedStepIds: Array.isArray(record.completedStepIds)
       ? record.completedStepIds.filter((v): v is string => typeof v === "string")
-      : []
+      : [],
+    hasEverCreatedWorkspace: record.hasEverCreatedWorkspace === true
   };
 }
 
@@ -402,4 +404,38 @@ export async function updateGuideStep(
   });
 
   return guideState;
+}
+
+export async function markWorkspaceCreatedForViewer(viewer: Viewer) {
+  const state = await getOnboardingStateForViewer(viewer);
+  const guideState = state.productGuideStateJson;
+
+  if (guideState.hasEverCreatedWorkspace) {
+    return guideState;
+  }
+
+  const nextGuideState: ProductGuideState = {
+    ...guideState,
+    hasEverCreatedWorkspace: true
+  };
+
+  if (!process.env.DATABASE_URL) {
+    const nextState = await setFallbackOnboardingStateCookie(viewer, {
+      productGuideVersion: Math.max(state.productGuideVersion, 1),
+      productGuideStateJson: nextGuideState
+    });
+
+    return nextState.productGuideStateJson;
+  }
+
+  await prisma.userOnboardingState.upsert({
+    where: { userId: viewer.id },
+    update: { productGuideStateJson: { ...nextGuideState } },
+    create: {
+      userId: viewer.id,
+      productGuideStateJson: { ...nextGuideState }
+    }
+  });
+
+  return nextGuideState;
 }

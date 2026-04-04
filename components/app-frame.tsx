@@ -5,10 +5,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bot, ChevronRight, Hand, Menu, Search } from "lucide-react";
-
+import { Bot, ChevronRight, Hand, Menu, MessageSquareMore, Search } from "lucide-react";
 
 import { PostHogActionLink } from "@/components/posthog-action-link";
+import { SidebarMilestonesCard } from "@/components/sidebar-milestones-card";
 import { buttonVariants } from "@/components/ui/button";
 import { AssistantProvider, useAssistant } from "@/components/assistant-provider";
 import { GuideProvider } from "@/components/guide-provider";
@@ -25,12 +25,14 @@ import {
   SheetTitle
 } from "@/components/ui/sheet";
 import { ThemeSwitch } from "@/components/theme-switch";
+import { FeedbackWidget } from "@/components/feedback-widget";
 import {
   getAppRouteMeta,
   isAppNavItemActive,
   primaryAppNavItems,
   secondaryAppNavItems
 } from "@/lib/app-shell";
+import type { SidebarMilestones } from "@/lib/sidebar-milestones";
 
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
@@ -65,19 +67,25 @@ function isMobileViewport() {
 
 export function AppFrame({
   children,
+  viewerId,
   banner,
   guideState,
   hasActiveWorkspace,
+  hasEverCreatedWorkspace,
   notifications,
   onboardingComplete,
+  sidebarMilestones,
   workspaceNavItems = []
 }: {
   children: ReactNode;
+  viewerId: string;
   banner?: ReactNode;
   guideState?: ProductGuideState;
   hasActiveWorkspace?: boolean;
+  hasEverCreatedWorkspace?: boolean;
   notifications?: NotificationItem[];
   onboardingComplete?: boolean;
+  sidebarMilestones?: SidebarMilestones;
   workspaceNavItems?: Array<{
     dealId: string;
     label: string;
@@ -93,10 +101,16 @@ export function AppFrame({
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
+  const [feedbackOpenRequestKey, setFeedbackOpenRequestKey] = useState(0);
   const isInboxRoute = pathname === "/app/inbox";
+  const hasVisibleSidebarMilestones = sidebarMilestones?.visible === true;
   const hasWorkspaceNotification = (notifications ?? []).some(
     (notification) => notification.category === "workspace" && notification.status === "active"
   );
+  const feedbackDealId =
+    pathname.match(/^\/app\/p\/([^/]+)/)?.[1] ??
+    pathname.match(/^\/app\/payments\/([^/]+)/)?.[1] ??
+    null;
   const sidebarSubItem = useMemo(() => {
     const paymentsMatch = pathname.match(/^\/app\/payments\/([^/]+)$/);
 
@@ -289,12 +303,39 @@ export function AppFrame({
     );
   };
 
+  const renderFeedbackItem = (options?: { onClick?: () => void }) => (
+    hasVisibleSidebarMilestones ? null : (
+    <button
+      type="button"
+      onClick={() => {
+        setFeedbackOpenRequestKey((current) => current + 1);
+        options?.onClick?.();
+      }}
+      className="group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-secondary/35 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]"
+    >
+      <MessageSquareMore className="h-4.5 w-4.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+      <span className="truncate">App feedback</span>
+    </button>
+    )
+  );
+
+  const renderSidebarMilestones = (options?: { onNavigate?: () => void }) =>
+    sidebarMilestones ? (
+      <SidebarMilestonesCard
+        milestones={sidebarMilestones}
+        onNavigate={options?.onNavigate}
+      />
+    ) : null;
+
   const guideWrapper = guideState
     ? (content: ReactNode) => (
         <GuideProvider
           initialGuideState={guideState}
           hasActiveWorkspace={hasActiveWorkspace ?? false}
           hasWorkspaceNotification={hasWorkspaceNotification}
+          hasEverCreatedWorkspace={
+            hasEverCreatedWorkspace ?? guideState.hasEverCreatedWorkspace
+          }
           visibilityKey={mobileMenuOpen}
           onUnavailableStep={requestGuideStepVisibility}
           onActiveStepChange={handleGuideActiveStepChange}
@@ -340,21 +381,29 @@ export function AppFrame({
             </form>
           </div>
 
-          <div className="flex-1 overflow-auto px-3 pb-4">
-            <div className="mb-4 px-2 pt-5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Workspace
-              </p>
-            </div>
-            <nav className="space-y-1">{primaryAppNavItems.map((item) => renderNavItem(item))}</nav>
+          <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
+            <div>
+              <div className="mb-4 px-2 pt-5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Workspace
+                </p>
+              </div>
+              <nav className="space-y-1">{primaryAppNavItems.map((item) => renderNavItem(item))}</nav>
 
-            <div className="mb-4 mt-8 px-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Preferences
-              </p>
+              <div className="mb-4 mt-8 px-2">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Preferences
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                {secondaryAppNavItems.map((item) => renderNavItem(item))}
+              </div>
+
+              {renderSidebarMilestones()}
             </div>
 
-            <div className="space-y-1">{secondaryAppNavItems.map((item) => renderNavItem(item))}</div>
+            <div className="mt-auto pt-4">{renderFeedbackItem()}</div>
           </div>
 
           <div className="border-t border-border px-5 py-5 dark:border-white/8">
@@ -427,32 +476,44 @@ export function AppFrame({
                 </form>
               </div>
 
-              <div className="flex-1 overflow-auto px-3 pb-4">
-                <div className="mb-4 px-2 pt-5">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Workspace
-                  </p>
-                </div>
-                <nav className="space-y-1">
-                  {primaryAppNavItems.map((item) =>
-                    renderNavItem(item, {
-                      onClick: () => handleMobileMenuOpenChange(false)
-                    })
-                  )}
-                </nav>
+              <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
+                <div>
+                  <div className="mb-4 px-2 pt-5">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Workspace
+                    </p>
+                  </div>
+                  <nav className="space-y-1">
+                    {primaryAppNavItems.map((item) =>
+                      renderNavItem(item, {
+                        onClick: () => handleMobileMenuOpenChange(false)
+                      })
+                    )}
+                  </nav>
 
-                <div className="mb-4 mt-8 px-2">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Preferences
-                  </p>
+                  <div className="mb-4 mt-8 px-2">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Preferences
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    {secondaryAppNavItems.map((item) =>
+                      renderNavItem(item, {
+                        onClick: () => handleMobileMenuOpenChange(false)
+                      })
+                    )}
+                    <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
+                  </div>
+
+                  {renderSidebarMilestones({
+                    onNavigate: () => handleMobileMenuOpenChange(false)
+                  })}
                 </div>
-                <div className="space-y-1">
-                  {secondaryAppNavItems.map((item) =>
-                    renderNavItem(item, {
-                      onClick: () => handleMobileMenuOpenChange(false)
-                    })
-                  )}
-                  <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
+
+                <div className="mt-auto pt-4">
+                  {renderFeedbackItem({
+                    onClick: () => handleMobileMenuOpenChange(false)
+                  })}
                 </div>
               </div>
 
@@ -527,6 +588,13 @@ export function AppFrame({
               <div className="flex min-h-full min-w-0 flex-col">{children}</div>
             </div>
           </main>
+          <FeedbackWidget
+            viewerId={viewerId}
+            pagePath={pathname}
+            pageTitle={meta.title}
+            dealId={feedbackDealId}
+            openRequestKey={feedbackOpenRequestKey}
+          />
 
         </div>
       </div>
