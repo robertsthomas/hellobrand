@@ -31,7 +31,7 @@ import {
   stripInlineMarkdown,
   toPlainDealSummary
 } from "@/lib/deal-summary";
-import { sanitizePartyName } from "@/lib/party-labels";
+import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { normalizeEvidenceSnippet } from "@/lib/utils";
 
 type TermsData = Omit<
@@ -645,19 +645,6 @@ function asString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-function sanitizeCampaignName(value: unknown) {
-  const normalized = asString(value);
-  if (!normalized) {
-    return null;
-  }
-
-  return /^(campaign|project|workspace|concept|campaign concept|brief|overview)$/i.test(
-    normalized
-  )
-    ? null
-    : normalized;
-}
-
 function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -788,7 +775,7 @@ function normalizeTerms(
     brandName: llmBrandName ?? fallbackData.brandName,
     agencyName: llmAgencyName ?? fallbackData.agencyName,
     creatorName: asString(input.creatorName) ?? fallbackData.creatorName,
-    campaignName: sanitizeCampaignName(input.campaignName) ?? fallbackData.campaignName,
+    campaignName: sanitizeCampaignName(asString(input.campaignName)) ?? fallbackData.campaignName,
     paymentAmount: asNumber(input.paymentAmount) ?? fallbackData.paymentAmount,
     currency: asString(input.currency) ?? fallbackData.currency,
     paymentTerms: asString(input.paymentTerms) ?? fallbackData.paymentTerms,

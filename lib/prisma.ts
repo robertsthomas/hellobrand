@@ -33,10 +33,7 @@ function hasExpectedDelegates(client: PrismaClient) {
 }
 
 function buildDatabaseUrl() {
-  const base =
-    process.env.NODE_ENV !== "production"
-      ? process.env.DIRECT_URL || process.env.DATABASE_URL
-      : process.env.DATABASE_URL;
+  const base = process.env.DATABASE_URL;
   if (!base) return undefined;
 
   // Keep Prisma conservative by default so Next dev/Turbopack workers do not

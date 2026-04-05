@@ -34,7 +34,7 @@ import {
   assertViewerWithinUsageLimit,
   recordViewerUsage
 } from "@/lib/billing/entitlements";
-import { sanitizePartyName } from "@/lib/party-labels";
+import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
@@ -145,6 +145,7 @@ function sanitizeCreatorExtractionResult(
 ): ReturnType<typeof mergeExtractionResults> {
   const brandName = sanitizePartyName(extraction.data.brandName, "brand");
   const agencyName = sanitizePartyName(extraction.data.agencyName, "agency");
+  const campaignName = sanitizeCampaignName(extraction.data.campaignName);
 
   return {
     ...extraction,
@@ -152,6 +153,7 @@ function sanitizeCreatorExtractionResult(
     data: {
       ...extraction.data,
       brandName,
+      campaignName,
       agencyName:
         agencyName &&
         (!brandName || agencyName.toLowerCase() !== brandName.toLowerCase())

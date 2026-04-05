@@ -4,7 +4,7 @@ import {
   buildConflictIntelligencePatch,
   mergeConflictIntelligence
 } from "@/lib/conflict-intelligence";
-import { sanitizePartyName } from "@/lib/party-labels";
+import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { normalizeEvidenceSnippet } from "@/lib/utils";
 import type {
   BriefData,
@@ -288,13 +288,7 @@ function isBriefLikeDocumentKind(documentKind: DocumentKind) {
 }
 
 function isGenericCampaignName(value: string | null | undefined) {
-  if (!value) {
-    return true;
-  }
-
-  return /^(campaign|project|workspace|concept|campaign concept|brief|overview)$/i.test(
-    value.trim()
-  );
+  return sanitizeCampaignName(value) === null;
 }
 
 function inferBriefBrandName(text: string) {
@@ -334,7 +328,7 @@ function shouldUseInferredBriefBrandName(
     .filter(Boolean);
 
   if (
-    /hook|second|requirement|guideline|messaging|concept|campaign|project|workspace|brief|overview/.test(current) ||
+    /hook|second|requirement|guideline|messaging|concept|campaign|project|workspace|brief|overview|usage|rights|payment|deliverables|timeline|summary|general/.test(current) ||
     current.length > 40
   ) {
     return true;
@@ -352,11 +346,9 @@ function inferBriefCampaignName(text: string, fileName?: string | null) {
       line.length > 2 &&
       line.length < 100 &&
       line.toLowerCase() !== inferredBrandName &&
-      !/^(campaign|project|workspace|overview|key messaging|creative territories|creative requirements|required elements)$/i.test(
-        line
-      )
+      sanitizeCampaignName(line)
     ) {
-      return line;
+      return sanitizeCampaignName(line);
     }
   }
 
@@ -370,7 +362,7 @@ function inferBriefCampaignName(text: string, fileName?: string | null) {
     .replace(/\s{2,}/g, " ")
     .trim();
   const afterBrief = stem.match(/\bbrief\b\s+(.+)$/i)?.[1]?.trim();
-  return afterBrief?.length ? afterBrief : null;
+  return sanitizeCampaignName(afterBrief ?? null);
 }
 
 function parseBriefDeliverables(text: string, evidence: FieldEvidence[]) {

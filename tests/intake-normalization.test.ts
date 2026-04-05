@@ -229,6 +229,71 @@ describe("intake normalization", () => {
     expect(normalized?.brandName).toBe("NimbusPM");
   });
 
+  test("ignores generic usage headings and keeps the real brand and campaign", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Workspace";
+    aggregate.deal.campaignName = "New workspace";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "NimbusPM_influencer_brief.pdf",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Influencer Brief
+          NimbusPM
+          Summer Push
+          Overview: Create content for the NimbusPM summer push.
+        `,
+        rawText: `
+          Influencer Brief
+          NimbusPM
+          Summer Push
+          Overview: Create content for the NimbusPM summer push.
+        `
+      },
+      {
+        ...aggregate.documents[1],
+        fileName: "usage_rights_addendum.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Brand Usage Rights
+          Campaign Overview
+          The brand receives 90 days paid and organic usage.
+        `,
+        rawText: `
+          Brand Usage Rights
+          Campaign Overview
+          The brand receives 90 days paid and organic usage.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[1];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Usage",
+      agencyName: null,
+      campaignName: "Overview"
+    };
+    aggregate.extractionEvidence = [
+      {
+        ...aggregate.extractionEvidence[0],
+        fieldPath: "brandName",
+        snippet: "Usage"
+      },
+      {
+        ...aggregate.extractionEvidence[0],
+        id: "campaign-evidence",
+        fieldPath: "campaignName",
+        snippet: "Overview"
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("NimbusPM");
+    expect(normalized?.contractTitle).toBe("NimbusPM - Summer Push");
+  });
+
   test("does not treat campaign brief bullets as a primary contact title", () => {
     const aggregate = createAggregate();
     aggregate.documents = [

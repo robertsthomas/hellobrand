@@ -1,23 +1,46 @@
+import { Prisma } from "@prisma/client";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { buildConflictResults } from "@/lib/conflict-intelligence";
 import { getRepository } from "@/lib/repository";
 import type { DealAggregate, Viewer } from "@/lib/types";
 
-async function loadRawAggregates(viewerId: string) {
-  const repository = getRepository();
-  const deals = await repository.listDeals(viewerId);
-  const aggregates: DealAggregate[] = [];
-
-  for (const deal of deals) {
-    const aggregate = await repository.getDealAggregate(viewerId, deal.id);
-
-    if (aggregate) {
-      aggregates.push(aggregate);
-    }
+function isLocalPoolExhaustionError(error: unknown) {
+  if (process.env.NODE_ENV === "production") {
+    return false;
   }
 
-  return aggregates;
+  const message = error instanceof Error ? error.message : "";
+
+  return (
+    (error instanceof Prisma.PrismaClientInitializationError ||
+      error instanceof Prisma.PrismaClientUnknownRequestError) &&
+    message.includes("MaxClientsInSessionMode")
+  );
+}
+
+async function loadRawAggregates(viewerId: string) {
+  try {
+    const repository = getRepository();
+    const deals = await repository.listDeals(viewerId);
+    const aggregates: DealAggregate[] = [];
+
+    for (const deal of deals) {
+      const aggregate = await repository.getDealAggregate(viewerId, deal.id);
+
+      if (aggregate) {
+        aggregates.push(aggregate);
+      }
+    }
+
+    return aggregates;
+  } catch (error) {
+    if (isLocalPoolExhaustionError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function getCachedDealAggregates(viewer: Viewer) {

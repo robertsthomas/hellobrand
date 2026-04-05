@@ -27,6 +27,7 @@ interface ListNotificationsOptions {
   includeSuperseded?: boolean;
   limit?: number;
   cursor?: string | null;
+  syncComputed?: boolean;
 }
 
 type AppNotificationRow = {
@@ -579,7 +580,11 @@ export async function listNotificationsForViewer(
     };
   }
 
-  await syncComputedNotificationsForViewer(viewer);
+  const shouldSyncComputed =
+    options.syncComputed ?? process.env.NODE_ENV === "production";
+  if (shouldSyncComputed) {
+    await syncComputedNotificationsForViewer(viewer);
+  }
 
   const limit = options.limit ?? 100;
   const includeRead = options.includeRead ?? true;

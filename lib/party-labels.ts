@@ -1,6 +1,9 @@
 import { stripInlineMarkdown } from "@/lib/deal-summary";
 import { isGenericWorkspaceLabel } from "@/lib/workspace-labels";
 
+const GENERIC_CAMPAIGN_LABEL_PATTERN =
+  /^(campaign|project|workspace|concept|campaign concept|brief|campaign brief|deliverables brief|influencer brief|creative brief|content brief|overview|campaign overview|project overview|brief overview|summary|general|details|notes|information|usage|rights|usage rights|brand usage rights|campaign usage rights|rights and restrictions|payment|payment terms|deliverables|deliverable|timeline|schedule|contact|primary contact|legal clauses|compensation|approval requirements|creative requirements|required elements|content concept|key messaging|messaging)$/i;
+
 function presentText(value: string | null | undefined) {
   if (typeof value !== "string") {
     return null;
@@ -79,7 +82,7 @@ export function sanitizePartyName(
 
   if (
     kind === "brand" &&
-    /^(brand|brand name|client|client name|campaign|project|workspace|concept|overview|campaign brief|partnership|influencer|creator|content creator|talent|brand contact)$/i.test(
+    /^(brand|brand name|client|client name|campaign|project|workspace|concept|overview|campaign overview|project overview|brief overview|campaign brief|partnership|influencer|creator|content creator|talent|brand contact|usage|rights|usage rights|brand usage rights|campaign usage rights|payment|payment terms|deliverables?|timeline|schedule|summary|general|details|legal clauses|contact|primary contact|compensation|key messaging|creative requirements|required elements|content concept)$/i.test(
       normalized
     )
   ) {
@@ -104,4 +107,44 @@ export function sanitizePartyName(
   }
 
   return normalized;
+}
+
+export function sanitizeCampaignName(value: string | null | undefined) {
+  const raw = presentText(value);
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = presentText(
+    stripInlineMarkdown(
+      raw
+        .split(/\s+#{1,6}\s+|\n\s*#{1,6}\s*|\n{2,}/g)
+        .map((segment) => segment.trim())
+        .find(Boolean) ?? raw
+    )
+  );
+  if (!normalized) {
+    return null;
+  }
+
+  const cleaned = normalized
+    .replace(/^(campaign(?:\s+name)?|project(?:\s+name)?)\b[:\s-]*/i, "")
+    .replace(/\(if any\)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return null;
+  }
+
+  if (
+    isGenericWorkspaceLabel(cleaned) ||
+    /^(name|unknown|not specified|not found|none|null|n\/a)$/i.test(cleaned) ||
+    GENERIC_CAMPAIGN_LABEL_PATTERN.test(cleaned) ||
+    looksSentenceLike(cleaned)
+  ) {
+    return null;
+  }
+
+  return cleaned;
 }

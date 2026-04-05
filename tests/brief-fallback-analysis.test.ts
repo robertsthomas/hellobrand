@@ -63,4 +63,22 @@ Overview: Create content for the NimbusPM summer push.
     expect(result.extraction.data.brandName).toBe("NimbusPM");
     expect(result.extraction.data.campaignName).toBe("Summer Push");
   });
+
+  test("does not treat usage-rights headings as brand or campaign names", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Brand Usage Rights
+Campaign Overview
+NimbusPM
+Summer Push
+Overview: Create content for the NimbusPM summer push.
+`,
+      {
+        fileName: "nimbuspm_brief.pdf"
+      }
+    );
+
+    expect(result.extraction.data.brandName).toBe("NimbusPM");
+    expect(result.extraction.data.campaignName).toBe("Summer Push");
+  });
 });
