@@ -42,7 +42,7 @@ describe("Yahoo provider cursor helpers", () => {
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBe("signed-state");
     expect(url.searchParams.get("nonce")).toBe("nonce-123");
-    expect(url.searchParams.get("scope")).toBe("openid profile email mail-r mail-w");
+    expect(url.searchParams.get("scope")).toBe("openid profile email mail-r");
   });
 
   test("round-trips uid and uidValidity", () => {
