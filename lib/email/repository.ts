@@ -131,7 +131,7 @@ function toAccountRecord(account: {
     refreshTokenEncrypted: account.refreshTokenEncrypted,
     mailAuthConfigured:
       account.provider === "yahoo"
-        ? Boolean(account.refreshTokenEncrypted)
+        ? Boolean(account.refreshTokenEncrypted && toStringArray(account.scopes).length > 0)
         : true,
     tokenExpiresAt: iso(account.tokenExpiresAt),
     lastSyncAt: iso(account.lastSyncAt),

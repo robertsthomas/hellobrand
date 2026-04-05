@@ -49,6 +49,11 @@ export function getOutlookRedirectUri() {
 }
 
 export function getYahooRedirectUri() {
+  const override = process.env.YAHOO_REDIRECT_URI?.trim();
+  if (override) {
+    return override;
+  }
+
   return `${getIntegrationBaseUrl()}/api/email/yahoo/callback`;
 }
 
@@ -75,7 +80,11 @@ export function hasProviderConfig(provider: EmailProvider) {
     );
   }
 
-  return true;
+  if (provider === "yahoo") {
+    return Boolean(process.env.YAHOO_CLIENT_ID && process.env.YAHOO_CLIENT_SECRET);
+  }
+
+  return false;
 }
 
 export const gmailScopes = [
@@ -98,7 +107,8 @@ export const yahooScopes = [
   "openid",
   "profile",
   "email",
-  "mail-r"
+  "mail-r",
+  "mail-w"
 ];
 
 export function getEmailSummaryModel() {
