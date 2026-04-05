@@ -441,7 +441,7 @@ function mapYahooThreads(messages: YahooMappedMessage[]) {
 }
 
 export function buildYahooAuthUrl(state: string, nonce: string) {
-  const connectScopes = ["openid", "email"];
+  const connectScopes = yahooScopes;
   const params = new URLSearchParams({
     client_id: process.env.YAHOO_CLIENT_ID ?? "",
     redirect_uri: getYahooRedirectUri(),
