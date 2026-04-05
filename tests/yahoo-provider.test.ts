@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe("Yahoo provider cursor helpers", () => {
-  test("builds Yahoo auth URLs with OAuth mail scopes", () => {
+  test("builds Yahoo auth URLs with the configured connect scopes", () => {
     const url = new URL(buildYahooAuthUrl("signed-state", "nonce-123"));
 
     expect(url.origin + url.pathname).toBe("https://api.login.yahoo.com/oauth2/request_auth");
@@ -42,7 +42,7 @@ describe("Yahoo provider cursor helpers", () => {
     expect(url.searchParams.get("response_type")).toBe("code");
     expect(url.searchParams.get("state")).toBe("signed-state");
     expect(url.searchParams.get("nonce")).toBe("nonce-123");
-    expect(url.searchParams.get("scope")).toBe("openid profile email mail-r mail-w");
+    expect(url.searchParams.get("scope")).toBe("openid");
   });
 
   test("round-trips uid and uidValidity", () => {

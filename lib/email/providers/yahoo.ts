@@ -441,11 +441,12 @@ function mapYahooThreads(messages: YahooMappedMessage[]) {
 }
 
 export function buildYahooAuthUrl(state: string, nonce: string) {
+  const connectScopes = ["openid"];
   const params = new URLSearchParams({
     client_id: process.env.YAHOO_CLIENT_ID ?? "",
     redirect_uri: getYahooRedirectUri(),
     response_type: "code",
-    scope: yahooScopes.join(" "),
+    scope: connectScopes.join(" "),
     state,
     nonce
   });
