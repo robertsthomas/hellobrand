@@ -33,6 +33,15 @@ export function buildAssistantPrompt(input: {
         `Today: ${isoDateContext()}`,
         `Current page: ${input.context.pageTitle} (${input.context.pathname})`,
         input.context.tab ? `Current partnership tab: ${input.context.tab}` : null,
+        input.context.pageContext
+          ? `Page purpose: ${input.context.pageContext.purpose}`
+          : null,
+        input.context.pageContext && input.context.pageContext.availableActions.length > 0
+          ? `Available actions on this page: ${input.context.pageContext.availableActions.join("; ")}`
+          : null,
+        input.context.pageContext && input.context.pageContext.dataHints.length > 0
+          ? `Data available on this page: ${input.context.pageContext.dataHints.join("; ")}`
+          : null,
         input.context.profileLocation
           ? `Creator location context: ${input.context.profileLocation}`
           : null,

@@ -736,6 +736,12 @@ export interface AssistantTrigger {
 
 export type AssistantTone = "professional" | "friendly" | "direct" | "warm";
 
+export interface AssistantPageContext {
+  purpose: string;
+  availableActions: string[];
+  dataHints: string[];
+}
+
 export interface AssistantClientContext {
   pathname: string;
   pageTitle: string;
@@ -744,6 +750,7 @@ export interface AssistantClientContext {
   profileLocation: string | null;
   trigger: AssistantTrigger | null;
   tone: AssistantTone;
+  pageContext: AssistantPageContext | null;
 }
 
 export interface AssistantThreadRecord {

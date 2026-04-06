@@ -133,6 +133,98 @@ export function buildAssistantSuggestedPrompts(
     ];
   }
 
+  if (context.pathname.startsWith("/app/inbox")) {
+    return [
+      {
+        id: "inbox-summary",
+        label: "Inbox summary",
+        description: "Get a quick overview of what needs attention in your inbox.",
+        prompt: "What's the current state of my inbox and which threads need my attention first?"
+      },
+      {
+        id: "inbox-draft",
+        label: "Draft a reply",
+        description: "Turn a selected thread into a creator-professional response.",
+        prompt: "Help me draft a concise, professional reply for the most urgent thread in my inbox."
+      },
+      {
+        id: "inbox-followup",
+        label: "Follow-up tracker",
+        description: "Track which threads need follow-ups and when.",
+        prompt: "Which threads in my inbox are waiting on a response from the brand side, and what should I follow up on?"
+      }
+    ];
+  }
+
+  if (context.pathname.startsWith("/app/analytics")) {
+    return [
+      {
+        id: "analytics-summary",
+        label: "Portfolio summary",
+        description: "Get a high-level view of your partnership performance.",
+        prompt: "Give me a summary of my partnership portfolio performance, including earnings trends and deal activity."
+      },
+      {
+        id: "analytics-insights",
+        label: "Key insights",
+        description: "Surface the most important patterns in your data.",
+        prompt: "What are the most important trends or patterns I should know about from my partnership data?"
+      },
+      {
+        id: "analytics-improvement",
+        label: "Growth opportunities",
+        description: "Identify areas to improve your partnership workflow.",
+        prompt: "Based on my portfolio data, where are the biggest opportunities to improve my partnership workflow or earnings?"
+      }
+    ];
+  }
+
+  if (context.pathname.startsWith("/app/intake")) {
+    return [
+      {
+        id: "intake-help",
+        label: "Intake guidance",
+        description: "Get help setting up a new workspace.",
+        prompt: "What should I know about setting up a new workspace, and what information does the extraction pipeline look for?"
+      },
+      {
+        id: "intake-tips",
+        description: "Best practices for uploading contracts.",
+        label: "Upload tips",
+        prompt: "What are the best practices for uploading contracts to get the most accurate extraction?"
+      },
+      {
+        id: "intake-next",
+        label: "What happens next",
+        description: "Understand the extraction and workspace creation flow.",
+        prompt: "What happens after I upload a contract, and how long does extraction take?"
+      }
+    ];
+  }
+
+  if (context.pathname.startsWith("/app/settings")) {
+    return [
+      {
+        id: "settings-profile",
+        label: "Profile setup",
+        description: "Make sure your profile is configured for the best assistant experience.",
+        prompt: "What profile settings should I configure to get the most out of the assistant?"
+      },
+      {
+        id: "settings-billing",
+        label: "Plan and features",
+        description: "Understand what features are available on your current plan.",
+        prompt: "What features do I have access to on my current plan, and what would an upgrade give me?"
+      },
+      {
+        id: "settings-notifications",
+        label: "Notification setup",
+        description: "Configure alerts for the things that matter most.",
+        prompt: "Which notification settings should I enable to stay on top of my partnerships without getting overwhelmed?"
+      }
+    ];
+  }
+
   if (context.profileLocation) {
     return [
       {

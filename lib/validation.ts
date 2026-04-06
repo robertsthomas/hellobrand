@@ -186,6 +186,12 @@ export const assistantTriggerSchema = z.object({
 
 export const assistantToneValues = ["professional", "friendly", "direct", "warm"] as const;
 
+export const assistantPageContextSchema = z.object({
+  purpose: z.string().min(1).max(500),
+  availableActions: z.array(z.string().max(200)).max(20),
+  dataHints: z.array(z.string().max(300)).max(20)
+});
+
 export const assistantClientContextSchema = z.object({
   pathname: z.string().min(1).max(500),
   pageTitle: z.string().min(1).max(120),
@@ -193,7 +199,8 @@ export const assistantClientContextSchema = z.object({
   tab: z.enum(assistantDealTabValues).nullable(),
   profileLocation: z.string().max(160).nullable(),
   trigger: assistantTriggerSchema.nullable(),
-  tone: z.enum(assistantToneValues)
+  tone: z.enum(assistantToneValues),
+  pageContext: assistantPageContextSchema.nullable()
 });
 
 export const assistantThreadCreateSchema = z.object({

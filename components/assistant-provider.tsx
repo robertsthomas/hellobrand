@@ -15,7 +15,7 @@ import { Bot, Loader2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { AssistantPanel } from "@/components/assistant-panel";
-import { assistantPageTitle, isValidAssistantTab } from "@/lib/assistant/app-manual";
+import { assistantPageTitle, getPageContext, isValidAssistantTab } from "@/lib/assistant/app-manual";
 import { assistantRecordToUIMessage } from "@/lib/assistant/messages";
 import { parseProfileMetadata } from "@/lib/profile-metadata";
 import type {
@@ -141,7 +141,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       tab: isValidAssistantTab(currentTab) ? (currentTab as AssistantDealTab) : null,
       profileLocation,
       trigger,
-      tone
+      tone,
+      pageContext: getPageContext(pathname)
     }),
     [currentTab, dealId, pathname, profileLocation, tone, trigger]
   );

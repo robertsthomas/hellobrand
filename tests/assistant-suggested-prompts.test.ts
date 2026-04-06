@@ -15,6 +15,7 @@ function buildContext(overrides?: Partial<AssistantClientContext>): AssistantCli
     profileLocation: null,
     trigger: null,
     tone: "professional",
+    pageContext: null,
     ...overrides
   };
 }
