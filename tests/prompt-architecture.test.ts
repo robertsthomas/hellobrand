@@ -28,7 +28,7 @@ vi.mock("@/lib/ai/gateway", () => ({
 import { generateAssistantWorkspaceDraft } from "@/lib/assistant/draft";
 import { buildAssistantPrompt } from "@/lib/assistant/prompt";
 import { joinPromptSections } from "@/lib/ai/prompting";
-import { extractSectionWithLlm } from "@/lib/analysis/llm";
+import { extractBriefWithLlm, extractSectionWithLlm } from "@/lib/analysis/llm";
 import { generateEmailReplyDraft } from "@/lib/email/ai";
 
 describe("prompt formatting helpers", () => {
@@ -70,6 +70,8 @@ describe("assistant prompt architecture", () => {
     expect(prompt).toContain("<runtime_context>");
     expect(prompt).toContain("<behavior_rules>");
     expect(prompt).toContain("When the user needs exact facts");
+    expect(prompt).toContain("When multiple documents, snapshots, or thread facts disagree");
+    expect(prompt).toContain("Not specified or unknown");
     expect(prompt).toContain("Only navigate when the user explicitly asks to go somewhere");
     expect(prompt).toContain("If the user asks a workspace-specific question and no workspace is active");
     expect(prompt).toContain("Current partnership snapshot");
@@ -182,6 +184,8 @@ describe("assistant workspace draft architecture", () => {
     expect(call.systemPrompt).toContain("<instruction_hierarchy>");
     expect(call.systemPrompt).toContain("<draft_job>");
     expect(call.systemPrompt).toContain("Saved workspace facts are highest priority.");
+    expect(call.systemPrompt).toContain("Preserve creator leverage");
+    expect(call.systemPrompt).toContain("ask a focused clarifying question");
     expect(call.userPrompt).toContain("<workspace_snapshot>");
     expect(call.userPrompt).toContain("<assistant_context>");
     expect(call.userPrompt).toContain("<risk_context>");
@@ -281,6 +285,8 @@ describe("email prompt architecture", () => {
 
     expect(call.systemPrompt).toContain("<instruction_hierarchy>");
     expect(call.systemPrompt).toContain("Linked workspace facts are highest priority.");
+    expect(call.systemPrompt).toContain("If workspace facts and thread facts conflict");
+    expect(call.systemPrompt).toContain("If a key business fact is missing");
     expect(call.systemPrompt).toContain("<few_shot_examples>");
     expect(call.userPrompt).toContain("<workspace_context>");
     expect(call.userPrompt).toContain("<custom_user_prompt>");
@@ -371,8 +377,63 @@ describe("document extraction prompt architecture", () => {
 
     expect(call.systemPrompt).toContain("<few_shot_examples>");
     expect(call.systemPrompt).toContain("Good evidence");
+    expect(call.systemPrompt).toContain("Invoices and finance documents");
+    expect(call.systemPrompt).toContain("Status updates, creative feedback, and revision notes");
+    expect(call.systemPrompt).toContain("Do not resolve cross-document conflicts");
     expect(call.userPrompt).toContain("<section_text>");
     expect(call.userPrompt).toContain("<fallback_extraction>");
     expect(call.userPrompt).toContain("extract only the explicit creator-partnership facts");
+  });
+});
+
+describe("brief extraction prompt architecture", () => {
+  beforeEach(() => {
+    runStructuredOpenRouterTaskMock.mockReset();
+    runStructuredOpenRouterTaskMock.mockResolvedValue({
+      data: {
+        campaignOverview: "Launch week awareness push.",
+        messagingPoints: ["Lead with a relatable problem"],
+        talkingPoints: ["Show product in use"],
+        creativeConceptOverview: "Creator-first demo",
+        brandGuidelines: "Avoid medical claims",
+        approvalRequirements: "Brand review required before posting",
+        targetAudience: "US skincare buyers",
+        toneAndStyle: "Natural and credible",
+        doNotMention: ["Guaranteed results"]
+      },
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+      resolvedModel: "google/gemini-3-flash-preview",
+      requestedModel: "google/gemini-3-flash-preview",
+      cacheHit: false,
+      budgetDecision: "normal"
+    });
+  });
+
+  it("builds brief extraction prompts for decks and creative guidance artifacts", async () => {
+    await extractBriefWithLlm(
+      "Launch week creative board. Avoid guaranteed claims. Brand review required before posting.",
+      "pitch_deck",
+      {
+        campaignOverview: null,
+        messagingPoints: [],
+        talkingPoints: [],
+        creativeConceptOverview: null,
+        brandGuidelines: null,
+        approvalRequirements: null,
+        targetAudience: null,
+        toneAndStyle: null,
+        doNotMention: [],
+        sourceDocumentIds: ["doc-1"]
+      }
+    );
+
+    const call = runStructuredOpenRouterTaskMock.mock.calls[0]?.[0];
+
+    expect(call.systemPrompt).toContain("<document_variety>");
+    expect(call.systemPrompt).toContain("Pitch decks and kickoff decks");
+    expect(call.systemPrompt).toContain("Storyboards, moodboards, creative feedback, and status updates");
+    expect(call.systemPrompt).toContain("Use doNotMention for prohibited claims");
+    expect(call.userPrompt).toContain("<document_metadata>");
+    expect(call.userPrompt).toContain("Document kind: pitch_deck");
   });
 });

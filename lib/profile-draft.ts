@@ -56,28 +56,36 @@ function buildProfileIdentityDraft(profile: ProfileRecord, initialEmail: string)
 }
 
 function buildGeneralHandles(initialHandles: SocialHandleEntry[]) {
-  const platforms: ProfilePlatform[] = [
-    "instagram",
-    "youtube",
-    "tiktok",
-    "twitter"
-  ];
+  const seen = new Set<ProfilePlatform>();
 
-  return platforms.map((platform) => {
-    const existing = initialHandles.find(
-      (entry) => entry.platform === platform && !entry.partnershipContext
-    );
-
-    return (
-      existing ?? {
-        id: `general-${platform}`,
-        platform,
-        handle: "",
-        audienceLabel: "",
-        partnershipContext: null
+  return initialHandles
+    .filter((entry) => !entry.partnershipContext)
+    .filter((entry) => {
+      if (seen.has(entry.platform)) {
+        return false;
       }
-    );
-  });
+
+      seen.add(entry.platform);
+      return true;
+    })
+    .map((entry) => ({
+      ...entry,
+      audienceLabel: entry.audienceLabel ?? "",
+      partnershipContext: null
+    }));
+}
+
+export function emptyGeneralHandle(
+  platform: ProfilePlatform,
+  id = createClientRowId(`general-${platform}`)
+): SocialHandleEntry {
+  return {
+    id,
+    platform,
+    handle: "",
+    audienceLabel: "",
+    partnershipContext: null
+  };
 }
 
 export function emptyDealHandle(
@@ -128,11 +136,21 @@ export function buildProfileEditorPatch(
   form: ProfileEditorDraft,
   profile: ProfileRecord
 ) {
+  const seenGeneralPlatforms = new Set<ProfilePlatform>();
   const socialHandles = [
-    ...form.generalHandles.map((entry) => ({
-      ...entry,
-      audienceLabel: entry.audienceLabel?.trim() || null
-    })),
+    ...form.generalHandles
+      .filter((entry) => {
+        if (seenGeneralPlatforms.has(entry.platform)) {
+          return false;
+        }
+
+        seenGeneralPlatforms.add(entry.platform);
+        return true;
+      })
+      .map((entry) => ({
+        ...entry,
+        audienceLabel: entry.audienceLabel?.trim() || null
+      })),
     ...form.dealHandles.map((entry) => ({
       ...entry,
       audienceLabel: entry.audienceLabel?.trim() || null,

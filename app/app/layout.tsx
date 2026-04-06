@@ -7,13 +7,16 @@ import { PostHogUserIdentify } from "@/components/posthog-user-identify";
 import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
 import { requireViewer } from "@/lib/auth";
+import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
   getCachedDealAggregates,
   getCachedOnboardingState,
   getCachedProfile
 } from "@/lib/cached-data";
+import { listEmailAccountsForViewer } from "@/lib/email/service";
 import { listNotificationsForViewer } from "@/lib/notification-service";
+import { buildSidebarMilestones } from "@/lib/sidebar-milestones";
 
 export default async function WorkspaceLayout({
   children
@@ -33,17 +36,30 @@ export default async function WorkspaceLayout({
     );
   }
 
-  const [profile, onboardingState, dealAggregates, notificationFeed] = await Promise.all([
+  const [profile, onboardingState, dealAggregates, notificationFeed, entitlements] = await Promise.all([
     getCachedProfile(viewer),
     getCachedOnboardingState(viewer),
     getCachedDealAggregates(viewer),
-    listNotificationsForViewer(viewer)
+    listNotificationsForViewer(viewer),
+    getViewerEntitlements(viewer)
   ]);
+  const emailAccounts = entitlements.features.email_connections
+    ? await listEmailAccountsForViewer(viewer)
+    : [];
 
   const isOnboardingComplete =
     !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;
+  const hasEverCreatedWorkspace =
+    hasActiveWorkspace || onboardingState.productGuideStateJson.hasEverCreatedWorkspace;
   const notifications = notificationFeed.notifications;
+  const sidebarMilestones = buildSidebarMilestones({
+    hasActiveWorkspace,
+    hasEverCreatedWorkspace,
+    profile,
+    entitlements,
+    emailAccounts
+  });
 
   return (
     <>
@@ -54,10 +70,13 @@ export default async function WorkspaceLayout({
         displayName={viewer.displayName}
       />
       <AppFrame
+        viewerId={viewer.id}
         guideState={onboardingState.productGuideStateJson}
         hasActiveWorkspace={hasActiveWorkspace}
+        hasEverCreatedWorkspace={hasEverCreatedWorkspace}
         notifications={notifications}
         onboardingComplete={isOnboardingComplete}
+        sidebarMilestones={sidebarMilestones}
         workspaceNavItems={dealAggregates.map((aggregate) => {
           const labels = getDisplayDealLabels(aggregate.deal);
 

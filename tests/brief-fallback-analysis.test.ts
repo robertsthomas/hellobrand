@@ -46,4 +46,39 @@ describe("brief fallback analysis", () => {
     expect(result.summary.body).toContain("Stories with Alexa");
     expect(result.summary.body).toContain("Key messaging includes");
   });
+
+  test("skips generic brief headings and uses the first real brand line", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Campaign Brief
+NimbusPM
+Summer Push
+Overview: Create content for the NimbusPM summer push.
+`,
+      {
+        fileName: "campaign_brief_nimbuspm.pdf"
+      }
+    );
+
+    expect(result.extraction.data.brandName).toBe("NimbusPM");
+    expect(result.extraction.data.campaignName).toBe("Summer Push");
+  });
+
+  test("does not treat usage-rights headings as brand or campaign names", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Brand Usage Rights
+Campaign Overview
+NimbusPM
+Summer Push
+Overview: Create content for the NimbusPM summer push.
+`,
+      {
+        fileName: "nimbuspm_brief.pdf"
+      }
+    );
+
+    expect(result.extraction.data.brandName).toBe("NimbusPM");
+    expect(result.extraction.data.campaignName).toBe("Summer Push");
+  });
 });

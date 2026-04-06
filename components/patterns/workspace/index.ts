@@ -1,0 +1,1 @@
+export { WorkspaceDetailHeader } from "./WorkspaceDetailHeader";

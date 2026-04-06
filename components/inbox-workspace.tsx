@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import {
   AlertTriangle,
+  ArrowUpDown,
   ArrowLeft,
-  Check,
   ChevronDown,
   CircleDot,
   File,
@@ -18,6 +18,7 @@ import {
   Inbox,
   Info,
   LoaderCircle,
+  SlidersHorizontal,
   MoreHorizontal,
   Paperclip,
   Plus,
@@ -30,6 +31,11 @@ import {
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
+import { InboxActionItemRow } from "@/components/inbox-action-item-row";
+import { InboxFilterDialog } from "@/components/inbox-filter-dialog";
+import { InboxPrivateNotesDialog } from "@/components/inbox-private-notes-dialog";
+import { InboxSelect } from "@/components/inbox-select";
+import { InboxSortDialog } from "@/components/inbox-sort-dialog";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
@@ -63,6 +69,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { normalizeInboxSort, sortInboxThreadItems, type InboxSortOption } from "@/lib/email/inbox-sort";
 import { buildReplySuggestionThreadVersion } from "@/lib/email/reply-suggestion-version";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,6 +138,47 @@ function workflowBadgeClass(state: EmailThreadWorkflowState) {
     default:
       return "bg-secondary/40 text-muted-foreground";
   }
+}
+
+function inboxSortLabel(sort: InboxSortOption) {
+  switch (sort) {
+    case "oldest":
+      return "Oldest first";
+    case "subject":
+      return "Subject A-Z";
+    case "newest":
+    default:
+      return "Newest first";
+  }
+}
+
+function buildActionItemReplyPrompt(item: EmailActionItemRecord) {
+  const contextLines = [
+    `Draft an email reply that addresses this action item: ${item.action}.`,
+    item.dueDate ? `Target due date: ${formatDate(item.dueDate)}.` : null,
+    item.sourceText ? `Relevant email context: "${item.sourceText}".` : null,
+    `Use the linked workspace context for tone and facts, answer the request directly, and do not invent missing details.`
+  ].filter(Boolean);
+
+  return contextLines.join(" ");
+}
+
+function isLegacyThreadSummary(value: string | null | undefined) {
+  const summary = value?.trim();
+  if (!summary) {
+    return false;
+  }
+
+  if (summary.length > 700) {
+    return true;
+  }
+
+  return [
+    "what they are asking you to do",
+    "what the other side is committing",
+    "unresolved or not specified in the thread",
+    "suggested next steps for you"
+  ].some((marker) => summary.toLowerCase().includes(marker));
 }
 
 function threadSearchText(item: EmailThreadListItem) {
@@ -376,7 +424,7 @@ const DRAFT_REFINEMENT_OPTIONS = {
 const DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY =
   "hellobrand:inbox:draft-prompt-suggestions";
 const THREAD_ACTION_BUTTON_CLASS =
-  "inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap border border-black/10 px-3.5 text-[12px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60";
 const INBOX_SIGNATURE_BANNER_DISMISS_KEY =
   "hellobrand:inbox:signature-banner:dismissed";
 
@@ -446,39 +494,6 @@ function replyStyleLabel(stance: NegotiationStance) {
     default:
       return "Balanced";
   }
-}
-
-function InboxSelect({
-  value,
-  onChange,
-  children,
-  className = ""
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`relative min-w-0 ${className}`}>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        className="h-11 w-full appearance-none border border-border bg-white px-4 pr-12 text-[13px] text-foreground outline-none transition focus:border-primary"
-        style={{
-          appearance: "none",
-          WebkitAppearance: "none",
-          MozAppearance: "none",
-          backgroundImage: "none"
-        }}
-      >
-        {children}
-      </select>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-11 items-center justify-center border-l border-border/80">
-        <span className="h-0 w-0 border-x-[5px] border-x-transparent border-t-[6px] border-t-muted-foreground" />
-      </div>
-    </div>
-  );
 }
 
 function participantLabel(participant: EmailParticipant | null | undefined) {
@@ -903,78 +918,6 @@ function MessageStrip({
   );
 }
 
-function ActionItemRow({ item }: { item: EmailActionItemRecord }) {
-  const [status, setStatus] = useState(item.status);
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  async function updateStatus(newStatus: "completed" | "dismissed") {
-    setIsUpdating(true);
-    try {
-      const response = await fetch(`/api/email/action-items/${item.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (response.ok) {
-        setStatus(newStatus);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setIsUpdating(false);
-    }
-  }
-
-  if (status !== "pending") {
-    return null;
-  }
-
-  return (
-    <div className="flex items-start gap-3 border-l-2 border-[#b42318]/30 pl-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-semibold text-foreground">{item.action}</p>
-        {item.dueDate ? (
-          <p className="mt-1 text-[11px] text-[#b42318]">Due: {formatDate(item.dueDate)}</p>
-        ) : null}
-        {item.sourceText ? (
-          <p className="mt-1 text-[11px] italic text-muted-foreground">
-            &ldquo;{item.sourceText}&rdquo;
-          </p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <span className={`px-2 py-0.5 text-[9px] font-medium uppercase ${
-          item.urgency === "high"
-            ? "bg-[#fecaca] text-[#991b1b]"
-            : item.urgency === "medium"
-            ? "bg-[#fef3c7] text-[#92400e]"
-            : "bg-[#e0e7ff] text-[#3730a3]"
-        }`}>
-          {item.urgency}
-        </span>
-        <button
-          type="button"
-          onClick={() => void updateStatus("completed")}
-          disabled={isUpdating}
-          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground transition hover:text-[#16a34a] disabled:opacity-50"
-          aria-label="Complete"
-        >
-          <Check className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => void updateStatus("dismissed")}
-          disabled={isUpdating}
-          className="inline-flex h-6 w-6 items-center justify-center text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-          aria-label="Dismiss"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function InboxWorkspace({
   threads,
   selectedThread: initialSelectedThread,
@@ -1002,6 +945,7 @@ export function InboxWorkspace({
     accountId: string;
     dealId: string;
     workflowState: string;
+    sort: InboxSortOption;
   };
 }) {
   const router = useRouter();
@@ -1011,6 +955,12 @@ export function InboxWorkspace({
   const promptActionControlRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [isSortDialogOpen, setIsSortDialogOpen] = useState(false);
+  const [draftProviderFilter, setDraftProviderFilter] = useState(selectedFilters.provider);
+  const [draftDealFilter, setDraftDealFilter] = useState(selectedFilters.dealId);
+  const [draftWorkflowFilter, setDraftWorkflowFilter] = useState(selectedFilters.workflowState);
+  const [draftSort, setDraftSort] = useState<InboxSortOption>(selectedFilters.sort);
   const [isManualAddModalOpen, setIsManualAddModalOpen] = useState(false);
   const [manualAddDealId, setManualAddDealId] = useState(selectedFilters.dealId);
   const [manualAddQuery, setManualAddQuery] = useState("");
@@ -1021,6 +971,7 @@ export function InboxWorkspace({
   const [isManualAddCreatingWorkspace, setIsManualAddCreatingWorkspace] = useState(false);
   const [isReplySignatureBannerVisible, setIsReplySignatureBannerVisible] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(!!initialSelectedThread);
   const [noteBody, setNoteBody] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -1149,8 +1100,32 @@ export function InboxWorkspace({
   useEffect(() => {
     setErrorMessage(null);
     setIsActionMenuOpen(false);
+    setIsNotesDialogOpen(false);
     setNoteBody("");
   }, [selectedThread]);
+
+  useEffect(() => {
+    if (!isFilterDialogOpen) {
+      return;
+    }
+
+    setDraftProviderFilter(selectedFilters.provider);
+    setDraftDealFilter(selectedFilters.dealId);
+    setDraftWorkflowFilter(selectedFilters.workflowState);
+  }, [
+    isFilterDialogOpen,
+    selectedFilters.dealId,
+    selectedFilters.provider,
+    selectedFilters.workflowState
+  ]);
+
+  useEffect(() => {
+    if (!isSortDialogOpen) {
+      return;
+    }
+
+    setDraftSort(selectedFilters.sort);
+  }, [isSortDialogOpen, selectedFilters.sort]);
 
   useEffect(() => {
     if (!isManualAddModalOpen) {
@@ -1252,12 +1227,17 @@ export function InboxWorkspace({
   const hasLinkedThreads = threads.length > 0;
   const normalizedQuery = query.trim().toLowerCase();
   const filteredThreads = useMemo(() => {
-    if (!normalizedQuery) {
-      return threads;
-    }
+    const nextThreads = normalizedQuery
+      ? threads.filter((item) => threadSearchText(item).includes(normalizedQuery))
+      : threads;
 
-    return threads.filter((item) => threadSearchText(item).includes(normalizedQuery));
-  }, [normalizedQuery, threads]);
+    return sortInboxThreadItems(nextThreads, normalizeInboxSort(selectedFilters.sort));
+  }, [normalizedQuery, selectedFilters.sort, threads]);
+  const activeFilterCount = [
+    selectedFilters.provider,
+    selectedFilters.dealId,
+    selectedFilters.workflowState
+  ].filter(Boolean).length;
   const selectedThreadDeals = useMemo(() => {
     const byId = new Map(deals.map((deal) => [deal.id, deal]));
     return selectedThread
@@ -1392,6 +1372,7 @@ export function InboxWorkspace({
   );
   const canAttachInvoice =
     Boolean(selectedThreadInvoiceAttachment) && selectedThreadInvoiceAttachment?.status !== "voided";
+  const hasThreadSummary = Boolean(summary?.trim()) && !isLegacyThreadSummary(summary);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1468,6 +1449,14 @@ export function InboxWorkspace({
     await saveDraft("ready");
     router.refresh();
   }, [router, saveDraft]);
+
+  const generateReplyFromActionItem = useCallback(
+    async (item: EmailActionItemRecord) => {
+      await runPromptForDraft(buildActionItemReplyPrompt(item));
+      replyBodyRef.current?.focus();
+    },
+    [replyBodyRef, runPromptForDraft]
+  );
 
   const savePrivateNote = useCallback(async () => {
     if (!selectedThread || !noteBody.trim()) {
@@ -1947,6 +1936,30 @@ export function InboxWorkspace({
     router.push(buildInboxUrl({ ...next, thread: next.thread ?? selectedThreadId }));
   }
 
+  function applyDialogFilters() {
+    setIsFilterDialogOpen(false);
+    applyFilters({
+      provider: draftProviderFilter,
+      dealId: draftDealFilter,
+      workflowState: draftWorkflowFilter,
+      thread: ""
+    });
+  }
+
+  function clearDialogFilters() {
+    setDraftProviderFilter("");
+    setDraftDealFilter("");
+    setDraftWorkflowFilter("");
+  }
+
+  function applyDialogSort() {
+    setIsSortDialogOpen(false);
+    applyFilters({
+      sort: draftSort,
+      thread: ""
+    });
+  }
+
   async function loadThread(threadId: string) {
     if (!threadId || threadId === selectedThreadId) {
       setMobileDetailOpen(true);
@@ -1999,17 +2012,19 @@ export function InboxWorkspace({
       <div className="flex h-full min-h-0 flex-col overflow-hidden px-5 py-4 lg:px-8 lg:py-5">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-[1520px] flex-col gap-4">
           <div className="border-b border-black/8 pb-4 dark:border-white/10">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <h1 className="text-[31px] font-semibold tracking-[-0.05em] text-foreground lg:text-[36px]">
-                  Inbox
-                </h1>
-               
-              </div>
-
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-end justify-end gap-3">
+              <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:items-center">
+                <div className="w-full max-w-sm sm:w-[20rem]">
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    placeholder="Search linked emails"
+                    aria-label="Search linked emails"
+                    className="h-9 rounded-none border-black/10 bg-white text-[12px] shadow-none dark:border-white/10 dark:bg-[#161a1f]"
+                  />
+                </div>
                 {hasConnectedAccounts && hasLinkedThreads ? (
-                  <>
+                  <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
                     <AppTooltip
                       content="Find emails"
                       sideOffset={8}
@@ -2019,7 +2034,7 @@ export function InboxWorkspace({
                         onClick={() => void discoverCandidates()}
                         disabled={isDiscovering}
                         aria-label={isDiscovering ? "Finding emails" : "Find emails"}
-                        className="inline-flex h-11 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
+                        className="inline-flex h-9 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
                       >
                         <MailSearch
                           strokeWidth={1.5}
@@ -2035,17 +2050,8 @@ export function InboxWorkspace({
                       <Plus className="h-4 w-4 shrink-0" />
                       Add threads
                     </button>
-                  </>
+                  </div>
                 ) : null}
-                <div className="w-full max-w-sm">
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.currentTarget.value)}
-                    placeholder="Search linked emails"
-                    aria-label="Search linked emails"
-                    className="h-11 rounded-none border-black/10 bg-white text-[13px] shadow-none dark:border-white/10 dark:bg-[#161a1f]"
-                  />
-                </div>
               </div>
             </div>
           </div>
@@ -2116,56 +2122,34 @@ export function InboxWorkspace({
             <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
               <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${mobileDetailOpen ? "hidden xl:flex" : ""}`}>
                 <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-[17px] font-semibold text-foreground">Inbox</h2>
-                    <span className="bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-1 flex-wrap gap-2 sm:gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsFilterDialogOpen(true)}
+                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 sm:flex-none"
+                      >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span>Filters</span>
+                        {activeFilterCount > 0 ? (
+                          <span className="border border-black/10 px-2 py-0.5 text-[11px] text-muted-foreground">
+                            {activeFilterCount}
+                          </span>
+                        ) : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsSortDialogOpen(true)}
+                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 sm:flex-none"
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                        <span>{inboxSortLabel(selectedFilters.sort)}</span>
+                      </button>
+                    </div>
+                    <span className="shrink-0 bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
                       {filteredThreads.length}
                     </span>
                   </div>
-
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                    }}
-                    className="mt-4 grid gap-3 sm:grid-cols-3"
-                  >
-                    <InboxSelect
-                      value={selectedFilters.provider}
-                      onChange={(value) => applyFilters({ provider: value, thread: "" })}
-                    >
-                      <option value="">All providers</option>
-                      <option value="gmail" disabled={!connectedProviders.includes("gmail")}>Gmail</option>
-                      <option value="outlook" disabled={!connectedProviders.includes("outlook")}>Outlook</option>
-                      <option value="yahoo" disabled={!connectedProviders.includes("yahoo")}>Yahoo</option>
-                    </InboxSelect>
-                    <InboxSelect
-                      value={selectedFilters.dealId}
-                      onChange={(value) => applyFilters({ dealId: value, thread: "" })}
-                    >
-                      <option value="">All partnerships</option>
-                      {deals.map((deal) => {
-                        const labels = getDisplayDealLabels(deal);
-
-                        return (
-                          <option key={deal.id} value={deal.id}>
-                            {labels.campaignName ?? deal.campaignName}
-                          </option>
-                        );
-                      })}
-                    </InboxSelect>
-                    <InboxSelect
-                      value={selectedFilters.workflowState}
-                      onChange={(value) => applyFilters({ workflowState: value, thread: "" })}
-                    >
-                      <option value="">All states</option>
-                      <option value="unlinked">Needs linking</option>
-                      <option value="needs_review">Needs review</option>
-                      <option value="needs_reply">Needs reply</option>
-                      <option value="draft_ready">Draft ready</option>
-                      <option value="waiting_on_them">Waiting</option>
-                      <option value="closed">Closed</option>
-                    </InboxSelect>
-                  </form>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-transparent">
@@ -2326,12 +2310,21 @@ export function InboxWorkspace({
                                   type="button"
                                   onClick={() => {
                                     setIsActionMenuOpen(false);
+                                    if (hasThreadSummary) {
+                                      setSummaryDialogOpen(true);
+                                      return;
+                                    }
+
                                     void summarizeThread();
                                   }}
-                                  disabled={isSummarizing}
+                                  disabled={isSummarizing && !hasThreadSummary}
                                   className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                {isSummarizing ? "Summarizing..." : "Generate summary"}
+                                {isSummarizing && !hasThreadSummary
+                                  ? "Summarizing..."
+                                  : hasThreadSummary
+                                    ? "View summary"
+                                    : "Generate summary"}
                               </button>
                               <div className="border-b border-black/6 pb-1 mb-1">
                                 <p className="px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -2354,14 +2347,25 @@ export function InboxWorkspace({
                                   ))}
                                 </div>
                               </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    setLinkModalOpen(true);
-                                  }}
-                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
-                                >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsActionMenuOpen(false);
+                                  setIsNotesDialogOpen(true);
+                                }}
+                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
+                              >
+                                Private notes
+                                {selectedThread.noteCount > 0 ? ` (${selectedThread.noteCount})` : ""}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsActionMenuOpen(false);
+                                  setLinkModalOpen(true);
+                                }}
+                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
+                              >
                                 Link partnership
                               </button>
                               <div className="border-t border-black/6 pt-1 mt-1">
@@ -2564,7 +2568,14 @@ export function InboxWorkspace({
                                   </CollapsibleTrigger>
                                   <CollapsibleContent className="mt-2 space-y-2">
                                     {selectedThread.actionItems.map((item) => (
-                                      <ActionItemRow key={item.id} item={item} />
+                                      <InboxActionItemRow
+                                        key={item.id}
+                                        item={item}
+                                        onGenerateReply={(actionItem) => {
+                                          void generateReplyFromActionItem(actionItem);
+                                        }}
+                                        isGeneratingReply={isDrafting}
+                                      />
                                     ))}
                                   </CollapsibleContent>
                                 </section>
@@ -2660,55 +2671,6 @@ export function InboxWorkspace({
                                 ) : null}
                               </section>
                             ) : null}
-
-                            <section className="border border-black/6 px-4 py-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                  Private notes
-                                </p>
-                                {selectedThread.noteCount > 0 ? (
-                                  <span className="text-[11px] text-muted-foreground">
-                                    {selectedThread.noteCount}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className="mt-3 space-y-3">
-                                {selectedThread.notes.length > 0 ? (
-                                  <div className="space-y-2">
-                                    {selectedThread.notes.map((note) => (
-                                      <div key={note.id} className="border-l-2 border-black/8 pl-3">
-                                        <p className="text-[12px] text-foreground">{note.body}</p>
-                                        <p className="mt-1 text-[11px] text-muted-foreground">
-                                          {formatDate(note.createdAt)}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-[12px] text-muted-foreground">
-                                    No private notes yet.
-                                  </p>
-                                )}
-                                <div className="space-y-2 border-t border-black/6 pt-3">
-                                  <Textarea
-                                    value={noteBody}
-                                    onChange={(event) => setNoteBody(event.currentTarget.value)}
-                                    placeholder="Capture guidance, risks, or follow-up notes for yourself..."
-                                    className="min-h-[88px] rounded-none border-black/10 bg-white text-[12px] shadow-none"
-                                  />
-                                  <div className="flex justify-end">
-                                    <button
-                                      type="button"
-                                      onClick={() => void savePrivateNote()}
-                                      disabled={!noteBody.trim() || isSavingNote}
-                                      className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
-                                    >
-                                      {isSavingNote ? "Saving..." : "Save note"}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            </section>
 
                             {earlierMessages.length > 0 ? (
                               <section className="space-y-3">
@@ -3343,6 +3305,29 @@ export function InboxWorkspace({
         </div>
       ) : null}
 
+      <InboxFilterDialog
+        open={isFilterDialogOpen}
+        onOpenChange={setIsFilterDialogOpen}
+        draftProviderFilter={draftProviderFilter}
+        setDraftProviderFilter={setDraftProviderFilter}
+        draftDealFilter={draftDealFilter}
+        setDraftDealFilter={setDraftDealFilter}
+        draftWorkflowFilter={draftWorkflowFilter}
+        setDraftWorkflowFilter={setDraftWorkflowFilter}
+        connectedProviders={connectedProviders}
+        deals={deals}
+        onClear={clearDialogFilters}
+        onApply={applyDialogFilters}
+      />
+
+      <InboxSortDialog
+        open={isSortDialogOpen}
+        onOpenChange={setIsSortDialogOpen}
+        draftSort={draftSort}
+        setDraftSort={setDraftSort}
+        onApply={applyDialogSort}
+      />
+
       {isDiscovering ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-sm border border-black/8 bg-white px-6 py-5 shadow-2xl">
@@ -3429,11 +3414,11 @@ export function InboxWorkspace({
                 </p>
               ) : null}
 
-              <div className="flex items-center justify-end gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setLinkModalOpen(false)}
-                  className="h-11 border border-black/10 px-4 text-sm font-semibold text-foreground transition hover:border-black/20"
+                  className="h-9 w-full border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 sm:w-auto"
                 >
                   Cancel
                 </button>
@@ -3441,7 +3426,7 @@ export function InboxWorkspace({
                   type="button"
                   onClick={() => void linkSelectedDeal()}
                   disabled={!selectedDealId || isLinking || linkableDeals.length === 0}
-                  className="h-11 border border-black/10 px-4 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="h-9 w-full border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {isLinking
                     ? "Updating..."
@@ -3456,6 +3441,18 @@ export function InboxWorkspace({
           </div>
         </div>
       ) : null}
+
+      <InboxPrivateNotesDialog
+        open={Boolean(selectedThread && isNotesDialogOpen)}
+        onOpenChange={setIsNotesDialogOpen}
+        selectedThread={selectedThread}
+        noteBody={noteBody}
+        setNoteBody={setNoteBody}
+        isSavingNote={isSavingNote}
+        onSave={() => {
+          void savePrivateNote();
+        }}
+      />
 
       <Dialog
         open={isManualAddModalOpen}
@@ -3500,7 +3497,7 @@ export function InboxWorkspace({
                 onChange={(event) => setManualAddQuery(event.currentTarget.value)}
                 placeholder="Search synced emails"
                 aria-label="Search synced emails"
-                className="h-11 w-full min-w-0 rounded-none border-black/10 bg-white shadow-none"
+                className="h-9 w-full min-w-0 rounded-none border-black/10 bg-white text-[12px] shadow-none"
               />
             </div>
 

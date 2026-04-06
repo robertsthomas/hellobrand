@@ -6,13 +6,15 @@ declare global {
 }
 
 function createPrismaClient() {
+  const databaseUrl = buildDatabaseUrl();
+
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-    ...(process.env.DATABASE_URL
+    ...(databaseUrl
       ? {
           datasources: {
             db: {
-              url: buildDatabaseUrl()
+              url: databaseUrl
             }
           }
         }
@@ -35,7 +37,7 @@ function buildDatabaseUrl() {
   if (!base) return undefined;
 
   // Keep Prisma conservative by default so Next dev/Turbopack workers do not
-  // exhaust Supabase's session-mode pooler.
+  // exhaust Supabase's session-mode pooler when the pooled URL is in use.
   const url = new URL(base);
   if (!url.searchParams.has("connection_limit")) {
     url.searchParams.set(

@@ -23,19 +23,18 @@ import {
   hasLlmKey
 } from "@/lib/analysis/llm";
 import {
-  extractContractWithLlamaExtract,
-  resolveContractLlamaExtractMode
-} from "@/lib/analysis/llamaextract";
+  getDocumentProcessingBackend,
+  sendDocumentProcessingMessage
+} from "@/lib/document-processing";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { generateEmailDraft } from "@/lib/email/generate";
-import { inngest } from "@/lib/inngest/client";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
 import {
   assertViewerWithinUsageLimit,
   recordViewerUsage
 } from "@/lib/billing/entitlements";
-import { sanitizePartyName } from "@/lib/party-labels";
+import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
@@ -146,6 +145,7 @@ function sanitizeCreatorExtractionResult(
 ): ReturnType<typeof mergeExtractionResults> {
   const brandName = sanitizePartyName(extraction.data.brandName, "brand");
   const agencyName = sanitizePartyName(extraction.data.agencyName, "agency");
+  const campaignName = sanitizeCampaignName(extraction.data.campaignName);
 
   return {
     ...extraction,
@@ -153,6 +153,7 @@ function sanitizeCreatorExtractionResult(
     data: {
       ...extraction.data,
       brandName,
+      campaignName,
       agencyName:
         agencyName &&
         (!brandName || agencyName.toLowerCase() !== brandName.toLowerCase())
@@ -169,17 +170,6 @@ function sanitizeCreatorExtractionResult(
     )
   };
 }
-
-const CONTRACT_SHADOW_DIFF_FIELDS = [
-  "paymentAmount",
-  "paymentTerms",
-  "deliverables",
-  "usageRights",
-  "usageRightsPaidAllowed",
-  "whitelistingAllowed",
-  "exclusivityApplies",
-  "termination"
-] as const;
 
 function finalizeDocumentExtraction(
   text: string,
@@ -204,29 +194,6 @@ function finalizeDocumentExtraction(
 
   return sanitizedExtraction;
 }
-
-function buildContractShadowDiff(
-  baseline: ExtractionPipelineResult["data"],
-  candidate: ExtractionPipelineResult["data"]
-) {
-  return CONTRACT_SHADOW_DIFF_FIELDS.flatMap((fieldPath) => {
-    const before = baseline[fieldPath];
-    const after = candidate[fieldPath];
-
-    if (JSON.stringify(before) === JSON.stringify(after)) {
-      return [];
-    }
-
-    return [
-      {
-        fieldPath,
-        before,
-        after
-      }
-    ];
-  });
-}
-
 async function hydrateProfileBackedCreatorName(
   viewer: Viewer,
   aggregate: DealAggregate
@@ -676,19 +643,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
   }
 
   try {
-    let cachedDocumentBuffer: Promise<Buffer> | null = null;
-    const getDocumentBuffer = async () => {
-      if (document.sourceType !== "file") {
-        return null;
-      }
-
-      if (!cachedDocumentBuffer) {
-        cachedDocumentBuffer = readStoredBytes(document.storagePath);
-      }
-
-      return cachedDocumentBuffer;
-    };
-
     const extractionSource = await runStage(
       document.dealId,
       document.id,
@@ -726,20 +680,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     });
     logStageDebug("classify_document ✓", { kind: classification.documentKind, confidence: classification.confidence });
 
-    const contractLlamaExtractMode = resolveContractLlamaExtractMode(
-      classification.documentKind,
-      document.sourceType
-    );
-
-    logDocumentPipeline("info", "llamaextract_mode_resolved", {
-      dealId: document.dealId,
-      documentId: document.id,
-      documentKind: classification.documentKind,
-      sourceType: document.sourceType,
-      mode: contractLlamaExtractMode,
-      hasParseJobId: Boolean(extractionSource._llama?.parseJobId)
-    });
-
     checkPipelineTimeout();
     const sections = await runStage(
       document.dealId,
@@ -762,7 +702,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     logStageDebug("section_document ✓", { sectionCount: sections.length });
 
     const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
-    const llamaExtractFallbackTerms = createEmptyTerms(aggregate.deal);
 
     async function runLegacySectionExtraction() {
       const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
@@ -809,55 +748,11 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
     }
 
     checkPipelineTimeout();
-    let extractionRoute = "legacy";
-    let llamaExtractInputSource: "parse_job" | "file_upload" | null = null;
     const partialExtractions = await runStage(
       document.dealId,
       document.id,
       "extract_fields",
-      async () => {
-        if (contractLlamaExtractMode !== "primary") {
-          return runLegacySectionExtraction();
-        }
-
-        try {
-          const llamaExtract = await extractContractWithLlamaExtract({
-            document,
-            fallbackData: llamaExtractFallbackTerms,
-            parseJobId: extractionSource._llama?.parseJobId ?? null,
-            projectId: extractionSource._llama?.projectId ?? null,
-            buffer: extractionSource._llama?.parseJobId
-              ? null
-              : await getDocumentBuffer()
-          });
-          extractionRoute = "llamaextract_primary";
-          llamaExtractInputSource = llamaExtract.inputSource;
-
-          logDocumentPipeline("info", "llamaextract_primary_complete", {
-            dealId: document.dealId,
-            documentId: document.id,
-            fileName: document.fileName,
-            inputSource: llamaExtract.inputSource,
-            projectId: llamaExtract.projectId,
-            parseJobId: extractionSource._llama?.parseJobId ?? null
-          });
-
-          return [llamaExtract.extraction];
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "LlamaExtract primary extraction failed.";
-          extractionRoute = "llamaextract_primary_fallback";
-
-          logDocumentPipeline("error", "llamaextract_primary_failed", {
-            dealId: document.dealId,
-            documentId: document.id,
-            fileName: document.fileName,
-            error: message
-          });
-
-          return runLegacySectionExtraction();
-        }
-      }
+      async () => runLegacySectionExtraction()
     );
 
     logDocumentPipeline("info", "field_extraction_complete", {
@@ -866,27 +761,14 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       fileName: document.fileName,
       sectionCount: sections.length,
       extractionCount: partialExtractions.length,
-      usedLlm:
-        extractionRoute === "legacy" || extractionRoute === "llamaextract_primary_fallback"
-          ? hasLlmKey()
-          : true,
-      extractionRoute,
-      llamaExtractInputSource
+      usedLlm: hasLlmKey(),
+      extractionRoute: "legacy"
     });
     logStageDebug("extract_fields ✓", {
       extractionCount: partialExtractions.length,
-      extractionRoute,
-      llamaExtractInputSource,
-      usedLlm:
-        extractionRoute === "legacy" || extractionRoute === "llamaextract_primary_fallback"
-          ? hasLlmKey()
-          : true,
-      model:
-        extractionRoute === "llamaextract_primary"
-          ? `llamaextract:${process.env.LLAMA_EXTRACT_TIER ?? "agentic"}`
-          : hasLlmKey()
-            ? getLlmRoute("extract_section").primary
-            : "heuristic"
+      extractionRoute: "legacy",
+      usedLlm: hasLlmKey(),
+      model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic"
     });
 
     checkPipelineTimeout();
@@ -917,50 +799,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       hasBrandName: Boolean(sanitizedExtraction.data.brandName),
       hasCampaignName: Boolean(sanitizedExtraction.data.campaignName)
     });
-
-    if (contractLlamaExtractMode === "shadow") {
-      try {
-        const shadowExtraction = await extractContractWithLlamaExtract({
-          document,
-          fallbackData: llamaExtractFallbackTerms,
-          parseJobId: extractionSource._llama?.parseJobId ?? null,
-          projectId: extractionSource._llama?.projectId ?? null,
-          buffer: extractionSource._llama?.parseJobId
-            ? null
-            : await getDocumentBuffer()
-        });
-        const finalizedShadowExtraction = finalizeDocumentExtraction(
-          extractionSource.normalizedText,
-          shadowExtraction.extraction,
-          preferredCreatorName
-        );
-        const diffs = buildContractShadowDiff(
-          sanitizedExtraction.data,
-          finalizedShadowExtraction.data
-        );
-
-        logDocumentPipeline("info", "llamaextract_shadow_complete", {
-          dealId: document.dealId,
-          documentId: document.id,
-          fileName: document.fileName,
-          inputSource: shadowExtraction.inputSource,
-          projectId: shadowExtraction.projectId,
-          parseJobId: extractionSource._llama?.parseJobId ?? null,
-          diffCount: diffs.length,
-          diffs
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "LlamaExtract shadow extraction failed.";
-
-        logDocumentPipeline("error", "llamaextract_shadow_failed", {
-          dealId: document.dealId,
-          documentId: document.id,
-          fileName: document.fileName,
-          error: message
-        });
-      }
-    }
 
     if (
       classification.documentKind === "campaign_brief" ||
@@ -1053,65 +891,6 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       brand: sanitizedExtraction.data.brandName
     });
 
-    checkPipelineTimeout();
-    const risks = await runStage(
-      document.dealId,
-      document.id,
-      "analyze_risks",
-      async () => {
-        const fallbackRisks = analyzeCreatorRisks(
-          extractionSource.normalizedText,
-          document.id,
-          sanitizedExtraction
-        );
-
-        if (!hasLlmKey()) {
-          return fallbackRisks;
-        }
-
-        try {
-          return await analyzeRisksWithLlm(
-            extractionSource.normalizedText,
-            classification.documentKind,
-            sanitizedExtraction,
-            fallbackRisks,
-            document.id
-          );
-        } catch {
-          return fallbackRisks;
-        }
-      }
-    );
-
-    await repository.replaceRiskFlagsForDocument(document.dealId, document.id, risks);
-    logStageDebug("analyze_risks ✓", { riskCount: risks.length, usedLlm: hasLlmKey(), model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic" });
-
-    checkPipelineTimeout();
-    const summary = await runStage(
-      document.dealId,
-      document.id,
-      "generate_summary",
-      async () => {
-        const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
-
-        if (!hasLlmKey()) {
-          return fallbackSummary;
-        }
-
-        try {
-          return await generateSummaryWithLlm(
-            sanitizedExtraction,
-            risks,
-            fallbackSummary
-          );
-        } catch {
-          return fallbackSummary;
-        }
-      }
-    );
-
-    await repository.saveSummary(document.dealId, document.id, summary);
-
     const latestAggregate =
       (await repository.getDealAggregate(viewer.id, document.dealId)) ?? aggregate;
     const isFirstDocument = latestAggregate.terms === null;
@@ -1138,15 +917,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
         await syncPaymentRecordForDeal(document.dealId, nextTerms);
       }
 
-      await repository.updateDocument(document.id, {
-        processingStatus: "ready",
-        rawText: extractionSource.rawText,
-        normalizedText: extractionSource.normalizedText,
-        errorMessage: null
-      });
-
       await repository.updateDeal(viewer.id, document.dealId, {
-        summary: summary.body,
         analyzedAt: new Date().toISOString(),
         nextDeliverableDate: earliestDeliverableDate(nextTerms),
         brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
@@ -1178,15 +949,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
           await syncPaymentRecordForDeal(document.dealId, nextTerms);
         }
 
-        await repository.updateDocument(document.id, {
-          processingStatus: "ready",
-          rawText: extractionSource.rawText,
-          normalizedText: extractionSource.normalizedText,
-          errorMessage: null
-        });
-
         await repository.updateDeal(viewer.id, document.dealId, {
-          summary: summary.body,
           analyzedAt: new Date().toISOString(),
           nextDeliverableDate: earliestDeliverableDate(existingTerms),
           brandName: existingTerms.brandName ?? latestAggregate.deal.brandName,
@@ -1207,26 +970,97 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
 
         await repository.savePendingExtraction(document.dealId, pendingData);
 
-        await repository.updateDocument(document.id, {
-          processingStatus: "ready",
-          rawText: extractionSource.rawText,
-          normalizedText: extractionSource.normalizedText,
-          errorMessage: null
-        });
-
         await repository.updateDeal(viewer.id, document.dealId, {
-          summary: summary.body,
           analyzedAt: new Date().toISOString()
         });
       }
     }
+
+    const risks = await runStage(
+      document.dealId,
+      document.id,
+      "analyze_risks",
+      async () => {
+        const fallbackRisks = analyzeCreatorRisks(
+          extractionSource.normalizedText,
+          document.id,
+          sanitizedExtraction
+        );
+
+        if (!hasLlmKey()) {
+          return fallbackRisks;
+        }
+
+        try {
+          return await analyzeRisksWithLlm(
+            extractionSource.normalizedText,
+            classification.documentKind,
+            sanitizedExtraction,
+            fallbackRisks,
+            document.id
+          );
+        } catch {
+          return fallbackRisks;
+        }
+      }
+    );
+
+    await repository.replaceRiskFlagsForDocument(
+      document.dealId,
+      document.id,
+      risks
+    );
+    logStageDebug("analyze_risks ✓", {
+      riskCount: risks.length,
+      usedLlm: hasLlmKey(),
+      model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic"
+    });
+
+    const summary = await runStage(
+      document.dealId,
+      document.id,
+      "generate_summary",
+      async () => {
+        const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
+
+        if (!hasLlmKey()) {
+          return fallbackSummary;
+        }
+
+        try {
+          return await generateSummaryWithLlm(
+            sanitizedExtraction,
+            risks,
+            fallbackSummary
+          );
+        } catch {
+          return fallbackSummary;
+        }
+      }
+    );
+
+    await repository.saveSummary(document.dealId, document.id, summary);
+    await repository.updateDeal(viewer.id, document.dealId, {
+      summary: summary.body,
+      analyzedAt: new Date().toISOString()
+    });
+    logStageDebug("generate_summary ✓", {
+      summaryLength: summary.body.length,
+      usedLlm: hasLlmKey()
+    });
+
+    await repository.updateDocument(document.id, {
+      processingStatus: "ready",
+      rawText: extractionSource.rawText,
+      normalizedText: extractionSource.normalizedText,
+      errorMessage: null
+    });
 
     if (process.env.DATABASE_URL) {
       await syncIntakeSessionForDealId(document.dealId);
     }
 
     const totalDurationMs = Date.now() - pipelineStartedAt;
-    logStageDebug("generate_summary ✓", { summaryLength: summary.body.length, usedLlm: hasLlmKey() });
     logStageDebug(`PIPELINE COMPLETE | total ${(totalDurationMs / 1000).toFixed(1)}s`);
 
     logDocumentPipeline("info", "pipeline_complete", {
@@ -1235,7 +1069,7 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       fileName: document.fileName,
       durationMs: totalDurationMs,
       riskCount: risks.length,
-      summaryLength: summary.body.length,
+      summaryLength: summary?.body.length ?? 0,
       deliverablesCount: sanitizedExtraction.data.deliverables?.length ?? 0
     });
 
@@ -1266,29 +1100,41 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
   }
 }
 
-function hasInngestEventKey() {
-  return Boolean(process.env.INNGEST_EVENT_KEY);
-}
-
 export async function enqueueDocumentProcessing(documentId: string) {
-  if (hasInngestEventKey()) {
+  const backend = getDocumentProcessingBackend();
+
+  if (backend === "vercel-queue") {
     try {
-      await inngest.send({
-        name: "documents/process.requested",
-        data: { documentId }
-      });
+      await sendDocumentProcessingMessage(documentId);
       logDocumentPipeline("info", "queue_enqueued", {
         documentId,
-        mode: "inngest"
+        mode: "queue"
       });
-      return { mode: "inngest" as const };
-    } catch {
+      return { mode: "queue" as const };
+    } catch (error) {
+      const repository = getRepository();
+      const document = await repository.getDocument(documentId);
+      const message =
+        error instanceof Error ? error.message : "Unable to queue document processing.";
+
+      if (document) {
+        await repository.updateDocument(document.id, {
+          processingStatus: "failed",
+          errorMessage: `queue: ${message}`
+        });
+
+        if (process.env.DATABASE_URL) {
+          await syncIntakeSessionForDealId(document.dealId);
+        }
+      }
+
       logDocumentPipeline("error", "queue_failed", {
         documentId,
-        mode: "inngest",
-        fallbackMode: "local"
+        mode: "queue",
+        error: message
       });
-      return { mode: "local" as const };
+
+      return { mode: "failed" as const };
     }
   }
 

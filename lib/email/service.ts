@@ -26,10 +26,10 @@ import { extractActionItemsFromMessage } from "@/lib/email/action-items";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { buildGoogleAuthUrl, exchangeGoogleCode, fetchGmailAttachment, fetchGmailThreadsByIds, getGoogleProfile, listGmailHistoryThreadIds, listRecentGmailThreads, refreshGoogleAccessToken, registerGmailWatch, sendGmailThreadReply } from "@/lib/email/providers/gmail";
 import { buildOutlookAuthUrl, createOutlookSubscription, exchangeOutlookCode, fetchOutlookAttachment, fetchOutlookMessage, fetchOutlookThreadsByConversationIds, getOutlookProfile, listRecentOutlookThreads, refreshOutlookAccessToken, renewOutlookSubscription, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
-import { fetchYahooAttachment, listRecentYahooThreads, listYahooThreadsSinceCursor, sendYahooThreadReply, verifyYahooMailboxAccess } from "@/lib/email/providers/yahoo";
+import { buildYahooAuthUrl, exchangeYahooCode, fetchYahooAttachment, getYahooProfile, listRecentYahooThreads, listYahooThreadsSinceCursor, refreshYahooAccessToken, sendYahooThreadReply, verifyYahooMailboxAccess } from "@/lib/email/providers/yahoo";
 import type { ProviderThreadPayload } from "@/lib/email/providers/types";
 import { parseOAuthState } from "@/lib/email/oauth-state";
-import { hasProviderConfig, resolveEmailAppBaseUrl } from "@/lib/email/config";
+import { hasProviderConfig, resolveEmailAppBaseUrl, yahooScopes } from "@/lib/email/config";
 import {
   assertViewerHasFeature
 } from "@/lib/billing/entitlements";
@@ -96,6 +96,8 @@ const YAHOO_POLL_INTERVAL_MS = 15 * 60 * 1000;
 const EMAIL_DISCOVERY_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 const EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT = 25;
 const OUTLOOK_WEBHOOK_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
+const EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW = "5s";
+const EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE = 5;
 const DEFAULT_TRANSACTIONAL_MAILBOX_SENDER = "onboarding@resend.dev";
 const HELLOBRAND_TRANSACTIONAL_MARKERS = [
   "you're receiving this because you have email notifications enabled in hellobrand",
@@ -302,6 +304,147 @@ function compareHistoryIds(left: string, right: string) {
   }
 }
 
+export type IncrementalEmailSyncRequest = {
+  accountId: string;
+  gmailHistoryId?: string | null;
+  outlookMessageIds?: string[];
+};
+
+export function coalesceIncrementalEmailSyncRequests(
+  requests: IncrementalEmailSyncRequest[]
+) {
+  const accountId = String(requests[0]?.accountId ?? "");
+  const filtered = requests.filter((request) => String(request.accountId) === accountId);
+
+  let gmailHistoryId: string | null = null;
+  for (const request of filtered) {
+    const candidate =
+      typeof request.gmailHistoryId === "string" && request.gmailHistoryId.trim().length > 0
+        ? request.gmailHistoryId.trim()
+        : null;
+
+    if (!candidate) {
+      continue;
+    }
+
+    if (!gmailHistoryId || compareHistoryIds(candidate, gmailHistoryId) > 0) {
+      gmailHistoryId = candidate;
+    }
+  }
+
+  const outlookMessageIds = [
+    ...new Set(
+      filtered.flatMap((request) =>
+        Array.isArray(request.outlookMessageIds)
+          ? request.outlookMessageIds.filter(
+              (messageId): messageId is string =>
+                typeof messageId === "string" && messageId.trim().length > 0
+            )
+          : []
+      )
+    )
+  ];
+
+  return {
+    accountId,
+    gmailHistoryId,
+    outlookMessageIds,
+    batchSize: filtered.length
+  };
+}
+
+export function getIncrementalEmailSyncBatchConfig(): {
+  maxSize: number;
+  timeout: typeof EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW;
+} {
+  return {
+    maxSize: EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE,
+    timeout: EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW
+  };
+}
+
+export async function runIncrementalEmailSync(
+  requests: IncrementalEmailSyncRequest[]
+) {
+  const merged = coalesceIncrementalEmailSyncRequests(requests);
+  if (!merged.accountId) {
+    throw new Error("Missing accountId.");
+  }
+
+  const account = await getConnectedEmailAccount(merged.accountId);
+  if (!account || account.status === "disconnected") {
+    return {
+      ok: true,
+      accountId: merged.accountId,
+      status: "skipped" as const,
+      reason: "account_unavailable" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  const syncState = await getEmailSyncState(account.id);
+
+  if (
+    account.provider === "gmail" &&
+    merged.gmailHistoryId &&
+    syncState?.lastHistoryId &&
+    compareHistoryIds(merged.gmailHistoryId, syncState.lastHistoryId) <= 0
+  ) {
+    return {
+      ok: true,
+      accountId: account.id,
+      status: "skipped" as const,
+      reason: "stale_history_id" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  let outlookMessageIds = merged.outlookMessageIds;
+  if (account.provider === "outlook" && outlookMessageIds.length > 0) {
+    const existingMessageIds = new Set(
+      await listExistingEmailMessageProviderIdsForAccount(account.id, outlookMessageIds)
+    );
+    outlookMessageIds = outlookMessageIds.filter(
+      (messageId) => !existingMessageIds.has(messageId)
+    );
+
+    if (outlookMessageIds.length === 0) {
+      return {
+        ok: true,
+        accountId: account.id,
+        status: "skipped" as const,
+        reason: "known_message_ids" as const,
+        batchSize: merged.batchSize
+      };
+    }
+  }
+
+  const syncedAccount = await syncEmailAccount(account.id, {
+    mode: "incremental",
+    gmailHistoryId: merged.gmailHistoryId,
+    outlookMessageIds
+  });
+
+  if (syncedAccount?.status === "syncing") {
+    return {
+      ok: true,
+      accountId: account.id,
+      status: "skipped" as const,
+      reason: "sync_in_progress" as const,
+      batchSize: merged.batchSize
+    };
+  }
+
+  return {
+    ok: true,
+    accountId: account.id,
+    status: "synced" as const,
+    batchSize: merged.batchSize,
+    gmailHistoryId: merged.gmailHistoryId,
+    outlookMessageCount: outlookMessageIds.length
+  };
+}
+
 async function assertPremiumInboxAccess(viewer: Viewer) {
   await assertViewerHasFeature(viewer, "premium_inbox");
 }
@@ -397,14 +540,18 @@ async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
         typeof data.recentLimit === "number" ? data.recentLimit : undefined
     });
   } else if (name === "email/account.incremental_sync.requested") {
-    await syncEmailAccount(String(data.accountId), {
-      mode: "incremental",
-      gmailHistoryId:
-        typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
-      outlookMessageIds: Array.isArray(data.outlookMessageIds)
-        ? data.outlookMessageIds.filter((entry): entry is string => typeof entry === "string")
-        : []
-    });
+    await runIncrementalEmailSync([
+      {
+        accountId: String(data.accountId),
+        gmailHistoryId:
+          typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
+        outlookMessageIds: Array.isArray(data.outlookMessageIds)
+          ? data.outlookMessageIds.filter(
+              (entry): entry is string => typeof entry === "string"
+            )
+          : []
+      }
+    ]);
   }
 
   return { mode: "local" as const };
@@ -414,21 +561,13 @@ async function ensureActiveEmailCredentials(account: ConnectedEmailAccountRecord
   const accessToken = decryptSecret(account.accessTokenEncrypted);
   const refreshToken = decryptSecret(account.refreshTokenEncrypted);
 
-  if (account.provider === "yahoo") {
-    if (!refreshToken) {
-      await updateConnectedEmailAccount(account.id, {
-        status: "reconnect_required",
-        lastErrorCode: "missing_yahoo_app_password",
-        lastErrorMessage: "Reconnect Yahoo with a fresh app password."
-      });
-      throw new Error("Reconnect required.");
-    }
-
-    return {
-      accessToken: null,
-      refreshToken,
-      mailPassword: refreshToken
-    };
+  if (account.provider === "yahoo" && account.scopes.length === 0) {
+    await updateConnectedEmailAccount(account.id, {
+      status: "reconnect_required",
+      lastErrorCode: "legacy_yahoo_app_password",
+      lastErrorMessage: "Reconnect Yahoo with Yahoo OAuth."
+    });
+    throw new Error("Reconnect required.");
   }
 
   const expiresAt = account.tokenExpiresAt ? new Date(account.tokenExpiresAt).getTime() : 0;
@@ -444,8 +583,12 @@ async function ensureActiveEmailCredentials(account: ConnectedEmailAccountRecord
   if (!refreshToken) {
     await updateConnectedEmailAccount(account.id, {
       status: "reconnect_required",
-      lastErrorCode: "missing_refresh_token",
-      lastErrorMessage: "Reconnect required."
+      lastErrorCode:
+        account.provider === "yahoo" ? "missing_yahoo_refresh_token" : "missing_refresh_token",
+      lastErrorMessage:
+        account.provider === "yahoo"
+          ? "Reconnect Yahoo with Yahoo OAuth."
+          : "Reconnect required."
     });
     throw new Error("Reconnect required.");
   }
@@ -453,7 +596,9 @@ async function ensureActiveEmailCredentials(account: ConnectedEmailAccountRecord
   const refreshed =
     account.provider === "gmail"
       ? await refreshGoogleAccessToken(refreshToken)
-      : await refreshOutlookAccessToken(refreshToken);
+      : account.provider === "outlook"
+        ? await refreshOutlookAccessToken(refreshToken)
+        : await refreshYahooAccessToken(refreshToken);
 
   const nextAccessToken = refreshed.access_token;
   const nextRefreshToken =
@@ -471,8 +616,7 @@ async function ensureActiveEmailCredentials(account: ConnectedEmailAccountRecord
 
   return {
     accessToken: decryptSecret(updated.accessTokenEncrypted),
-    refreshToken: decryptSecret(updated.refreshTokenEncrypted),
-    mailPassword: null
+    refreshToken: decryptSecret(updated.refreshTokenEncrypted)
   };
 }
 
@@ -970,19 +1114,19 @@ async function syncYahooAccount(
 
   try {
     const credentials = await ensureActiveEmailCredentials(account);
-    const mailPassword = credentials.mailPassword;
+    const yahooAccessToken = credentials.accessToken;
 
-    if (!mailPassword) {
-      throw new Error("Missing Yahoo app password.");
+    if (!yahooAccessToken) {
+      throw new Error("Missing Yahoo access token.");
     }
 
     const syncState = await getEmailSyncState(account.id);
     const result =
       mode === "initial" || !syncState?.providerCursor
-        ? await listRecentYahooThreads(account.emailAddress, mailPassword, recentLimit)
+        ? await listRecentYahooThreads(account.emailAddress, yahooAccessToken, recentLimit)
         : await listYahooThreadsSinceCursor(
             account.emailAddress,
-            mailPassword,
+            yahooAccessToken,
             syncState.providerCursor,
             Math.max(250, recentLimit)
           );
@@ -1229,7 +1373,6 @@ export async function sendEmailThreadReplyForViewer(
   const account = detail.account;
   const credentials = await ensureActiveEmailCredentials(account);
   const accessToken = credentials.accessToken ?? "";
-  const mailPassword = credentials.mailPassword ?? "";
   const normalizedSubject = input.subject.trim() || detail.thread.subject;
   const normalizedBody = input.body.trim();
 
@@ -1300,7 +1443,7 @@ export async function sendEmailThreadReplyForViewer(
               bytes
             }))
           })
-        : await sendYahooThreadReply(account.emailAddress, mailPassword, {
+        : await sendYahooThreadReply(account.emailAddress, accessToken, {
             threadId: detail.thread.providerThreadId,
             subject: normalizedSubject,
             body: normalizedBody,
@@ -1392,11 +1535,12 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
 
   const credentials = await ensureActiveEmailCredentials(attachment.account);
   const accessToken = credentials.accessToken;
-  const mailPassword = credentials.mailPassword;
 
   if (
-    (attachment.account.provider === "gmail" || attachment.account.provider === "outlook") &&
-    !accessToken
+    !accessToken &&
+    (attachment.account.provider === "gmail" ||
+      attachment.account.provider === "outlook" ||
+      attachment.account.provider === "yahoo")
   ) {
     throw new Error("Could not access the connected inbox.");
   }
@@ -1416,10 +1560,10 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
             attachment.providerMessageId,
             attachment.providerAttachmentId
           )
-        : attachment.account.provider === "yahoo" && mailPassword
+        : attachment.account.provider === "yahoo"
           ? await fetchYahooAttachment(
               attachment.account.emailAddress,
-              mailPassword,
+              providerAccessToken,
               attachment.providerMessageId,
               attachment.providerAttachmentId
             )
@@ -1744,6 +1888,33 @@ export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
   );
 }
 
+export async function createYahooConnectUrlForViewer(viewer: Viewer) {
+  await assertEmailConnectionsAccess(viewer);
+  if (!hasProviderConfig("yahoo")) {
+    throw new Error("Yahoo email is not configured.");
+  }
+
+  const { createOAuthState } = await import("@/lib/email/oauth-state");
+  const state = createOAuthState(viewer.id, "yahoo");
+  return buildYahooAuthUrl(state, parseOAuthState(state).nonce);
+}
+
+export async function createYahooConnectUrlForViewerWithReturnBaseUrl(
+  viewer: Viewer,
+  returnBaseUrl: string | null | undefined
+) {
+  await assertEmailConnectionsAccess(viewer);
+  if (!hasProviderConfig("yahoo")) {
+    throw new Error("Yahoo email is not configured.");
+  }
+
+  const { createOAuthState } = await import("@/lib/email/oauth-state");
+  const state = createOAuthState(viewer.id, "yahoo", {
+    returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+  });
+  return buildYahooAuthUrl(state, parseOAuthState(state).nonce);
+}
+
 export async function handleGoogleCallbackForViewer(
   viewer: Viewer,
   input: { code: string; state: string }
@@ -1815,22 +1986,33 @@ export async function handleOutlookCallbackForViewer(
   })}`;
 }
 
-export async function connectYahooAccountForViewer(
+export async function handleYahooCallbackForViewer(
   viewer: Viewer,
-  input: { emailAddress: string; appPassword: string }
+  input: { code: string; state: string }
 ) {
-  await assertEmailConnectionsAccess(viewer);
-  const verified = await verifyYahooMailboxAccess(input.emailAddress, input.appPassword);
+  const state = parseOAuthState(input.state);
+  if (state.userId !== viewer.id || state.provider !== "yahoo") {
+    throw new Error("Yahoo OAuth state did not match the current session.");
+  }
+
+  const tokens = await exchangeYahooCode(input.code);
+  if (!tokens.refresh_token) {
+    throw new Error("Yahoo token exchange did not return a refresh token.");
+  }
+
+  const profile = await getYahooProfile(tokens.access_token);
+  const grantedScopes = (tokens.scope ?? "").split(/[ ,]+/).filter(Boolean);
+  await verifyYahooMailboxAccess(profile.emailAddress, tokens.access_token);
   const account = await saveConnectedEmailAccount({
     userId: viewer.id,
     provider: "yahoo",
-    providerAccountId: verified.emailAddress,
-    emailAddress: verified.emailAddress,
-    displayName: verified.emailAddress.split("@")[0] || verified.emailAddress,
-    scopes: [],
-    accessTokenEncrypted: null,
-    refreshTokenEncrypted: encryptSecret(input.appPassword.trim()),
-    tokenExpiresAt: null,
+    providerAccountId: profile.providerAccountId,
+    emailAddress: profile.emailAddress,
+    displayName: profile.displayName,
+    scopes: grantedScopes.length > 0 ? grantedScopes : yahooScopes,
+    accessTokenEncrypted: encryptSecret(tokens.access_token),
+    refreshTokenEncrypted: encryptSecret(tokens.refresh_token),
+    tokenExpiresAt: tokenExpiresAt(tokens.expires_in),
     status: "syncing"
   });
 
@@ -1848,7 +2030,10 @@ export async function connectYahooAccountForViewer(
     recentLimit: 100
   });
 
-  return account;
+  return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
+    email_status: "connected",
+    email_provider: "yahoo"
+  })}`;
 }
 
 export async function handleGmailWebhookNotification(payload: {

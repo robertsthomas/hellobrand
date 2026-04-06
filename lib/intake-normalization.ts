@@ -14,7 +14,7 @@ import type {
   SummaryRecord
 } from "@/lib/types";
 import { stripInlineMarkdown, toPlainDealSummary } from "@/lib/deal-summary";
-import { sanitizePartyName } from "@/lib/party-labels";
+import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import {
   cleanWorkspaceFileName,
   deriveWorkspaceTitleFromFileNames,
@@ -109,6 +109,7 @@ function isGenericIntakeLabel(value: string | null | undefined) {
   }
 
   return (
+    sanitizeCampaignName(normalized) === null ||
     isGenericWorkspaceLabel(normalized) ||
     normalized === "pasted email thread" ||
     normalized === "pasted deliverables notes" ||
@@ -118,8 +119,17 @@ function isGenericIntakeLabel(value: string | null | undefined) {
     normalized === "pasted context" ||
     normalized === "email thread" ||
     normalized === "campaign brief" ||
+    normalized === "campaign" ||
+    normalized === "project" ||
+    normalized === "workspace" ||
+    normalized === "overview" ||
+    normalized === "concept" ||
     normalized === "contract" ||
     normalized === "context" ||
+    normalized === "influencer" ||
+    normalized === "creator" ||
+    normalized === "content creator" ||
+    normalized === "talent" ||
     normalized === "partnership"
   );
 }
@@ -212,6 +222,15 @@ function scoreContactLine(line: string) {
 function sanitizeContactName(value: string | null | undefined) {
   const normalized = presentText(value);
   if (!normalized) {
+    return null;
+  }
+
+  const lower = normalized.toLowerCase();
+  if (
+    /\b(manager|director|lead|specialist|executive|strategist|partnerships?|campaign|marketing|media|talent|agent|coordinator|producer|contact|email|phone|agency|brand|team)\b/.test(
+      lower
+    )
+  ) {
     return null;
   }
 
@@ -423,7 +442,7 @@ function inferBrandName(aggregate: DealAggregate) {
   }
 
   const termsBrand = sanitizePartyName(aggregate.terms?.brandName, "brand");
-  if (termsBrand && !/^client\b/i.test(termsBrand)) {
+  if (termsBrand && !/^client\b/i.test(termsBrand) && !isGenericIntakeLabel(termsBrand)) {
     return termsBrand;
   }
 
@@ -803,15 +822,28 @@ function extractAnalytics(aggregate: DealAggregate) {
     return persisted;
   }
 
-  const highlights = new Set<string>();
+  const highlights: string[] = [];
+  const highlightSet = new Set<string>();
   const analyticsDocumentPattern =
-    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|performance|viewers)\b/i;
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|performance|performance summary|topline metrics|analyst notes|viewers|impressions|clicks|ctr|conversions|saves|comments)\b/i;
   const analyticsLinePattern =
-    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|for you|following|personal profile|female|male|18-24|25-34|35-44|45-54|55\+)\b/i;
+    /\b(total viewers|average watch time|watched full video|new followers|traffic sources|top locations|retention rate|for you|following|personal profile|female|male|18-24|25-34|35-44|45-54|55\+|impressions|clicks|ctr|conversions|attributed conversions|saves|comments|engagement rate)\b/i;
   const analyticsMetricPattern =
-    /(?:\b\d+(?:\.\d+)?%\b|\b\d+(?:\.\d+)?s\b|\b\d+(?:\.\d+)?[kKmM]\b|\b\d{1,3}(?:,\d{3})+\b)/;
+    /(?:\b\d+(?:\.\d+)?%|\b\d+(?:\.\d+)?s\b|\b\d+(?:\.\d+)?[kKmM]\b|\b\d{1,4}(?:,\d{3})*(?:\.\d+)?\b)/;
   const analyticsBoilerplatePattern =
     /\b(manager\/agency|agreement|term of agreement|usage term|usage platforms|document ref|company|talent manager|services and deliverables)\b/i;
+  const analyticsTableLabelPattern =
+    /^(impressions|clicks|ctr|saves|comments|attributed conversions|conversions|engagement rate|average watch time|total viewers|new followers|retention rate)$/i;
+
+  function pushHighlight(value: string | null | undefined) {
+    const normalized = presentText(value)?.replace(/\s{2,}/g, " ");
+    if (!normalized || highlightSet.has(normalized)) {
+      return;
+    }
+
+    highlightSet.add(normalized);
+    highlights.push(normalized);
+  }
 
   for (const document of aggregate.documents) {
     const text = document.normalizedText ?? document.rawText ?? "";
@@ -828,27 +860,49 @@ function extractAnalytics(aggregate: DealAggregate) {
       continue;
     }
 
-    const lines = text.split(/\r?\n/);
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim());
 
-    for (const line of lines) {
-      const trimmed = line.replace(/\s+/g, " ").trim();
+    for (let index = 0; index < lines.length; index += 1) {
+      const trimmed = lines[index] ?? "";
       if (!trimmed || trimmed.length > 120) {
         continue;
       }
       if (analyticsBoilerplatePattern.test(trimmed)) {
         continue;
       }
+
+      const nextLine = lines
+        .slice(index + 1)
+        .find((candidate) => candidate.length > 0) ?? null;
+
+      if (
+        analyticsTableLabelPattern.test(trimmed) &&
+        nextLine &&
+        nextLine.length <= 40 &&
+        analyticsMetricPattern.test(nextLine)
+      ) {
+        pushHighlight(`${trimmed}: ${nextLine}`);
+        continue;
+      }
+
+      if (/^[•*-]\s*/.test(trimmed) || /^(note|insight):/i.test(trimmed)) {
+        pushHighlight(trimmed.replace(/^[•*-]\s*/, ""));
+        continue;
+      }
+
       if (
         analyticsLinePattern.test(trimmed) &&
         (analyticsMetricPattern.test(trimmed) ||
           /\b(gender|age|traffic sources|top locations|retention rate)\b/i.test(trimmed))
       ) {
-        highlights.add(trimmed.replace(/\s{2,}/g, " "));
+        pushHighlight(trimmed);
       }
     }
   }
 
-  return highlights.size > 0 ? { highlights: Array.from(highlights).slice(0, 5) } : null;
+  return highlights.length > 0 ? { highlights: highlights.slice(0, 6) } : null;
 }
 
 function inferContractTitle(
@@ -863,17 +917,47 @@ function inferContractTitle(
 
   const campaign = cleanExtractedLabel(aggregate.terms?.campaignName);
   const campaignSegments = splitLabelSegments(aggregate.terms?.campaignName);
-  const normalizedCampaign =
-    campaignSegments[campaignSegments.length - 1] ?? campaign;
-  if (
-    normalizedCampaign &&
-    !/\bname\b/i.test(aggregate.terms?.campaignName ?? "") &&
-    !isGenericIntakeLabel(normalizedCampaign)
-  ) {
+  const normalizedCampaign = sanitizeCampaignName(
+    campaignSegments[campaignSegments.length - 1] ?? campaign
+  );
+  if (normalizedCampaign && !/\bname\b/i.test(aggregate.terms?.campaignName ?? "")) {
     return brandName &&
       !normalizedCampaign.toLowerCase().includes(brandName.toLowerCase())
       ? `${brandName} - ${normalizedCampaign}`
       : normalizedCampaign;
+  }
+
+  for (const document of aggregate.documents
+    .slice()
+    .sort((left, right) => lineScore(right.documentKind) - lineScore(left.documentKind))) {
+    if (
+      document.documentKind !== "campaign_brief" &&
+      document.documentKind !== "deliverables_brief" &&
+      document.documentKind !== "pitch_deck"
+    ) {
+      continue;
+    }
+
+    const lines = (document.normalizedText ?? document.rawText ?? "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+
+    for (const line of lines) {
+      const candidate = sanitizeCampaignName(line);
+      if (!candidate) {
+        continue;
+      }
+      if (brandName && candidate.toLowerCase() === brandName.toLowerCase()) {
+        continue;
+      }
+
+      return brandName &&
+        !candidate.toLowerCase().includes(brandName.toLowerCase())
+        ? `${brandName} - ${candidate}`
+        : candidate;
+    }
   }
 
   const primaryText = aggregate.documents
@@ -896,10 +980,10 @@ function inferContractTitle(
         : subject;
     }
 
-    const explicitCampaign = presentText(
+    const explicitCampaign = sanitizeCampaignName(
       primaryText.match(/^(?:campaign|project)\s*:\s*(.+)$/im)?.[1] ?? null
     );
-    if (explicitCampaign && !isGenericIntakeLabel(explicitCampaign)) {
+    if (explicitCampaign) {
       return brandName && !explicitCampaign.toLowerCase().includes(brandName.toLowerCase())
         ? `${brandName} - ${explicitCampaign}`
         : explicitCampaign;
@@ -942,8 +1026,7 @@ function inferContractTitle(
     return `${brandName} partnership`;
   }
 
-  const fallbackCampaign = presentText(aggregate.deal.campaignName);
-  return fallbackCampaign && !isGenericIntakeLabel(fallbackCampaign) ? fallbackCampaign : null;
+  return sanitizeCampaignName(aggregate.deal.campaignName);
 }
 
 function buildContractSummary(input: {

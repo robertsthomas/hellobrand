@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { cn } from "@/lib/utils";
-
+import { FormInput, FormSelect, FormTextarea } from "@/components/generic/form";
+import { IntakeAccordion } from "@/components/intake";
 import { dealCategoryLabel, dealCategoryOptions } from "@/lib/conflict-intelligence";
 import { createClientRowId, dedupeRowsById } from "@/lib/row-identity";
 import type {
@@ -15,41 +15,6 @@ import type {
   IntakeAnalyticsRecord,
   IntakeTimelineItem
 } from "@/lib/types";
-
-function CollapsibleSection({
-  title,
-  badge,
-  defaultOpen = false,
-  children
-}: {
-  title: string;
-  badge?: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <div className="border border-black/8 dark:border-white/10">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-2">
-          <ChevronRight className={cn("h-4 w-4 shrink-0 text-black/40 transition-transform dark:text-white/40", open && "rotate-90")} />
-          <span className="text-sm font-medium text-ink">{title}</span>
-          {badge ? (
-            <span className="bg-sand/80 px-2 py-0.5 text-[11px] font-medium text-black/50 dark:bg-white/[0.06] dark:text-white/50">
-              {badge}
-            </span>
-          ) : null}
-        </div>
-      </button>
-      {open ? <div className="border-t border-black/8 px-4 py-4 dark:border-white/10">{children}</div> : null}
-    </div>
-  );
-}
 
 function joinLines(values: string[]) {
   return values.join("\n");
@@ -67,7 +32,42 @@ function toDateInputValue(value: string | null | undefined) {
     return "";
   }
 
-  return value.slice(0, 10);
+  const normalized = value.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  const candidate =
+    normalized.match(
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:,\s*\d{4})?/i
+    )?.[0] ??
+    normalized.match(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/)?.[0] ??
+    null;
+  if (!candidate) {
+    return "";
+  }
+
+  const withYear =
+    /^\d{1,2}\/\d{1,2}$/.test(candidate) ||
+    /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}$/i.test(
+      candidate
+    )
+      ? `${candidate}${candidate.includes("/") ? "/" : ", "}${new Date().getFullYear()}`
+      : candidate;
+
+  const parsed = new Date(withYear);
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function normalizeDeliverables(deliverables: DeliverableItem[]) {
@@ -109,8 +109,6 @@ function normalizeDisclosureObligations(items: DisclosureObligation[]) {
 }
 
 export function IntakeGeneratedFieldsEditor({
-  inputClassName,
-  textareaClassName,
   initialBrandCategory,
   initialCompetitorCategories,
   initialRestrictedCategories,
@@ -121,8 +119,6 @@ export function IntakeGeneratedFieldsEditor({
   initialAnalytics,
   conflictMessagesByField = {}
 }: {
-  inputClassName: string;
-  textareaClassName: string;
   initialBrandCategory: DealCategory | null;
   initialCompetitorCategories: string[];
   initialRestrictedCategories: string[];
@@ -291,7 +287,7 @@ export function IntakeGeneratedFieldsEditor({
       />
       <input type="hidden" name="analyticsJson" value={analyticsJson} />
 
-      <CollapsibleSection
+      <IntakeAccordion
         title="Category and posting window"
         badge={brandCategory ? (dealCategoryLabel(brandCategory) ?? undefined) : undefined}
         defaultOpen={hasConflicts}
@@ -300,8 +296,8 @@ export function IntakeGeneratedFieldsEditor({
           <div className="grid gap-5 md:grid-cols-3">
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Brand category
-              <select
-                className={`${inputClassName} ${fieldClass("brandCategory")}`}
+              <FormSelect
+                className={fieldClass("brandCategory")}
                 name="brandCategory"
                 value={brandCategory}
                 onChange={(event) =>
@@ -314,13 +310,13 @@ export function IntakeGeneratedFieldsEditor({
                     {dealCategoryLabel(category)}
                   </option>
                 ))}
-              </select>
+              </FormSelect>
               {renderConflictNote("brandCategory")}
             </label>
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Posting window start
-              <input
-                className={`${inputClassName} ${fieldClass("campaignDateWindow")}`}
+              <FormInput
+                className={fieldClass("campaignDateWindow")}
                 type="date"
                 value={campaignDateWindow.startDate}
                 onChange={(event) =>
@@ -333,8 +329,8 @@ export function IntakeGeneratedFieldsEditor({
             </label>
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Posting window end
-              <input
-                className={`${inputClassName} ${fieldClass("campaignDateWindow")}`}
+              <FormInput
+                className={fieldClass("campaignDateWindow")}
                 type="date"
                 value={campaignDateWindow.endDate}
                 onChange={(event) =>
@@ -349,8 +345,8 @@ export function IntakeGeneratedFieldsEditor({
 
           <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
             Posting window label
-            <input
-              className={`${inputClassName} ${fieldClass("campaignDateWindow")}`}
+            <FormInput
+              className={fieldClass("campaignDateWindow")}
               value={campaignDateWindow.postingWindow}
               onChange={(event) =>
                 setCampaignDateWindow((current) => ({
@@ -366,8 +362,8 @@ export function IntakeGeneratedFieldsEditor({
           <div className="grid gap-5 md:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Competitor categories
-              <textarea
-                className={`${textareaClassName} min-h-24 ${fieldClass("competitorCategories")}`}
+              <FormTextarea
+                className={`min-h-24 ${fieldClass("competitorCategories")}`}
                 value={competitorCategories}
                 onChange={(event) => setCompetitorCategories(event.target.value)}
                 placeholder="One category per line"
@@ -379,8 +375,8 @@ export function IntakeGeneratedFieldsEditor({
             </label>
             <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
               Restricted categories
-              <textarea
-                className={`${textareaClassName} min-h-24 ${fieldClass("restrictedCategories")}`}
+              <FormTextarea
+                className={`min-h-24 ${fieldClass("restrictedCategories")}`}
                 value={restrictedCategories}
                 onChange={(event) => setRestrictedCategories(event.target.value)}
                 placeholder="One category per line"
@@ -392,9 +388,9 @@ export function IntakeGeneratedFieldsEditor({
             </label>
           </div>
         </div>
-      </CollapsibleSection>
+      </IntakeAccordion>
 
-      <CollapsibleSection
+      <IntakeAccordion
         title="Disclosure obligations"
         badge={disclosureObligations.length > 0 ? String(disclosureObligations.length) : undefined}
       >
@@ -443,8 +439,7 @@ export function IntakeGeneratedFieldsEditor({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.title}
                     onChange={(event) =>
                       setDisclosureObligations((current) =>
@@ -455,8 +450,8 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Disclosure title"
                   />
-                  <textarea
-                    className={`${textareaClassName} min-h-24`}
+                  <FormTextarea
+                    className="min-h-24"
                     value={item.detail}
                     onChange={(event) =>
                       setDisclosureObligations((current) =>
@@ -467,8 +462,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Explain the requirement"
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.source}
                     onChange={(event) =>
                       setDisclosureObligations((current) =>
@@ -484,9 +478,9 @@ export function IntakeGeneratedFieldsEditor({
             </div>
           ) : null}
         </div>
-      </CollapsibleSection>
+      </IntakeAccordion>
 
-      <CollapsibleSection
+      <IntakeAccordion
         title="Deliverables"
         badge={deliverables.length > 0 ? String(deliverables.length) : undefined}
         defaultOpen={(conflictMessagesByField.deliverables ?? []).length > 0}
@@ -538,8 +532,7 @@ export function IntakeGeneratedFieldsEditor({
                   </button>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.title}
                     onChange={(event) =>
                       setDeliverables((current) =>
@@ -550,8 +543,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Deliverable title"
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.channel}
                     onChange={(event) =>
                       setDeliverables((current) =>
@@ -562,8 +554,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Channel"
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     type="number"
                     value={item.quantity ?? ""}
                     onChange={(event) =>
@@ -583,8 +574,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Quantity"
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     type="date"
                     value={item.dueDate}
                     onChange={(event) =>
@@ -596,8 +586,8 @@ export function IntakeGeneratedFieldsEditor({
                     }
                   />
                 </div>
-                <textarea
-                  className={`${textareaClassName} min-h-24`}
+                <FormTextarea
+                  className="min-h-24"
                   value={item.description}
                   onChange={(event) =>
                     setDeliverables((current) =>
@@ -615,9 +605,9 @@ export function IntakeGeneratedFieldsEditor({
           </div>
           {renderConflictNote("deliverables")}
         </div>
-      </CollapsibleSection>
+      </IntakeAccordion>
 
-      <CollapsibleSection
+      <IntakeAccordion
         title="Timeline"
         badge={timelineItems.length > 0 ? String(timelineItems.length) : undefined}
         defaultOpen={(conflictMessagesByField.timelineItems ?? []).length > 0}
@@ -666,8 +656,7 @@ export function IntakeGeneratedFieldsEditor({
                   </button>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.label}
                     onChange={(event) =>
                       setTimelineItems((current) =>
@@ -678,8 +667,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Milestone label"
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     type="date"
                     value={item.date}
                     onChange={(event) =>
@@ -690,8 +678,7 @@ export function IntakeGeneratedFieldsEditor({
                       )
                     }
                   />
-                  <input
-                    className={inputClassName}
+                  <FormInput
                     value={item.source}
                     onChange={(event) =>
                       setTimelineItems((current) =>
@@ -702,8 +689,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Source"
                   />
-                  <select
-                    className={inputClassName}
+                  <FormSelect
                     value={item.status}
                     onChange={(event) =>
                       setTimelineItems((current) =>
@@ -722,25 +708,25 @@ export function IntakeGeneratedFieldsEditor({
                     <option value="pending">Pending</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="completed">Completed</option>
-                  </select>
+                  </FormSelect>
                 </div>
               </div>
             ))}
           </div>
           {renderConflictNote("timelineItems")}
         </div>
-      </CollapsibleSection>
+      </IntakeAccordion>
 
-      <CollapsibleSection title="Analytics highlights">
+      <IntakeAccordion title="Analytics highlights">
         <label className="grid gap-2 text-sm font-medium text-black/70 dark:text-white/75">
-          <textarea
-            className={`${textareaClassName} min-h-24`}
+          <FormTextarea
+            className="min-h-24"
             value={analyticsHighlights}
             onChange={(event) => setAnalyticsHighlights(event.target.value)}
             placeholder="One highlight per line"
           />
         </label>
-      </CollapsibleSection>
+      </IntakeAccordion>
     </div>
   );
 }

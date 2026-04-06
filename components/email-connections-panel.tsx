@@ -1,6 +1,5 @@
 "use client";
 
-import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
@@ -50,6 +49,8 @@ function providerConnectPath(provider: SafeEmailAccount["provider"]) {
       return "/api/email/google/connect";
     case "outlook":
       return "/api/email/outlook/connect";
+    case "yahoo":
+      return "/api/email/yahoo/connect";
     default:
       return null;
   }
@@ -75,7 +76,7 @@ function providerDescription(provider: SafeEmailAccount["provider"]) {
     case "outlook":
       return "Use your Microsoft account to sync inbox threads.";
     case "yahoo":
-      return "Use your Yahoo email address and a Yahoo app password.";
+      return "Use your Yahoo account to sync inbox threads and send replies with OAuth.";
     default:
       return null;
   }
@@ -94,15 +95,6 @@ export function EmailConnectionsPanel({
   const posthog = usePostHog();
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
   const [panelError, setPanelError] = useState<string | null>(null);
-  const [panelSuccess, setPanelSuccess] = useState<string | null>(null);
-  const [isConnectingYahoo, setIsConnectingYahoo] = useState(false);
-  const [yahooEmail, setYahooEmail] = useState(
-    () => accounts.find((account) => account.provider === "yahoo")?.emailAddress ?? ""
-  );
-  const [yahooAppPassword, setYahooAppPassword] = useState("");
-  const [isYahooCredentialsOpen, setIsYahooCredentialsOpen] = useState(
-    () => accounts.some((account) => account.provider === "yahoo" && !account.mailAuthConfigured)
-  );
 
   const grouped = useMemo(
     () => ({
@@ -143,45 +135,6 @@ export function EmailConnectionsPanel({
     }
   }
 
-  async function connectYahooAccount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsConnectingYahoo(true);
-    setPanelError(null);
-    setPanelSuccess(null);
-
-    captureAppEvent(posthog, "email_connection_started", {
-      provider: "yahoo",
-      hasExistingAccount: grouped.yahoo.length > 0,
-      surface: "settings_email_connections"
-    });
-
-    try {
-      const response = await fetch("/api/email/yahoo/connect", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          emailAddress: yahooEmail,
-          appPassword: yahooAppPassword
-        })
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not connect Yahoo Mail.");
-      }
-
-      setYahooAppPassword("");
-      setPanelSuccess("Yahoo connected. IMAP and SMTP verified. Initial sync started.");
-      router.refresh();
-    } catch (error) {
-      setPanelError(error instanceof Error ? error.message : "Could not connect Yahoo Mail.");
-    } finally {
-      setIsConnectingYahoo(false);
-    }
-  }
-
   return (
     <section className="border-b border-border py-10">
       <div className="mb-6">
@@ -197,11 +150,6 @@ export function EmailConnectionsPanel({
       {statusMessage ? (
         <div className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {statusMessage}
-        </div>
-      ) : null}
-      {panelSuccess ? (
-        <div className="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {panelSuccess}
         </div>
       ) : null}
       {errorMessage || panelError ? (
@@ -249,100 +197,10 @@ export function EmailConnectionsPanel({
                       ? "Reconnect"
                       : "Connect"}
                   </a>
-                ) : (
-                  <a
-                    href="https://help.yahoo.com/kb/generate-manage-rd-party-passwords-sln15241.html"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="self-start border border-black/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20 sm:shrink-0"
-                  >
-                    Get app password
-                  </a>
-                )}
+                ) : null}
               </div>
 
               <div className="mt-5 space-y-3">
-                {provider === "yahoo" ? (
-                  <details
-                    open={isYahooCredentialsOpen}
-                    onToggle={(event) =>
-                      setIsYahooCredentialsOpen((event.currentTarget as HTMLDetailsElement).open)
-                    }
-                    className="border border-border bg-[#faf8f4]"
-                  >
-                    <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
-                      <span className="flex items-center justify-between gap-3">
-                        <span>Enter credentials</span>
-                        <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                          {isYahooCredentialsOpen ? "Hide" : "Show"}
-                        </span>
-                      </span>
-                    </summary>
-
-                    <form
-                      onSubmit={connectYahooAccount}
-                      className="space-y-3 border-t border-border px-4 py-4"
-                    >
-                      <div className="space-y-1">
-                        <label
-                          htmlFor="yahoo-email-address"
-                          className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"
-                        >
-                          Yahoo email
-                        </label>
-                        <input
-                          id="yahoo-email-address"
-                          type="email"
-                          value={yahooEmail}
-                          onChange={(event) => setYahooEmail(event.target.value)}
-                          placeholder="name@yahoo.com"
-                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
-                          autoComplete="email"
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label
-                          htmlFor="yahoo-app-password"
-                          className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground"
-                        >
-                          Yahoo app password
-                        </label>
-                        <input
-                          id="yahoo-app-password"
-                          type="password"
-                          value={yahooAppPassword}
-                          onChange={(event) => setYahooAppPassword(event.target.value)}
-                          placeholder="Paste the app password from Yahoo"
-                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
-                          autoComplete="current-password"
-                          required
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="submit"
-                          disabled={isConnectingYahoo}
-                          className="border border-black bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/90 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {isConnectingYahoo
-                            ? "Verifying Yahoo..."
-                            : records.length > 0
-                              ? "Reconnect Yahoo"
-                              : "Connect Yahoo"}
-                        </button>
-                      </div>
-
-                      <p className="text-sm text-muted-foreground">
-                        We test both IMAP and SMTP before saving the connection. Yahoo inbox updates
-                        are polled on an interval instead of using webhooks.
-                      </p>
-                    </form>
-                  </details>
-                ) : null}
-
                 {records.length === 0 ? (
                   <div className="border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
                     No {providerLabel(provider)} accounts connected yet.
@@ -380,16 +238,12 @@ export function EmailConnectionsPanel({
 
                       <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                         <p>Last sync: {formatDate(account.lastSyncAt) || "Not yet synced"}</p>
-                        <p>
-                          {account.provider === "yahoo"
-                            ? "Auth: Yahoo app password"
-                            : `Token expiry: ${formatDate(account.tokenExpiresAt) || "Unknown"}`}
-                        </p>
+                        <p>Token expiry: {formatDate(account.tokenExpiresAt) || "Unknown"}</p>
                       </div>
 
                       {account.provider === "yahoo" && !account.mailAuthConfigured ? (
                         <p className="mt-3 text-sm text-muted-foreground">
-                          Finish Yahoo setup with an app password to start inbox sync.
+                          Reconnect Yahoo with OAuth to start inbox sync.
                         </p>
                       ) : null}
 

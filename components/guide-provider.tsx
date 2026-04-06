@@ -53,6 +53,7 @@ export function GuideProvider({
   initialGuideState,
   hasActiveWorkspace,
   hasWorkspaceNotification,
+  hasEverCreatedWorkspace,
   visibilityKey,
   onUnavailableStep,
   onActiveStepChange
@@ -61,6 +62,7 @@ export function GuideProvider({
   initialGuideState: ProductGuideState;
   hasActiveWorkspace: boolean;
   hasWorkspaceNotification: boolean;
+  hasEverCreatedWorkspace: boolean;
   visibilityKey?: string | number | boolean;
   onUnavailableStep?: (step: GuideStep) => boolean;
   onActiveStepChange?: (step: GuideStep | null) => void;
@@ -103,6 +105,7 @@ export function GuideProvider({
       pathname,
       hasActiveWorkspace,
       hasWorkspaceNotification,
+      hasEverCreatedWorkspace,
       isMobile,
       dismissedStepIds,
       completedStepIds
@@ -111,6 +114,7 @@ export function GuideProvider({
       pathname,
       hasActiveWorkspace,
       hasWorkspaceNotification,
+      hasEverCreatedWorkspace,
       isMobile,
       dismissedStepIds,
       completedStepIds

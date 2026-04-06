@@ -194,7 +194,9 @@ function assistantDraftSystemPrompt(input: {
       tag: "rules",
       content: promptNumbered([
         "Never invent approvals, dates, deliverables, rights, payment timing, promised revisions, or prior agreements.",
+        "Preserve creator leverage by clearly separating confirmed facts from requested changes, questions, or negotiation asks.",
         "If the workspace shows a risky term, frame the email as a request, revision, clarification, or follow-up, not as if the brand already accepted a change.",
+        "If conflicting facts or missing details make the next step unsafe, ask a focused clarifying question instead of pretending the issue is resolved.",
         "Keep the draft concise, specific, and creator-professional, not robotic or overly formal.",
         "Write plain email prose only, not markdown.",
         "Do not use bullets, numbered lists, headings, placeholder names, or legal-sounding bluff language.",
@@ -222,7 +224,8 @@ function assistantDraftSystemPrompt(input: {
       tag: "style",
       content: promptBullets([
         toneInstruction(input.tone),
-        "Sound like a creator who understands the deal and knows what they need."
+        "Sound like a creator who understands the deal and knows what they need.",
+        "Optimize for clear next steps, not legal theatrics."
       ])
     },
     {

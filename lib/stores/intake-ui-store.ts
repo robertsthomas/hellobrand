@@ -64,6 +64,39 @@ const initialState = {
   isDuplicateCheckPending: false
 };
 
+function toSelectedFileMeta(file: File): SelectedFileMeta {
+  return {
+    name: file.name,
+    size: file.size,
+    type: file.type
+  };
+}
+
+function getFileSignature(file: File) {
+  return [file.name, file.size, file.type, file.lastModified].join(":");
+}
+
+function mergePendingFiles(existingFiles: File[], incomingFiles: File[]) {
+  if (incomingFiles.length === 0) {
+    return existingFiles;
+  }
+
+  const seen = new Set(existingFiles.map(getFileSignature));
+  const mergedFiles = [...existingFiles];
+
+  for (const file of incomingFiles) {
+    const signature = getFileSignature(file);
+    if (seen.has(signature)) {
+      continue;
+    }
+
+    seen.add(signature);
+    mergedFiles.push(file);
+  }
+
+  return mergedFiles;
+}
+
 export const useIntakeUiStore: UseBoundStore<StoreApi<IntakeUiState>> =
   create<IntakeUiState>((set) => ({
   ...initialState,
@@ -74,22 +107,17 @@ export const useIntakeUiStore: UseBoundStore<StoreApi<IntakeUiState>> =
   setNotes: (notes) => set({ notes }),
   setPastedText: (pastedText) => set({ pastedText }),
   setSelectedFilesFromList: (files) =>
-    set({
-      pendingFiles: Array.from(files ?? []),
-      selectedFiles: Array.from(files ?? []).map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }))
+    set((state) => {
+      const mergedFiles = mergePendingFiles(state.pendingFiles, Array.from(files ?? []));
+      return {
+        pendingFiles: mergedFiles,
+        selectedFiles: mergedFiles.map(toSelectedFileMeta)
+      };
     }),
   setPendingFiles: (pendingFiles) =>
     set({
       pendingFiles,
-      selectedFiles: pendingFiles.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type
-      }))
+      selectedFiles: pendingFiles.map(toSelectedFileMeta)
     }),
   setIsSubmitting: (isSubmitting) => set({ isSubmitting }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),

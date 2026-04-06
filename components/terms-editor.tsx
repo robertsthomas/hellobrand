@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronDown, LoaderCircle, Pencil, X } from "lucide-react";
 
 import { confirmTermsReviewAction, saveTermsAction } from "@/app/actions";
+import {
+  FORM_INPUT_CLASS,
+  FORM_SELECT_CLASS,
+  FORM_TEXTAREA_CLASS
+} from "@/components/generic/form";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import {
   EditableStringListField,
@@ -19,68 +24,19 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import type {
-  DealCategory,
   DealTermsRecord,
   DocumentSectionRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord
 } from "@/lib/types";
 import { ProseText } from "@/components/prose-text";
+import {
+  CURRENCY_OPTIONS,
+  DEAL_CATEGORY_OPTIONS,
+  DEAL_FIELD_LABELS,
+  DEAL_REVIEW_SECTION_FIELDS
+} from "@/lib/deal-terms-constants";
 import { humanizeToken, stripHtmlTags } from "@/lib/utils";
-
-const DEAL_CATEGORY_OPTIONS: DealCategory[] = [
-  "beauty_personal_care",
-  "fashion_apparel",
-  "food_beverage",
-  "entertainment_media",
-  "fitness_wellness",
-  "parenting_family",
-  "tech_gaming",
-  "travel_hospitality",
-  "finance",
-  "home_lifestyle",
-  "retail_ecommerce",
-  "sports_outdoors",
-  "other"
-];
-
-const CURRENCY_OPTIONS = [
-  "USD", "EUR", "GBP", "CAD", "AUD", "NZD", "JPY", "CHF",
-  "SEK", "NOK", "DKK", "SGD", "HKD", "BRL", "MXN", "INR",
-  "KRW", "ZAR", "AED", "PLN", "CZK", "ILS", "THB", "PHP",
-  "MYR", "IDR", "TWD", "VND", "CLP", "COP", "PEN", "ARS"
-];
-
-const INPUT_CLASS =
-  "h-11 w-full border border-black/10 bg-white px-4 text-[15px] text-foreground shadow-none outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20";
-const SELECT_CLASS = INPUT_CLASS;
-const TEXTAREA_CLASS =
-  "w-full resize-none border border-black/10 bg-white px-4 py-3 text-[15px] text-foreground shadow-none outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20";
-
-const SECTION_FIELDS = {
-  partnership: ["brandName", "campaignName", "creatorName", "agencyName", "brandCategory"],
-  payment: ["paymentAmount", "paymentTerms"],
-  deliverables: ["deliverables"],
-  usage: ["usageRights"],
-  exclusivity: ["exclusivity", "exclusivityRestrictions"],
-  termination: ["termination", "governingLaw"]
-} as const;
-
-const FIELD_LABELS: Record<string, string> = {
-  brandName: "Brand name",
-  campaignName: "Campaign name",
-  creatorName: "Creator name",
-  agencyName: "Agency name",
-  brandCategory: "Brand category",
-  paymentAmount: "Payment amount",
-  paymentTerms: "Payment terms",
-  deliverables: "Deliverables",
-  usageRights: "Usage rights summary",
-  exclusivity: "Exclusivity summary",
-  exclusivityRestrictions: "Restricted categories",
-  termination: "Termination summary",
-  governingLaw: "Governing law"
-};
 
 function fieldValue(value: string | null | undefined) {
   if (!value) return "";
@@ -460,7 +416,7 @@ function ReviewDialog({
 
 function BoolSelect({ name, value }: { name: string; value: boolean | null | undefined }) {
   return (
-    <select className={SELECT_CLASS} name={name} defaultValue={value == null ? "" : String(value)}>
+    <select className={FORM_SELECT_CLASS} name={name} defaultValue={value == null ? "" : String(value)}>
       <option value="">Unknown</option>
       <option value="true">Yes</option>
       <option value="false">No</option>
@@ -507,7 +463,7 @@ export function TermsEditor({
     termination: true,
     notes: true
   });
-  const [openReviewSection, setOpenReviewSection] = useState<keyof typeof SECTION_FIELDS | null>(
+  const [openReviewSection, setOpenReviewSection] = useState<keyof typeof DEAL_REVIEW_SECTION_FIELDS | null>(
     null
   );
   const [confirmingField, setConfirmingField] = useState<string | null>(null);
@@ -537,19 +493,19 @@ export function TermsEditor({
   const conflictCount = activeConflictFields.size;
 
   const sectionReviewItems = useMemo(() => {
-    const entries = Object.entries(SECTION_FIELDS).map(([sectionKey, fieldPaths]) => [
+    const entries = Object.entries(DEAL_REVIEW_SECTION_FIELDS).map(([sectionKey, fieldPaths]) => [
       sectionKey,
       fieldPaths
         .filter((fieldPath) => activeConflictFields.has(fieldPath))
         .map((fieldPath) => ({
           fieldPath,
-          label: FIELD_LABELS[fieldPath] ?? humanizeToken(fieldPath),
+          label: DEAL_FIELD_LABELS[fieldPath] ?? humanizeToken(fieldPath),
           value: formatReviewValue(terms, fieldPath)
         }))
     ]);
 
     return Object.fromEntries(entries) as Record<
-      keyof typeof SECTION_FIELDS,
+      keyof typeof DEAL_REVIEW_SECTION_FIELDS,
       Array<{ fieldPath: string; label: string; value: string }>
     >;
   }, [activeConflictFields, terms]);
@@ -631,24 +587,24 @@ export function TermsEditor({
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Brand name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.brandName)} />}
-            editControl={<input className={INPUT_CLASS} name="brandName" type="text" defaultValue={fieldValue(terms?.brandName)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="brandName" type="text" defaultValue={fieldValue(terms?.brandName)} />}
           />
           <Field label="Campaign name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.campaignName)} />}
-            editControl={<input className={INPUT_CLASS} name="campaignName" type="text" defaultValue={fieldValue(terms?.campaignName)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="campaignName" type="text" defaultValue={fieldValue(terms?.campaignName)} />}
           />
           <Field label="Creator name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.creatorName)} />}
-            editControl={<input className={INPUT_CLASS} name="creatorName" type="text" defaultValue={fieldValue(terms?.creatorName)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="creatorName" type="text" defaultValue={fieldValue(terms?.creatorName)} />}
           />
           <Field label="Agency name" editing={ed("partnership")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.agencyName)} />}
-            editControl={<input className={INPUT_CLASS} name="agencyName" type="text" defaultValue={fieldValue(terms?.agencyName)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="agencyName" type="text" defaultValue={fieldValue(terms?.agencyName)} />}
           />
           <Field label="Brand category" editing={ed("partnership")}
             readOnly={<ReadOnlySelect value={terms?.brandCategory ?? ""} options={catOpts} />}
             editControl={
-              <select className={SELECT_CLASS} name="brandCategory" defaultValue={terms?.brandCategory ?? ""}>
+              <select className={FORM_SELECT_CLASS} name="brandCategory" defaultValue={terms?.brandCategory ?? ""}>
                 <option value="">Not set</option>
                 {DEAL_CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{dealCategoryLabel(c)}</option>)}
               </select>
@@ -682,31 +638,31 @@ export function TermsEditor({
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Payment amount" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={terms?.paymentAmount != null ? String(terms.paymentAmount) : ""} placeholder="No amount set" />}
-            editControl={<input className={INPUT_CLASS} name="paymentAmount" type="number" step="0.01" defaultValue={terms?.paymentAmount ?? ""} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="paymentAmount" type="number" step="0.01" defaultValue={terms?.paymentAmount ?? ""} />}
           />
           <Field label="Currency" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={terms?.currency ?? "USD"} />}
             editControl={
-              <select className={SELECT_CLASS} name="currency" defaultValue={terms?.currency ?? "USD"}>
+              <select className={FORM_SELECT_CLASS} name="currency" defaultValue={terms?.currency ?? "USD"}>
                 {CURRENCY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             }
           />
           <Field label="Payment terms" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentTerms)} />}
-            editControl={<textarea className={`${TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTerms" defaultValue={fieldValue(terms?.paymentTerms)} />}
+            editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTerms" defaultValue={fieldValue(terms?.paymentTerms)} />}
           />
           <Field label="Payment structure" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentStructure)} />}
-            editControl={<input className={INPUT_CLASS} name="paymentStructure" type="text" defaultValue={fieldValue(terms?.paymentStructure)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="paymentStructure" type="text" defaultValue={fieldValue(terms?.paymentStructure)} />}
           />
           <Field label="Net terms days" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={terms?.netTermsDays != null ? String(terms.netTermsDays) : ""} placeholder="Not set" />}
-            editControl={<input className={INPUT_CLASS} name="netTermsDays" type="number" step="1" defaultValue={terms?.netTermsDays ?? ""} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="netTermsDays" type="number" step="1" defaultValue={terms?.netTermsDays ?? ""} />}
           />
           <Field label="Payment trigger" editing={ed("payment")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentTrigger)} />}
-            editControl={<textarea className={`${TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTrigger" defaultValue={fieldValue(terms?.paymentTrigger)} />}
+            editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTrigger" defaultValue={fieldValue(terms?.paymentTrigger)} />}
           />
         </div>
         <Signals fields={["paymentAmount", "paymentTerms"]} evidence={evidence} sections={sections} />
@@ -738,8 +694,8 @@ export function TermsEditor({
         <TermsArrayFieldsEditor
           deliverables={terms?.deliverables ?? []}
           usageChannels={terms?.usageChannels ?? []}
-          inputClassName={INPUT_CLASS}
-          textareaClassName={TEXTAREA_CLASS}
+          inputClassName={FORM_INPUT_CLASS}
+          textareaClassName={FORM_TEXTAREA_CLASS}
         />
         <Signals fields={["deliverables"]} evidence={evidence} sections={sections} />
       </Section>
@@ -758,7 +714,7 @@ export function TermsEditor({
       >
         <Field label="Usage rights summary" editing={ed("usage")}
           readOnly={<ReadOnlyValue value={fieldValue(terms?.usageRights)} />}
-          editControl={<textarea className={`${TEXTAREA_CLASS} min-h-24`} name="usageRights" defaultValue={fieldValue(terms?.usageRights)} />}
+          editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-24`} name="usageRights" defaultValue={fieldValue(terms?.usageRights)} />}
         />
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-3">
           <Field label="Organic usage allowed" editing={ed("usage")}
@@ -777,11 +733,11 @@ export function TermsEditor({
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Usage duration" editing={ed("usage")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.usageDuration)} />}
-            editControl={<input className={INPUT_CLASS} name="usageDuration" type="text" defaultValue={fieldValue(terms?.usageDuration)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="usageDuration" type="text" defaultValue={fieldValue(terms?.usageDuration)} />}
           />
           <Field label="Usage territory" editing={ed("usage")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.usageTerritory)} />}
-            editControl={<input className={INPUT_CLASS} name="usageTerritory" type="text" defaultValue={fieldValue(terms?.usageTerritory)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="usageTerritory" type="text" defaultValue={fieldValue(terms?.usageTerritory)} />}
           />
         </div>
         <Signals fields={["usageRights"]} evidence={evidence} sections={sections} />
@@ -811,7 +767,7 @@ export function TermsEditor({
       >
         <Field label="Exclusivity summary" editing={ed("exclusivity")}
           readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivity)} />}
-          editControl={<textarea className={`${TEXTAREA_CLASS} min-h-20`} name="exclusivity" defaultValue={fieldValue(terms?.exclusivity)} />}
+          editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-20`} name="exclusivity" defaultValue={fieldValue(terms?.exclusivity)} />}
         />
 
         {ed("exclusivity") ? (
@@ -823,7 +779,7 @@ export function TermsEditor({
               textName="exclusivityRestrictions"
               initialValues={terms?.restrictedCategories ?? []}
               fallbackText={terms?.exclusivityRestrictions}
-              inputClassName={INPUT_CLASS}
+              inputClassName={FORM_INPUT_CLASS}
               emptyLabel="No restricted categories added yet."
               addLabel="Add restriction"
               placeholder="Cookie brands"
@@ -833,7 +789,7 @@ export function TermsEditor({
               description="Add the competitor groups this partnership should be compared against."
               jsonName="competitorCategoriesJson"
               initialValues={terms?.competitorCategories ?? []}
-              inputClassName={INPUT_CLASS}
+              inputClassName={FORM_INPUT_CLASS}
               emptyLabel="No competitor categories added yet."
               addLabel="Add competitor group"
               placeholder="Packaged snack foods"
@@ -859,11 +815,11 @@ export function TermsEditor({
           />
           <Field label="Exclusivity category" editing={ed("exclusivity")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivityCategory)} />}
-            editControl={<input className={INPUT_CLASS} name="exclusivityCategory" type="text" defaultValue={fieldValue(terms?.exclusivityCategory)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="exclusivityCategory" type="text" defaultValue={fieldValue(terms?.exclusivityCategory)} />}
           />
           <Field label="Exclusivity duration" editing={ed("exclusivity")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivityDuration)} />}
-            editControl={<input className={INPUT_CLASS} name="exclusivityDuration" type="text" defaultValue={fieldValue(terms?.exclusivityDuration)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="exclusivityDuration" type="text" defaultValue={fieldValue(terms?.exclusivityDuration)} />}
           />
         </div>
         <Signals fields={["exclusivity", "exclusivityRestrictions"]} evidence={evidence} sections={sections} />
@@ -895,21 +851,21 @@ export function TermsEditor({
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Revisions" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.revisions)} />}
-            editControl={<input className={INPUT_CLASS} name="revisions" type="text" defaultValue={fieldValue(terms?.revisions)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="revisions" type="text" defaultValue={fieldValue(terms?.revisions)} />}
           />
           <Field label="Revision rounds" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={terms?.revisionRounds != null ? String(terms.revisionRounds) : ""} placeholder="Not set" />}
-            editControl={<input className={INPUT_CLASS} name="revisionRounds" type="number" step="1" defaultValue={terms?.revisionRounds ?? ""} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="revisionRounds" type="number" step="1" defaultValue={terms?.revisionRounds ?? ""} />}
           />
         </div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <Field label="Termination summary" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.termination)} />}
-            editControl={<textarea className={`${TEXTAREA_CLASS} min-h-20`} name="termination" defaultValue={fieldValue(terms?.termination)} />}
+            editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-20`} name="termination" defaultValue={fieldValue(terms?.termination)} />}
           />
           <Field label="Termination conditions" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.terminationConditions)} />}
-            editControl={<textarea className={`${TEXTAREA_CLASS} min-h-20`} name="terminationConditions" defaultValue={fieldValue(terms?.terminationConditions)} />}
+            editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-20`} name="terminationConditions" defaultValue={fieldValue(terms?.terminationConditions)} />}
           />
         </div>
         <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-3">
@@ -919,11 +875,11 @@ export function TermsEditor({
           />
           <Field label="Termination notice" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.terminationNotice)} />}
-            editControl={<input className={INPUT_CLASS} name="terminationNotice" type="text" defaultValue={fieldValue(terms?.terminationNotice)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="terminationNotice" type="text" defaultValue={fieldValue(terms?.terminationNotice)} />}
           />
           <Field label="Governing law" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.governingLaw)} />}
-            editControl={<input className={INPUT_CLASS} name="governingLaw" type="text" defaultValue={fieldValue(terms?.governingLaw)} />}
+            editControl={<input className={FORM_INPUT_CLASS} name="governingLaw" type="text" defaultValue={fieldValue(terms?.governingLaw)} />}
           />
         </div>
         <Signals fields={["termination", "governingLaw"]} evidence={evidence} sections={sections} />
@@ -950,7 +906,7 @@ export function TermsEditor({
         onToggleEdit={() => toggle("notes")}
       >
         {ed("notes") ? (
-          <textarea className={`${TEXTAREA_CLASS} min-h-24`} name="notes" defaultValue={fieldValue(terms?.notes)} placeholder="Add workspace notes..." />
+          <textarea className={`${FORM_TEXTAREA_CLASS} min-h-24`} name="notes" defaultValue={fieldValue(terms?.notes)} placeholder="Add workspace notes..." />
         ) : (
           <>
             <ReadOnlyValue value={fieldValue(terms?.notes)} placeholder="No notes yet" />

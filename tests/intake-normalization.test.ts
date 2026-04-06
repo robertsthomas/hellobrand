@@ -188,6 +188,112 @@ describe("intake normalization", () => {
     expect(normalized?.contractTitle).toBe("Amazon Kids - Stories with Alexa");
   });
 
+  test("does not keep generic influencer labels as the brand name", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Workspace";
+    aggregate.deal.campaignName = "New workspace";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "NimbusPM_influencer_brief.pdf",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Influencer Brief
+          NimbusPM
+          Overview: Create content for the NimbusPM summer push.
+        `,
+        rawText: `
+          Influencer Brief
+          NimbusPM
+          Overview: Create content for the NimbusPM summer push.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Influencer",
+      agencyName: null,
+      campaignName: null
+    };
+    aggregate.extractionEvidence = [
+      {
+        ...aggregate.extractionEvidence[0],
+        fieldPath: "brandName",
+        snippet: "Influencer"
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("NimbusPM");
+  });
+
+  test("ignores generic usage headings and keeps the real brand and campaign", () => {
+    const aggregate = createAggregate();
+    aggregate.deal.brandName = "Workspace";
+    aggregate.deal.campaignName = "New workspace";
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "NimbusPM_influencer_brief.pdf",
+        documentKind: "campaign_brief",
+        normalizedText: `
+          Influencer Brief
+          NimbusPM
+          Summer Push
+          Overview: Create content for the NimbusPM summer push.
+        `,
+        rawText: `
+          Influencer Brief
+          NimbusPM
+          Summer Push
+          Overview: Create content for the NimbusPM summer push.
+        `
+      },
+      {
+        ...aggregate.documents[1],
+        fileName: "usage_rights_addendum.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Brand Usage Rights
+          Campaign Overview
+          The brand receives 90 days paid and organic usage.
+        `,
+        rawText: `
+          Brand Usage Rights
+          Campaign Overview
+          The brand receives 90 days paid and organic usage.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[1];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Usage",
+      agencyName: null,
+      campaignName: "Overview"
+    };
+    aggregate.extractionEvidence = [
+      {
+        ...aggregate.extractionEvidence[0],
+        fieldPath: "brandName",
+        snippet: "Usage"
+      },
+      {
+        ...aggregate.extractionEvidence[0],
+        id: "campaign-evidence",
+        fieldPath: "campaignName",
+        snippet: "Overview"
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("NimbusPM");
+    expect(normalized?.contractTitle).toBe("NimbusPM - Summer Push");
+  });
+
   test("does not treat campaign brief bullets as a primary contact title", () => {
     const aggregate = createAggregate();
     aggregate.documents = [
@@ -222,6 +328,60 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.name).toBeNull();
     expect(normalized?.primaryContact.title).toBeNull();
     expect(normalized?.primaryContact.email).toBeNull();
+  });
+
+  test("does not treat a role title as the primary contact name", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "offer-email.txt",
+        documentKind: "email_thread",
+        normalizedText: `
+          NimbusPM
+          Let's move forward on this partnership.
+
+          --
+          Campaign Manager
+          Partnerships Team
+          team@nimbuspm.com
+        `,
+        rawText: `
+          NimbusPM
+          Let's move forward on this partnership.
+
+          --
+          Campaign Manager
+          Partnerships Team
+          team@nimbuspm.com
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "NimbusPM",
+      agencyName: null,
+      campaignName: "Campaign"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.primaryContact.name).toBeNull();
+    expect(normalized?.primaryContact.email).toBe("team@nimbuspm.com");
+  });
+
+  test("does not use a generic campaign label as the contract title", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "NimbusPM",
+      campaignName: "Campaign"
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.contractTitle).not.toBe("NimbusPM - Campaign");
   });
 
   test("filters boilerplate contract delivery clauses out of timeline items", () => {
@@ -304,5 +464,57 @@ describe("intake normalization", () => {
     const normalized = buildNormalizedIntakeRecord(aggregate);
 
     expect(normalized?.analytics).toBeNull();
+  });
+
+  test("extracts analytics highlights from performance reports", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "performance_report.pdf",
+        documentKind: "unknown",
+        normalizedText: `
+          LumaSkin Performance Summary
+          Topline Metrics
+          Impressions
+          400,327
+          Clicks
+          5,766
+          CTR
+          1.44%
+          Attributed conversions
+          334
+          Analyst Notes
+          • Strongest retention typically came from direct problem-solution intros.
+          • Assets with visible product demo outperformed talking-head-only variants.
+        `,
+        rawText: `
+          LumaSkin Performance Summary
+          Topline Metrics
+          Impressions
+          400,327
+          Clicks
+          5,766
+          CTR
+          1.44%
+          Attributed conversions
+          334
+          Analyst Notes
+          • Strongest retention typically came from direct problem-solution intros.
+          • Assets with visible product demo outperformed talking-head-only variants.
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.analytics?.highlights).toContain("Impressions: 400,327");
+    expect(normalized?.analytics?.highlights).toContain("Clicks: 5,766");
+    expect(normalized?.analytics?.highlights).toContain("CTR: 1.44%");
+    expect(normalized?.analytics?.highlights).toContain("Attributed conversions: 334");
+    expect(normalized?.analytics?.highlights).toContain(
+      "Strongest retention typically came from direct problem-solution intros."
+    );
   });
 });

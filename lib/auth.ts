@@ -1,5 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
 import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
@@ -49,6 +50,13 @@ function deriveViewerDefaults(
 }
 
 async function ensureViewerRecord(viewer: Viewer): Promise<Viewer> {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    viewer.mode === "demo"
+  ) {
+    return viewer;
+  }
+
   if (!process.env.DATABASE_URL) {
     return viewer;
   }
@@ -197,7 +205,7 @@ async function upsertViewerFromSession() {
   } satisfies Viewer;
 }
 
-export async function getCurrentViewer(): Promise<Viewer | null> {
+const getCurrentViewerCached = cache(async (): Promise<Viewer | null> => {
   const e2eViewer = await resolveE2EViewerFromCookies();
   if (e2eViewer) {
     return ensureViewerRecord(e2eViewer);
@@ -213,6 +221,10 @@ export async function getCurrentViewer(): Promise<Viewer | null> {
   }
 
   return null;
+});
+
+export async function getCurrentViewer(): Promise<Viewer | null> {
+  return getCurrentViewerCached();
 }
 
 export async function requireViewer() {
@@ -233,7 +245,7 @@ export async function requireApiViewer() {
   return viewer;
 }
 
-export async function getViewerById(viewerId: string): Promise<Viewer> {
+const getViewerByIdCached = cache(async (viewerId: string): Promise<Viewer> => {
   if (!process.env.DATABASE_URL) {
     if (viewerId === DEFAULT_E2E_VIEWER.id) {
       return DEFAULT_E2E_VIEWER;
@@ -266,4 +278,8 @@ export async function getViewerById(viewerId: string): Promise<Viewer> {
     displayName: user.displayName,
     mode: "clerk"
   };
+});
+
+export async function getViewerById(viewerId: string): Promise<Viewer> {
+  return getViewerByIdCached(viewerId);
 }

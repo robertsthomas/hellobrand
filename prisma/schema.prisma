@@ -89,6 +89,7 @@ model User {
   onboardingState             UserOnboardingState?
   appNotifications            AppNotification[]
   notificationEmailDeliveries NotificationEmailDelivery[]
+  feedbackSubmissions         FeedbackSubmission[]
   invoiceRecords               InvoiceRecord[]
   invoiceDeliveryRecords       InvoiceDeliveryRecord[]
   invoiceReminderTouchpoints   InvoiceReminderTouchpoint[]
@@ -169,6 +170,29 @@ model AnonymousUploadLedger {
   @@index([visitorId, createdAt])
   @@index([ipHash, createdAt])
   @@index([visitorId, fileHash, createdAt])
+}
+
+model FeedbackSubmission {
+  id                       String   @id @default(uuid())
+  userId                   String
+  score                    Int
+  message                  String?
+  pagePath                 String
+  pageTitle                String
+  dealId                   String?
+  requestedFollowUp        Boolean  @default(false)
+  contactEmail             String
+  userFollowUpEmailMessageId String?
+  userFollowUpEmailSentAt  DateTime?
+  supportEmailMessageId    String?
+  supportEmailSentAt       DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([dealId, createdAt])
 }
 
 model Deal {

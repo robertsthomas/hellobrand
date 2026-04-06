@@ -207,80 +207,67 @@ export async function getIntakeSessionRecord(sessionId: string) {
   return session ? toIntakeSessionRecord(session) : null;
 }
 
-function hasInngestEventKey() {
-  return Boolean(process.env.INNGEST_EVENT_KEY);
-}
-
 async function triggerDuplicateCheck(input: {
   dealId: string;
   userId: string;
   sessionId: string;
 }) {
   try {
-    if (hasInngestEventKey()) {
-      const { inngest } = await import("@/lib/inngest/client");
-      await inngest.send({
-        name: "workspace/check-duplicates.requested",
-        data: input
-      });
-    } else {
-      // Inline fallback when Inngest is not configured
-      const { findDuplicateDeals } = await import("@/lib/duplicate-detection");
+    const { findDuplicateDeals } = await import("@/lib/duplicate-detection");
 
+    await prisma.intakeSession.update({
+      where: { id: input.sessionId },
+      data: { duplicateCheckStatus: "checking" }
+    });
+    await emitWorkspaceNotificationForSession(
+      input.sessionId,
+      "workspace.duplicate_checking"
+    );
+
+    const documents = await prisma.document.findMany({
+      where: { dealId: input.dealId },
+      select: { rawText: true, normalizedText: true, fileName: true }
+    });
+
+    const rawTexts = documents
+      .map((doc) => doc.normalizedText || doc.rawText || "")
+      .filter(Boolean);
+    const fileNames = documents.map((doc) => doc.fileName).filter(Boolean);
+
+    if (rawTexts.length === 0) {
       await prisma.intakeSession.update({
         where: { id: input.sessionId },
-        data: { duplicateCheckStatus: "checking" }
+        data: { duplicateCheckStatus: "clean" }
       });
+      await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
+        "workspace.duplicate_checking"
+      ]);
+      return;
+    }
+
+    const matches = (await findDuplicateDeals(input.userId, { rawTexts, fileNames }))
+      .filter((match) => match.dealId !== input.dealId);
+
+    await prisma.intakeSession.update({
+      where: { id: input.sessionId },
+      data: {
+        duplicateCheckStatus: matches.length > 0 ? "duplicates_found" : "clean",
+        duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
+      }
+    });
+
+    // Revalidate so duplicate notification appears on dashboard
+    revalidateTag(`user-${input.userId}-deals`, "max");
+    revalidateTag(`user-${input.userId}-notifications`, "max");
+    if (matches.length > 0) {
       await emitWorkspaceNotificationForSession(
         input.sessionId,
-        "workspace.duplicate_checking"
+        "workspace.duplicates_found"
       );
-
-      const documents = await prisma.document.findMany({
-        where: { dealId: input.dealId },
-        select: { rawText: true, normalizedText: true, fileName: true }
-      });
-
-      const rawTexts = documents
-        .map((doc) => doc.normalizedText || doc.rawText || "")
-        .filter(Boolean);
-      const fileNames = documents.map((doc) => doc.fileName).filter(Boolean);
-
-      if (rawTexts.length === 0) {
-        await prisma.intakeSession.update({
-          where: { id: input.sessionId },
-          data: { duplicateCheckStatus: "clean" }
-        });
-        await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
-          "workspace.duplicate_checking"
-        ]);
-        return;
-      }
-
-      const matches = (await findDuplicateDeals(input.userId, { rawTexts, fileNames }))
-        .filter((match) => match.dealId !== input.dealId);
-
-      await prisma.intakeSession.update({
-        where: { id: input.sessionId },
-        data: {
-          duplicateCheckStatus: matches.length > 0 ? "duplicates_found" : "clean",
-          duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
-        }
-      });
-
-      // Revalidate so duplicate notification appears on dashboard
-      revalidateTag(`user-${input.userId}-deals`, "max");
-      revalidateTag(`user-${input.userId}-notifications`, "max");
-      if (matches.length > 0) {
-        await emitWorkspaceNotificationForSession(
-          input.sessionId,
-          "workspace.duplicates_found"
-        );
-      } else {
-        await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
-          "workspace.duplicate_checking"
-        ]);
-      }
+    } else {
+      await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
+        "workspace.duplicate_checking"
+      ]);
     }
   } catch (error) {
     console.error("[triggerDuplicateCheck] Failed:", error);

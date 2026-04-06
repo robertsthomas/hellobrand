@@ -13,6 +13,8 @@
     "start": "next start",
     "start:prd": "doppler run --config prd -- next start",
     "start:dev": "doppler run --config dev -- next start",
+    "document-worker": "tsx scripts/document-processing-worker.ts",
+    "document-worker:once": "tsx scripts/document-processing-worker.ts --once",
     "db:migrate": "doppler run -- pnpm exec prisma migrate dev",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev",
     "lint": "eslint .",
@@ -27,7 +29,6 @@
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",
     "@clerk/nextjs": "^7.0.7",
-    "@llamaindex/llama-cloud": "^1.8.0",
     "@openrouter/ai-sdk-provider": "^2.3.3",
     "@prisma/client": "^6.5.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -61,6 +62,7 @@
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-table": "^8.21.3",
     "@vercel/speed-insights": "^2.0.0",
+    "@vercel/queue": "^0.1.6",
     "ai": "^6.0.116",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -114,6 +116,7 @@
     "postcss": "^8.5.3",
     "prisma": "^6.5.0",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.8"
   }

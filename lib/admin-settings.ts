@@ -1,3 +1,6 @@
+import { Prisma } from "@prisma/client";
+import { cache } from "react";
+
 import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_APP_SETTINGS = {
@@ -44,20 +47,61 @@ function toAppSettingsRecord(settings: {
   };
 }
 
-export async function getAppSettings(): Promise<AppSettingsRecord> {
+function isUniqueConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function isDatabaseInitializationError(error: unknown) {
+  return error instanceof Prisma.PrismaClientInitializationError;
+}
+
+const getAppSettingsCached = cache(async (): Promise<AppSettingsRecord> => {
   if (!process.env.DATABASE_URL) {
     return {
       ...DEFAULT_APP_SETTINGS
     };
   }
 
-  const settings = await prisma.appSettings.upsert({
-    where: { id: "primary" },
-    update: {},
-    create: { id: "primary" }
-  });
+  try {
+    const existing = await prisma.appSettings.findUnique({
+      where: { id: "primary" }
+    });
 
-  return toAppSettingsRecord(settings);
+    if (existing) {
+      return toAppSettingsRecord(existing);
+    }
+
+    const created = await prisma.appSettings.create({
+      data: { id: "primary" }
+    });
+
+    return toAppSettingsRecord(created);
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      const existing = await prisma.appSettings.findUnique({
+        where: { id: "primary" }
+      });
+
+      if (existing) {
+        return toAppSettingsRecord(existing);
+      }
+    }
+
+    if (
+      process.env.NODE_ENV !== "production" &&
+      isDatabaseInitializationError(error)
+    ) {
+      return {
+        ...DEFAULT_APP_SETTINGS
+      };
+    }
+
+    throw error;
+  }
+});
+
+export async function getAppSettings(): Promise<AppSettingsRecord> {
+  return getAppSettingsCached();
 }
 
 export async function updateAppSettings(

@@ -10,6 +10,10 @@ import {
   X
 } from "lucide-react";
 
+import {
+  AdminCacheCleanerDialog,
+  type AdminCacheTargetKey
+} from "@/components/admin/admin-cache-cleaner-dialog";
 import type { AdminDashboardSnapshot, AdminManagedUser, AdminUserDetail } from "@/lib/admin-dashboard";
 import type { AppSettingsRecord } from "@/lib/admin-settings";
 import { Button } from "@/components/ui/button";
@@ -385,6 +389,9 @@ export function AdminDashboardClient({
   const [savingSettings, setSavingSettings] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [clearingInboxCaches, setClearingInboxCaches] = useState(false);
+  const [cacheDialogOpen, setCacheDialogOpen] = useState(false);
+  const [selectedCacheTargets, setSelectedCacheTargets] = useState<AdminCacheTargetKey[]>(["inbox"]);
   const deferredQuery = useDeferredValue(query);
 
   const filteredUsers = users.filter((user) => {
@@ -465,6 +472,70 @@ export function AdminDashboardClient({
     );
     keys.forEach((key) => window.localStorage.removeItem(key));
     toast.success(`Cleared ${keys.length} localStorage item${keys.length === 1 ? "" : "s"}.`);
+  }
+
+  function toggleCacheTarget(target: AdminCacheTargetKey) {
+    setSelectedCacheTargets((current) =>
+      current.includes(target)
+        ? current.filter((value) => value !== target)
+        : [...current, target]
+    );
+  }
+
+  async function clearSelectedCaches() {
+    if (selectedCacheTargets.length === 0) {
+      toast.error("Select at least one cache target.");
+      return;
+    }
+
+    setClearingInboxCaches(true);
+    try {
+      const res = await fetch("/api/admin/inbox-cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets: selectedCacheTargets })
+      });
+      const data = await res.json() as {
+        error?: string;
+        message?: string;
+        targets?: AdminCacheTargetKey[];
+        cleared?: {
+          threadSummaries?: number;
+          previewStates?: number;
+          aiCacheEntries?: number;
+        };
+      };
+
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not clear caches.");
+        return;
+      }
+
+      if (selectedCacheTargets.includes("inbox")) {
+        window.localStorage.removeItem("hellobrand:inbox:draft-prompt-suggestions");
+        window.localStorage.removeItem("hellobrand:inbox:signature-banner:dismissed");
+      }
+
+      const responseTargets = data.targets ?? selectedCacheTargets;
+      const targetSummary = responseTargets.join(", ");
+
+      if (responseTargets.includes("inbox")) {
+        const clearedSummary = [
+          `${data.cleared?.threadSummaries ?? 0} summaries`,
+          `${data.cleared?.previewStates ?? 0} preview states`,
+          `${data.cleared?.aiCacheEntries ?? 0} AI cache rows`
+        ].join(", ");
+        toast.success(`${data.message ?? "Selected caches cleared."} ${targetSummary}. Inbox cleanup: ${clearedSummary}.`);
+      } else {
+        toast.success(`${data.message ?? "Selected caches cleared."} ${targetSummary}.`);
+      }
+
+      setCacheDialogOpen(false);
+    } catch {
+      toast.error("Could not clear caches.");
+    } finally {
+      setClearingInboxCaches(false);
+    }
   }
 
   return (
@@ -590,6 +661,20 @@ export function AdminDashboardClient({
                   }}>Reset</Button>
                 </div>
 
+                <div className="flex items-center justify-between gap-3 border border-neutral-200 px-3 py-3">
+                  <div>
+                    <div className="text-sm font-medium text-neutral-900">Clear selected app caches</div>
+                    <div className="text-sm text-neutral-600">Pick which app pages and caches to clear without reloading admin.</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCacheDialogOpen(true)}
+                  >
+                    Choose caches
+                  </Button>
+                </div>
+
                 <div className="flex items-center justify-between gap-3 border border-amber-200 bg-amber-50 px-3 py-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
@@ -638,6 +723,15 @@ export function AdminDashboardClient({
           }}
         />
       ) : null}
+
+      <AdminCacheCleanerDialog
+        open={cacheDialogOpen}
+        onOpenChange={setCacheDialogOpen}
+        selectedTargets={selectedCacheTargets}
+        onToggleTarget={toggleCacheTarget}
+        onSubmit={() => void clearSelectedCaches()}
+        clearing={clearingInboxCaches}
+      />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes
 } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { History, Plus, Trash2, Upload } from "lucide-react";
 
@@ -27,6 +27,7 @@ import {
 import {
   buildProfileEditorDraft,
   buildProfileEditorPatch,
+  emptyGeneralHandle,
   emptyDealHandle,
   type ProfileEditorDraft
 } from "@/lib/profile-draft";
@@ -72,6 +73,10 @@ function deriveInitials(value: string) {
 
 function iconForPlatform(platform: ProfilePlatform) {
   return <SocialPlatformIcon platform={platform} />;
+}
+
+function labelForPlatform(platform: ProfilePlatform) {
+  return platform === "twitter" ? "Twitter / X" : platform;
 }
 
 function SectionHeader({
@@ -191,6 +196,69 @@ export function ProfileEditor({
       form.generalHandles
     ]
   );
+
+  const availableGeneralPlatforms = useMemo(
+    () =>
+      PROFILE_PLATFORM_OPTIONS.filter(
+        (platform) =>
+          !form.generalHandles.some((entry) => entry.platform === platform)
+      ),
+    [form.generalHandles]
+  );
+  const [pendingGeneralHandle, setPendingGeneralHandle] = useState<SocialHandleEntry | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!pendingGeneralHandle) {
+      return;
+    }
+
+    const canKeepCurrentPlatform =
+      pendingGeneralHandle.platform === pendingGeneralHandle.platform &&
+      (availableGeneralPlatforms.includes(pendingGeneralHandle.platform) ||
+        !form.generalHandles.some((entry) => entry.platform === pendingGeneralHandle.platform));
+
+    if (canKeepCurrentPlatform) {
+      return;
+    }
+
+    if (availableGeneralPlatforms.length === 0) {
+      setPendingGeneralHandle(null);
+      return;
+    }
+
+    setPendingGeneralHandle((current) =>
+      current ? { ...current, platform: availableGeneralPlatforms[0] } : current
+    );
+  }, [availableGeneralPlatforms, form.generalHandles, pendingGeneralHandle]);
+
+  function startAddingGeneralHandle() {
+    if (pendingGeneralHandle || availableGeneralPlatforms.length === 0) {
+      return;
+    }
+
+    setPendingGeneralHandle(emptyGeneralHandle(availableGeneralPlatforms[0]));
+  }
+
+  function savePendingGeneralHandle() {
+    if (!pendingGeneralHandle || !pendingGeneralHandle.handle.trim()) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      generalHandles: [...current.generalHandles, pendingGeneralHandle]
+    }));
+    setPendingGeneralHandle(null);
+  }
+
+  function removeGeneralHandle(id: string) {
+    setForm((current) => ({
+      ...current,
+      generalHandles: current.generalHandles.filter((entry) => entry.id !== id)
+    }));
+  }
 
   function updateGeneralHandle(
     id: string,
@@ -444,14 +512,14 @@ export function ProfileEditor({
           {form.generalHandles.map((entry) => (
             <div
               key={entry.id}
-              className="grid items-end gap-4 border-b border-border py-5 md:grid-cols-[44px_1fr_140px]"
+              className="grid items-end gap-4 border-b border-border py-5 md:grid-cols-[44px_1fr_140px_44px]"
             >
               <div className="flex h-12 w-11 items-center justify-center border border-border bg-secondary">
                 {iconForPlatform(entry.platform)}
               </div>
               <div className="space-y-2">
                 <FieldLabel htmlFor={`${entry.id}-handle`}>
-                  {entry.platform === "twitter" ? "Twitter / X" : entry.platform}
+                  {labelForPlatform(entry.platform)}
                 </FieldLabel>
                 <FlatInput
                   id={`${entry.id}-handle`}
@@ -475,9 +543,106 @@ export function ProfileEditor({
                   }}
                 />
               </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="flex h-12 w-12 items-center justify-center border border-border bg-white text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  aria-label={`Remove ${labelForPlatform(entry.platform)} channel`}
+                  onClick={() => removeGeneralHandle(entry.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
+
+          {pendingGeneralHandle ? (
+            <div className="grid items-end gap-4 border-b border-border py-5 md:grid-cols-[180px_1fr_140px_88px]">
+              <div className="space-y-2">
+                <FieldLabel htmlFor="pending-general-platform">Platform</FieldLabel>
+                <select
+                  id="pending-general-platform"
+                  value={pendingGeneralHandle.platform}
+                  onChange={(event) => {
+                    setPendingGeneralHandle((current) =>
+                      current
+                        ? {
+                            ...current,
+                            platform: event.currentTarget.value as ProfilePlatform
+                          }
+                        : current
+                    );
+                  }}
+                  className="h-12 w-full border border-border bg-white px-4 text-[15px] text-foreground outline-none transition-colors focus:border-primary"
+                >
+                  {[pendingGeneralHandle.platform, ...availableGeneralPlatforms]
+                    .filter((platform, index, array) => array.indexOf(platform) === index)
+                    .map((platform) => (
+                      <option key={platform} value={platform}>
+                        {labelForPlatform(platform)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor="pending-general-handle">Handle</FieldLabel>
+                <FlatInput
+                  id="pending-general-handle"
+                  value={pendingGeneralHandle.handle}
+                  placeholder="@handle"
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setPendingGeneralHandle((current) =>
+                      current ? { ...current, handle: value } : current
+                    );
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel htmlFor="pending-general-audience">Audience</FieldLabel>
+                <FlatInput
+                  id="pending-general-audience"
+                  value={pendingGeneralHandle.audienceLabel ?? ""}
+                  placeholder="245K"
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    setPendingGeneralHandle((current) =>
+                      current ? { ...current, audienceLabel: value } : current
+                    );
+                  }}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-12 items-center justify-center border border-border bg-white px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!pendingGeneralHandle.handle.trim()}
+                  onClick={savePendingGeneralHandle}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {form.generalHandles.length === 0 ? (
+            <p className="border-b border-border py-5 text-sm text-muted-foreground">
+              No core channels added yet.
+            </p>
+          ) : null}
         </div>
+
+        {availableGeneralPlatforms.length > 0 && !pendingGeneralHandle ? (
+          <div className="mt-4">
+            <button
+              type="button"
+              className="text-sm font-medium text-foreground underline underline-offset-4"
+              onClick={startAddingGeneralHandle}
+            >
+              Add channel
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="border-b border-border py-10">

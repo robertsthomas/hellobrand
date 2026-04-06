@@ -4,35 +4,43 @@ import { Suspense } from "react";
 import { Trash2 } from "lucide-react";
 
 import { deleteIntakeDraftAction } from "@/app/actions";
-import { IntakeAutoRefresh } from "@/components/intake-auto-refresh";
-import { DeleteDraftButton } from "@/components/delete-draft-button";
-import { IntakeDuplicateWarning } from "@/components/intake-duplicate-warning";
-import { IntakePendingUpload } from "@/components/intake-pending-upload";
-import { IntakeProcessingState } from "@/components/intake-processing-state";
+import {
+  DeleteDraftButton,
+  IntakeAutoRefresh,
+  IntakeDuplicateWarning,
+  IntakePendingUpload,
+  IntakeProcessingState,
+  StartQueuedAnalysisButton,
+} from "@/components/intake-flow";
 import { PostHogActionLink } from "@/components/posthog-action-link";
-import { StartQueuedAnalysisButton } from "@/components/start-queued-analysis-button";
 import { requireViewer } from "@/lib/auth";
 import { getIntakeSessionForViewer } from "@/lib/intake";
 
 export default function IntakeProcessingPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ starting?: string }>;
 }) {
   return (
     <Suspense fallback={<div className="flex min-h-full items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
-      <IntakeProcessingContent params={params} />
+      <IntakeProcessingContent params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
 async function IntakeProcessingContent({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ starting?: string }>;
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
+  const resolvedSearchParams = await searchParams;
+  const isStarting = resolvedSearchParams.starting === "1";
   let sessionData: Awaited<ReturnType<typeof getIntakeSessionForViewer>>;
 
   try {
@@ -60,7 +68,7 @@ async function IntakeProcessingContent({
 
   const documents = aggregate?.documents ?? [];
 
-  if (session.status === "queued") {
+  if (session.status === "queued" && !isStarting) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
         <div className="w-full max-w-2xl space-y-8 border border-black/8 bg-white p-8 dark:border-white/10 dark:bg-[#161a1f]">
@@ -148,6 +156,7 @@ async function IntakeProcessingContent({
           sessionId={session.id}
           status={session.status}
           readyHref={`/app/intake/${session.id}/review`}
+          forcePolling={isStarting}
         />
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   listEmailAccountsForViewer,
   listInboxThreadsForViewer
 } from "@/lib/email/service";
+import { normalizeInboxSort, sortInboxThreadItems } from "@/lib/email/inbox-sort";
 import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
 import { getProfileForViewer } from "@/lib/profile";
 
@@ -23,6 +24,7 @@ export default function InboxPage({
     accountId?: string;
     dealId?: string;
     workflowState?: string;
+    sort?: string;
     thread?: string;
     attachInvoice?: string;
   }>;
@@ -43,6 +45,7 @@ async function InboxContent({
     accountId?: string;
     dealId?: string;
     workflowState?: string;
+    sort?: string;
     thread?: string;
     attachInvoice?: string;
   }>;
@@ -59,20 +62,23 @@ async function InboxContent({
   }
 
   const resolved = searchParams ? await searchParams : {};
+  const workflowState =
+    resolved.workflowState === "unlinked" ? null : resolved.workflowState ?? null;
+  const sort = normalizeInboxSort(resolved.sort);
   const [threads, deals, emailAccounts, profile] = await Promise.all([
     listInboxThreadsForViewer(viewer, {
       query: resolved.q ?? null,
       provider: resolved.provider ?? null,
       accountId: resolved.accountId ?? null,
       linkedDealId: resolved.dealId ?? null,
-      workflowState: (resolved.workflowState as
-        | "unlinked"
+      linkedOnly: true,
+      workflowState: workflowState as
         | "needs_review"
         | "needs_reply"
         | "draft_ready"
         | "waiting_on_them"
         | "closed"
-        | undefined) ?? null,
+        | null,
       limit: 100
     }),
     listDealsForViewer(viewer),
@@ -80,12 +86,15 @@ async function InboxContent({
     getProfileForViewer(viewer)
   ]);
   const connectedProviders = [...new Set(emailAccounts.map((account) => account.provider))];
+  const sortedThreads = sortInboxThreadItems(threads, sort);
   const selectedProvider =
     resolved.provider && connectedProviders.includes(resolved.provider as (typeof connectedProviders)[number])
       ? resolved.provider
       : "";
 
-  const selectedThreadId = resolved.thread ?? threads[0]?.thread.id ?? null;
+  const selectedThreadId = sortedThreads.some((item) => item.thread.id === resolved.thread)
+    ? resolved.thread ?? null
+    : sortedThreads[0]?.thread.id ?? null;
   const [selectedThread, threadPreviewStates] = await Promise.all([
     selectedThreadId
       ? getEmailThreadForViewer(viewer, selectedThreadId)
@@ -144,7 +153,8 @@ async function InboxContent({
         provider: selectedProvider,
         accountId: resolved.accountId ?? "",
         dealId: resolved.dealId ?? "",
-        workflowState: resolved.workflowState ?? ""
+        workflowState: workflowState ?? "",
+        sort
       }}
     />
   );

@@ -164,7 +164,7 @@ export function IntakeDraftEditor({
       }
 
       reset("upload");
-      router.push("/app/intake/new");
+      router.push(`/app/intake/${nextSessionId}`);
       router.refresh();
     } catch (error) {
       setErrorMessage(

@@ -18,11 +18,13 @@ function logClientRefresh(event: string, details: Record<string, unknown>) {
 export function IntakeAutoRefresh({
   sessionId,
   status,
-  readyHref
+  readyHref,
+  forcePolling = false
 }: {
   sessionId: string;
   status: IntakeSessionStatus;
   readyHref?: string;
+  forcePolling?: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -31,6 +33,7 @@ export function IntakeAutoRefresh({
   const lastKnownStatus = useRef(status);
   const [remoteStatus, setRemoteStatus] = useState<IntakeSessionStatus>(status);
   const shouldPoll =
+    forcePolling ||
     ["uploading", "processing"].includes(status) ||
     (status === "draft" && pendingSessionId === sessionId && isSubmitting);
 
@@ -137,7 +140,7 @@ export function IntakeAutoRefresh({
       disposed = true;
       clearTimeout(timeoutId);
     };
-  }, [isSubmitting, pendingSessionId, router, sessionId, shouldPoll, startTransition, status]);
+  }, [forcePolling, isSubmitting, pendingSessionId, router, sessionId, shouldPoll, startTransition, status]);
 
   if (!shouldPoll && !["uploading", "processing"].includes(remoteStatus)) {
     return null;

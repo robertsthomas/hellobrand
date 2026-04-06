@@ -2,9 +2,11 @@ import { Suspense } from "react";
 
 import { PlanTier } from "@prisma/client";
 
-import { EmailConnectionsPanel } from "@/components/email-connections-panel";
-import { FeatureUpgradeCard } from "@/components/feature-locked-state";
-import { SettingsEditor } from "@/components/settings-editor";
+import {
+  EmailConnectionsPanel,
+  FeatureUpgradeCard,
+  SettingsEditor,
+} from "@/components/settings";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedProfile } from "@/lib/cached-data";

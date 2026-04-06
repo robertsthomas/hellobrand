@@ -9,10 +9,8 @@ import {
   emailRenewalSweepFunction
 } from "@/lib/inngest/email-functions";
 import {
-  checkWorkspaceDuplicatesFunction,
   invoiceReminderSweepFunction,
   notificationEmailSendFunction,
-  processContractFunction,
   workspaceNudgeSweepFunction,
   workspaceReminderSweepFunction
 } from "@/lib/inngest/functions";
@@ -20,8 +18,6 @@ import {
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
-    processContractFunction,
-    checkWorkspaceDuplicatesFunction,
     notificationEmailSendFunction,
     invoiceReminderSweepFunction,
     workspaceReminderSweepFunction,

@@ -127,9 +127,11 @@ async function fetchNotifications() {
 }
 
 export function NotificationsCenter({
-  notifications
+  notifications,
+  hasEverCreatedWorkspace = false
 }: {
   notifications: NotificationItem[];
+  hasEverCreatedWorkspace?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -195,15 +197,15 @@ export function NotificationsCenter({
   }, []);
 
   useEffect(() => {
-    if (pathname !== "/app") {
+    if (pathname !== "/app" || hasEverCreatedWorkspace) {
       setShowGenerationHint(false);
       setPendingHintNotificationId(null);
       return;
     }
-  }, [pathname]);
+  }, [hasEverCreatedWorkspace, pathname]);
 
   useEffect(() => {
-    if (pathname !== "/app" || !pendingHintNotificationId) {
+    if (pathname !== "/app" || hasEverCreatedWorkspace || !pendingHintNotificationId) {
       return;
     }
 
@@ -223,7 +225,7 @@ export function NotificationsCenter({
     }, 7000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pathname, pendingHintNotificationId, previewItems]);
+  }, [hasEverCreatedWorkspace, pathname, pendingHintNotificationId, previewItems]);
 
   useEffect(() => {
     const handleWorkspaceNotificationEvent = (event: Event) => {
@@ -247,7 +249,7 @@ export function NotificationsCenter({
         mergeNotificationItems(current, detail.notification, detail.replaceId)
       );
 
-      if (detail.showHint) {
+      if (detail.showHint && !hasEverCreatedWorkspace) {
         setPendingHintNotificationId(detail.notification.id);
       }
     };
@@ -262,7 +264,7 @@ export function NotificationsCenter({
         WORKSPACE_GENERATION_NOTIFICATION_EVENT,
         handleWorkspaceNotificationEvent as EventListener
       );
-  }, []);
+  }, [hasEverCreatedWorkspace]);
 
   const refresh = useCallback(async () => {
     const next = await fetchNotifications();

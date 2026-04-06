@@ -4,6 +4,7 @@ import type { FormEvent, InputHTMLAttributes } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { SettingsSection } from "@/components/patterns/settings";
 import {
   buildProfileSettingsDraft,
   buildProfileSettingsPatch,
@@ -179,17 +180,10 @@ export function SettingsEditor({
         </div>
       ) : null}
 
-      <section className="border-b border-border py-10">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
-            Workflow Defaults
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            These defaults influence new partnership setup, reminder timing, and generated
-            drafts.
-          </p>
-        </div>
-
+      <SettingsSection
+        title="Workflow Defaults"
+        description="These defaults influence new partnership setup, reminder timing, and generated drafts."
+      >
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-2">
             <FieldLabel htmlFor="defaultCurrency">Default currency</FieldLabel>
@@ -227,19 +221,12 @@ export function SettingsEditor({
             />
           </div>
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="border-b border-border py-10">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
-            Notifications
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Control the alerts HelloBrand surfaces as your partnerships move through review,
-            deliverables, and payment follow-up.
-          </p>
-        </div>
-
+      <SettingsSection
+        title="Notifications"
+        description="Control the alerts HelloBrand surfaces as your partnerships move through review, deliverables, and payment follow-up."
+      >
         <div className="border-t border-border">
           <FlatToggleRow
             title="Email notifications"
@@ -266,19 +253,12 @@ export function SettingsEditor({
             onChange={(checked) => updateFormField("conflictAlertsEnabled", checked)}
           />
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="border-b border-border py-10">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
-            Accent Color
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Choose the primary accent color used across the app. This tints buttons,
-            highlights, and key UI surfaces.
-          </p>
-        </div>
-
+      <SettingsSection
+        title="Accent Color"
+        description="Choose the primary accent color used across the app. This tints buttons, highlights, and key UI surfaces."
+      >
         <div className="flex flex-wrap items-center gap-3">
           {ACCENT_PRESETS.map((preset) => {
             const isSelected = form.accentColor.toLowerCase() === preset.hex;
@@ -366,19 +346,12 @@ export function SettingsEditor({
             </span>
           </div>
         ) : null}
-      </section>
+      </SettingsSection>
 
-      <section className="border-b border-border py-10">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
-            Account Reference
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Core account identity comes from your creator profile and sign-in
-            provider. Update social handles and business details in Profile.
-          </p>
-        </div>
-
+      <SettingsSection
+        title="Account Reference"
+        description="Core account identity comes from your creator profile and sign-in provider. Update social handles and business details in Profile."
+      >
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-2">
             <FieldLabel htmlFor="settingsDisplayName">Display name</FieldLabel>
@@ -398,7 +371,7 @@ export function SettingsEditor({
             />
           </div>
         </div>
-      </section>
+      </SettingsSection>
 
       <div className="flex items-center gap-4 py-8">
         <button

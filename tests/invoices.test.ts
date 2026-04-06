@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildInvoiceLineItems, computeInvoiceReminderAnchorDate } from "@/lib/invoices";
+import {
+  buildInvoiceDraftNotes,
+  buildInvoiceLineItems,
+  computeInvoiceReminderAnchorDate
+} from "@/lib/invoices";
 import type { DealAggregate, DealRecord, DealTermsRecord, DocumentRecord } from "@/lib/types";
 
 function makeDeal(): DealRecord {
@@ -115,6 +119,7 @@ describe("buildInvoiceLineItems", () => {
     const lineItems = buildInvoiceLineItems({
       amount: 3000,
       fallbackTitle: "Spring Drop",
+      revisionRounds: 1,
       deliverables: [
         {
           id: "d1",
@@ -144,6 +149,8 @@ describe("buildInvoiceLineItems", () => {
       unitRate: 1000,
       amount: 2000
     });
+    expect(lineItems[0]?.description).toContain("Due Mar 30, 2026");
+    expect(lineItems[0]?.description).toContain("Includes 1 revision round");
     expect(lineItems[1]).toMatchObject({
       title: "Instagram story",
       quantity: 1,
@@ -156,17 +163,66 @@ describe("buildInvoiceLineItems", () => {
     const lineItems = buildInvoiceLineItems({
       amount: 1800,
       fallbackTitle: "Spring Drop",
+      paymentStructure: "Flat fee",
       deliverables: []
     });
 
     expect(lineItems).toEqual([
       expect.objectContaining({
         title: "Spring Drop",
+        description: "Flat fee",
         quantity: 1,
         unitRate: 1800,
         amount: 1800
       })
     ]);
+  });
+});
+
+describe("buildInvoiceDraftNotes", () => {
+  it("builds invoice notes from deliverables, revisions, and payment terms", () => {
+    const notes = buildInvoiceDraftNotes({
+      deliverables: [
+        {
+          id: "d1",
+          title: "TikTok videos",
+          dueDate: "2026-03-30",
+          channel: "TikTok",
+          quantity: 2,
+          status: "pending",
+          description: null
+        },
+        {
+          id: "d2",
+          title: "Instagram Reel",
+          dueDate: "2026-03-31",
+          channel: "Instagram",
+          quantity: 1,
+          status: "pending",
+          description: null
+        }
+      ],
+      paymentTerms: "Net 30",
+      paymentTrigger: "After final live links",
+      paymentStructure: "50% on signature, 50% on completion",
+      revisionRounds: 1
+    });
+
+    expect(notes).toContain("Services rendered: 2 TikTok videos, Instagram Reel.");
+    expect(notes).toContain("Includes 1 revision round.");
+    expect(notes).toContain(
+      "Payment terms: 50% on signature, 50% on completion, Net 30, After final live links."
+    );
+  });
+
+  it("preserves an existing note instead of regenerating one", () => {
+    const notes = buildInvoiceDraftNotes({
+      existingNotes: "Use vendor portal reference PO-123.",
+      deliverables: [],
+      paymentTerms: "Net 30"
+    });
+
+    expect(notes).toBe("Use vendor portal reference PO-123.");
   });
 });
 

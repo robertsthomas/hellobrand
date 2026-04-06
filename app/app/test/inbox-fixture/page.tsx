@@ -464,7 +464,8 @@ export default async function InboxFixturePage() {
         provider: "",
         accountId: "",
         dealId: "",
-        workflowState: ""
+        workflowState: "",
+        sort: "newest"
       }}
     />
   );
