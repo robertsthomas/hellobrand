@@ -40,7 +40,10 @@ export default async function WorkspaceLayout({
     getCachedProfile(viewer),
     getCachedOnboardingState(viewer),
     getCachedDealAggregates(viewer),
-    listNotificationsForViewer(viewer),
+    listNotificationsForViewer(viewer, {
+      limit: 20,
+      syncComputed: false
+    }),
     getViewerEntitlements(viewer)
   ]);
   const emailAccounts = entitlements.features.email_connections

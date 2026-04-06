@@ -19,21 +19,38 @@ function isLocalPoolExhaustionError(error: unknown) {
   );
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+) {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
+  );
+
+  return results;
+}
+
 async function loadRawAggregates(viewerId: string) {
   try {
     const repository = getRepository();
     const deals = await repository.listDeals(viewerId);
-    const aggregates: DealAggregate[] = [];
+    const aggregates = await mapWithConcurrency(deals, 4, async (deal) =>
+      repository.getDealAggregate(viewerId, deal.id)
+    );
 
-    for (const deal of deals) {
-      const aggregate = await repository.getDealAggregate(viewerId, deal.id);
-
-      if (aggregate) {
-        aggregates.push(aggregate);
-      }
-    }
-
-    return aggregates;
+    return aggregates.filter((aggregate): aggregate is DealAggregate => aggregate !== null);
   } catch (error) {
     if (isLocalPoolExhaustionError(error)) {
       return [];
@@ -103,6 +120,10 @@ export async function getCachedProfile(viewer: Viewer) {
 }
 
 export async function getCachedOnboardingState(viewer: Viewer) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag(`user-${viewer.id}-onboarding`);
+
   const { getOnboardingStateForViewer } = await import("@/lib/onboarding");
   return getOnboardingStateForViewer(viewer);
 }

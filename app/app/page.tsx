@@ -21,8 +21,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { requireViewer } from "@/lib/auth";
 import {
   getCachedDealAggregates,
-  getCachedIntakeDrafts,
-  getCachedOnboardingState
+  getCachedIntakeDrafts
 } from "@/lib/cached-data";
 import { countConflictSeverity } from "@/lib/conflict-intelligence";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
@@ -194,13 +193,10 @@ export default function WorkspaceDashboardPage() {
 
 async function DashboardContent() {
   const viewer = await requireViewer();
-  const [aggregates, intakeDrafts, onboardingState] = await Promise.all([
+  const [aggregates, intakeDrafts] = await Promise.all([
     getCachedDealAggregates(viewer),
-    getCachedIntakeDrafts(viewer),
-    getCachedOnboardingState(viewer)
+    getCachedIntakeDrafts(viewer)
   ]);
-
-  const isOnboardingComplete = !!onboardingState.profileOnboardingCompletedAt;
 
   const dealRows = aggregates.map((aggregate) => {
     const normalized = buildNormalizedIntakeRecord(aggregate);

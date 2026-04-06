@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  UserButton
+  ClerkProvider
 } from "@clerk/nextjs";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { cookies } from "next/headers";
@@ -12,7 +9,6 @@ import { Suspense, type ReactNode } from "react";
 
 import "@/app/globals.css";
 import { PostHogProvider } from "@/app/providers";
-import { Show } from "@/components/clerk-show";
 import { PostHogPageView } from "@/components/posthog-pageview";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -73,15 +69,6 @@ async function AppProviders({ children }: { children: ReactNode }) {
         }
       }}
     >
-      <header className="sr-only">
-        <Show when="signed-out">
-          <SignInButton />
-          <SignUpButton />
-        </Show>
-        <Show when="signed-in">
-          <UserButton />
-        </Show>
-      </header>
       <PostHogProvider>
         <ThemeProvider>
           <Suspense fallback={null}>
