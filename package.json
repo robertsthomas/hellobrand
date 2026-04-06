@@ -61,6 +61,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-table": "^8.21.3",
+    "@vercel/speed-insights": "^2.0.0",
     "@vercel/queue": "^0.1.6",
     "ai": "^6.0.116",
     "class-variance-authority": "^0.7.1",

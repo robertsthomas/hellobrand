@@ -5,6 +5,7 @@ import {
   SignUpButton,
   UserButton
 } from "@clerk/nextjs";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
@@ -110,6 +111,7 @@ export default function RootLayout({
             <AppProviders>{children}</AppProviders>
           </div>
         </Suspense>
+        <SpeedInsights />
       </body>
     </html>
   );
