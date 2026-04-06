@@ -325,7 +325,7 @@ export function useInboxReplyComposer({
     overrideInstructions?: string | null,
     revisionTarget?: DraftRevisionTarget | null
   ) => Promise<void>;
-  usePromptForDraft: () => Promise<void>;
+  usePromptForDraft: (overrideInstructions?: string | null) => Promise<void>;
   cancelDraftReply: () => void;
   clearDraftComposer: () => void;
   refineGeneratedDraft: (instruction: string) => Promise<void>;
@@ -515,8 +515,8 @@ export function useInboxReplyComposer({
     ]
   );
 
-  const usePromptForDraft = useCallback(async () => {
-    const currentInstructions = stateRef.current.draftInstructions;
+  const usePromptForDraft = useCallback(async (overrideInstructions?: string | null) => {
+    const currentInstructions = overrideInstructions ?? stateRef.current.draftInstructions;
     dispatch({ type: "prepare_prompt_use" });
     await draftReply(currentInstructions);
   }, [draftReply]);

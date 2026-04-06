@@ -41,6 +41,8 @@ const replySuggestionsSchema = z.object({
   ).max(3)
 });
 
+const EMAIL_THREAD_SUMMARY_FORMAT_VERSION = "v2_short";
+
 function emailThreadSummarySystemPrompt() {
   return joinPromptSections([
     {
@@ -57,6 +59,12 @@ function emailThreadSummarySystemPrompt() {
         "Prefer creator-native framing, such as what the creator needs to do, what the other side is asking for, and what is still unresolved.",
         "If an item is not explicit in the thread, omit it.",
         "Write plain text only.",
+        "Keep the summary short and simple.",
+        "Default to 4 to 5 sentences total.",
+        "Only add a short bullet list when the email includes multiple concrete deal terms or next steps that would be hard to scan in prose.",
+        "If you use bullets, use at most 3 bullets and keep each bullet to one short sentence.",
+        "Do not use headings, sections, labels, or long checklists.",
+        "Do not repeat the same fact in both prose and bullets.",
         "Never use em dashes or en dashes. Replace them with commas."
       ])
     }
@@ -72,7 +80,7 @@ function emailThreadSummaryUserPrompt(threadText: string) {
     {
       tag: "task",
       content:
-        "Based on the thread above, write a concise creator-facing summary that helps the creator understand what happened, what is being asked, and what to do next."
+        "Based on the thread above, write a short creator-facing recap of the email. Keep it easy to skim, explain what happened, what they are asking for, and the most important next step. Aim for 4 to 5 sentences, and only add up to 3 bullets if the thread includes several concrete terms that are worth breaking out."
     }
   ]);
 }
@@ -341,9 +349,10 @@ export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
   const threadText = plainTextThread(thread);
   const cache = aiCachePolicy({
     taskKey: "email_summary",
-    scopeKey: `email-thread:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
+    scopeKey: `email-thread:${EMAIL_THREAD_SUMMARY_FORMAT_VERSION}:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
     input: {
       threadId: thread.thread.id,
+      formatVersion: EMAIL_THREAD_SUMMARY_FORMAT_VERSION,
       threadText
     }
   });
