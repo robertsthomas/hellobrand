@@ -8,6 +8,19 @@ import { buildClerkProfileSyncPayload } from "@/lib/clerk-profile";
 import { prisma } from "@/lib/prisma";
 import type { ProfileRecord } from "@/lib/types";
 
+export type AiModelInfo = {
+  task: string;
+  primary: string;
+  fallbacks: string[];
+  envVar: string | null;
+  routeVersion: string;
+};
+
+export type AiModelConfig = {
+  models: AiModelInfo[];
+  approvedProductionModels: string[];
+};
+
 export type AdminDashboardStats = {
   users: number;
   profiles: number;
@@ -47,6 +60,7 @@ export type AdminDashboardSnapshot = {
   stats: AdminDashboardStats | null;
   appSettings: AppSettingsRecord;
   users: AdminManagedUser[];
+  aiModelConfig: AiModelConfig;
 };
 
 type AdminUserUpdateInput = {
@@ -217,8 +231,95 @@ export async function getAdminDashboardSnapshot(): Promise<AdminDashboardSnapsho
     environment: process.env.NODE_ENV ?? "development",
     stats,
     appSettings,
-    users
+    users,
+    aiModelConfig: getAiModelConfig()
   };
+}
+
+const AI_TASKS: Array<{ key: string; envVar: string | null; category?: string }> = [
+  { key: "extract_section", envVar: "OPENROUTER_MODEL_EXTRACT" },
+  { key: "analyze_risks", envVar: "OPENROUTER_MODEL_RISKS" },
+  { key: "generate_summary", envVar: "OPENROUTER_MODEL_CONTENT", category: "OPENROUTER_MODEL_CONTENT" },
+  { key: "generate_brief", envVar: "OPENROUTER_MODEL_CONTENT", category: "OPENROUTER_MODEL_CONTENT" },
+  { key: "assistant_chat", envVar: null },
+  { key: "email_summary", envVar: "OPENROUTER_MODEL_EMAIL", category: "OPENROUTER_MODEL_EMAIL" },
+  { key: "email_draft", envVar: "OPENROUTER_MODEL_EMAIL", category: "OPENROUTER_MODEL_EMAIL" },
+  { key: "email_suggestions", envVar: "OPENROUTER_MODEL_EMAIL", category: "OPENROUTER_MODEL_EMAIL" },
+  { key: "email_action_items", envVar: "OPENROUTER_MODEL_EMAIL", category: "OPENROUTER_MODEL_EMAIL" }
+];
+
+const TASK_PRIMARY_DEFAULTS: Record<string, string> = {
+  extract_section: "google/gemini-3-flash-preview",
+  analyze_risks: "google/gemini-3-flash-preview",
+  generate_summary: "google/gemini-3-flash-preview",
+  generate_brief: "google/gemini-3-flash-preview",
+  assistant_chat: "openai/gpt-5-mini",
+  email_summary: "google/gemini-2.5-flash",
+  email_draft: "google/gemini-2.5-flash",
+  email_suggestions: "google/gemini-2.5-flash",
+  email_action_items: "google/gemini-2.5-flash"
+};
+
+const TASK_FALLBACK_DEFAULTS: Record<string, string[]> = {
+  extract_section: ["openai/gpt-5-mini"],
+  analyze_risks: ["openai/gpt-5-mini"],
+  generate_summary: ["openai/gpt-5-mini"],
+  generate_brief: ["openai/gpt-5-mini"],
+  assistant_chat: ["google/gemini-2.5-flash"],
+  email_summary: ["openai/gpt-5-mini"],
+  email_draft: ["openai/gpt-5.4-mini", "google/gemini-3-flash-preview"],
+  email_suggestions: ["openai/gpt-5-mini"],
+  email_action_items: ["openai/gpt-5-mini"]
+};
+
+const ROUTE_VERSIONS: Record<string, string> = {
+  extract_section: "extract.route.v2",
+  analyze_risks: "risks.route.v2",
+  generate_summary: "summary.route.v2",
+  generate_brief: "brief.route.v2",
+  assistant_chat: "assistant.route.v2",
+  email_summary: "email.summary.route.v1",
+  email_draft: "email.draft.route.v3",
+  email_suggestions: "email.suggestions.route.v1",
+  email_action_items: "email.action-items.route.v1"
+};
+
+const APPROVED_PRODUCTION_MODELS = [
+  "google/gemini-3-flash-preview",
+  "google/gemini-2.5-flash",
+  "openai/gpt-5-mini",
+  "openai/gpt-5.4-mini"
+];
+
+export function getAiModelConfig(): AiModelConfig {
+  const globalModel = process.env.OPENROUTER_MODEL;
+
+  const models: AiModelInfo[] = AI_TASKS.map(({ key, envVar }) => {
+    const taskModel = envVar ? process.env[envVar] : null;
+    const effectiveModel = globalModel ?? taskModel ?? TASK_PRIMARY_DEFAULTS[key] ?? "unknown";
+
+    const taskFallbackKey = envVar;
+    const fallbacks = [
+      ...(taskFallbackKey ? parseEnvFallbacks(process.env[`${taskFallbackKey}_FALLBACKS`]) : []),
+      ...parseEnvFallbacks(process.env.OPENROUTER_MODEL_FALLBACKS),
+      ...(TASK_FALLBACK_DEFAULTS[key] ?? [])
+    ].filter((m, i, arr) => m !== effectiveModel && arr.indexOf(m) === i);
+
+    return {
+      task: key,
+      primary: effectiveModel,
+      fallbacks,
+      envVar: globalModel ? null : envVar,
+      routeVersion: ROUTE_VERSIONS[key] ?? "unknown"
+    };
+  });
+
+  return { models, approvedProductionModels: APPROVED_PRODUCTION_MODELS };
+}
+
+function parseEnvFallbacks(value: string | undefined): string[] {
+  if (!value) return [];
+  return value.split(",").map((m) => m.trim()).filter(Boolean);
 }
 
 export async function updateAdminManagedUser(

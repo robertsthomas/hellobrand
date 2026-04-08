@@ -1,5 +1,6 @@
 "use client";
 
+import { FileText, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
@@ -36,9 +37,11 @@ export function IntakeFileField({
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selectedFiles = useIntakeUiStore((state) => state.selectedFiles);
+  const pendingFiles = useIntakeUiStore((state) => state.pendingFiles);
   const setSelectedFilesFromList = useIntakeUiStore(
     (state) => state.setSelectedFilesFromList
   );
+  const removeFileByIndex = useIntakeUiStore((state) => state.removeFileByIndex);
   const hasAutoOpened = useRef(false);
 
   useEffect(() => {
@@ -87,10 +90,37 @@ export function IntakeFileField({
             onClick={() => inputRef.current?.click()}
             className="rounded-lg bg-ocean px-4 py-2.5 text-sm font-semibold text-white dark:bg-sand dark:text-[#18201d]"
           >
-            Choose documents
+            <Plus className="mr-1.5 inline h-4 w-4 -translate-y-px" />
+            {selectedFiles.length > 0 ? "Add more" : "Choose files"}
           </button>
           <span className="text-sm text-black/60 dark:text-white/65">{summary}</span>
         </div>
+        {pendingFiles.length > 0 && (
+          <div className="mt-3 grid gap-1.5 border border-black/8 bg-black/[0.02] p-2 dark:border-white/10 dark:bg-white/[0.02]">
+            {pendingFiles.slice(0, 6).map((file, index) => (
+              <div
+                key={`${file.name}:${file.size}:${file.type}:${index}`}
+                className="group flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFileByIndex(index)}
+                  className="shrink-0 rounded p-0.5 text-black/30 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-white/30 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            {pendingFiles.length > 6 && (
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                +{pendingFiles.length - 6} more
+              </div>
+            )}
+          </div>
+        )}
         <p className="mt-3 text-xs text-black/45 dark:text-white/45">
           Supports contract and campaign document formats only: PDF, DOC, DOCX,
           RTF, TXT, EML, MSG, PPT, PPTX, XLS, and XLSX.

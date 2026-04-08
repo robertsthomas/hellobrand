@@ -11,6 +11,7 @@ type NotificationEmailStatus = "pending" | "sent" | "failed" | "skipped";
 type EmailEligibleEventType =
   | "workspace.ready_for_review"
   | "workspace.failed"
+  | "workspace.deleted"
   | "workspace.missing_payment"
   | "workspace.missing_deliverables"
   | "workspace.missing_usage_rights"
@@ -208,6 +209,11 @@ function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string):
       const truncated = truncateEntityName(entity, 18);
       return `${truncated} workspace could not be processed`;
     }
+    case "workspace.deleted": {
+      const entity = title.replace(/^Workspace deleted: /i, "") || "A";
+      const truncated = truncateEntityName(entity, 22);
+      return `${truncated} workspace has been deleted`;
+    }
     case "workspace.missing_payment": {
       const entity = title.replace(/^Payment amount missing from /i, "") || "This campaign";
       const truncated = truncateEntityName(entity, 21);
@@ -242,6 +248,8 @@ function resolveCtaLabel(eventType: EmailEligibleEventType): string {
       return "Review workspace";
     case "workspace.failed":
       return "View error details";
+    case "workspace.deleted":
+      return "Go to dashboard";
     case "workspace.missing_payment":
       return "Add payment amount";
     case "workspace.missing_deliverables":
@@ -260,6 +268,7 @@ function resolveCtaLabel(eventType: EmailEligibleEventType): string {
 const EMAIL_ELIGIBLE_EVENT_TYPES = new Set<string>([
   "workspace.ready_for_review",
   "workspace.failed",
+  "workspace.deleted",
   "workspace.missing_payment",
   "workspace.missing_deliverables",
   "workspace.missing_usage_rights",

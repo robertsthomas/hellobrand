@@ -1,4 +1,4 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { safeRevalidatePath, safeRevalidateTag } from "@/lib/safe-revalidate";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
@@ -204,9 +204,9 @@ async function supersedeWorkspaceNotifications(
 }
 
 async function refreshNotificationViews(userId: string) {
-  revalidateTag(`user-${userId}-notifications`, "max");
-  revalidatePath("/app", "layout");
-  revalidatePath("/app/settings/notifications");
+  safeRevalidateTag(`user-${userId}-notifications`);
+  safeRevalidatePath("/app", "layout");
+  safeRevalidatePath("/app/settings/notifications");
 }
 
 async function emitWorkspaceNotificationSeed(userId: string, seed: NotificationSeed) {

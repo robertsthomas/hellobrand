@@ -10,7 +10,9 @@ import {
   splitIntoSections
 } from "@/lib/analysis/fallback";
 import { buildConflictResults } from "@/lib/conflict-intelligence";
+import { mergeTerms } from "@/lib/deals";
 import { generateEmailDraft } from "@/lib/email/generate";
+import { sanitizeCampaignName } from "@/lib/party-labels";
 import { createSeedStore } from "@/lib/repository/seed";
 import { extractDocumentText } from "@/lib/documents/extract";
 import type { DealAggregate } from "@/lib/types";
@@ -60,6 +62,119 @@ Brand shall pay Creator $3,000 on Net 45 terms.
 
     expect(result.extraction.conflicts).toContain("paymentAmount");
     expect(result.extraction.conflicts).toContain("paymentTerms");
+  });
+
+  test("extracts split payment structure and hyphenated net terms", () => {
+    const fixture = `
+Creator Agreement
+
+Compensation
+Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 after final live links.
+`;
+
+    const result = fallbackAnalyzeDocument(fixture, {
+      fileName: "split-payment-contract.txt",
+      documentKindHint: "contract"
+    });
+
+    expect(result.extraction.data.paymentAmount).toBe(7200);
+    expect(result.extraction.data.currency).toBe("USD");
+    expect(result.extraction.data.netTermsDays).toBe(30);
+    expect(result.extraction.data.paymentTerms).toBe("Net 30");
+    expect(result.extraction.data.paymentStructure).toBe(
+      "50% on signature, 50% on completion"
+    );
+    expect(result.extraction.data.paymentTrigger).toBe(
+      "On signature and after final live links"
+    );
+  });
+
+  test("mergeTerms preserves earlier extracted usage and exclusivity fields when a later brief omits them", () => {
+    const base = {
+      brandName: "NimbusPM",
+      agencyName: null,
+      creatorName: "Jordan Alvarez",
+      campaignName: "HB-SAAS-002",
+      paymentAmount: 7200,
+      currency: "USD",
+      paymentTerms: "50% on signature and 50% net-30 after final live links",
+      paymentStructure: "50% on signature, 50% on completion",
+      netTermsDays: 30,
+      paymentTrigger: "On signature and after final live links",
+      deliverables: [],
+      usageRights: "Organic usage (Perpetual unless revoked for breach), Paid usage (See deal type), Whitelisting (Only if expressly authorized)",
+      usageRightsOrganicAllowed: true,
+      usageRightsPaidAllowed: true,
+      whitelistingAllowed: true,
+      usageDuration: "Perpetual unless revoked for breach",
+      usageTerritory: "United States",
+      usageChannels: ["Organic reposting", "Paid social", "Whitelisting"],
+      exclusivity: "Campaign-specific; category-based only",
+      exclusivityApplies: true,
+      exclusivityCategory: null,
+      exclusivityDuration: null,
+      exclusivityRestrictions: "Category-based only",
+      brandCategory: "other",
+      competitorCategories: [],
+      restrictedCategories: [],
+      campaignDateWindow: null,
+      disclosureObligations: [],
+      revisions: null,
+      revisionRounds: null,
+      termination: null,
+      terminationAllowed: null,
+      terminationNotice: null,
+      terminationConditions: null,
+      governingLaw: "State of Delaware",
+      notes: null,
+      manuallyEditedFields: [],
+      briefData: null,
+      pendingExtraction: null
+    };
+
+    const laterBriefPatch = {
+      brandName: "NimbusPM",
+      campaignName: "Brief Campaign objective",
+      paymentAmount: null,
+      currency: null,
+      paymentTerms: null,
+      paymentStructure: null,
+      netTermsDays: null,
+      paymentTrigger: null,
+      usageRights: null,
+      usageRightsOrganicAllowed: null,
+      usageRightsPaidAllowed: null,
+      whitelistingAllowed: null,
+      usageDuration: null,
+      usageTerritory: null,
+      usageChannels: [],
+      exclusivity: null,
+      exclusivityApplies: null,
+      exclusivityCategory: null,
+      exclusivityDuration: null,
+      exclusivityRestrictions: null,
+      notes:
+        "Target audience: Startup operators, PMs, founders, 25-45. Primary CTA: Book a demo through the custom link."
+    };
+
+    const merged = mergeTerms(base, laterBriefPatch);
+
+    expect(merged.usageRights).toBe(base.usageRights);
+    expect(merged.usageRightsOrganicAllowed).toBe(true);
+    expect(merged.usageRightsPaidAllowed).toBe(true);
+    expect(merged.whitelistingAllowed).toBe(true);
+    expect(merged.usageDuration).toBe(base.usageDuration);
+    expect(merged.usageTerritory).toBe(base.usageTerritory);
+    expect(merged.exclusivity).toBe(base.exclusivity);
+    expect(merged.exclusivityApplies).toBe(true);
+    expect(merged.paymentStructure).toBe(base.paymentStructure);
+    expect(merged.paymentTrigger).toBe(base.paymentTrigger);
+    expect(merged.notes).toBe(laterBriefPatch.notes);
+  });
+
+  test("rejects generic brief section headers as campaign names", () => {
+    expect(sanitizeCampaignName("Brief Campaign objective")).toBeNull();
+    expect(sanitizeCampaignName("Campaign objective")).toBeNull();
   });
 
   test("creates a usable negotiation email draft", () => {

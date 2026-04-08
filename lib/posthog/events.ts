@@ -15,6 +15,7 @@ export const appActionEventNames = [
   "workspace_file_picker_clicked",
   "workspace_saved",
   "workspace_analysis_started",
+  "workspace_analysis_failed",
   "workspace_add_another_clicked",
   "workspace_documents_submitted",
   "workspace_pasted_context_submitted",

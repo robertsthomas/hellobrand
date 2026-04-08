@@ -2,6 +2,9 @@ import { serve } from "inngest/next";
 
 import { inngest } from "@/lib/inngest/client";
 import {
+  documentProcessingFunction
+} from "@/lib/inngest/document-functions";
+import {
   emailActionItemDeadlineCheckFunction,
   emailIncrementalSyncFunction,
   emailInitialSyncFunction,
@@ -18,6 +21,7 @@ import {
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
+    documentProcessingFunction,
     notificationEmailSendFunction,
     invoiceReminderSweepFunction,
     workspaceReminderSweepFunction,

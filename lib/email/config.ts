@@ -113,19 +113,16 @@ export const yahooScopes = [
 
 export function getEmailSummaryModel() {
   return (
-    process.env.OPENROUTER_MODEL_EMAIL_SUMMARY ||
-    process.env.LLM_MODEL_SUMMARY ||
-    process.env.OPENROUTER_MODEL_SUMMARY ||
-    process.env.LLM_MODEL ||
+    process.env.OPENROUTER_MODEL_EMAIL ||
     process.env.OPENROUTER_MODEL ||
-    "openai/gpt-5-chat"
+    "google/gemini-2.5-flash"
   );
 }
 
 export function getEmailDraftModel() {
   return (
-    process.env.OPENROUTER_MODEL_EMAIL_DRAFT ||
-    process.env.LLM_MODEL_EMAIL_DRAFT ||
+    process.env.OPENROUTER_MODEL_EMAIL ||
+    process.env.OPENROUTER_MODEL ||
     "google/gemini-2.5-flash"
   );
 }

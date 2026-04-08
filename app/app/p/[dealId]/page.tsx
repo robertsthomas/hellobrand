@@ -158,7 +158,12 @@ async function DealDetailContent({
   };
   const rawTab = resolvedSearchParams?.tab ?? "";
   const resolvedTab = TAB_REDIRECTS[rawTab] ?? rawTab;
-  const currentTab = VALID_TABS.includes(resolvedTab) ? resolvedTab : "overview";
+  const hasPendingExtraction = Boolean(terms?.pendingExtraction);
+  const currentTab = VALID_TABS.includes(resolvedTab)
+    ? resolvedTab
+    : hasPendingExtraction
+      ? "terms"
+      : "overview";
 
   const nextAction = buildNextAction({
     status: deal.status,
@@ -209,7 +214,7 @@ async function DealDetailContent({
               <TabsTrigger value="terms" data-guide="tab-terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
                 Terms
                 {riskCount > 0 ? (
-                  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center bg-clay/10 px-1 text-[11px] font-semibold text-clay">
+                  <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center bg-clay/10 px-1 text-[11px] font-semibold text-clay transition-colors group-data-[state=active]:bg-white/10 group-data-[state=active]:text-white dark:group-data-[state=active]:bg-black/10 dark:group-data-[state=active]:text-[#111827]">
                     {riskCount}
                   </span>
                 ) : null}
@@ -233,11 +238,6 @@ async function DealDetailContent({
 
           {/* ── Overview: "Today" view ── */}
           <TabsContent value="overview" id="tab-overview" className="mt-0 space-y-6">
-            {/* Pending changes banner */}
-            {terms?.pendingExtraction ? (
-              <PendingChangesBanner dealId={deal.id} terms={terms} />
-            ) : null}
-
             {/* Next action */}
             <div className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}>
               <div>
@@ -302,6 +302,9 @@ async function DealDetailContent({
 
           {/* ── Terms (includes risks) ── */}
           <TabsContent value="terms" id="tab-terms" className="mt-0 space-y-6">
+            {terms?.pendingExtraction ? (
+              <PendingChangesBanner dealId={deal.id} terms={terms} />
+            ) : null}
             {riskCount > 0 ? (
               <RiskFlags dealId={deal.id} flags={riskFlags} />
             ) : null}

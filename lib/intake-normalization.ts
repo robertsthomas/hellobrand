@@ -111,6 +111,7 @@ function isGenericIntakeLabel(value: string | null | undefined) {
   return (
     sanitizeCampaignName(normalized) === null ||
     isGenericWorkspaceLabel(normalized) ||
+    /addendum$/i.test(normalized) ||
     normalized === "pasted email thread" ||
     normalized === "pasted deliverables notes" ||
     normalized === "pasted invoice" ||
@@ -386,11 +387,15 @@ function extractLikelyBrandFromFileNames(fileNames: string[]) {
 
     const beforeHandle = cleaned.split(/\s+@\w+/i)[0]?.trim();
     if (beforeHandle) {
-      return beforeHandle.replace(/\s+x\s*$/i, "").trim();
+      const sanitized = sanitizePartyName(beforeHandle.replace(/\s+x\s*$/i, "").trim(), "brand");
+      if (sanitized) {
+        return sanitized;
+      }
     }
 
-    if (cleaned) {
-      return cleaned;
+    const fallbackBrand = sanitizePartyName(cleaned, "brand");
+    if (fallbackBrand) {
+      return fallbackBrand;
     }
   }
 

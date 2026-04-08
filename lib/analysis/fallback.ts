@@ -130,7 +130,7 @@ function parseCurrencyAmount(text: string) {
 }
 
 function parseNetTerms(text: string) {
-  const match = firstMatch(text, /\bnet\s?(\d{1,3})\b/i);
+  const match = firstMatch(text, /\bnet[\s-]?(\d{1,3})\b/i);
   if (!match) {
     return null;
   }
@@ -140,6 +140,94 @@ function parseNetTerms(text: string) {
     netTermsDays: Number(match.value),
     snippet: sentenceAround(text, match.index)
   };
+}
+
+function parsePaymentStructure(text: string) {
+  const splitSentence = text.match(
+    /(\d{1,3}%[^.\n]{0,120}?\b(?:and|,)\s*\d{1,3}%[^.\n]{0,120})/i
+  );
+  const splitSnippet = splitSentence?.[1] ?? null;
+  const splitLower = splitSnippet?.toLowerCase() ?? "";
+
+  if (splitSnippet && splitLower.includes("signature")) {
+    const firstPercent = splitSnippet.match(/(\d{1,3})%/i)?.[1] ?? null;
+    const percentMatches = [...splitSnippet.matchAll(/(\d{1,3})%/gi)];
+    const lastPercent = percentMatches.at(-1)?.[1] ?? null;
+
+    if (firstPercent && lastPercent) {
+      if (
+        /final live links|final post|completion|delivery|deliverable|posting/.test(splitLower)
+      ) {
+        return {
+          value: `${firstPercent}% on signature, ${lastPercent}% on completion`,
+          snippet: normalizeEvidenceSnippet(splitSnippet) ?? splitSnippet
+        };
+      }
+
+      return {
+        value: `${firstPercent}% on signature, ${lastPercent}% milestone-based`,
+        snippet: normalizeEvidenceSnippet(splitSnippet) ?? splitSnippet
+      };
+    }
+  }
+
+  if (/flat fee|one-time fee/i.test(text)) {
+    const match = firstMatch(text, /(flat fee|one-time fee)/i);
+    if (match) {
+      return {
+        value: "Flat fee",
+        snippet: sentenceAround(text, match.index)
+      };
+    }
+  }
+
+  return null;
+}
+
+function parsePaymentTrigger(text: string) {
+  const lower = text.toLowerCase();
+
+  if (/signature/.test(lower) && /final live links/.test(lower)) {
+    const match = firstMatch(text, /signature[^.\n]{0,120}final live links/i);
+    return {
+      value: "On signature and after final live links",
+      snippet: match ? sentenceAround(text, match.index) : sentenceAround(text, 0)
+    };
+  }
+
+  if (/after invoice|upon receipt of invoice/i.test(text)) {
+    const match = firstMatch(text, /(after invoice|upon receipt of invoice)/i);
+    return {
+      value: "After invoice receipt",
+      snippet: match ? sentenceAround(text, match.index) : null
+    };
+  }
+
+  if (/after final live links|upon final live links/i.test(text)) {
+    const match = firstMatch(text, /(after final live links|upon final live links)/i);
+    return {
+      value: "After final live links",
+      snippet: match ? sentenceAround(text, match.index) : null
+    };
+  }
+
+  if (/upon posting|after posting|after final post|upon final post/i.test(text)) {
+    const match = firstMatch(text, /(upon posting|after posting|after final post|upon final post)/i);
+    return {
+      value: "After posting",
+      snippet: match ? sentenceAround(text, match.index) : null
+    };
+  }
+
+  if (/on signature|upon signature/i.test(text)) {
+    const match = firstMatch(text, /(on signature|upon signature)/i);
+    return {
+      value: "On signature",
+      snippet: match ? sentenceAround(text, match.index) : null
+    };
+  }
+
+  return null;
 }
 
 function parseDuration(text: string, keyword: string) {
@@ -577,14 +665,16 @@ function extractStructuredTermsFromSection(
       pushEvidence(evidence, "paymentTerms", netTerms.snippet, sectionKey, 0.84);
     }
 
-    if (/flat fee|one-time fee/i.test(text)) {
-      terms.paymentStructure = "Flat fee";
+    const paymentStructure = parsePaymentStructure(text);
+    if (paymentStructure) {
+      terms.paymentStructure = paymentStructure.value;
+      pushEvidence(evidence, "paymentStructure", paymentStructure.snippet, sectionKey, 0.8);
     }
 
-    if (/after invoice|upon receipt of invoice/i.test(text)) {
-      terms.paymentTrigger = "After invoice receipt";
-    } else if (/upon posting|after posting/i.test(text)) {
-      terms.paymentTrigger = "After posting";
+    const paymentTrigger = parsePaymentTrigger(text);
+    if (paymentTrigger) {
+      terms.paymentTrigger = paymentTrigger.value;
+      pushEvidence(evidence, "paymentTrigger", paymentTrigger.snippet, sectionKey, 0.8);
     }
   }
 

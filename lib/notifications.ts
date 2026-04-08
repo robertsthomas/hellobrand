@@ -19,6 +19,7 @@ export type NotificationEventType =
   | "workspace.duplicates_found"
   | "workspace.confirmed"
   | "workspace.cancelled"
+  | "workspace.deleted"
   | "workspace.missing_payment"
   | "workspace.missing_deliverables"
   | "workspace.missing_usage_rights"
@@ -48,6 +49,7 @@ export type NotificationType =
   | "workspace_duplicate_found"
   | "workspace_confirmed"
   | "workspace_cancelled"
+  | "workspace_deleted"
   | "workspace_missing_data";
 
 export interface NotificationItem {
@@ -177,7 +179,8 @@ export function notificationTypeForEventType(
     case "workspace.confirmed":
       return "workspace_confirmed";
     case "workspace.cancelled":
-      return "workspace_cancelled";
+    case "workspace.deleted":
+      return "workspace_deleted";
     case "workspace.missing_payment":
     case "workspace.missing_deliverables":
     case "workspace.missing_usage_rights":
@@ -436,6 +439,20 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "This workspace was cancelled and removed.",
         href: "/app",
         dedupeKey: `workspace.cancelled:${input.sessionId}`,
+        createdAt: input.createdAt
+      };
+    case "workspace.deleted":
+      return {
+        category: "workspace",
+        eventType: input.eventType,
+        entityType: "workspace",
+        entityId: input.sessionId,
+        sessionId: input.sessionId,
+        dealId: input.dealId,
+        title: `Workspace deleted: ${label}`,
+        description: "This workspace was deleted and cannot be recovered.",
+        href: "/app",
+        dedupeKey: `workspace.deleted:${input.sessionId}`,
         createdAt: input.createdAt
       };
     default:

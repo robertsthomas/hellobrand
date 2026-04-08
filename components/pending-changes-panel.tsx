@@ -83,46 +83,6 @@ function previewText(value: string, maxLength = 96) {
   return `${value.slice(0, maxLength).trim()}...`;
 }
 
-function formatCollectionSummary(value: unknown) {
-  if (!Array.isArray(value) || value.length === 0) {
-    return "None added";
-  }
-
-  if (typeof value[0] !== "string") {
-    return `${value.length} item${value.length === 1 ? "" : "s"}`;
-  }
-
-  if (value.length <= 2) {
-    return value.join(", ");
-  }
-
-  return `${value.length} items added`;
-}
-
-function buildChangeSummary(entry: TermsDiffEntry) {
-  const current = formatValue(entry.currentValue);
-  const proposed = formatValue(entry.proposedValue);
-
-  if (entry.fieldType === "json_array") {
-    const currentArray = Array.isArray(entry.currentValue) ? entry.currentValue : [];
-    const proposedArray = Array.isArray(entry.proposedValue) ? entry.proposedValue : [];
-
-    if (currentArray.length === 0) {
-      return `Add ${formatCollectionSummary(proposedArray)}`;
-    }
-
-    return `Replace ${formatCollectionSummary(currentArray)} with ${formatCollectionSummary(
-      proposedArray
-    )}`;
-  }
-
-  if (current === "Not set" || current === "None") {
-    return `Set to ${previewText(proposed, 84)}`;
-  }
-
-  return `Update from ${previewText(current, 48)} to ${previewText(proposed, 60)}`;
-}
-
 function shouldAllowExpansion(entry: TermsDiffEntry) {
   const current = formatValue(entry.currentValue);
   const proposed = formatValue(entry.proposedValue);
@@ -174,7 +134,7 @@ function DiffRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <label
                   htmlFor={`field-${entry.field}`}
@@ -198,10 +158,6 @@ function DiffRow({
                   </span>
                 ) : null}
               </div>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {buildChangeSummary(entry)}
-              </p>
             </div>
 
             <span

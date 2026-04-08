@@ -33,6 +33,7 @@ interface IntakeUiState {
   setPastedText: (value: string) => void;
   setSelectedFilesFromList: (files: FileList | null) => void;
   setPendingFiles: (files: File[]) => void;
+  removeFileByIndex: (index: number) => void;
   setIsSubmitting: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;
   setDuplicateMatches: (matches: DuplicateMatch[]) => void;
@@ -118,6 +119,14 @@ export const useIntakeUiStore: UseBoundStore<StoreApi<IntakeUiState>> =
     set({
       pendingFiles,
       selectedFiles: pendingFiles.map(toSelectedFileMeta)
+    }),
+  removeFileByIndex: (index: number) =>
+    set((state) => {
+      const newPendingFiles = state.pendingFiles.filter((_, i) => i !== index);
+      return {
+        pendingFiles: newPendingFiles,
+        selectedFiles: newPendingFiles.map(toSelectedFileMeta)
+      };
     }),
   setIsSubmitting: (isSubmitting) => set({ isSubmitting }),
   setErrorMessage: (errorMessage) => set({ errorMessage }),

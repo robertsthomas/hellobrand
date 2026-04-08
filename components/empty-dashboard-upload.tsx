@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { FileText, Plus, Trash2, X } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
 import { InfoTooltip } from "@/components/app-tooltip";
@@ -184,6 +184,7 @@ export function EmptyDashboardUpload({
   const setSelectedFilesFromList = useIntakeUiStore(
     (state) => state.setSelectedFilesFromList
   );
+  const removeFileByIndex = useIntakeUiStore((state) => state.removeFileByIndex);
   const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
   const reset = useIntakeUiStore((state) => state.reset);
@@ -280,15 +281,10 @@ export function EmptyDashboardUpload({
 
   async function startAnalysisInBackground(
     optimisticNotificationId: string,
-    initialSessionId: string | null
-  ) {
+    generationId: string
+  ): Promise<string | null> {
     try {
       const createdSessionIds: string[] = [];
-      let navigatedToSessionId = initialSessionId;
-
-      if (navigatedToSessionId) {
-        router.push(`/app/intake/${navigatedToSessionId}?starting=1`);
-      }
 
       for (const workspace of localWorkspaces) {
         const payload = await loadLocalWorkspace(workspace.localId);
@@ -321,10 +317,6 @@ export function EmptyDashboardUpload({
         }
 
         createdSessionIds.push(sessionId);
-        if (!navigatedToSessionId) {
-          navigatedToSessionId = sessionId;
-          router.push(`/app/intake/${sessionId}?starting=1`);
-        }
         await deleteLocalWorkspace(workspace.localId);
       }
 
@@ -360,44 +352,68 @@ export function EmptyDashboardUpload({
         showHint: true
       });
 
-      router.refresh();
+      setLocalWorkspaces([]);
+      setServerQueuedWorkspaces([]);
+      setIsComposerVisible(true);
+
+      return payload.session.id;
     } catch (error) {
       console.error("[startAnalysisInBackground] Failed:", error);
+      captureAppEvent(posthog, "workspace_analysis_failed", {
+        generationId,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
       dispatchWorkspaceGenerationNotification({
         action: "remove",
         notificationId: optimisticNotificationId
       });
-      router.refresh();
+      setErrorMessage(error instanceof Error ? error.message : "Could not start analysis.");
+      const remaining = readLocalWorkspaceManifest();
+      setLocalWorkspaces(remaining);
+      return null;
     }
   }
 
   async function startAnalysis() {
-    if (queuedCount === 0) {
-      setErrorMessage("Save at least one workspace before starting analysis.");
+    if (isSubmitting || queuedCount === 0) {
+      if (queuedCount === 0) {
+        setErrorMessage("Save at least one workspace before starting analysis.");
+      }
       return;
     }
 
+    const generationId = `gen-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    captureAppEvent(posthog, "workspace_analysis_started", {
+      generationId,
+      queuedCount,
+      localWorkspaceCount: localWorkspaces.length,
+      serverQueuedCount: serverQueuedWorkspaces.length
+    });
+
+    setIsSubmitting(true);
     setErrorMessage(null);
-    reset(initialMode);
+
+    const optimisticNotificationId = `optimistic-workspace-processing:${Date.now()}`;
+
+    const firstServerQueued = serverQueuedWorkspaces[0];
+    const firstLocal = localWorkspaces[0];
+
     const primaryQueuedWorkspace =
-      serverQueuedWorkspaces[0] ??
-      (localWorkspaces[0]
+      firstServerQueued ??
+      (firstLocal
         ? {
-            sessionId: `optimistic-${localWorkspaces[0].localId}`,
-            dealId: `optimistic-${localWorkspaces[0].localId}`,
-            brandName: localWorkspaces[0].brandName,
-            campaignName: localWorkspaces[0].campaignName
+            brandName: firstLocal.brandName,
+            campaignName: firstLocal.campaignName
           }
         : null);
-    const optimisticNotificationId = `optimistic-workspace-processing:${Date.now()}`;
 
     if (primaryQueuedWorkspace) {
       dispatchWorkspaceGenerationNotification({
         action: "upsert",
         notification: buildOptimisticWorkspaceGeneratingNotification({
           id: optimisticNotificationId,
-          sessionId: primaryQueuedWorkspace.sessionId,
-          dealId: primaryQueuedWorkspace.dealId,
+          sessionId: firstServerQueued?.sessionId ?? optimisticNotificationId,
+          dealId: firstServerQueued?.dealId ?? optimisticNotificationId,
           brandName: primaryQueuedWorkspace.brandName,
           campaignName: primaryQueuedWorkspace.campaignName
         }),
@@ -405,15 +421,16 @@ export function EmptyDashboardUpload({
       });
     }
 
-      captureAppEvent(posthog, "workspace_analysis_started", {
-        queuedCount,
-        localWorkspaceCount: localWorkspaces.length,
-        serverQueuedCount: serverQueuedWorkspaces.length
-      });
-    void startAnalysisInBackground(
+    const realSessionId = await startAnalysisInBackground(
       optimisticNotificationId,
-      serverQueuedWorkspaces[0]?.sessionId ?? null
+      generationId
     );
+
+    if (realSessionId) {
+      router.push(`/app/intake/${realSessionId}?starting=1`);
+    } else {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -522,19 +539,28 @@ export function EmptyDashboardUpload({
                   </button>
                 </div>
                 {selectedFiles.length > 0 ? (
-                  <div className="grid gap-2 border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
-                    {selectedFiles.slice(0, 4).map((file) => (
+                  <div className="grid gap-1.5 border border-black/8 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+                    {selectedFiles.slice(0, 8).map((file, index) => (
                       <div
-                        key={`${file.name}:${file.size}:${file.type}`}
-                        className="flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
+                        key={`${file.name}:${file.size}:${file.type}:${index}`}
+                        className="group flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
                       >
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={() => removeFileByIndex(index)}
+                          className="shrink-0 rounded p-0.5 text-black/30 opacity-0 transition hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-white/30 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     ))}
-                    {selectedFiles.length > 4 ? (
+                    {selectedFiles.length > 8 ? (
                       <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
-                        +{selectedFiles.length - 4} more
+                        +{selectedFiles.length - 8} more
                       </div>
                     ) : null}
                   </div>
@@ -655,7 +681,7 @@ export function EmptyDashboardUpload({
                     })
                   )}
                 >
-                  Generate workspace
+                  {isSubmitting ? "Starting generation..." : "Generate workspace"}
                 </button>
                 {!isComposerVisible ? (
                   <button
@@ -691,7 +717,7 @@ export function EmptyDashboardUpload({
                   })
                 )}
               >
-                Generate workspace
+                {isSubmitting ? "Starting generation..." : "Generate workspace"}
               </button>
               {!isComposerVisible ? (
                 <button

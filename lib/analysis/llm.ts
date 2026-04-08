@@ -141,35 +141,18 @@ function parseModelList(value: string | undefined) {
   return value
     .split(",")
     .map((entry) => entry.trim())
-    .filter((entry) => Boolean(entry) && !entry.startsWith("anthropic/"));
+    .filter((entry) => Boolean(entry));
 }
 
 function taskSpecificModel(task: LlmTask) {
   switch (task) {
     case "extract_section":
-      return (
-        process.env.LLM_MODEL_EXTRACT ||
-        process.env.OPENROUTER_MODEL_EXTRACT ||
-        null
-      );
+      return process.env.OPENROUTER_MODEL_EXTRACT || null;
     case "analyze_risks":
-      return (
-        process.env.LLM_MODEL_RISKS ||
-        process.env.OPENROUTER_MODEL_RISKS ||
-        null
-      );
+      return process.env.OPENROUTER_MODEL_RISKS || null;
     case "generate_summary":
-      return (
-        process.env.LLM_MODEL_SUMMARY ||
-        process.env.OPENROUTER_MODEL_SUMMARY ||
-        null
-      );
     case "generate_brief":
-      return (
-        process.env.LLM_MODEL_BRIEF ||
-        process.env.OPENROUTER_MODEL_BRIEF ||
-        null
-      );
+      return process.env.OPENROUTER_MODEL_CONTENT || null;
     default:
       return null;
   }
@@ -178,25 +161,12 @@ function taskSpecificModel(task: LlmTask) {
 function taskSpecificFallbacks(task: LlmTask) {
   switch (task) {
     case "extract_section":
-      return parseModelList(
-        process.env.LLM_MODEL_EXTRACT_FALLBACKS ||
-          process.env.OPENROUTER_MODEL_EXTRACT_FALLBACKS
-      );
+      return parseModelList(process.env.OPENROUTER_MODEL_EXTRACT_FALLBACKS);
     case "analyze_risks":
-      return parseModelList(
-        process.env.LLM_MODEL_RISKS_FALLBACKS ||
-          process.env.OPENROUTER_MODEL_RISKS_FALLBACKS
-      );
+      return parseModelList(process.env.OPENROUTER_MODEL_RISKS_FALLBACKS);
     case "generate_summary":
-      return parseModelList(
-        process.env.LLM_MODEL_SUMMARY_FALLBACKS ||
-          process.env.OPENROUTER_MODEL_SUMMARY_FALLBACKS
-      );
     case "generate_brief":
-      return parseModelList(
-        process.env.LLM_MODEL_BRIEF_FALLBACKS ||
-          process.env.OPENROUTER_MODEL_BRIEF_FALLBACKS
-      );
+      return parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS);
     default:
       return [];
   }
@@ -226,17 +196,12 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
     }
   };
 
-  const sharedFallbacks = parseModelList(
-    process.env.LLM_MODEL_FALLBACKS || process.env.OPENROUTER_MODEL_FALLBACKS
-  );
+  const sharedFallbacks = parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS);
   const requestedPrimary =
     taskSpecificModel(task) ||
-    process.env.LLM_MODEL ||
     process.env.OPENROUTER_MODEL ||
     defaultRoutes[task].primary;
-  const primary = requestedPrimary.startsWith("anthropic/")
-    ? defaultRoutes[task].primary
-    : requestedPrimary;
+  const primary = requestedPrimary;
   const fallbacks = [
     ...taskSpecificFallbacks(task),
     ...sharedFallbacks,
@@ -334,54 +299,90 @@ function extractSectionSystemPrompt() {
     {
       tag: "role",
       content:
-        "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven."
-    },
-    {
-      tag: "document_variety",
-      content: [
-        "Creator documents vary widely in format. Adapt your extraction to the document type:",
-        "- Formal agreements/contracts: Extract from term sheets, SOW schedules, and legal clauses. Look for structured fields like payment amount, net terms, usage rights duration, exclusivity terms, territory, platform, and edit rounds.",
-        "- Campaign briefs and deliverables docs: Extract deliverable requirements from creative specs, trackers, schedules, and timelines. Map disclosure or labeling requirements (e.g. #ad, verbal mentions, FTC compliance) to disclosureObligations. Map content format specs (e.g. Reel, TikTok, Story, livestream, blog, Discord post) to deliverables with channels when stated.",
-        "- Email threads/pitches: Extract stated terms, proposed compensation, and timeline commitments.",
-        "- Invoices and finance documents: Extract payment amount, payment terms, payment trigger, currency, creator, brand, and campaign references only when explicit. Treat them as payment evidence, not as a substitute for missing contract rights language.",
-        "- Status updates, creative feedback, and revision notes: Extract concrete dates, approval requirements, disclosure reminders, revision limits, deliverable changes, and operational constraints. Put artifact-specific context that does not map to a first-class field into notes.",
-        "- Decks, moodboards, storyboards, and other OCR-able creative assets: Extract campaign framing, product names, CTAs, target audience, talking points, prohibited claims, visual instructions, and disclosure reminders only when explicit. Use notes for visual or performance context that does not fit the structured schema.",
-        "- Performance reports and post-campaign recaps: Do not invent analytics fields. Only carry forward operationally relevant facts, such as status, outcome notes, or post-campaign observations, into notes when explicit.",
-        "Do not force fields that don't exist in the document type. A brief without payment terms should have null for paymentAmount, not a guess."
-      ].join("\n")
+        "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven. Your goal is to extract REAL values from the document, not placeholders."
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Return only facts that are explicitly stated in the section.",
-        "Do not guess missing values or infer unstated business terms.",
+        "Return only facts that are explicitly stated in the section. Do not guess, infer, or fill gaps.",
         "Use null, empty arrays, or omission when the section does not support a field.",
-        "Do not resolve cross-document conflicts or choose a source of truth here. Section extraction is single-document grounding only.",
-        "If a fact is useful but does not map cleanly to the creator_deal_terms schema, place it in notes instead of inventing a new field.",
-        "Do not let invoices, reports, decks, or updates override contractual rights or commercial terms unless the section itself explicitly states the operative term.",
-        "Evidence snippets must be copied from the section and must be meaningful phrases or full sentences.",
-        "Do not return numbering fragments, bullets by themselves, headings by themselves, page labels, or isolated tokens as evidence.",
-        "For brandName and campaignName, use the actual brand and campaign names from the document. Never use generic labels like 'Workspace', 'Concept', 'Project', 'Campaign', 'Brief', or 'Overview'. If the section does not name a real brand or campaign, return null."
+        "Evidence snippets must be copied verbatim from the section: meaningful phrases or full sentences only. No bullets, headings, page labels, or isolated tokens.",
+        "Do not resolve cross-document conflicts here. Section extraction is single-document grounding only.",
+        "If a fact does not map cleanly to the schema, place it in notes instead of inventing a field.",
+        "Adapt extraction to the document type: contracts yield structured terms, briefs yield deliverable specs and timelines, emails yield proposed terms, invoices yield payment evidence. Do not force fields that don't exist in the document type."
       ])
+    },
+    {
+      tag: "field_extraction_rules",
+      content: [
+        "brandName: The company/entity name ONLY (e.g., 'NimbusPM', 'Nike'). NEVER document titles, section headers, product descriptions, industry terms, or descriptors appended to the name. 'NimbusPM Product Project management software' is WRONG; the brandName is 'NimbusPM'. Look for company names in contract parties ('by and between X and Y'), 'Brand:' labels, or names near payment/legal terms.",
+        "campaignName: The specific campaign title (e.g., 'Summer Launch 2024'). NOT generic words or section headers like 'Campaign', 'Project', 'Brief', 'Overview', 'Campaign objective', or 'Brief Campaign objective'.",
+        "paymentAmount: Numeric value only. '$7,200' or 'USD 7200' or '$7.2k' all become 7200. If no amount stated, return null.",
+        "currency: Currency code (USD, EUR, GBP). Default to 'USD' only if there's a payment amount without explicit currency.",
+        "paymentTerms: The stated payment timing phrase, especially net terms, milestone timing, or due-date language. Examples: 'Net 30', 'due within 15 days', '50% on signature and 50% net-30 after final live links'.",
+        "paymentStructure: The payout split or structure when explicitly stated. Examples: 'Flat fee', '50% on signature, 50% on completion', 'monthly retainer'.",
+        "paymentTrigger: The event that causes payment. Examples: 'On signature', 'After final live links', 'After invoice receipt'.",
+        "netTermsDays: Numeric day count from 'Net 45', '45 days', 'due within 45 days'. If not stated, null.",
+        "deliverables: Content requirements with channels and quantities. Map format specs (Reel, TikTok, Story) to deliverables with channels.",
+        "disclosureObligations: FTC, platform-specific labeling requirements (e.g., #ad, verbal mentions)."
+      ].join("\n")
     },
     {
       tag: "few_shot_examples",
       content: [
-        "<example>",
-        'Section text: Payment will be made within 45 days of receiving the final invoice.',
-        'Good evidence: "Payment will be made within 45 days of receiving the final invoice."',
-        'Bad evidence: "45 days" or "Payment".',
-        "</example>",
+        "<example_correct>",
+        "Section text: This Usage Rights Addendum ('Agreement') is entered into by NimbusPM ('Company') and the Influencer ('Creator'). Company agrees to pay Creator $7,200.",
+        "Extract: brandName='NimbusPM', paymentAmount=7200",
+        "Even though the section header mentions 'Usage Rights Addendum', the actual brand is 'NimbusPM' from the contract parties.",
+        "</example_correct>",
         "",
-        "<example>",
-        'Section text: Creator grants Brand the right to use the content in paid social advertisements for 90 days.',
-        'Extract usage-rights facts only from that sentence. Do not invent territory, ownership, or whitelisting if they are not stated.',
-        "</example>",
+        "<example_correct>",
+        "Section text: The influencer will be compensated $7,200 USD for the NimbusPM product launch campaign.",
+        "Extract: brandName='NimbusPM', campaignName='product launch', paymentAmount=7200, currency='USD'",
+        "</example_correct>",
         "",
-        "<example>",
-        'Section text: Keep disclosure visible and natural, not hidden in tiny text.',
-        'Map that to disclosureObligations or notes. Do not invent payment, rights, or legal fields from creative feedback.',
-        "</example>"
+        "<example_wrong>",
+        "Section text from a document titled 'Usage Rights Addendum' about content usage licensing.",
+        "Bad extract: brandName='Usage Rights Addendum' (WRONG - this is a document title, not a brand name)",
+        "Correct: brandName=null, put relevant terms in usageRights or notes.",
+        "</example_wrong>",
+        "",
+        "<example_wrong>",
+        "Section text: USAGE RIGHTS ADDENDUM",
+        "Bad extract: brandName='Usage Rights Addendum' or brandName='Usage Rights' (WRONG - document type and section header, not a brand)",
+        "Correct: brandName=null",
+        "</example_wrong>",
+        "",
+        "<example_correct>",
+        "Section text: Payment will be made within 45 days of receiving the final invoice.",
+        "Extract: netTermsDays=45, paymentTerms='Net 45'",
+        "Bad extract: paymentAmount=45 (WRONG - 45 is days, not dollars)",
+        "</example_correct>",
+        "",
+        "<example_correct>",
+        "Section text: Compensation is payable 50% on signature and 50% net-30 after final live links.",
+        "Extract: paymentTerms='50% on signature and 50% net-30 after final live links', paymentStructure='50% on signature, 50% on completion', paymentTrigger='On signature and after final live links', netTermsDays=30",
+        "</example_correct>",
+        "",
+        "<example_correct>",
+        "Section text: Creator grants Brand the right to use the content in paid social advertisements for 90 days on LinkedIn and YouTube.",
+        "Extract: usageRightsPaidAllowed=true, usageDuration='90 days', usageChannels=['LinkedIn', 'YouTube']",
+        "</example_correct>",
+        "",
+        "<example_null>",
+        "Section text: Key Messaging: Create content that resonates with the target audience.",
+        "Extract: brandName=null, campaignName=null, notes='Key Messaging: Create content that resonates with the target audience.'",
+        "</example_null>",
+        "",
+        "<example_null>",
+        "Section text: Campaign Brief Campaign objective: Generate demo requests from founder-led teams.",
+        "Extract: campaignName=null (WRONG to use 'Campaign objective' or 'Brief Campaign objective' because this is a section header, not the campaign title)",
+        "</example_null>",
+        "",
+        "<example_null>",
+        "Section text: Influencer: [Insert Name] | Brand: [To Be Determined] | Campaign: [TBD]",
+        "Extract: brandName=null, campaignName=null (template placeholders, not actual values)",
+        "</example_null>"
       ].join("\n")
     },
     {
@@ -399,12 +400,11 @@ function extractSectionUserPrompt(
 ) {
   return joinPromptSections([
     {
-      tag: "document_metadata",
+      tag: "context",
       content: promptBullets([
         `Today: ${isoDateContext()}`,
         `Document kind: ${documentKind}`,
-        `Section index: ${section.chunkIndex}`,
-        `Section title: ${section.title}`
+        `Section ${section.chunkIndex}: ${section.title}`
       ])
     },
     {
@@ -412,13 +412,23 @@ function extractSectionUserPrompt(
       content: promptQuotedText(section.content)
     },
     {
-      tag: "fallback_extraction",
-      content: promptQuotedText(JSON.stringify(fallback.data, null, 2))
+      tag: "prior_extraction",
+      content: [
+        "Overwrite these values ONLY if this section has more specific or contradictory info.",
+        promptQuotedText(JSON.stringify(fallback.data, null, 2))
+      ].join("\n\n")
     },
     {
       tag: "task",
-      content:
-        "Based on the section above, extract only the explicit creator-partnership facts and attach direct evidence snippets from this section."
+      content: [
+        "Extract creator partnership facts. Before each field confirm:",
+        "1. Is it explicitly stated in the text?",
+        "2. Is it a real value, not a placeholder or header?",
+        "",
+        "Fields to extract when stated: brandName, campaignName, paymentAmount, currency, paymentTerms, paymentStructure, paymentTrigger, netTermsDays, deliverables, usageRights, usageDuration, usageTerritory, usageChannels, exclusivity, exclusivityDuration, exclusivityCategory, disclosureObligations, revisions, termination, terminationNotice, governingLaw, notes.",
+        "",
+        "Return null for any field not explicitly stated."
+      ].join("\n")
     }
   ]);
 }
@@ -428,40 +438,43 @@ function analyzeRisksSystemPrompt() {
     {
       tag: "role",
       content:
-        "You analyze creator partnership risk after factual extraction is complete. You focus on creator-specific negotiation and risk signals."
+        "You flag creator-relevant risks in partnership documents. Only flag items needing creator attention or negotiation."
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Only flag risks that are supported by the provided document text or extracted facts.",
-        "Focus on material creator issues like paid usage, whitelisting, exclusivity, vague deliverables, long payment terms, one-sided termination, and reshoot/edit obligations.",
-        "For campaign briefs without formal contracts: flag missing payment terms, undefined revision limits, or open-ended content requirements as risks.",
-        "For formal agreements: focus on IP assignment scope, usage rights duration and territory, termination clauses, liability/indemnity, and payment net terms.",
-        "For invoices, trackers, status updates, or email threads: flag operational creator risks such as delayed payment triggers, unresolved approval blockers, hidden scope creep, or missing acceptance criteria, but do not invent legal rights that are not stated.",
-        "Decks, moodboards, storyboards, and performance reports usually provide context rather than standalone legal risk. Only flag them when they reveal a concrete creator risk, such as undisclosed disclosure requirements, vague deliverable expansion, or pressure to create unpaid extra assets.",
-        "Do not restate every contract term. Only flag items that need creator attention or negotiation.",
-        "If a risk is not clearly supported, omit it rather than guessing.",
-        "Every evidence snippet must be a real clause or sentence from the document."
+        "Every risk must be supported by quoted document text. No guessing.",
+        "Focus on: perpetual/broad usage rights, unpaid whitelisting, exclusivity traps, vague deliverables, long net terms (Net 60+), one-sided termination, unlimited revisions, and IP assignment overreach.",
+        "Contracts: flag IP scope, usage duration/territory, termination, indemnity, net terms.",
+        "Briefs without contracts: flag missing payment terms, undefined revision limits, open-ended scope.",
+        "Invoices/emails/trackers: flag delayed payment triggers, approval blockers, scope creep. Do not invent unstated legal rights.",
+        "Decks/moodboards/reports: only flag when they reveal concrete creator risk (undisclosed disclosure requirements, unpaid extra assets).",
+        "Do not restate normal terms as risks. A clear deliverable with a date is not a risk."
       ])
     },
     {
       tag: "few_shot_examples",
       content: [
         "<example>",
-        'Document text: Brand may use the content in paid media worldwide in perpetuity.',
-        'Good risk: category=usage_rights, severity=high, evidence=["Brand may use the content in paid media worldwide in perpetuity."]',
+        'Text: "Brand may use the content in paid media worldwide in perpetuity."',
+        "Good: category=usage_rights, severity=high, evidence=[that exact sentence]",
         "</example>",
         "",
         "<example>",
-        'Document text: Creator will deliver one Instagram Reel by May 5.',
-        "Do not create a deliverables risk unless the scope is vague, open-ended, or conflicting.",
+        'Text: "Creator will deliver one Instagram Reel by May 5."',
+        "Do NOT flag. Clear scope, clear date, not a risk.",
+        "</example>",
+        "",
+        "<example>",
+        'Text: "Creator grants Brand exclusive rights across all social platforms for 12 months."',
+        "Good: category=exclusivity, severity=high, evidence=[that exact sentence]",
         "</example>"
       ].join("\n")
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON with this shape: { "riskFlags": [{ "category": "usage_rights", "title": "Perpetual paid usage rights", "detail": "plain-language explanation", "severity": "high", "suggestedAction": "practical negotiation step", "evidence": ["quoted snippet"] }] }.'
+        'Return JSON: { "riskFlags": [{ "category": "usage_rights|exclusivity|payment_terms|deliverables|termination|other", "title": "short label", "detail": "plain-language explanation", "severity": "low|medium|high", "suggestedAction": "practical negotiation step or null", "evidence": ["quoted snippet from document"] }] }.'
     }
   ]);
 }
@@ -474,58 +487,59 @@ function analyzeRisksUserPrompt(
 ) {
   return joinPromptSections([
     {
-      tag: "document_metadata",
+      tag: "context",
       content: promptBullets([
         `Today: ${isoDateContext()}`,
         `Document kind: ${documentKind}`
       ])
     },
     {
-      tag: "normalized_document_text",
+      tag: "document_text",
       content: promptQuotedText(text)
     },
     {
-      tag: "structured_extraction",
+      tag: "extracted_facts",
       content: promptQuotedText(JSON.stringify(extraction.data, null, 2))
     },
     {
-      tag: "fallback_risks",
+      tag: "prior_risks",
       content: promptQuotedText(JSON.stringify(fallback, null, 2))
     },
     {
       tag: "task",
       content:
-        "Based on the document text and extracted facts above, return only the creator-relevant risk flags that are directly supported."
+        "Return only creator-relevant risk flags directly supported by the document text and extracted facts."
     }
   ]);
 }
 
 function summarySystemPrompt(mode: "default" | "rewrite") {
+  const roleDescription =
+    mode === "rewrite"
+      ? "You rewrite creator contract summaries into shorter, scannable versions without changing meaning."
+      : "You write scannable creator partnership summaries. The reader must understand the deal in under 30 seconds.";
+
   return joinPromptSections([
     {
       tag: "role",
-      content:
-        mode === "rewrite"
-          ? "You rewrite creator contract summaries into shorter, scannable versions without changing their meaning."
-          : "You write short, scannable creator partnership summaries. The user should be able to understand the deal in under 30 seconds."
+      content: roleDescription
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Be extremely concise. Each section should be 1-3 short sentences maximum. The entire summary should fit on one phone screen.",
-        "Answer the creator's practical questions first: what they need to post, when it is due, how they get paid, and anything risky or unusual.",
-        "Preserve material obligations, restrictions, payment facts, exclusivity, rights limits, and watchouts, but state each in the fewest words possible.",
-        "Keep the language creator-facing and practical, not legalistic.",
-        "Use plain text only. No markdown, no bullets, no heading markers, no asterisks, no underscores.",
-        'Use these exact section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", and "Watchouts".',
-        "If a section has nothing notable, write one sentence saying so rather than padding with generic language.",
-        "If a key fact is missing, say Not specified briefly instead of filling space with generic language."
+        "1-3 short sentences per section max. Entire summary must fit on one phone screen.",
+        "Lead with what matters: what to post, when it is due, how they get paid, what is risky.",
+        "Preserve material obligations, payment facts, exclusivity, rights limits, and watchouts. State each in fewest words.",
+        "Creator-facing plain language. Not legalistic.",
+        "Plain text only. No markdown, bullets, asterisks, or underscores.",
+        'Required section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", "Watchouts".',
+        "If nothing notable for a section, say so in one sentence. If a fact is missing, write Not specified."
       ])
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON with this shape: { "sections": [{ "title": "What this partnership is", "paragraphs": ["plain text paragraph"] }], "body": "plain text summary" }.'
+        'Return JSON: { "sections": [{ "title": "What this partnership is", "paragraphs": ["plain text"] }], "body": "full plain text summary" }.'
     }
   ]);
 }
@@ -560,7 +574,7 @@ function summaryUserPrompt(input: {
       : null,
     input.grounding
       ? {
-          tag: "grounding_facts",
+          tag: "grounding",
           content: promptQuotedText(JSON.stringify(input.grounding, null, 2))
         }
       : null,
@@ -571,7 +585,7 @@ function summaryUserPrompt(input: {
     {
       tag: "task",
       content: input.styleInstruction
-        ? `Target summary type: ${input.targetType}\n${input.styleInstruction}`
+        ? `Type: ${input.targetType}. ${input.styleInstruction}`
         : "Write the creator-facing summary from the extracted facts and risk flags above."
     }
   ];
@@ -584,31 +598,21 @@ function briefExtractionSystemPrompt() {
     {
       tag: "role",
       content:
-        "You extract campaign-brief fields from creator partnership documents. You are strict and only capture what is explicitly stated."
-    },
-    {
-      tag: "document_variety",
-      content: [
-        "These fields can come from more than a formal campaign brief.",
-        "- Campaign briefs and deliverables briefs: primary source for messaging, audience, approvals, and timelines.",
-        "- Pitch decks and kickoff decks: good source for campaign overview, product, CTA, audience, and expected document package.",
-        "- Storyboards, moodboards, creative feedback, and status updates: good source for talking points, visual direction, approval requirements, and do-not-mention guidance when those facts are explicit."
-      ].join("\n")
+        "You extract campaign-brief fields from partnership documents. Strict: only capture what is explicitly stated."
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Only include information explicitly present in the document.",
-        "Return null or empty arrays for anything not found.",
-        "Do not merge or invent missing messaging, approvals, or audience details.",
+        "Source types vary: formal briefs, pitch decks, storyboards, moodboards, creative feedback, and status updates are all valid sources.",
+        "Return null or empty arrays for anything not found. Do not invent messaging, approvals, or audience details.",
         "Use doNotMention for prohibited claims, banned phrasing, or explicit avoid lists.",
-        "Ignore payment, invoicing, and legal clause details unless they directly shape the creator brief experience."
+        "Ignore payment, invoicing, and legal clauses unless they directly shape the creator brief experience."
       ])
     },
     {
       tag: "output_contract",
       content:
-        "Return a JSON object with these fields: campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention."
+        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention }. Null or [] for missing fields."
     }
   ]);
 }
@@ -618,15 +622,15 @@ function briefGenerationSystemPrompt() {
     {
       tag: "role",
       content:
-        "You write polished, actionable campaign briefs for creators using grounded partnership context."
+        "You write polished, actionable campaign briefs for creators from partnership context."
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Use the provided partnership context only.",
-        "Preserve risks, deliverables, timing, rights, and approval constraints when they are present.",
-        "Pre-fill from existing briefData when available, but improve clarity and organization.",
-        "Each section must have an id, title, and content. Items are optional."
+        "Use provided context only. Do not invent terms, dates, or requirements.",
+        "Preserve risks, deliverables, timing, rights, and approval constraints when present.",
+        "Pre-fill from briefData when available, improve clarity and organization.",
+        "Each section: id, title, content required. items is optional."
       ])
     },
     {
@@ -636,7 +640,7 @@ function briefGenerationSystemPrompt() {
     {
       tag: "output_contract",
       content:
-        'Return JSON: { "sections": [{ "id": "...", "title": "...", "content": "...", "items": ["..."] }] }.'
+        'Return JSON: { "sections": [{ "id": "campaign-overview", "title": "...", "content": "...", "items": ["..."] }] }.'
     }
   ]);
 }

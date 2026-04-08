@@ -1,11 +1,10 @@
-import { revalidateTag } from "next/cache";
-
 import {
   emitWorkspaceNotificationForCurrentState,
   emitWorkspaceNotificationForSession,
   supersedeWorkspaceNotificationEvents
 } from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
+import { safeRevalidateTag } from "@/lib/safe-revalidate";
 import { startNextQueuedIntakeSessionForUser } from "@/lib/intake-queue";
 import type { IntakeSessionRecord, IntakeSessionStatus, PaymentStatus } from "@/lib/types";
 
@@ -175,8 +174,8 @@ export async function syncIntakeSessionForDealId(dealId: string) {
 
   // Invalidate the cached deals so the dashboard picks up the new notification
   if (nextStatus !== session.status) {
-    revalidateTag(`user-${session.userId}-deals`, "max");
-    revalidateTag(`user-${session.userId}-notifications`, "max");
+    safeRevalidateTag(`user-${session.userId}-deals`);
+    safeRevalidateTag(`user-${session.userId}-notifications`);
   }
 
   // Trigger background duplicate check when workspace is ready
@@ -257,8 +256,8 @@ async function triggerDuplicateCheck(input: {
     });
 
     // Revalidate so duplicate notification appears on dashboard
-    revalidateTag(`user-${input.userId}-deals`, "max");
-    revalidateTag(`user-${input.userId}-notifications`, "max");
+    safeRevalidateTag(`user-${input.userId}-deals`);
+    safeRevalidateTag(`user-${input.userId}-notifications`);
     if (matches.length > 0) {
       await emitWorkspaceNotificationForSession(
         input.sessionId,

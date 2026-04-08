@@ -126,6 +126,14 @@ const MODEL_PRICING: Record<string, Pricing> = {
   "openai/gpt-5.4-mini": {
     inputUsdPerMillion: 0.75,
     outputUsdPerMillion: 4.5
+  },
+  "anthropic/claude-3.5-sonnet": {
+    inputUsdPerMillion: 3,
+    outputUsdPerMillion: 15
+  },
+  "anthropic/claude-3.5-haiku": {
+    inputUsdPerMillion: 0.8,
+    outputUsdPerMillion: 4
   }
 };
 
@@ -150,8 +158,8 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "extract.v2",
-    routeVersion: "extract.route.v2",
+    cachePromptVersion: "extract.v3",
+    routeVersion: "extract.route.v3",
     throttle: true
   },
   analyze_risks: {
@@ -162,8 +170,8 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "risks.v2",
-    routeVersion: "risks.route.v2",
+    cachePromptVersion: "risks.v3",
+    routeVersion: "risks.route.v3",
     throttle: true
   },
   generate_summary: {
@@ -174,8 +182,8 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "summary.v2",
-    routeVersion: "summary.route.v2",
+    cachePromptVersion: "summary.v3",
+    routeVersion: "summary.route.v3",
     throttle: true
   },
   generate_brief: {
@@ -186,8 +194,8 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 30,
-    cachePromptVersion: "brief.v2",
-    routeVersion: "brief.route.v2",
+    cachePromptVersion: "brief.v3",
+    routeVersion: "brief.route.v3",
     throttle: true
   },
   email_summary: {
@@ -312,10 +320,6 @@ function approvedModel(model: string | null | undefined) {
     return null;
   }
 
-  if (model.includes("anthropic/")) {
-    return null;
-  }
-
   if (process.env.NODE_ENV === "production" && !APPROVED_PRODUCTION_MODELS.has(model)) {
     return null;
   }
@@ -337,21 +341,29 @@ function uniqueModels(models: Array<string | null | undefined>) {
 }
 
 function taskEnvPrimary(taskKey: AiTaskKey) {
+  const globalModel = process.env.OPENROUTER_MODEL;
+  const taskSpecificVar = getTaskSpecificEnvVar(taskKey);
+  const taskModel = taskSpecificVar ? process.env[taskSpecificVar] : null;
+
+  return globalModel || taskModel || null;
+}
+
+function getTaskSpecificEnvVar(taskKey: AiTaskKey): string | null {
   switch (taskKey) {
     case "extract_section":
-      return process.env.LLM_MODEL_EXTRACT || process.env.OPENROUTER_MODEL_EXTRACT || process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
+      return "OPENROUTER_MODEL_EXTRACT";
     case "analyze_risks":
-      return process.env.LLM_MODEL_RISKS || process.env.OPENROUTER_MODEL_RISKS || process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
+      return "OPENROUTER_MODEL_RISKS";
     case "generate_summary":
-      return process.env.LLM_MODEL_SUMMARY || process.env.OPENROUTER_MODEL_SUMMARY || process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
     case "generate_brief":
-      return process.env.LLM_MODEL_BRIEF || process.env.OPENROUTER_MODEL_BRIEF || process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
+      return "OPENROUTER_MODEL_CONTENT";
     case "email_summary":
-      return process.env.OPENROUTER_MODEL_EMAIL_SUMMARY || process.env.LLM_MODEL_SUMMARY || process.env.OPENROUTER_MODEL_SUMMARY || process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
     case "email_draft":
-      return process.env.LLM_MODEL_EMAIL_DRAFT || process.env.OPENROUTER_MODEL_EMAIL_DRAFT || null;
+    case "email_suggestions":
+    case "email_action_items":
+      return "OPENROUTER_MODEL_EMAIL";
     default:
-      return process.env.LLM_MODEL || process.env.OPENROUTER_MODEL || null;
+      return null;
   }
 }
 
@@ -359,42 +371,28 @@ function taskEnvFallbacks(taskKey: AiTaskKey) {
   switch (taskKey) {
     case "extract_section":
       return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_EXTRACT_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_EXTRACT_FALLBACKS),
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
       ]);
     case "analyze_risks":
       return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_RISKS_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_RISKS_FALLBACKS),
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
       ]);
     case "generate_summary":
-      return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_SUMMARY_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_SUMMARY_FALLBACKS),
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
-      ]);
     case "generate_brief":
       return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_BRIEF_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_BRIEF_FALLBACKS),
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
+        ...parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
       ]);
+    case "email_summary":
     case "email_draft":
       return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_EMAIL_DRAFT_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_EMAIL_DRAFT_FALLBACKS),
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
+        ...parseModelList(process.env.OPENROUTER_MODEL_EMAIL_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
       ]);
     default:
       return uniqueModels([
-        ...parseModelList(process.env.LLM_MODEL_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
       ]);
   }

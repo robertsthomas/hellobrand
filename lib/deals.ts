@@ -1,3 +1,6 @@
+import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   analyzeCreatorRisks,
   buildCreatorSummary,
@@ -22,10 +25,6 @@ import {
   generateSummaryWithLlm,
   hasLlmKey
 } from "@/lib/analysis/llm";
-import {
-  getDocumentProcessingBackend,
-  sendDocumentProcessingMessage
-} from "@/lib/document-processing";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { generateEmailDraft } from "@/lib/email/generate";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
@@ -34,6 +33,9 @@ import {
   assertViewerWithinUsageLimit,
   recordViewerUsage
 } from "@/lib/billing/entitlements";
+import {
+  emitNotificationSeedForUser
+} from "@/lib/notification-service";
 import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
@@ -322,7 +324,11 @@ export function mergeTerms(
           return value.trim().length > 0;
         }
 
-        return value !== null && value !== undefined;
+        if (typeof value === "number" || typeof value === "boolean") {
+          return true;
+        }
+
+        return value !== undefined && value !== null;
       })
     ),
     deliverables: mergeDeliverables(base.deliverables, patch.deliverables ?? []),
@@ -591,6 +597,52 @@ async function runStage<T>(
     });
     throw new Error(`${type}: ${message}`);
   }
+}
+
+function writeGenerationSnapshot(input: {
+  dealId: string;
+  documentId: string;
+  fileName: string;
+  documentKind: string;
+  model: string;
+  durationMs: number;
+  extraction: ExtractionPipelineResult;
+  risks: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>;
+  summary: { body: string; version: string } | null;
+}) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  const dir = join(process.cwd(), "generations");
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    return;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const fileName = `${timestamp}_${input.fileName.replace(/[^a-zA-Z0-9]/g, "_")}.json`;
+
+  writeFileSync(
+    join(dir, fileName),
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        dealId: input.dealId,
+        documentId: input.documentId,
+        fileName: input.fileName,
+        documentKind: input.documentKind,
+        model: input.model,
+        durationMs: input.durationMs,
+        extraction: input.extraction,
+        risks: input.risks,
+        summary: input.summary
+      },
+      null,
+      2
+    )
+  );
 }
 
 async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord) {
@@ -1073,6 +1125,22 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
       deliverablesCount: sanitizedExtraction.data.deliverables?.length ?? 0
     });
 
+    try {
+      writeGenerationSnapshot({
+        dealId: document.dealId,
+        documentId: document.id,
+        fileName: document.fileName,
+        documentKind: classification.documentKind,
+        model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic",
+        durationMs: totalDurationMs,
+        extraction: sanitizedExtraction,
+        risks,
+        summary
+      });
+    } catch {
+      // Snapshot write failure should not affect pipeline
+    }
+
     void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
 
     return repository.getDealAggregate(viewer.id, document.dealId);
@@ -1101,40 +1169,27 @@ async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord)
 }
 
 export async function enqueueDocumentProcessing(documentId: string) {
-  const backend = getDocumentProcessingBackend();
+  const eventKey = process.env.INNGEST_EVENT_KEY;
 
-  if (backend === "vercel-queue") {
+  if (eventKey) {
     try {
-      await sendDocumentProcessingMessage(documentId);
+      const { inngest } = await import("@/lib/inngest/client");
+      await inngest.send({
+        name: "document/process.requested",
+        data: { documentId }
+      });
       logDocumentPipeline("info", "queue_enqueued", {
         documentId,
-        mode: "queue"
+        mode: "inngest"
       });
-      return { mode: "queue" as const };
+      return { mode: "inngest" as const };
     } catch (error) {
-      const repository = getRepository();
-      const document = await repository.getDocument(documentId);
       const message =
-        error instanceof Error ? error.message : "Unable to queue document processing.";
-
-      if (document) {
-        await repository.updateDocument(document.id, {
-          processingStatus: "failed",
-          errorMessage: `queue: ${message}`
-        });
-
-        if (process.env.DATABASE_URL) {
-          await syncIntakeSessionForDealId(document.dealId);
-        }
-      }
-
-      logDocumentPipeline("error", "queue_failed", {
+        error instanceof Error ? error.message : "Unable to enqueue Inngest event.";
+      logDocumentPipeline("error", "inngest_enqueue_failed", {
         documentId,
-        mode: "queue",
         error: message
       });
-
-      return { mode: "failed" as const };
     }
   }
 
@@ -1248,7 +1303,39 @@ export async function updateDealForViewer(
 }
 
 export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
-  return getRepository().deleteDeal(viewer.id, dealId);
+  const repository = getRepository();
+
+  if (process.env.DATABASE_URL) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const deal = await repository.getDealAggregate(viewer.id, dealId);
+      if (deal) {
+        const session = await prisma.intakeSession.findUnique({
+          where: { dealId },
+          select: { id: true }
+        });
+        const sessionId = session?.id ?? dealId;
+
+        await emitNotificationSeedForUser(viewer.id, {
+          category: "workspace",
+          eventType: "workspace.deleted",
+          entityType: "workspace",
+          entityId: sessionId,
+          sessionId,
+          dealId,
+          title: `Workspace deleted: ${deal.deal.brandName || deal.deal.campaignName || "Untitled"}`,
+          description: "This workspace was deleted and cannot be recovered.",
+          href: "/app",
+          dedupeKey: `workspace.deleted:${sessionId}`,
+          createdAt: new Date()
+        });
+      }
+    } catch {
+      // Notification failure should not block deletion
+    }
+  }
+
+  return repository.deleteDeal(viewer.id, dealId);
 }
 
 export async function updateTermsForViewer(

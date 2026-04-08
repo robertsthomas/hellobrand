@@ -61,6 +61,8 @@ const GENERIC_VALUES = new Set([
   "concept",
   "project",
   "campaign",
+  "brief",
+  "objective",
   "partnership",
   "untitled",
   "draft",
@@ -84,6 +86,7 @@ function isWorseIdentityValue(field: string, current: unknown, proposed: unknown
   // Proposed is composed entirely of generic words (e.g. "Campaign Concept")
   const proposedWords = proposedTrimmed.toLowerCase().split(/\s+/);
   if (proposedWords.length <= 3 && proposedWords.every((word) => GENERIC_VALUES.has(word))) return true;
+  if (/\bcampaign objective\b/i.test(proposedTrimmed)) return true;
 
   // Proposed is significantly shorter than current (likely lost information)
   if (proposedTrimmed.length < currentTrimmed.length * 0.5 && currentTrimmed.length > 5) return true;
