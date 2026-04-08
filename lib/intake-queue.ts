@@ -21,7 +21,7 @@ async function enqueuePendingDocumentsForDeal(dealId: string) {
     const queue = await enqueueDocumentProcessing(document.id);
 
     if (queue.mode === "local") {
-      void processDocumentById(document.id).catch(() => undefined);
+      void processDocumentById(document.id, queue.runId).catch(() => undefined);
     }
   }
 

@@ -114,7 +114,7 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       exclusivityCategory: null,
       exclusivityDuration: null,
       exclusivityRestrictions: "Category-based only",
-      brandCategory: "other",
+      brandCategory: "other" as const,
       competitorCategories: [],
       restrictedCategories: [],
       campaignDateWindow: null,

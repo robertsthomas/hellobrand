@@ -129,6 +129,9 @@ export function createSeedStore(): AppStore {
         classificationConfidence: 0.98,
         sourceType: "file",
         errorMessage: null,
+        processingRunId: null,
+        processingRunStateJson: null,
+        processingStartedAt: null,
         createdAt: now,
         updatedAt: now
       }

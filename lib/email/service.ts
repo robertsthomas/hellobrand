@@ -1678,12 +1678,15 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     documentKind: "unknown",
     classificationConfidence: null,
     sourceType: "email_attachment",
-    errorMessage: null
+    errorMessage: null,
+    processingRunId: null,
+    processingRunStateJson: null,
+    processingStartedAt: null
   });
 
   const queue = await enqueueDocumentProcessing(document.id);
   if (queue.mode === "local") {
-    void processDocumentById(document.id).catch(() => undefined);
+    void processDocumentById(document.id, queue.runId).catch(() => undefined);
   }
 
   return document;

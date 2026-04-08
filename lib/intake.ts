@@ -1170,7 +1170,10 @@ export async function confirmBatchGroupForViewer(
         documentKind: existingDoc.documentKind,
         classificationConfidence: existingDoc.classificationConfidence,
         sourceType: existingDoc.sourceType,
-        errorMessage: null
+        errorMessage: null,
+        processingRunId: null,
+        processingRunStateJson: null,
+        processingStartedAt: null
       });
 
       await prisma.intakeDocument.create({

@@ -626,7 +626,10 @@ export async function finalizeInvoiceForViewer(
     documentKind: "invoice",
     classificationConfidence: 1,
     sourceType: "file",
-    errorMessage: null
+    errorMessage: null,
+    processingRunId: null,
+    processingRunStateJson: null,
+    processingStartedAt: null
   });
 
   const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {

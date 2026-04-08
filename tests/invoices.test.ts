@@ -90,6 +90,9 @@ function makeAggregate(terms: DealTermsRecord): DealAggregate {
     classificationConfidence: 1,
     sourceType: "file",
     errorMessage: null,
+    processingRunId: null,
+    processingRunStateJson: null,
+    processingStartedAt: null,
     createdAt: "2026-03-01T00:00:00.000Z",
     updatedAt: "2026-03-01T00:00:00.000Z"
   };

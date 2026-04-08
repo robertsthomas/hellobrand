@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
@@ -50,6 +51,15 @@ import {
   coalesceExtractions,
   hasMeaningfulChanges
 } from "@/lib/pending-changes";
+import {
+  createDocumentProcessingRunState
+} from "@/lib/document-pipeline-shared";
+import {
+  DocumentRunSupersededError,
+  failDocumentProcessingRun,
+  getDocumentPipelineFailedStep,
+  runDocumentPipelineSteps
+} from "@/lib/pipeline-steps";
 import type {
   BriefData,
   DealAggregate,
@@ -61,6 +71,7 @@ import type {
   ExtractionPipelineResult,
   JobType,
   PendingExtractionData,
+  RiskFlagRecord,
   SummaryType,
   Viewer
 } from "@/lib/types";
@@ -645,562 +656,15 @@ function writeGenerationSnapshot(input: {
   );
 }
 
-async function processDocumentPipeline(viewer: Viewer, document: DocumentRecord) {
-  const repository = getRepository();
-  const aggregate = await repository.getDealAggregate(viewer.id, document.dealId);
-
-  if (!aggregate) {
-    throw new Error("Deal not found.");
-  }
-
-  const PIPELINE_TIMEOUT_MS = (() => {
-    const configured = Number.parseInt(
-      process.env.DOCUMENT_PIPELINE_TIMEOUT_MS ?? "",
-      10
-    );
-
-    if (Number.isFinite(configured) && configured > 0) {
-      return configured;
-    }
-
-    return 8 * 60 * 1000;
-  })();
-
-  await repository.updateDocument(document.id, {
-    processingStatus: "processing",
-    errorMessage: null
-  });
-  const pipelineStartedAt = Date.now();
-
-  function checkPipelineTimeout() {
-    if (Date.now() - pipelineStartedAt > PIPELINE_TIMEOUT_MS) {
-      throw new Error("Document processing timed out. The file may be too large or complex.");
-    }
-  }
-
-  logDocumentPipeline("info", "pipeline_start", {
-    dealId: document.dealId,
-    documentId: document.id,
-    fileName: document.fileName,
-    sourceType: document.sourceType,
-    mimeType: document.mimeType
-  });
-
-  function logStageDebug(stage: string, extra?: Record<string, unknown>) {
-    const elapsed = Date.now() - pipelineStartedAt;
-    console.info(
-      `[pipeline] ${stage} | ${document.fileName} | elapsed ${(elapsed / 1000).toFixed(1)}s`,
-      extra ?? ""
-    );
-  }
-
-  try {
-    const extractionSource = await runStage(
-      document.dealId,
-      document.id,
-      "extract_text",
-      async () => {
-        if (document.sourceType === "pasted_text") {
-          const rawText = document.rawText ?? "";
-          const normalizedText = normalizeDocumentText(rawText);
-          return { rawText, normalizedText };
-        }
-
-        const buffer = await readStoredBytes(document.storagePath);
-        return extractDocumentText(buffer, document.mimeType, document.fileName);
-      }
-    );
-
-    await repository.updateDocument(document.id, extractionSource);
-    logStageDebug("extract_text ✓", extractionSource._debug ?? undefined);
-
-    checkPipelineTimeout();
-    const classification = await runStage(
-      document.dealId,
-      document.id,
-      "classify_document",
-      async () =>
-        classifyDocumentHeuristically(
-          extractionSource.normalizedText,
-          document.fileName
-        )
-    );
-
-    await repository.updateDocument(document.id, {
-      documentKind: classification.documentKind,
-      classificationConfidence: classification.confidence
-    });
-    logStageDebug("classify_document ✓", { kind: classification.documentKind, confidence: classification.confidence });
-
-    checkPipelineTimeout();
-    const sections = await runStage(
-      document.dealId,
-      document.id,
-      "section_document",
-      async () =>
-        splitIntoSections(extractionSource.normalizedText, classification.documentKind)
-    );
-
-    logDocumentPipeline("info", "sections_created", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      documentKind: classification.documentKind,
-      sectionCount: sections.length,
-      normalizedChars: extractionSource.normalizedText.length
-    });
-
-    const savedSections = await repository.replaceDocumentSections(document.id, sections);
-    logStageDebug("section_document ✓", { sectionCount: sections.length });
-
-    const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
-
-    async function runLegacySectionExtraction() {
-      const llmPlan = selectSectionsForLlm(sections, classification.documentKind);
-      const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
-
-      logDocumentPipeline("info", "llm_section_plan", {
-        dealId: document.dealId,
-        documentId: document.id,
-        fileName: document.fileName,
-        model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
-        fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
-        usingFreeModel: llmPlan.usingFreeModel,
-        selectedSectionCount: llmPlan.selected.length,
-        totalSectionCount: sections.length,
-        concurrency: llmPlan.concurrency,
-        selectedSections: llmPlan.selected.map((section) => ({
-          chunkIndex: section.chunkIndex,
-          title: section.title,
-          chars: section.content.length
-        }))
-      });
-
-      return mapWithConcurrency(sections, llmPlan.concurrency, async (section) => {
-        const fallback = extractStructuredTerms(
-          section.content,
-          [section],
-          classification.documentKind
-        );
-
-        if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
-          return fallback;
-        }
-
-        try {
-          return await extractSectionWithLlm(
-            section,
-            classification.documentKind,
-            fallback
-          );
-        } catch {
-          return fallback;
-        }
-      });
-    }
-
-    checkPipelineTimeout();
-    const partialExtractions = await runStage(
-      document.dealId,
-      document.id,
-      "extract_fields",
-      async () => runLegacySectionExtraction()
-    );
-
-    logDocumentPipeline("info", "field_extraction_complete", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      sectionCount: sections.length,
-      extractionCount: partialExtractions.length,
-      usedLlm: hasLlmKey(),
-      extractionRoute: "legacy"
-    });
-    logStageDebug("extract_fields ✓", {
-      extractionCount: partialExtractions.length,
-      extractionRoute: "legacy",
-      usedLlm: hasLlmKey(),
-      model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic"
-    });
-
-    checkPipelineTimeout();
-    const extraction = await runStage(
-      document.dealId,
-      document.id,
-      "merge_results",
-      async () => mergeExtractionResults(partialExtractions as ExtractionPipelineResult[])
-    );
-    const sanitizedExtraction = finalizeDocumentExtraction(
-      extractionSource.normalizedText,
-      extraction,
-      preferredCreatorName
-    );
-    const extractionEvidence = Array.isArray(sanitizedExtraction.evidence)
-      ? sanitizedExtraction.evidence
-      : [];
-    const extractionDeliverables = Array.isArray(sanitizedExtraction.data.deliverables)
-      ? sanitizedExtraction.data.deliverables
-      : [];
-
-    logDocumentPipeline("info", "merge_complete", {
-      dealId: document.dealId,
-      documentId: document.id,
-      evidenceCount: extractionEvidence.length,
-      deliverablesCount: extractionDeliverables.length,
-      hasPaymentAmount: sanitizedExtraction.data.paymentAmount !== null,
-      hasBrandName: Boolean(sanitizedExtraction.data.brandName),
-      hasCampaignName: Boolean(sanitizedExtraction.data.campaignName)
-    });
-
-    if (
-      classification.documentKind === "campaign_brief" ||
-      classification.documentKind === "deliverables_brief" ||
-      classification.documentKind === "pitch_deck"
-    ) {
-      const fallbackBrief = extractBriefData(
-        extractionSource.normalizedText,
-        classification.documentKind
-      );
-      if (fallbackBrief) {
-        fallbackBrief.sourceDocumentIds = [document.id];
-        let briefData = fallbackBrief;
-        if (hasLlmKey()) {
-          try {
-            briefData = await extractBriefWithLlm(
-              extractionSource.normalizedText,
-              classification.documentKind,
-              fallbackBrief
-            );
-          } catch {
-            // keep fallback
-          }
-        }
-        sanitizedExtraction.data.briefData = briefData;
-      }
-    }
-
-    const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
-      sanitizedExtraction.data.brandName
-    );
-
-    if (categoryEnrichment?.category) {
-      const previousCategory = sanitizedExtraction.data.brandCategory;
-      sanitizedExtraction.data.brandCategory = categoryEnrichment.category;
-      sanitizedExtraction.evidence = [
-        ...sanitizedExtraction.evidence,
-        {
-          fieldPath: "brandCategory",
-          snippet:
-            categoryEnrichment.snippet ??
-            `${categoryEnrichment.brandName} matched ${dealCategoryLabel(
-              categoryEnrichment.category
-            )}.`,
-          sectionKey: null,
-          confidence: categoryEnrichment.confidence
-        }
-      ];
-
-      if (
-        previousCategory &&
-        previousCategory !== categoryEnrichment.category
-      ) {
-        sanitizedExtraction.evidence.push({
-          fieldPath: "brandCategory",
-          snippet: `${categoryEnrichment.brandName} company enrichment suggests ${dealCategoryLabel(
-            categoryEnrichment.category
-          )}, which overrides a conflicting detected category.`,
-          sectionKey: null,
-          confidence: categoryEnrichment.confidence
-        });
-      }
-
-      logDocumentPipeline("info", "brand_category_enriched", {
-        dealId: document.dealId,
-        documentId: document.id,
-        brandName: categoryEnrichment.brandName,
-        previousCategory,
-        enrichedCategory: categoryEnrichment.category,
-        confidence: categoryEnrichment.confidence,
-        website: categoryEnrichment.website
-      });
-    }
-
-    await repository.upsertExtractionResult(document.id, sanitizedExtraction);
-
-    await repository.replaceExtractionEvidence(
-      document.id,
-      extractionEvidence.map((entry) => ({
-        fieldPath: entry.fieldPath,
-        snippet: entry.snippet,
-        sectionId: savedSections.find(
-          (section) => `section:${section.chunkIndex}` === entry.sectionKey
-        )?.id ?? null,
-        confidence: entry.confidence
-      }))
-    );
-    logStageDebug("merge_results ✓", {
-      evidenceCount: extractionEvidence.length,
-      brand: sanitizedExtraction.data.brandName
-    });
-
-    const latestAggregate =
-      (await repository.getDealAggregate(viewer.id, document.dealId)) ?? aggregate;
-    const isFirstDocument = latestAggregate.terms === null;
-    const existingTerms = latestAggregate.terms ?? createEmptyTerms(latestAggregate.deal);
-
-    // Documents uploaded before (or during) intake confirmation should merge
-    // directly into terms, not create pendingExtraction. Only documents
-    // uploaded AFTER confirmation should produce pending changes for review.
-    const isIntakeDocument =
-      latestAggregate.deal.confirmedAt &&
-      document.createdAt <= latestAggregate.deal.confirmedAt;
-    const shouldMergeDirectly = isFirstDocument || isIntakeDocument;
-
-    if (shouldMergeDirectly) {
-      const nextTerms = mergeTerms(
-        withPreferredCreatorName(existingTerms, preferredCreatorName),
-        sanitizedExtraction.data,
-        {
-          manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-        }
-      );
-      await repository.upsertTerms(document.dealId, nextTerms);
-      if (process.env.DATABASE_URL) {
-        await syncPaymentRecordForDeal(document.dealId, nextTerms);
-      }
-
-      await repository.updateDeal(viewer.id, document.dealId, {
-        analyzedAt: new Date().toISOString(),
-        nextDeliverableDate: earliestDeliverableDate(nextTerms),
-        brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
-        campaignName: nextTerms.campaignName ?? latestAggregate.deal.campaignName
-      });
-    } else {
-      const mergedFull = mergeTerms(
-        createEmptyTerms(latestAggregate.deal),
-        sanitizedExtraction.data
-      );
-      const { pendingExtraction: _pe, ...mergedExtraction } = mergedFull;
-      const pendingCandidate = mergedExtraction as PendingExtractionData;
-
-      if (
-        !hasMeaningfulChanges(
-          latestAggregate.terms as DealTermsRecord,
-          pendingCandidate
-        )
-      ) {
-        const nextTerms = mergeTerms(
-          withPreferredCreatorName(existingTerms, preferredCreatorName),
-          sanitizedExtraction.data,
-          {
-            manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-          }
-        );
-        await repository.upsertTerms(document.dealId, nextTerms);
-        if (process.env.DATABASE_URL) {
-          await syncPaymentRecordForDeal(document.dealId, nextTerms);
-        }
-
-        await repository.updateDeal(viewer.id, document.dealId, {
-          analyzedAt: new Date().toISOString(),
-          nextDeliverableDate: earliestDeliverableDate(existingTerms),
-          brandName: existingTerms.brandName ?? latestAggregate.deal.brandName,
-          campaignName: existingTerms.campaignName ?? latestAggregate.deal.campaignName
-        });
-      } else {
-        const existingPending = (latestAggregate.terms as DealTermsRecord)
-          .pendingExtraction as PendingExtractionData | null;
-
-        const pendingData = existingPending
-          ? coalesceExtractions(existingPending, sanitizedExtraction.data, (base, patch) => {
-              const full = { ...base, pendingExtraction: null };
-              const merged = mergeTerms(full, patch);
-              const { pendingExtraction: _, ...rest } = merged;
-              return rest as PendingExtractionData;
-            })
-          : pendingCandidate;
-
-        await repository.savePendingExtraction(document.dealId, pendingData);
-
-        await repository.updateDeal(viewer.id, document.dealId, {
-          analyzedAt: new Date().toISOString()
-        });
-      }
-    }
-
-    const risks = await runStage(
-      document.dealId,
-      document.id,
-      "analyze_risks",
-      async () => {
-        const fallbackRisks = analyzeCreatorRisks(
-          extractionSource.normalizedText,
-          document.id,
-          sanitizedExtraction
-        );
-
-        if (!hasLlmKey()) {
-          return fallbackRisks;
-        }
-
-        try {
-          return await analyzeRisksWithLlm(
-            extractionSource.normalizedText,
-            classification.documentKind,
-            sanitizedExtraction,
-            fallbackRisks,
-            document.id
-          );
-        } catch {
-          return fallbackRisks;
-        }
-      }
-    );
-
-    await repository.replaceRiskFlagsForDocument(
-      document.dealId,
-      document.id,
-      risks
-    );
-    logStageDebug("analyze_risks ✓", {
-      riskCount: risks.length,
-      usedLlm: hasLlmKey(),
-      model: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "heuristic"
-    });
-
-    const summary = await runStage(
-      document.dealId,
-      document.id,
-      "generate_summary",
-      async () => {
-        const fallbackSummary = buildCreatorSummary(sanitizedExtraction, risks);
-
-        if (!hasLlmKey()) {
-          return fallbackSummary;
-        }
-
-        try {
-          return await generateSummaryWithLlm(
-            sanitizedExtraction,
-            risks,
-            fallbackSummary
-          );
-        } catch {
-          return fallbackSummary;
-        }
-      }
-    );
-
-    await repository.saveSummary(document.dealId, document.id, summary);
-    await repository.updateDeal(viewer.id, document.dealId, {
-      summary: summary.body,
-      analyzedAt: new Date().toISOString()
-    });
-    logStageDebug("generate_summary ✓", {
-      summaryLength: summary.body.length,
-      usedLlm: hasLlmKey()
-    });
-
-    await repository.updateDocument(document.id, {
-      processingStatus: "ready",
-      rawText: extractionSource.rawText,
-      normalizedText: extractionSource.normalizedText,
-      errorMessage: null
-    });
-
-    if (process.env.DATABASE_URL) {
-      await syncIntakeSessionForDealId(document.dealId);
-    }
-
-    const totalDurationMs = Date.now() - pipelineStartedAt;
-    logStageDebug(`PIPELINE COMPLETE | total ${(totalDurationMs / 1000).toFixed(1)}s`);
-
-    logDocumentPipeline("info", "pipeline_complete", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      durationMs: totalDurationMs,
-      riskCount: risks.length,
-      summaryLength: summary?.body.length ?? 0,
-      deliverablesCount: sanitizedExtraction.data.deliverables?.length ?? 0
-    });
-
-    try {
-      writeGenerationSnapshot({
-        dealId: document.dealId,
-        documentId: document.id,
-        fileName: document.fileName,
-        documentKind: classification.documentKind,
-        model: hasLlmKey() ? getLlmRoute("extract_section").primary : "heuristic",
-        durationMs: totalDurationMs,
-        extraction: sanitizedExtraction,
-        risks,
-        summary
-      });
-    } catch {
-      // Snapshot write failure should not affect pipeline
-    }
-
-    void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);
-
-    return repository.getDealAggregate(viewer.id, document.dealId);
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "We could not reliably process this document.";
-
-    await repository.updateDocument(document.id, {
-      processingStatus: "failed",
-      errorMessage: message
-    });
-    if (process.env.DATABASE_URL) {
-      await syncIntakeSessionForDealId(document.dealId);
-    }
-    logDocumentPipeline("error", "pipeline_failed", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      durationMs: Date.now() - pipelineStartedAt,
-      error: message
-    });
-    throw new Error(`pipeline: ${message}`);
-  }
+async function processDocumentPipeline(
+  _viewer: Viewer,
+  document: DocumentRecord,
+  runId: string
+) {
+  return runDocumentPipelineSteps(document.id, runId);
 }
 
-export async function enqueueDocumentProcessing(documentId: string) {
-  const eventKey = process.env.INNGEST_EVENT_KEY;
-
-  if (eventKey) {
-    try {
-      const { inngest } = await import("@/lib/inngest/client");
-      await inngest.send({
-        name: "document/process.requested",
-        data: { documentId }
-      });
-      logDocumentPipeline("info", "queue_enqueued", {
-        documentId,
-        mode: "inngest"
-      });
-      return { mode: "inngest" as const };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to enqueue Inngest event.";
-      logDocumentPipeline("error", "inngest_enqueue_failed", {
-        documentId,
-        error: message
-      });
-    }
-  }
-
-  logDocumentPipeline("info", "queue_enqueued", {
-    documentId,
-    mode: "local"
-  });
-  return { mode: "local" as const };
-}
-
-export async function processDocumentById(documentId: string) {
+async function startDocumentProcessingRun(documentId: string) {
   const repository = getRepository();
   const document = await repository.getDocument(documentId);
 
@@ -1208,15 +672,92 @@ export async function processDocumentById(documentId: string) {
     throw new Error("Document not found.");
   }
 
+  const runId = randomUUID();
+  await repository.updateDocument(documentId, {
+    processingStatus: "pending",
+    errorMessage: null,
+    processingRunId: runId,
+    processingRunStateJson: createDocumentProcessingRunState(runId),
+    processingStartedAt: new Date().toISOString()
+  });
+
+  return { runId, documentId };
+}
+
+export async function enqueueDocumentProcessing(documentId: string) {
+  const startedRun = await startDocumentProcessingRun(documentId);
+  const eventKey = process.env.INNGEST_EVENT_KEY;
+
+  if (eventKey) {
+    try {
+      const { inngest } = await import("@/lib/inngest/client");
+      await inngest.send({
+        name: "document/process.requested",
+        data: { documentId, runId: startedRun.runId }
+      });
+      logDocumentPipeline("info", "queue_enqueued", {
+        documentId,
+        runId: startedRun.runId,
+        mode: "inngest"
+      });
+      return { mode: "inngest" as const, runId: startedRun.runId };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to enqueue Inngest event.";
+      logDocumentPipeline("error", "inngest_enqueue_failed", {
+        documentId,
+        runId: startedRun.runId,
+        error: message
+      });
+    }
+  }
+
+  logDocumentPipeline("info", "queue_enqueued", {
+    documentId,
+    runId: startedRun.runId,
+    mode: "local"
+  });
+  return { mode: "local" as const, runId: startedRun.runId };
+}
+
+export async function processDocumentById(documentId: string, runId?: string) {
+  const repository = getRepository();
+  const document = await repository.getDocument(documentId);
+
+  if (!document) {
+    throw new Error("Document not found.");
+  }
+
+  const activeRunId = runId ?? document.processingRunId ?? (await startDocumentProcessingRun(documentId)).runId;
   const viewer = await getViewerById(document.userId);
 
   logDocumentPipeline("info", "process_document_requested", {
     documentId,
     dealId: document.dealId,
-    fileName: document.fileName
+    fileName: document.fileName,
+    runId: activeRunId
   });
 
-  return processDocumentPipeline(viewer, document);
+  try {
+    return await processDocumentPipeline(viewer, document, activeRunId);
+  } catch (error) {
+    if (error instanceof DocumentRunSupersededError) {
+      return repository.getDealAggregate(viewer.id, document.dealId);
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "We could not reliably process this document.";
+
+    await failDocumentProcessingRun({
+      documentId,
+      runId: activeRunId,
+      message,
+      failedStep: getDocumentPipelineFailedStep(error)
+    });
+    throw error;
+  }
 }
 
 export async function listDealsForViewer(viewer: Viewer) {
@@ -1469,7 +1010,10 @@ export async function uploadDocumentsForViewer(
       documentKind: input.documentKindHint ?? "unknown",
       classificationConfidence: null,
       sourceType: "file",
-      errorMessage: null
+      errorMessage: null,
+      processingRunId: null,
+      processingRunStateJson: null,
+      processingStartedAt: null
     });
 
     createdDocuments.push(document);
@@ -1489,7 +1033,10 @@ export async function uploadDocumentsForViewer(
       documentKind: input.documentKindHint ?? "unknown",
       classificationConfidence: null,
       sourceType: "pasted_text",
-      errorMessage: null
+      errorMessage: null,
+      processingRunId: null,
+      processingRunStateJson: null,
+      processingStartedAt: null
     });
 
     createdDocuments.push(pastedDocument);
@@ -1504,7 +1051,7 @@ export async function uploadDocumentsForViewer(
       const queue = await enqueueDocumentProcessing(document.id);
 
       if (queue.mode === "local") {
-        void processDocumentById(document.id).catch(async () => {
+        void processDocumentById(document.id, queue.runId).catch(async () => {
           await getRepository().getDealAggregate(viewer.id, dealId);
         });
       }
@@ -1540,7 +1087,7 @@ export async function reprocessDocumentForViewer(
   const queue = await enqueueDocumentProcessing(document.id);
 
   if (queue.mode === "local") {
-    void processDocumentById(document.id).catch(() => undefined);
+    void processDocumentById(document.id, queue.runId).catch(() => undefined);
   }
 
   void queueAssistantSnapshotRefresh(viewer, document.dealId).catch(() => undefined);

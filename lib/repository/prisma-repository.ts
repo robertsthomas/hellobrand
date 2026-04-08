@@ -105,6 +105,9 @@ function toDocumentRecord(document: {
   classificationConfidence: number | null;
   sourceType: string;
   errorMessage: string | null;
+  processingRunId: string | null;
+  processingRunStateJson: unknown | null;
+  processingStartedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }): DocumentRecord {
@@ -113,6 +116,10 @@ function toDocumentRecord(document: {
     processingStatus: document.processingStatus as DocumentRecord["processingStatus"],
     sourceType: document.sourceType as DocumentRecord["sourceType"],
     documentKind: document.documentKind as DocumentRecord["documentKind"],
+    processingRunId: document.processingRunId,
+    processingRunStateJson:
+      (document.processingRunStateJson as DocumentRecord["processingRunStateJson"]) ?? null,
+    processingStartedAt: iso(document.processingStartedAt),
     createdAt: iso(document.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(document.updatedAt) ?? new Date().toISOString()
   };
@@ -913,7 +920,12 @@ export class PrismaRepository {
         documentKind: document.documentKind,
         classificationConfidence: document.classificationConfidence,
         sourceType: document.sourceType,
-        errorMessage: document.errorMessage
+        errorMessage: document.errorMessage,
+        processingRunId: document.processingRunId,
+        processingRunStateJson: toNullableJsonValue(document.processingRunStateJson),
+        processingStartedAt: document.processingStartedAt
+          ? new Date(document.processingStartedAt)
+          : null
       }
     });
 
@@ -1111,7 +1123,18 @@ export class PrismaRepository {
           normalizedText: patch.normalizedText,
           documentKind: patch.documentKind,
           classificationConfidence: patch.classificationConfidence,
-          errorMessage: patch.errorMessage
+          errorMessage: patch.errorMessage,
+          processingRunId: patch.processingRunId,
+          processingRunStateJson:
+            patch.processingRunStateJson === undefined
+              ? undefined
+              : toNullableJsonValue(patch.processingRunStateJson),
+          processingStartedAt:
+            patch.processingStartedAt === undefined
+              ? undefined
+              : patch.processingStartedAt
+                ? new Date(patch.processingStartedAt)
+                : null
         }
       });
 
@@ -1146,6 +1169,15 @@ export class PrismaRepository {
     return saved.map(toSectionRecord);
   }
 
+  async listDocumentSections(documentId: string) {
+    const sections = await prisma.documentSection.findMany({
+      where: { documentId },
+      orderBy: { chunkIndex: "asc" }
+    });
+
+    return sections.map(toSectionRecord);
+  }
+
   async upsertExtractionResult(
     documentId: string,
     result: Omit<ExtractionResultRecord, "id" | "documentId" | "createdAt">
@@ -1172,6 +1204,14 @@ export class PrismaRepository {
     return toExtractionResultRecord(saved);
   }
 
+  async getExtractionResult(documentId: string) {
+    const result = await prisma.extractionResult.findUnique({
+      where: { documentId }
+    });
+
+    return result ? toExtractionResultRecord(result) : null;
+  }
+
   async replaceExtractionEvidence(
     documentId: string,
     evidence: Omit<ExtractionEvidenceRecord, "id" | "documentId" | "createdAt">[]
@@ -1195,6 +1235,15 @@ export class PrismaRepository {
     });
 
     return saved.map(toEvidenceRecord);
+  }
+
+  async listExtractionEvidence(documentId: string) {
+    const evidence = await prisma.extractionEvidence.findMany({
+      where: { documentId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return evidence.map(toEvidenceRecord);
   }
 
   async saveSummary(
@@ -1393,6 +1442,18 @@ export class PrismaRepository {
     });
 
     return saved.map(toRiskFlagRecord);
+  }
+
+  async listRiskFlagsForDocument(dealId: string, documentId: string) {
+    const flags = await prisma.riskFlag.findMany({
+      where: {
+        dealId,
+        sourceDocumentId: documentId
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return flags.map(toRiskFlagRecord);
   }
 
   async saveEmailDraft(

@@ -88,7 +88,10 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
         documentKind: document.documentKind ?? legacyDocument.type ?? "unknown",
         classificationConfidence: document.classificationConfidence ?? null,
         sourceType: document.sourceType ?? "file",
-        errorMessage: document.errorMessage ?? legacyDocument.failureReason ?? null
+        errorMessage: document.errorMessage ?? legacyDocument.failureReason ?? null,
+        processingRunId: document.processingRunId ?? null,
+        processingRunStateJson: document.processingRunStateJson ?? null,
+        processingStartedAt: document.processingStartedAt ?? null
       };
     }),
     dealTerms: (store.dealTerms ?? []).map((terms) => ({
@@ -606,6 +609,13 @@ export class FileRepository {
     return store.documentSections.filter((section) => section.documentId === documentId);
   }
 
+  async listDocumentSections(documentId: string) {
+    const store = await ensureStore();
+    return store.documentSections
+      .filter((section) => section.documentId === documentId)
+      .sort((left, right) => left.chunkIndex - right.chunkIndex);
+  }
+
   async upsertExtractionResult(
     documentId: string,
     result: Omit<ExtractionResultRecord, "id" | "documentId" | "createdAt">
@@ -633,6 +643,11 @@ export class FileRepository {
     return next;
   }
 
+  async getExtractionResult(documentId: string) {
+    const store = await ensureStore();
+    return store.extractionResults.find((entry) => entry.documentId === documentId) ?? null;
+  }
+
   async replaceExtractionEvidence(
     documentId: string,
     evidence: Omit<
@@ -654,6 +669,11 @@ export class FileRepository {
       }))
     );
     await saveStore(store);
+    return store.extractionEvidence.filter((entry) => entry.documentId === documentId);
+  }
+
+  async listExtractionEvidence(documentId: string) {
+    const store = await ensureStore();
     return store.extractionEvidence.filter((entry) => entry.documentId === documentId);
   }
 
@@ -823,6 +843,13 @@ export class FileRepository {
     );
     await saveStore(store);
     return store.riskFlags.filter((flag) => flag.dealId === dealId);
+  }
+
+  async listRiskFlagsForDocument(dealId: string, documentId: string) {
+    const store = await ensureStore();
+    return store.riskFlags.filter(
+      (flag) => flag.dealId === dealId && flag.sourceDocumentId === documentId
+    );
   }
 
   async saveEmailDraft(

@@ -44,6 +44,15 @@ export type JobType =
   | "analyze_risks"
   | "generate_summary";
 
+export interface DocumentProcessingRunState {
+  runId: string;
+  completedSteps: JobType[];
+  stepCompletedAt: Partial<Record<JobType, string>>;
+  failedStep: JobType | null;
+  failedAt: string | null;
+  lastError: string | null;
+}
+
 export type IntakeProcessingStageId =
   | "extracting"
   | "structuring"
@@ -138,6 +147,9 @@ export interface DocumentRecord {
   classificationConfidence: number | null;
   sourceType: "file" | "pasted_text" | "email_attachment";
   errorMessage: string | null;
+  processingRunId: string | null;
+  processingRunStateJson: DocumentProcessingRunState | null;
+  processingStartedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

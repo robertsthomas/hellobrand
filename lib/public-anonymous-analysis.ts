@@ -759,7 +759,10 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       documentKind: lockedSession.analysis.classification.documentKind,
       classificationConfidence: lockedSession.analysis.classification.confidence,
       sourceType: lockedSession.sourceType,
-      errorMessage: null
+      errorMessage: null,
+      processingRunId: null,
+      processingRunStateJson: null,
+      processingStartedAt: null
     });
 
     const savedSections = await repository.replaceDocumentSections(

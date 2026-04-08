@@ -249,6 +249,9 @@ model Document {
   classificationConfidence Float?
   sourceType               String
   errorMessage             String?
+  processingRunId          String?
+  processingRunStateJson   Json?
+  processingStartedAt      DateTime?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 

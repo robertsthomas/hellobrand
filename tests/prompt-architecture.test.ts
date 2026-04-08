@@ -61,7 +61,8 @@ describe("assistant prompt architecture", () => {
           prompt: "Help me push back on paid usage."
         },
         dealId: "deal-123",
-        profileLocation: null
+        profileLocation: null,
+        pageContext: null
       },
       snapshotSummary: "Payment terms are Net 45 and paid usage is broad.",
       userSnapshotSummary: "Creator has 3 active deals."
@@ -172,7 +173,8 @@ describe("assistant workspace draft architecture", () => {
           sourceId: "risk-1",
           label: "Negotiate watchout",
           prompt: "Help me push back on the paid usage terms."
-        }
+        },
+        pageContext: null
       },
       focus: "Push back on the paid usage scope before signature.",
       intent: "limit-usage-rights",
