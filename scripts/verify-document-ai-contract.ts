@@ -35,7 +35,16 @@ async function main() {
   );
 
   const contractPath = await firstExistingPath([
-    "/Users/thomasroberts/Downloads/@therobertscasa Kraft Lunchables CLP Influencer Agreement.pdf",
+    path.join(
+      process.cwd(),
+      "example-docs",
+      "@therobertscasa Kraft Lunchables CLP Influencer Agreement.pdf"
+    ),
+    path.join(
+      process.cwd(),
+      "example-docs",
+      "OREO Cakesters _ @therobertscasa Agreement.pdf"
+    ),
     path.join(
       process.cwd(),
       "public",

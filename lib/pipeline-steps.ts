@@ -33,6 +33,10 @@ import {
   writeGenerationSnapshot
 } from "@/lib/document-pipeline-shared";
 import {
+  extractBriefTermsWithDocumentAiDetailed,
+  hasMeaningfulBriefExtraction
+} from "@/lib/document-ai-brief";
+import {
   extractContractTermsWithDocumentAiDetailed,
   hasMeaningfulContractExtraction
 } from "@/lib/document-ai-contract";
@@ -857,7 +861,80 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
       runId
     });
 
-    if (routing.extractionRoute === "document_ai_contract") {
+    if (routing.extractionRoute === "document_ai_brief") {
+      let briefExtraction: ExtractionPipelineResult | null = null;
+
+      try {
+        const detailedBriefExtraction = await extractBriefTermsWithDocumentAiDetailed({
+          bytes: await readStoredBytes(document.storagePath),
+          mimeType: document.mimeType,
+          deal: {
+            brandName: null,
+            campaignName: null
+          }
+        });
+        briefExtraction = detailedBriefExtraction.extraction;
+        const rawVendorArtifact = await saveArtifact({
+          documentId: document.id,
+          runId,
+          step: "extract_fields",
+          kind: "raw_vendor_output",
+          processor: detailedBriefExtraction.processor,
+          payload: detailedBriefExtraction.rawResponse
+        });
+        rawVendorArtifactId = rawVendorArtifact.id;
+      } catch (error) {
+        logDocumentPipeline("error", "document_ai_brief_failed", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          error: getErrorMessage(error),
+          runId
+        });
+      }
+
+      if (briefExtraction && hasMeaningfulBriefExtraction(briefExtraction)) {
+        briefExtraction.data.briefData = briefExtraction.data.briefData
+          ? {
+              ...briefExtraction.data.briefData,
+              sourceDocumentIds: [document.id]
+            }
+          : null;
+
+        sanitizedExtraction = finalizeDocumentExtraction(
+          document.normalizedText,
+          briefExtraction,
+          preferredCreatorName
+        );
+
+        logDocumentPipeline("info", "field_extraction_complete", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          sectionCount: sections.length,
+          extractionCount: 1,
+          usedLlm: false,
+          extractionRoute: routing.extractionRoute,
+          processor: routing.processor,
+          runId
+        });
+      } else {
+        logDocumentPipeline("info", "document_ai_brief_fallback", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          extractionRoute: "legacy",
+          reason: briefExtraction ? "empty_brief_extraction" : "brief_processor_failed",
+          runId
+        });
+        sanitizedExtraction = await runLegacyExtractFields({
+          document,
+          sections,
+          preferredCreatorName,
+          viewer
+        });
+      }
+    } else if (routing.extractionRoute === "document_ai_contract") {
       let contractExtraction: ExtractionPipelineResult | null = null;
 
       try {

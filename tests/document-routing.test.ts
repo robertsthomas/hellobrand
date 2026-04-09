@@ -72,6 +72,27 @@ describe("document routing", () => {
     });
   });
 
+  it("routes file-based briefs to the Document AI brief processor when configured", async () => {
+    hasDocumentAiProcessorMock.mockImplementation((kind: string) => kind === "brief");
+    const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
+
+    const decision = resolveDocumentRoutingDecision({
+      document: {
+        documentKind: "campaign_brief",
+        classificationConfidence: 0.89,
+        fileName: "brief.pdf",
+        normalizedText: "Campaign overview and messaging points",
+        sourceType: "file"
+      }
+    });
+
+    expect(decision).toMatchObject({
+      extractionRoute: "document_ai_brief",
+      processor: "brief",
+      fallbackRoute: "legacy"
+    });
+  });
+
   it("keeps pasted-text invoices on the legacy path", async () => {
     hasDocumentAiProcessorMock.mockReturnValue(true);
     const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
@@ -114,5 +135,27 @@ describe("document routing", () => {
       fallbackRoute: null
     });
     expect(decision.reasons).toContain("contract_processor_requires_file");
+  });
+
+  it("keeps pasted-text briefs on the legacy path", async () => {
+    hasDocumentAiProcessorMock.mockReturnValue(true);
+    const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
+
+    const decision = resolveDocumentRoutingDecision({
+      document: {
+        documentKind: "campaign_brief",
+        classificationConfidence: 0.9,
+        fileName: "pasted-brief.txt",
+        normalizedText: "Campaign overview",
+        sourceType: "pasted_text"
+      }
+    });
+
+    expect(decision).toMatchObject({
+      extractionRoute: "legacy",
+      processor: null,
+      fallbackRoute: null
+    });
+    expect(decision.reasons).toContain("brief_processor_requires_file");
   });
 });

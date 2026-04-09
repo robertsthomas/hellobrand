@@ -11,6 +11,7 @@ coverage
 # Local runtime state
 .runtime
 generations/
+example-docs/
 *.log
 supabase/.temp
 playwright-report

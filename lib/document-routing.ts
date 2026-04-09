@@ -10,7 +10,8 @@ import type {
 export type DocumentExtractionRoute =
   | "legacy"
   | "document_ai_invoice"
-  | "document_ai_contract";
+  | "document_ai_contract"
+  | "document_ai_brief";
 
 export interface DocumentRoutingDecision {
   classification: DocumentClassificationResult;
@@ -123,6 +124,36 @@ export function resolveDocumentRoutingDecision(input: {
     }
 
     reasons.push("document_ai_contract_processor_missing");
+  }
+
+  if (
+    classification.documentKind === "campaign_brief" ||
+    classification.documentKind === "deliverables_brief" ||
+    classification.documentKind === "pitch_deck"
+  ) {
+    if (input.document.sourceType === "pasted_text") {
+      reasons.push("brief_processor_requires_file");
+      return {
+        classification,
+        extractionRoute: "legacy" as const,
+        processor: null,
+        fallbackRoute: null,
+        reasons
+      };
+    }
+
+    if (hasDocumentAiProcessor("brief")) {
+      reasons.push("document_ai_brief_processor_configured");
+      return {
+        classification,
+        extractionRoute: "document_ai_brief" as const,
+        processor: "brief" as const,
+        fallbackRoute: "legacy" as const,
+        reasons
+      };
+    }
+
+    reasons.push("document_ai_brief_processor_missing");
   }
 
   return {
