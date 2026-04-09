@@ -415,7 +415,7 @@ export function AppFrame({
                 data-guide="sidebar-new-workspace"
                 className={cn(
                   buttonVariants({ size: "sm" }),
-                  "h-11 w-full justify-between px-4"
+                  "h-11 w-full justify-between rounded-none px-4"
                 )}
               >
                 <span>New workspace</span>
@@ -525,7 +525,7 @@ export function AppFrame({
                     payload={{ source: "sidebar_mobile" }}
                     data-guide="sidebar-new-workspace"
                     onClick={() => handleMobileMenuOpenChange(false)}
-                    className={cn(buttonVariants({ size: "sm" }), "h-11 w-full justify-between px-4")}
+                    className={cn(buttonVariants({ size: "sm" }), "h-11 w-full justify-between rounded-none px-4")}
                   >
                     <span>New workspace</span>
                   </PostHogActionLink>

@@ -11,10 +11,6 @@ function isUniqueConstraintError(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
-function isDevelopmentAuthBypassEnabled() {
-  return process.env.NODE_ENV !== "production";
-}
-
 function firstString(...values: unknown[]) {
   for (const value of values) {
     if (typeof value === "string" && value.trim().length > 0) {
@@ -214,10 +210,6 @@ const getCurrentViewerCached = cache(async (): Promise<Viewer | null> => {
   const sessionViewer = await upsertViewerFromSession();
   if (sessionViewer) {
     return sessionViewer;
-  }
-
-  if (isDevelopmentAuthBypassEnabled()) {
-    return ensureViewerRecord(DEFAULT_E2E_VIEWER);
   }
 
   return null;

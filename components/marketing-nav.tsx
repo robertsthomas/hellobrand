@@ -97,9 +97,13 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                 <span className="sr-only">Open navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[86vw] max-w-[320px] bg-[#fefcfa] dark:bg-[#101318]">
-              <SheetHeader className="gap-4 border-b border-black/5 pb-5 pr-14 dark:border-white/10">
-                <div className="flex items-start justify-between gap-4">
+            <SheetContent
+              side="right"
+              className="w-[86vw] max-w-[320px] bg-[#fefcfa] [&>[data-slot=sheet-close]]:top-4 [&>[data-slot=sheet-close]]:right-4 dark:bg-[#101318]"
+            >
+              <ThemeButton className="absolute right-12 top-4 z-10 h-4 w-4 rounded-none text-[#667085] dark:text-[#c4cad2]" />
+              <SheetHeader className="gap-4 border-b border-black/5 pb-5 pr-24 dark:border-white/10">
+                <div className="flex items-start gap-4">
                   <div className="space-y-1">
                     <SheetTitle className="text-left text-lg font-semibold text-[#1a2634] dark:text-[#eef2f5]">
                       HelloBrand
@@ -108,7 +112,6 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                       Explore the site and jump into the app.
                     </SheetDescription>
                   </div>
-                  <ThemeButton className="border border-black/8 bg-white text-[#667085] dark:border-white/10 dark:bg-white/5 dark:text-[#c4cad2]" />
                 </div>
               </SheetHeader>
 
@@ -117,7 +120,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                   <SheetClose asChild>
                     <Link
                       href="/"
-                      className="flex h-12 items-center rounded-xl px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                      className="flex h-12 items-center rounded-none px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
                     >
                       Home
                     </Link>
@@ -125,7 +128,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                   <SheetClose asChild>
                     <Link
                       href="/pricing"
-                      className="flex h-12 items-center rounded-xl px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                      className="flex h-12 items-center rounded-none px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
                     >
                       Pricing
                     </Link>
@@ -133,7 +136,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                   <SheetClose asChild>
                     <Link
                       href="/blog"
-                      className="flex h-12 items-center rounded-xl px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                      className="flex h-12 items-center rounded-none px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
                     >
                       Blog
                     </Link>
@@ -142,7 +145,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                     <SheetClose asChild>
                       <Link
                         href="/waitlist"
-                        className="flex h-12 items-center rounded-xl px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                        className="flex h-12 items-center rounded-none px-4 text-base font-medium text-[#1a2634] transition hover:bg-black/[0.04] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
                       >
                         Waitlist
                       </Link>
@@ -155,7 +158,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                     {returning ? (
                       <Link
                         href="/login"
-                        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
+                        className="inline-flex h-12 w-full items-center justify-center rounded-none bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
                       >
                         Go to app
                       </Link>
@@ -163,7 +166,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                       <Link
                         href="/upload"
                         onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_drawer" })}
-                        className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
+                        className="inline-flex h-12 w-full items-center justify-center rounded-none bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
                       >
                         Upload free
                       </Link>
@@ -196,18 +199,23 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
             {returning ? (
               <Link
                 href="/login"
-                className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
+                className="inline-flex h-10 items-center rounded-none bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
               >
                 Go to app
               </Link>
             ) : (
-              <Link
-                href="/upload"
-                onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_desktop" })}
-                className="inline-flex h-10 items-center rounded-lg bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
-              >
-                Upload free
-              </Link>
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/upload"
+                  onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_desktop" })}
+                  className="inline-flex h-10 items-center rounded-none bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
+                >
+                  Upload free
+                </Link>
+                <Button asChild variant="outline" className="h-10 rounded-none px-5 text-[14px] font-semibold">
+                  <Link href="/login">Login</Link>
+                </Button>
+              </div>
             )}
           </div>
         </div>

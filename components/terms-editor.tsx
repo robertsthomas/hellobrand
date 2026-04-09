@@ -432,6 +432,10 @@ function textHidden(name: string, value: string) {
   return <input type="hidden" name={name} value={value} />;
 }
 
+function mixedSectionTwoUpGrid(editing: boolean) {
+  return `grid grid-cols-1 gap-x-8 gap-y-5 ${editing ? "md:grid-cols-2" : "md:grid-cols-3"}`;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
@@ -730,7 +734,7 @@ export function TermsEditor({
             editControl={<BoolSelect name="whitelistingAllowed" value={terms?.whitelistingAllowed} />}
           />
         </div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+        <div className={mixedSectionTwoUpGrid(ed("usage"))}>
           <Field label="Usage duration" editing={ed("usage")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.usageDuration)} />}
             editControl={<input className={FORM_INPUT_CLASS} name="usageDuration" type="text" defaultValue={fieldValue(terms?.usageDuration)} />}
@@ -771,7 +775,7 @@ export function TermsEditor({
         />
 
         {ed("exclusivity") ? (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <div className={mixedSectionTwoUpGrid(true)}>
             <EditableStringListField
               title="Restricted categories"
               description="List the brands or categories this partnership blocks you from working with."
@@ -796,7 +800,7 @@ export function TermsEditor({
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <div className={mixedSectionTwoUpGrid(false)}>
             <Field label="Restricted categories" editing={false}
               readOnly={<ReadOnlyValue value={(terms?.restrictedCategories ?? []).join(", ") || fieldValue(terms?.exclusivityRestrictions)} placeholder="No restrictions" />}
               editControl={null}
@@ -848,7 +852,7 @@ export function TermsEditor({
         onOpenReview={() => setOpenReviewSection("termination")}
         onToggleEdit={() => toggle("termination")}
       >
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+        <div className={mixedSectionTwoUpGrid(ed("termination"))}>
           <Field label="Revisions" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.revisions)} />}
             editControl={<input className={FORM_INPUT_CLASS} name="revisions" type="text" defaultValue={fieldValue(terms?.revisions)} />}
@@ -858,7 +862,7 @@ export function TermsEditor({
             editControl={<input className={FORM_INPUT_CLASS} name="revisionRounds" type="number" step="1" defaultValue={terms?.revisionRounds ?? ""} />}
           />
         </div>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+        <div className={mixedSectionTwoUpGrid(ed("termination"))}>
           <Field label="Termination summary" editing={ed("termination")}
             readOnly={<ReadOnlyValue value={fieldValue(terms?.termination)} />}
             editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-20`} name="termination" defaultValue={fieldValue(terms?.termination)} />}
