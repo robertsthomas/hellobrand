@@ -4,13 +4,16 @@ import { getDocumentDisplayStatus } from "@/lib/document-status";
 import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
 
 function makeDocument(overrides?: Partial<DocumentRecord>): DocumentRecord {
-  return {
-    id: "doc-1",
-    dealId: "deal-1",
-    userId: "user-1",
+  return Object.assign(
+    {
+      id: "doc-1",
+      dealId: "deal-1",
+      userId: "user-1",
     fileName: "contract.pdf",
     mimeType: "application/pdf",
     storagePath: "/tmp/contract.pdf",
+    fileSizeBytes: null,
+    checksumSha256: null,
     processingStatus: "pending",
     rawText: null,
     normalizedText: null,
@@ -19,12 +22,17 @@ function makeDocument(overrides?: Partial<DocumentRecord>): DocumentRecord {
     sourceType: "file",
     errorMessage: null,
     processingRunId: null,
-    processingRunStateJson: null,
-    processingStartedAt: null,
-    createdAt: "2026-04-09T12:00:00.000Z",
-    updatedAt: "2026-04-09T12:00:00.000Z",
-    ...overrides
-  };
+      processingRunStateJson: null,
+      processingStartedAt: null,
+      createdAt: "2026-04-09T12:00:00.000Z",
+      updatedAt: "2026-04-09T12:00:00.000Z"
+    },
+    overrides,
+    {
+      fileSizeBytes: overrides?.fileSizeBytes ?? null,
+      checksumSha256: overrides?.checksumSha256 ?? null
+    }
+  );
 }
 
 function makeJob(overrides?: Partial<JobRecord>): JobRecord {

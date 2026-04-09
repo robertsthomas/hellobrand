@@ -1659,9 +1659,10 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     throw new Error("Attachment not found.");
   }
 
+  const attachmentBytes = Buffer.from(attachment.bytes);
   const { storagePath } = await storeUploadedBytes({
     fileName: attachment.filename,
-    bytes: Buffer.from(attachment.bytes),
+    bytes: attachmentBytes,
     contentType: attachment.mimeType || "application/octet-stream",
     folder: dealId
   });
@@ -1672,6 +1673,8 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     fileName: attachment.filename,
     mimeType: attachment.mimeType || "application/octet-stream",
     storagePath,
+    fileSizeBytes: attachmentBytes.length,
+    checksumSha256: null,
     processingStatus: "pending",
     rawText: null,
     normalizedText: null,

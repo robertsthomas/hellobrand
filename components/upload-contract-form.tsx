@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FileText, MessageSquareText, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileText, LoaderCircle, MessageSquareText, Plus } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
-import { reprocessDocumentAction, uploadDocumentsAction } from "@/app/actions";
+import { reprocessDocumentAction } from "@/app/actions";
+import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
 import { getDocumentDisplayStatus } from "@/lib/document-status";
 import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
 import { cn, humanizeToken } from "@/lib/utils";
 import { captureAppEvent } from "@/lib/posthog/events";
-import { SubmitButton } from "@/components/submit-button";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -27,9 +28,12 @@ export function UploadContractForm({
   reviewItems: DocumentReviewItemRecord[];
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const router = useRouter();
   const posthog = usePostHog();
   const [mode, setMode] = useState<UploadMode>("upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const latestDocument = documents[0] ?? null;
   const latestStatus = latestDocument
     ? getDocumentDisplayStatus({
@@ -63,22 +67,58 @@ export function UploadContractForm({
     [documents, jobs, reviewItems]
   );
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const pastedField = event.currentTarget.elements.namedItem("pastedText");
+    const pastedText =
+      pastedField instanceof HTMLTextAreaElement ? pastedField.value.trim() : "";
+
+    captureAppEvent(
+      posthog,
+      mode === "upload"
+        ? "workspace_documents_submitted"
+        : "workspace_pasted_context_submitted",
+      {
+        surface: "deal_upload_form",
+        dealId,
+        fileCount: selectedFiles.length
+      }
+    );
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      await uploadDocumentsViaDirectStorage({
+        registerUrl: `/api/p/${dealId}/documents/direct/register`,
+        completeUrl: `/api/p/${dealId}/documents/direct/complete`,
+        uploadUrl: `/api/p/${dealId}/documents`,
+        files: selectedFiles,
+        pastedText,
+        onRegistered: async () => {
+          router.refresh();
+        }
+      });
+
+      setSelectedFiles([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      event.currentTarget.reset();
+      router.refresh();
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Could not upload documents."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <form
-      action={uploadDocumentsAction}
-      onSubmit={() => {
-        captureAppEvent(
-          posthog,
-          mode === "upload"
-            ? "workspace_documents_submitted"
-            : "workspace_pasted_context_submitted",
-          {
-            surface: "deal_upload_form",
-            dealId,
-            fileCount: selectedFiles.length
-          }
-        );
-      }}
+      onSubmit={(event) => void handleSubmit(event)}
       className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
     >
       <input type="hidden" name="dealId" value={dealId} />
@@ -166,6 +206,7 @@ export function UploadContractForm({
               <div className="flex items-center gap-3">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => {
                     captureAppEvent(posthog, "workspace_file_picker_clicked", {
                       surface: "deal_upload_form",
@@ -177,13 +218,21 @@ export function UploadContractForm({
                 >
                   Choose files
                 </button>
-                <SubmitButton
-                  pendingLabel="Adding to workspace..."
-                  showSpinner
+                <button
+                  type="submit"
+                  aria-busy={isSubmitting || undefined}
+                  disabled={isSubmitting}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
                 >
-                  Add to workspace
-                </SubmitButton>
+                  {isSubmitting ? (
+                    <>
+                      <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+                      Adding to workspace...
+                    </>
+                  ) : (
+                    "Add to workspace"
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -198,13 +247,21 @@ export function UploadContractForm({
               <p className="text-xs text-black/45 dark:text-white/45">
                 Plain text works best here. The content will be attached to this workspace only.
               </p>
-              <SubmitButton
-                pendingLabel="Adding to workspace..."
-                showSpinner
+              <button
+                type="submit"
+                aria-busy={isSubmitting || undefined}
+                disabled={isSubmitting}
                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
               >
-                Add to workspace
-              </SubmitButton>
+                {isSubmitting ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    Adding to workspace...
+                  </>
+                ) : (
+                  "Add to workspace"
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -265,6 +322,12 @@ export function UploadContractForm({
               </p>
             ))}
         </div>
+      ) : null}
+
+      {submitError ? (
+        <p className="mt-4 border-l-2 border-clay/60 bg-clay/5 px-4 py-3 text-sm text-clay">
+          {submitError}
+        </p>
       ) : null}
     </form>
   );

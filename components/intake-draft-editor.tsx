@@ -5,31 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { IntakeSourceSwitcher } from "@/components/intake-source-switcher";
 import { SubmitButton } from "@/components/submit-button";
+import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
-
-async function uploadSessionDocumentsRequest({
-  sessionId,
-  files,
-  pastedText
-}: {
-  sessionId: string;
-  files: File[];
-  pastedText: string;
-}) {
-  const formData = new FormData();
-  for (const file of files) {
-    formData.append("documents", file);
-  }
-  if (pastedText) {
-    formData.append("pastedText", pastedText);
-  }
-  formData.append("startProcessing", "0");
-
-  return fetch(`/api/intake/${sessionId}/documents`, {
-    method: "POST",
-    body: formData
-  });
-}
 
 export function IntakeDraftEditor({
   autoOpenPicker,
@@ -152,16 +129,14 @@ export function IntakeDraftEditor({
 
     try {
       const nextSessionId = sessionId ?? (await createDraftSession());
-      const response = await uploadSessionDocumentsRequest({
-        sessionId: nextSessionId,
+      const payload = await uploadDocumentsViaDirectStorage({
+        registerUrl: `/api/intake/${nextSessionId}/documents/direct/register`,
+        completeUrl: `/api/intake/${nextSessionId}/documents/direct/complete`,
+        uploadUrl: `/api/intake/${nextSessionId}/documents`,
         files: pendingFiles,
-        pastedText: pastedText.trim()
+        pastedText: pastedText.trim(),
+        startProcessing: false
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Could not upload documents.");
-      }
 
       reset("upload");
       router.push(`/app/intake/${nextSessionId}`);

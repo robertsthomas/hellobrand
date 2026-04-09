@@ -120,6 +120,8 @@ export function createSeedStore(): AppStore {
         fileName: "nimbus-spring-contract.pdf",
         mimeType: "application/pdf",
         storagePath: "demo/nimbus-spring-contract.pdf",
+        fileSizeBytes: null,
+        checksumSha256: null,
         processingStatus: "ready",
         rawText:
           "Creator Agreement\nCompensation\nBrand shall pay Creator $2,000 net 45 after invoice. Deliverables include 1 Instagram Reel and 2 Story frames. Brand receives 6 months paid social usage. Exclusivity for athletic footwear lasts 30 days.",

@@ -1,4 +1,4 @@
-import { getDocumentProcessingRunState } from "@/lib/document-pipeline-shared";
+import { getDocumentProcessingRunState } from "@/lib/document-pipeline-run-state";
 import type {
   DocumentRecord,
   DocumentReviewItemRecord,

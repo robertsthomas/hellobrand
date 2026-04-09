@@ -83,6 +83,8 @@ function makeAggregate(terms: DealTermsRecord): DealAggregate {
     fileName: "contract.pdf",
     mimeType: "application/pdf",
     storagePath: "/tmp/contract.pdf",
+    fileSizeBytes: null,
+    checksumSha256: null,
     processingStatus: "ready",
     rawText: null,
     normalizedText: null,

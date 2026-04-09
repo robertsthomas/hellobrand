@@ -42,6 +42,11 @@ interface PersistedIntakeRecord {
   notes: string | null;
 }
 
+interface IntakeNormalizationOptions {
+  excludedPrimaryContactEmails?: Array<string | null | undefined>;
+  excludedPrimaryContactNames?: Array<string | null | undefined>;
+}
+
 function presentText(value: string | null | undefined) {
   if (typeof value !== "string") {
     return null;
@@ -192,6 +197,10 @@ function extractEmails(text: string) {
   );
 }
 
+function normalizeEmail(value: string | null | undefined) {
+  return presentText(value)?.toLowerCase() ?? null;
+}
+
 function extractPhones(text: string) {
   return Array.from(
     new Set(
@@ -203,6 +212,36 @@ function extractPhones(text: string) {
       )
     )
   );
+}
+
+function buildExcludedContactEmails(options: IntakeNormalizationOptions | undefined) {
+  return new Set(
+    (options?.excludedPrimaryContactEmails ?? [])
+      .map((email) => normalizeEmail(email))
+      .filter((email): email is string => Boolean(email))
+  );
+}
+
+function normalizeContactName(value: string | null | undefined) {
+  return presentText(value)?.toLowerCase() ?? null;
+}
+
+function buildExcludedContactNames(options: IntakeNormalizationOptions | undefined) {
+  return new Set(
+    (options?.excludedPrimaryContactNames ?? [])
+      .map((name) => normalizeContactName(name))
+      .filter((name): name is string => Boolean(name))
+  );
+}
+
+function isExcludedContactEmail(email: string | null | undefined, excludedEmails: Set<string>) {
+  const normalized = normalizeEmail(email);
+  return Boolean(normalized && excludedEmails.has(normalized));
+}
+
+function isExcludedContactName(name: string | null | undefined, excludedNames: Set<string>) {
+  const normalized = normalizeContactName(name);
+  return Boolean(normalized && excludedNames.has(normalized));
 }
 
 function scoreContactLine(line: string) {
@@ -280,15 +319,33 @@ function sanitizeContactTitle(value: string | null | undefined) {
 function extractPrimaryContact(
   aggregate: DealAggregate,
   agencyName: string | null,
-  brandName: string | null
+  brandName: string | null,
+  options?: IntakeNormalizationOptions
 ): IntakePrimaryContact {
+  const excludedEmails = buildExcludedContactEmails(options);
+  const excludedNames = buildExcludedContactNames(options);
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.primaryContact;
   if (persisted) {
+    const persistedEmail = presentText(persisted.email);
+    const persistedName = presentText(persisted.name);
+    if (
+      isExcludedContactEmail(persistedEmail, excludedEmails) ||
+      isExcludedContactName(persistedName, excludedNames)
+    ) {
+      return {
+        organizationType: persisted.organizationType ?? (agencyName ? "agency" : "brand"),
+        name: null,
+        title: null,
+        email: null,
+        phone: null
+      };
+    }
+
     return {
       organizationType: persisted.organizationType ?? (agencyName ? "agency" : "brand"),
-      name: presentText(persisted.name),
+      name: persistedName,
       title: presentText(persisted.title),
-      email: presentText(persisted.email),
+      email: persistedEmail,
       phone: presentText(persisted.phone)
     };
   }
@@ -309,11 +366,33 @@ function extractPrimaryContact(
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter(Boolean);
-    const emailIndex = emails.length ? lines.findIndex((line) => line.includes(emails[0])) : -1;
-    const phoneIndex = phones.length ? lines.findIndex((line) => line.includes(phones[0])) : -1;
+    const candidateEmails = emails.filter(
+      (email) => !isExcludedContactEmail(email, excludedEmails)
+    );
+    const excludedEmailIndexes = emails
+      .filter((email) => isExcludedContactEmail(email, excludedEmails))
+      .map((email) => lines.findIndex((line) => line.includes(email)))
+      .filter((index) => index !== -1);
+    const candidatePhones = phones.filter((phone) => {
+      const phoneIndex = lines.findIndex((line) => line.includes(phone));
+      if (phoneIndex === -1) {
+        return true;
+      }
+
+      return !excludedEmailIndexes.some((emailIndex) => Math.abs(emailIndex - phoneIndex) <= 4);
+    });
+    const emailIndex = candidateEmails.length
+      ? lines.findIndex((line) => line.includes(candidateEmails[0]))
+      : -1;
+    const phoneIndex = candidatePhones.length
+      ? lines.findIndex((line) => line.includes(candidatePhones[0]))
+      : -1;
     const anchorIndex = emailIndex !== -1 ? emailIndex : phoneIndex;
 
-    if (anchorIndex === -1 && document.documentKind !== "email_thread") {
+    if (
+      anchorIndex === -1 &&
+      (document.documentKind !== "email_thread" || excludedEmailIndexes.length > 0)
+    ) {
       continue;
     }
 
@@ -326,19 +405,22 @@ function extractPrimaryContact(
       [...windowLines]
         .sort((left, right) => scoreContactLine(right) - scoreContactLine(left))
         .map((line) => sanitizeContactName(line))
-        .find((line): line is string => Boolean(line)) ?? null;
+        .find(
+          (line): line is string =>
+            Boolean(line) && !isExcludedContactName(line, excludedNames)
+        ) ?? null;
     const titleLine =
       windowLines
         .map((line) => sanitizeContactTitle(line))
         .find((line): line is string => Boolean(line)) ?? null;
 
-    if (emails[0] || phones[0] || nameLine) {
+    if (candidateEmails[0] || candidatePhones[0] || nameLine) {
       return {
         organizationType: agencyName ? "agency" : brandName ? "brand" : null,
         name: sanitizeContactName(nameLine),
         title: sanitizeContactTitle(titleLine),
-        email: presentText(emails[0] ?? null),
-        phone: presentText(phones[0] ?? null)
+        email: presentText(candidateEmails[0] ?? null),
+        phone: presentText(candidatePhones[0] ?? null)
       };
     }
   }
@@ -1174,7 +1256,8 @@ function buildEvidenceGroups(input: {
 }
 
 export function buildNormalizedIntakeRecord(
-  aggregate: DealAggregate | null
+  aggregate: DealAggregate | null,
+  options?: IntakeNormalizationOptions
 ): NormalizedIntakeRecord | null {
   if (!aggregate) {
     return null;
@@ -1183,7 +1266,7 @@ export function buildNormalizedIntakeRecord(
   const persisted = getPersistedIntakeRecord(aggregate.summaries);
   const brandName = inferBrandName(aggregate);
   const agencyName = inferAgencyName(aggregate, brandName);
-  const primaryContact = extractPrimaryContact(aggregate, agencyName, brandName);
+  const primaryContact = extractPrimaryContact(aggregate, agencyName, brandName, options);
   const contractTitle = inferContractTitle(aggregate, brandName, agencyName);
   const paymentAmount = inferPaymentAmount(aggregate);
   const persistedDeliverables = Array.isArray(persisted?.deliverables)

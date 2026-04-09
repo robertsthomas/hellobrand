@@ -620,6 +620,8 @@ export async function finalizeInvoiceForViewer(
     fileName,
     mimeType: "application/pdf",
     storagePath,
+    fileSizeBytes: pdfBytes.length,
+    checksumSha256: null,
     processingStatus: "ready",
     rawText,
     normalizedText: rawText,

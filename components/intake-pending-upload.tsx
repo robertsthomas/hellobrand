@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
+import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
 import type { IntakeSessionStatus } from "@/lib/types";
 
@@ -78,23 +79,16 @@ export function IntakePendingUpload({
       });
 
       try {
-        const formData = new FormData();
-        for (const file of pendingFiles) {
-          formData.append("documents", file);
-        }
-        if (pastedText.trim()) {
-          formData.append("pastedText", pastedText.trim());
-        }
-
-        const response = await fetch(`/api/intake/${sessionId}/documents`, {
-          method: "POST",
-          body: formData
+        const payload = await uploadDocumentsViaDirectStorage({
+          registerUrl: `/api/intake/${sessionId}/documents/direct/register`,
+          completeUrl: `/api/intake/${sessionId}/documents/direct/complete`,
+          uploadUrl: `/api/intake/${sessionId}/documents`,
+          files: pendingFiles,
+          pastedText,
+          onRegistered: async () => {
+            router.refresh();
+          }
         });
-
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Could not upload documents.");
-        }
 
         logClientIntake("pending_upload_complete", {
           sessionId,

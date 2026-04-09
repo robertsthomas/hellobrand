@@ -375,6 +375,43 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.email).toBe("team@nimbuspm.com");
   });
 
+  test("does not use creator profile contact details as the primary contact", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "@therobertscasa Agreement.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Talent
+          Thomas Roberts
+          Campaign Manager, Partnerships Lead, Agent
+          thomas@example.com
+          909-743-1880
+        `,
+        rawText: `
+          Talent
+          Thomas Roberts
+          Campaign Manager, Partnerships Lead, Agent
+          thomas@example.com
+          909-743-1880
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.summaries = [];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate, {
+      excludedPrimaryContactEmails: ["thomas@example.com"],
+      excludedPrimaryContactNames: ["Thomas Roberts"]
+    });
+
+    expect(normalized?.primaryContact.name).toBeNull();
+    expect(normalized?.primaryContact.title).toBeNull();
+    expect(normalized?.primaryContact.email).toBeNull();
+    expect(normalized?.primaryContact.phone).toBeNull();
+  });
+
   test("does not use a generic campaign label as the contract title", () => {
     const aggregate = createAggregate();
     aggregate.terms = {

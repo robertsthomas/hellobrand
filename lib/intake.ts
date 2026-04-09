@@ -8,7 +8,9 @@ import { startNextQueuedIntakeSessionForUser, startQueuedIntakeSessionById } fro
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { markWorkspaceCreatedForViewer } from "@/lib/onboarding";
 import {
+  completeDirectDocumentUploadsForViewer,
   getDealForViewer,
+  registerDirectDocumentUploadsForViewer,
   reprocessDocumentForViewer,
   updateDealForViewer,
   updateTermsForViewer,
@@ -18,6 +20,7 @@ import type {
   CampaignDateWindow,
   DealAggregate,
   DealCategory,
+  DirectUploadFileRegistration,
   DeliverableItem,
   DisclosureObligation,
   IntakeAnalyticsRecord,
@@ -78,7 +81,10 @@ function toIntakeSessionRecord(session: {
   };
 }
 
-function detectInputSource(files: File[], pastedText: string | null | undefined) {
+function detectInputSource(
+  files: Array<{ size: number }>,
+  pastedText: string | null | undefined
+) {
   const hasFiles = files.length > 0;
   const hasPastedText = Boolean(pastedText?.trim());
 
@@ -572,6 +578,121 @@ export async function appendDocumentsToIntakeSessionForViewer(
     data: {
       status: shouldStartProcessing ? "processing" : "queued",
       errorMessage: null
+    }
+  });
+
+  const synced = await syncIntakeSessionForDealId(session.dealId);
+  await emitWorkspaceNotificationForCurrentState(session.id);
+  return synced ?? toIntakeSessionRecord(session);
+}
+
+export async function registerDirectDocumentsToIntakeSessionForViewer(
+  viewer: Viewer,
+  sessionId: string,
+  input: {
+    files?: DirectUploadFileRegistration[];
+    pastedText?: string | null;
+  }
+) {
+  const session = await prisma.intakeSession.findFirst({
+    where: {
+      id: sessionId,
+      userId: viewer.id
+    }
+  });
+
+  if (!session) {
+    throw new Error("Intake session not found.");
+  }
+
+  if (["completed", "expired"].includes(session.status)) {
+    throw new Error("This intake session can no longer accept uploads.");
+  }
+
+  const files = input.files ?? [];
+  const pastedText = input.pastedText?.trim() ?? null;
+
+  if (files.length === 0 && !pastedText) {
+    throw new Error("Please upload a file or paste document text.");
+  }
+
+  await prisma.intakeSession.update({
+    where: { id: session.id },
+    data: {
+      status: "uploading",
+      inputSource: mergeInputSource(
+        session.inputSource as IntakeSessionRecord["inputSource"] | null,
+        detectInputSource(files.map((file) => ({ size: file.fileSizeBytes })), pastedText)
+      ),
+      draftPastedText: pastedText ?? session.draftPastedText,
+      draftPastedTextTitle: pastedText ? null : session.draftPastedTextTitle,
+      errorMessage: null
+    }
+  });
+
+  const registered = await registerDirectDocumentUploadsForViewer(viewer, session.dealId, {
+    files,
+    pastedText
+  });
+
+  if (registered.mode === "direct" && registered.documents.length > 0) {
+    await prisma.intakeDocument.createMany({
+      data: registered.documents.map((document) => ({
+        intakeSessionId: session.id,
+        documentId: document.id
+      })),
+      skipDuplicates: true
+    });
+  }
+
+  return {
+    session: (await prisma.intakeSession.findUnique({ where: { id: session.id } }))!,
+    registration: registered
+  };
+}
+
+export async function completeDirectDocumentsToIntakeSessionForViewer(
+  viewer: Viewer,
+  sessionId: string,
+  input: {
+    succeededDocumentIds: string[];
+    failedUploads: Array<{ documentId: string; errorMessage: string }>;
+    startProcessing?: boolean;
+  }
+) {
+  const session = await prisma.intakeSession.findFirst({
+    where: {
+      id: sessionId,
+      userId: viewer.id
+    }
+  });
+
+  if (!session) {
+    throw new Error("Intake session not found.");
+  }
+
+  if (["completed", "expired"].includes(session.status)) {
+    throw new Error("This intake session can no longer accept uploads.");
+  }
+
+  await completeDirectDocumentUploadsForViewer(viewer, session.dealId, input);
+
+  const nextStatus =
+    input.succeededDocumentIds.length > 0
+      ? input.startProcessing === false
+        ? "queued"
+        : "processing"
+      : "failed";
+  const errorMessage =
+    input.failedUploads.length > 0 && input.succeededDocumentIds.length === 0
+      ? input.failedUploads[0]?.errorMessage ?? "Could not upload documents."
+      : null;
+
+  await prisma.intakeSession.update({
+    where: { id: session.id },
+    data: {
+      status: nextStatus,
+      errorMessage
     }
   });
 
@@ -1164,6 +1285,8 @@ export async function confirmBatchGroupForViewer(
         fileName: existingDoc.fileName,
         mimeType: existingDoc.mimeType,
         storagePath: existingDoc.storagePath,
+        fileSizeBytes: existingDoc.fileSizeBytes,
+        checksumSha256: existingDoc.checksumSha256,
         processingStatus: "pending",
         rawText: existingDoc.rawText,
         normalizedText: existingDoc.normalizedText,

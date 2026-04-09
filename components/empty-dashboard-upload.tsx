@@ -15,7 +15,9 @@ import { buildWorkspaceNotificationItem } from "@/lib/notifications";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 import { dispatchWorkspaceGenerationNotification } from "@/lib/workspace-generation-hint";
+import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
 import {
+  clearLocalWorkspaces,
   deleteLocalWorkspace,
   loadLocalWorkspace,
   readLocalWorkspaceManifest,
@@ -285,6 +287,8 @@ export function EmptyDashboardUpload({
   ): Promise<string | null> {
     try {
       const createdSessionIds: string[] = [];
+      const processedLocalWorkspaceIds: string[] = [];
+      const createdServerQueuedWorkspaces: ServerQueuedWorkspaceItem[] = [];
 
       for (const workspace of localWorkspaces) {
         const payload = await loadLocalWorkspace(workspace.localId);
@@ -297,27 +301,33 @@ export function EmptyDashboardUpload({
           campaignName: workspace.campaignName
         });
 
-        const formData = new FormData();
-        for (const file of payload.files) {
-          formData.append("documents", file);
-        }
-        if (payload.pastedText.trim()) {
-          formData.append("pastedText", payload.pastedText.trim());
-        }
-        formData.append("startProcessing", "0");
-
-        const uploadResponse = await fetch(`/api/intake/${sessionId}/documents`, {
-          method: "POST",
-          body: formData
+        const uploadPayload = await uploadDocumentsViaDirectStorage({
+          registerUrl: `/api/intake/${sessionId}/documents/direct/register`,
+          completeUrl: `/api/intake/${sessionId}/documents/direct/complete`,
+          uploadUrl: `/api/intake/${sessionId}/documents`,
+          files: payload.files,
+          pastedText: payload.pastedText.trim(),
+          startProcessing: false
         });
-        const uploadPayload = await uploadResponse.json();
-
-        if (!uploadResponse.ok || !uploadPayload.session?.id) {
-          throw new Error(uploadPayload.error ?? "Could not queue workspace analysis.");
-        }
 
         createdSessionIds.push(sessionId);
-        await deleteLocalWorkspace(workspace.localId);
+        processedLocalWorkspaceIds.push(workspace.localId);
+        createdServerQueuedWorkspaces.push({
+          sessionId,
+          dealId: uploadPayload.session?.dealId ?? sessionId,
+          brandName: uploadPayload.session?.draftBrandName ?? workspace.brandName,
+          campaignName: uploadPayload.session?.draftCampaignName ?? workspace.campaignName,
+          updatedAt: uploadPayload.session?.updatedAt ?? new Date().toISOString(),
+          status: "queued",
+          inputSource: uploadPayload.session?.inputSource ?? workspace.inputSource
+        });
+      }
+
+      if (processedLocalWorkspaceIds.length > 0) {
+        setLocalWorkspaces((current) =>
+          current.filter((workspace) => !processedLocalWorkspaceIds.includes(workspace.localId))
+        );
+        setServerQueuedWorkspaces((current) => [...current, ...createdServerQueuedWorkspaces]);
       }
 
       const response = await fetch("/api/intake/queue/start", {
@@ -351,6 +361,12 @@ export function EmptyDashboardUpload({
         }),
         showHint: true
       });
+
+      if (processedLocalWorkspaceIds.length > 0) {
+        void clearLocalWorkspaces(processedLocalWorkspaceIds).catch((error) => {
+          console.error("[startAnalysisInBackground] Could not clear local workspaces:", error);
+        });
+      }
 
       setLocalWorkspaces([]);
       setServerQueuedWorkspaces([]);

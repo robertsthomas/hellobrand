@@ -154,6 +154,8 @@ export interface DocumentRecord {
   fileName: string;
   mimeType: string;
   storagePath: string;
+  fileSizeBytes: number | null;
+  checksumSha256: string | null;
   processingStatus: ProcessingStatus;
   rawText: string | null;
   normalizedText: string | null;
@@ -166,6 +168,13 @@ export interface DocumentRecord {
   processingStartedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DirectUploadFileRegistration {
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  checksumSha256: string | null;
 }
 
 export interface DeliverableItem {

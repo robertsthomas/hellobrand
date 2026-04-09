@@ -42,7 +42,12 @@ import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { buildGeneratedSummaryVariant } from "@/lib/summary-variants";
-import { readStoredBytes, storeUploadedBytes } from "@/lib/storage";
+import {
+  createSignedUploadTarget,
+  readStoredBytes,
+  storeUploadedBytes,
+  supportsDirectStorageUploads
+} from "@/lib/storage";
 import {
   getLatestSummaryByType
 } from "@/lib/summaries";
@@ -812,6 +817,187 @@ export async function listDocumentsForViewer(viewer: Viewer, dealId: string) {
   return getRepository().listDocuments(viewer.id, dealId);
 }
 
+export interface DirectUploadFileRegistration {
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  checksumSha256: string | null;
+}
+
+export interface RegisteredDirectDocumentUpload {
+  documentId: string;
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  checksumSha256: string | null;
+  bucket: string;
+  objectPath: string;
+  token: string;
+}
+
+export async function registerDirectDocumentUploadsForViewer(
+  viewer: Viewer,
+  dealId: string,
+  input: {
+    files?: DirectUploadFileRegistration[];
+    pastedText?: string | null;
+    documentKindHint?: DocumentKind | null;
+  }
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate) {
+    throw new Error("Deal not found.");
+  }
+
+  const files = (input.files ?? []).filter((file) => file.fileSizeBytes > 0);
+  const pastedText = input.pastedText?.trim() ?? null;
+
+  if (files.length === 0 && !pastedText) {
+    throw new Error("Please upload at least one file or paste document text.");
+  }
+
+  if (files.length > 0 && !supportsDirectStorageUploads()) {
+    return {
+      mode: "legacy" as const,
+      uploads: [] as RegisteredDirectDocumentUpload[],
+      documents: [] as DocumentRecord[],
+      pastedDocumentIds: [] as string[]
+    };
+  }
+
+  const createdDocuments: DocumentRecord[] = [];
+  const uploads: RegisteredDirectDocumentUpload[] = [];
+  const pastedDocumentIds: string[] = [];
+
+  for (const file of files) {
+    const target = await createSignedUploadTarget({
+      fileName: file.fileName,
+      folder: dealId
+    });
+
+    const document = await getRepository().createDocument({
+      dealId,
+      userId: viewer.id,
+      fileName: file.fileName,
+      mimeType: file.mimeType || "application/octet-stream",
+      storagePath: target.storagePath,
+      fileSizeBytes: file.fileSizeBytes,
+      checksumSha256: file.checksumSha256,
+      processingStatus: "pending",
+      rawText: null,
+      normalizedText: null,
+      documentKind: input.documentKindHint ?? "unknown",
+      classificationConfidence: null,
+      sourceType: "file",
+      errorMessage: null,
+      processingRunId: null,
+      processingRunStateJson: null,
+      processingStartedAt: null
+    });
+
+    createdDocuments.push(document);
+    uploads.push({
+      documentId: document.id,
+      fileName: file.fileName,
+      mimeType: file.mimeType || "application/octet-stream",
+      fileSizeBytes: file.fileSizeBytes,
+      checksumSha256: file.checksumSha256,
+      bucket: target.bucket,
+      objectPath: target.objectPath,
+      token: target.token
+    });
+  }
+
+  if (pastedText) {
+    const title = inferPastedTextFileName(pastedText);
+    const pastedDocument = await getRepository().createDocument({
+      dealId,
+      userId: viewer.id,
+      fileName: title,
+      mimeType: "text/plain",
+      storagePath: `pasted:${title}`,
+      fileSizeBytes: Buffer.byteLength(pastedText, "utf8"),
+      checksumSha256: null,
+      processingStatus: "pending",
+      rawText: pastedText,
+      normalizedText: null,
+      documentKind: input.documentKindHint ?? "unknown",
+      classificationConfidence: null,
+      sourceType: "pasted_text",
+      errorMessage: null,
+      processingRunId: null,
+      processingRunStateJson: null,
+      processingStartedAt: null
+    });
+
+    createdDocuments.push(pastedDocument);
+    pastedDocumentIds.push(pastedDocument.id);
+  }
+
+  if (process.env.DATABASE_URL) {
+    await syncIntakeSessionForDealId(dealId);
+  }
+
+  return {
+    mode: "direct" as const,
+    uploads,
+    documents: createdDocuments,
+    pastedDocumentIds
+  };
+}
+
+export async function completeDirectDocumentUploadsForViewer(
+  viewer: Viewer,
+  dealId: string,
+  input: {
+    succeededDocumentIds: string[];
+    failedUploads: Array<{ documentId: string; errorMessage: string }>;
+    startProcessing?: boolean;
+  }
+) {
+  const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
+  if (!aggregate) {
+    throw new Error("Deal not found.");
+  }
+
+  const createdDocuments = aggregate.documents.filter((document) =>
+    document.userId === viewer.id &&
+    [...input.succeededDocumentIds, ...input.failedUploads.map((entry) => entry.documentId)].includes(
+      document.id
+    )
+  );
+
+  for (const failure of input.failedUploads) {
+    await getRepository().updateDocument(failure.documentId, {
+      processingStatus: "failed",
+      errorMessage: failure.errorMessage
+    });
+  }
+
+  if (input.startProcessing !== false) {
+    for (const documentId of input.succeededDocumentIds) {
+      const queue = await enqueueDocumentProcessing(documentId);
+      if (queue.mode === "local") {
+        void processDocumentById(documentId, queue.runId).catch(async () => {
+          await getRepository().getDealAggregate(viewer.id, dealId);
+        });
+      }
+    }
+  }
+
+  if (process.env.DATABASE_URL) {
+    await syncIntakeSessionForDealId(dealId);
+  }
+
+  void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
+
+  return {
+    documents: createdDocuments,
+    succeededCount: input.succeededDocumentIds.length,
+    failedCount: input.failedUploads.length
+  };
+}
+
 export async function getDealForViewer(viewer: Viewer, dealId: string) {
   const target = await getRepository().getDealAggregate(viewer.id, dealId);
   if (!target) {
@@ -1023,6 +1209,8 @@ export async function uploadDocumentsForViewer(
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
       storagePath,
+      fileSizeBytes: file.size,
+      checksumSha256: null,
       processingStatus: "pending",
       rawText: null,
       normalizedText: null,
@@ -1046,6 +1234,8 @@ export async function uploadDocumentsForViewer(
       fileName: title,
       mimeType: "text/plain",
       storagePath: `pasted:${title}`,
+      fileSizeBytes: Buffer.byteLength(input.pastedText.trim(), "utf8"),
+      checksumSha256: null,
       processingStatus: "pending",
       rawText: input.pastedText.trim(),
       normalizedText: null,

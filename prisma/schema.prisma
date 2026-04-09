@@ -242,6 +242,8 @@ model Document {
   fileName                 String
   mimeType                 String
   storagePath              String
+  fileSizeBytes            Int?
+  checksumSha256           String?
   processingStatus         String
   rawText                  String?
   normalizedText           String?

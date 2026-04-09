@@ -102,6 +102,8 @@ function toDocumentRecord(document: {
   fileName: string;
   mimeType: string;
   storagePath: string;
+  fileSizeBytes: number | null;
+  checksumSha256: string | null;
   processingStatus: string;
   rawText: string | null;
   normalizedText: string | null;
@@ -1045,6 +1047,8 @@ export class PrismaRepository {
         fileName: document.fileName,
         mimeType: document.mimeType,
         storagePath: document.storagePath,
+        fileSizeBytes: document.fileSizeBytes,
+        checksumSha256: document.checksumSha256,
         processingStatus: document.processingStatus,
         rawText: document.rawText,
         normalizedText: document.normalizedText,
@@ -1250,6 +1254,8 @@ export class PrismaRepository {
         where: { id: documentId },
         data: {
           processingStatus: patch.processingStatus,
+          fileSizeBytes: patch.fileSizeBytes,
+          checksumSha256: patch.checksumSha256,
           rawText: patch.rawText,
           normalizedText: patch.normalizedText,
           documentKind: patch.documentKind,

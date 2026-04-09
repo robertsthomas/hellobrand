@@ -139,14 +139,6 @@ async function IntakeReviewContent({
   }
 
   const analysisRunning = false;
-  const normalized = buildNormalizedIntakeRecord(aggregate);
-  const deliverables = normalized?.deliverables ?? [];
-  const timelineItems = normalized?.timelineItems ?? [];
-  const evidenceGroups = normalized?.evidenceGroups ?? [];
-  const analyticsHighlights = normalized?.analytics?.highlights ?? [];
-  const conflictResults = aggregate?.conflictResults ?? [];
-  const conflictMessagesByField = intakeConflictMessagesByField(conflictResults);
-  const riskFlags = aggregate?.riskFlags ?? [];
   const derivedHandle = deriveHandleFromEmail(profileDefaults?.contactEmail ?? viewer.email);
   const creatorDefault =
     presentText(profileDefaults?.creatorLegalName) ??
@@ -166,6 +158,24 @@ async function IntakeReviewContent({
     presentText(profileDefaults?.creatorLegalName) ||
       presentText(profileDefaults?.businessName)
   );
+  const normalized = buildNormalizedIntakeRecord(aggregate, {
+    excludedPrimaryContactEmails: [viewer.email, profileDefaults?.contactEmail],
+    excludedPrimaryContactNames: profileConfigured
+      ? [
+          profileDefaults?.creatorLegalName,
+          profileDefaults?.displayName,
+          profileDefaults?.businessName,
+          viewer.displayName
+        ]
+      : []
+  });
+  const deliverables = normalized?.deliverables ?? [];
+  const timelineItems = normalized?.timelineItems ?? [];
+  const evidenceGroups = normalized?.evidenceGroups ?? [];
+  const analyticsHighlights = normalized?.analytics?.highlights ?? [];
+  const conflictResults = aggregate?.conflictResults ?? [];
+  const conflictMessagesByField = intakeConflictMessagesByField(conflictResults);
+  const riskFlags = aggregate?.riskFlags ?? [];
   const initialProfileName =
     presentText(profileDefaults?.creatorLegalName) ??
     presentText(profileDefaults?.displayName) ??

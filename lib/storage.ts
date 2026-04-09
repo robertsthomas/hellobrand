@@ -23,6 +23,10 @@ function hasSupabaseStorage() {
   return Boolean(supabaseUrl && supabaseAdminKey);
 }
 
+export function supportsDirectStorageUploads() {
+  return Boolean(supabaseUrl && supabaseAdminKey && supabasePublicKey);
+}
+
 function supabaseAdmin() {
   return createClient(supabaseUrl, supabaseAdminKey);
 }
@@ -63,6 +67,33 @@ export async function storeUploadedBytes(input: {
   await writeFile(destination, input.bytes);
   return {
     storagePath: destination
+  };
+}
+
+export async function createSignedUploadTarget(input: {
+  fileName: string;
+  folder: string;
+}) {
+  if (!supportsDirectStorageUploads()) {
+    throw new Error("Direct storage uploads are not configured.");
+  }
+
+  const safeName = input.fileName.replace(/[^\w.\-]+/g, "-");
+  const objectPath = `${input.folder}/${Date.now()}-${safeName}`;
+  const { data, error } = await supabaseAdmin()
+    .storage
+    .from(DEFAULT_BUCKET)
+    .createSignedUploadUrl(objectPath);
+
+  if (error || !data?.token) {
+    throw new Error(error?.message ?? "Could not create signed upload target.");
+  }
+
+  return {
+    bucket: DEFAULT_BUCKET,
+    objectPath,
+    token: data.token,
+    storagePath: `supabase:${DEFAULT_BUCKET}:${objectPath}`
   };
 }
 

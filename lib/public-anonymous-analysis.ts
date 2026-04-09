@@ -736,8 +736,10 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
     });
 
     let documentStoragePath = lockedSession.storagePath;
+    let documentFileSizeBytes: number | null = null;
     if (lockedSession.storagePath) {
       const bytes = await readStoredBytes(lockedSession.storagePath);
+      documentFileSizeBytes = bytes.length;
       const stored = await storeUploadedBytes({
         fileName: lockedSession.fileName,
         bytes,
@@ -753,6 +755,8 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       fileName: lockedSession.fileName,
       mimeType: lockedSession.mimeType,
       storagePath: documentStoragePath ?? `pasted:${lockedSession.fileName}`,
+      fileSizeBytes: documentFileSizeBytes,
+      checksumSha256: null,
       processingStatus: "ready",
       rawText: lockedSession.rawText,
       normalizedText: lockedSession.normalizedText,
