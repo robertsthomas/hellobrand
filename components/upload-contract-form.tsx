@@ -4,27 +4,40 @@ import { useMemo, useRef, useState } from "react";
 import { FileText, MessageSquareText, Plus } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
-import { uploadDocumentsAction } from "@/app/actions";
-import type { DocumentRecord } from "@/lib/types";
+import { reprocessDocumentAction, uploadDocumentsAction } from "@/app/actions";
+import { getDocumentDisplayStatus } from "@/lib/document-status";
+import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
 import { cn, humanizeToken } from "@/lib/utils";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { SubmitButton } from "@/components/submit-button";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 type UploadMode = "upload" | "paste";
 
 export function UploadContractForm({
   dealId,
-  documents
+  documents,
+  jobs,
+  reviewItems
 }: {
   dealId: string;
   documents: DocumentRecord[];
+  jobs: JobRecord[];
+  reviewItems: DocumentReviewItemRecord[];
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const posthog = usePostHog();
   const [mode, setMode] = useState<UploadMode>("upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const latestDocument = documents[0] ?? null;
+  const latestStatus = latestDocument
+    ? getDocumentDisplayStatus({
+        document: latestDocument,
+        jobs,
+        reviewItems
+      })
+    : null;
 
   const selectedFilesLabel = useMemo(() => {
     if (selectedFiles.length === 0) {
@@ -37,6 +50,18 @@ export function UploadContractForm({
 
     return `${selectedFiles.length} files selected`;
   }, [selectedFiles]);
+  const recentDocuments = useMemo(
+    () =>
+      documents.slice(0, 3).map((document) => ({
+        document,
+        status: getDocumentDisplayStatus({
+          document,
+          jobs,
+          reviewItems
+        })
+      })),
+    [documents, jobs, reviewItems]
+  );
 
   return (
     <form
@@ -191,7 +216,39 @@ export function UploadContractForm({
           <span className="font-medium text-black/65 dark:text-white/70">
             {latestDocument.fileName}
           </span>{" "}
-          · {humanizeToken(latestDocument.processingStatus)}
+          · {latestStatus?.label ?? humanizeToken(latestDocument.processingStatus)}
+          {latestStatus ? (
+            <span className="text-black/40 dark:text-white/40"> · {latestStatus.detail}</span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {recentDocuments.length > 0 ? (
+        <div className="mt-4 grid gap-2 border-t border-black/8 pt-4 dark:border-white/10">
+          {recentDocuments.map(({ document, status }) => (
+            <div
+              key={document.id}
+              className="flex items-center justify-between gap-3 text-xs text-black/50 dark:text-white/50"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-black/65 dark:text-white/70">
+                  {document.fileName}
+                </p>
+                <p className="mt-1">
+                  {status.label} · {status.detail}
+                </p>
+              </div>
+              {status.state === "failed" ? (
+                <form action={reprocessDocumentAction}>
+                  <input type="hidden" name="dealId" value={dealId} />
+                  <input type="hidden" name="documentId" value={document.id} />
+                  <Button type="submit" size="sm" variant="outline">
+                    Retry
+                  </Button>
+                </form>
+              ) : null}
+            </div>
+          ))}
         </div>
       ) : null}
 

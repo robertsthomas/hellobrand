@@ -126,6 +126,8 @@ async function DealDetailContent({
     documents,
     terms,
     riskFlags,
+    jobs,
+    documentReviewItems,
     extractionEvidence,
     documentSections,
     extractionResults
@@ -440,8 +442,18 @@ async function DealDetailContent({
 
           {/* ── Documents ── */}
           <TabsContent value="documents" className="mt-0 space-y-6">
-            <UploadContractForm dealId={deal.id} documents={documents} />
-            <DocumentsPanel dealId={deal.id} documents={documents} />
+            <UploadContractForm
+              dealId={deal.id}
+              documents={documents}
+              jobs={jobs}
+              reviewItems={documentReviewItems}
+            />
+            <DocumentsPanel
+              dealId={deal.id}
+              documents={documents}
+              jobs={jobs}
+              reviewItems={documentReviewItems}
+            />
           </TabsContent>
         </WorkspaceTabs>
 

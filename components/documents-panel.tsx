@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { ExternalLink, FileText, RefreshCcw } from "lucide-react";
+import Link from "next/link";
 
 import { reprocessDocumentAction } from "@/app/actions";
-import type { DocumentRecord } from "@/lib/types";
+import { getDocumentDisplayStatus } from "@/lib/document-status";
+import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
 import { humanizeToken } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
@@ -25,10 +27,14 @@ function documentPreviewUrl(documentId: string) {
 
 export function DocumentsPanel({
   dealId,
-  documents
+  documents,
+  jobs,
+  reviewItems
 }: {
   dealId: string;
   documents: DocumentRecord[];
+  jobs: JobRecord[];
+  reviewItems: DocumentReviewItemRecord[];
 }) {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
     documents[0]?.id ?? null
@@ -38,6 +44,13 @@ export function DocumentsPanel({
     () => documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null,
     [documents, selectedDocumentId]
   );
+  const selectedStatus = selectedDocument
+    ? getDocumentDisplayStatus({
+        document: selectedDocument,
+        jobs,
+        reviewItems
+      })
+    : null;
 
   return (
     <section className="grid gap-6 xl:h-[min(78vh,820px)] xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -53,6 +66,11 @@ export function DocumentsPanel({
           <div className="min-h-0 overflow-y-auto divide-y divide-black/8 dark:divide-white/10">
             {documents.map((document) => {
               const isSelected = selectedDocument?.id === document.id;
+              const status = getDocumentDisplayStatus({
+                document,
+                jobs,
+                reviewItems
+              });
               return (
                 <button
                   key={document.id}
@@ -73,8 +91,10 @@ export function DocumentsPanel({
                       {document.fileName}
                     </p>
                     <p className="mt-1 text-xs text-black/45 dark:text-white/45">
-                      {humanizeToken(document.documentKind)} ·{" "}
-                      {humanizeToken(document.processingStatus)}
+                      {humanizeToken(document.documentKind)} · {status.label}
+                    </p>
+                    <p className="mt-1 text-xs text-black/40 dark:text-white/40">
+                      {status.detail}
                     </p>
                   </div>
                 </button>
@@ -96,15 +116,25 @@ export function DocumentsPanel({
             </h3>
             <p className="mt-1 text-sm text-black/55 dark:text-white/60">
               {selectedDocument
-                ? `${humanizeToken(selectedDocument.documentKind)} · ${humanizeToken(
+                ? `${humanizeToken(selectedDocument.documentKind)} · ${selectedStatus?.label ?? humanizeToken(
                     selectedDocument.processingStatus
                   )}`
                 : "Select a document to preview it."}
             </p>
+            {selectedStatus ? (
+              <p className="mt-1 text-xs text-black/45 dark:text-white/45">
+                {selectedStatus.detail}
+              </p>
+            ) : null}
           </div>
 
           {selectedDocument ? (
             <div className="flex items-center gap-2">
+              {selectedStatus?.state === "review_needed" ? (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={`/app/p/${dealId}?tab=terms`}>Review {selectedStatus.reviewCount}</Link>
+                </Button>
+              ) : null}
               {selectedDocument.processingStatus === "failed" ? (
                 <form action={reprocessDocumentAction}>
                   <input type="hidden" name="dealId" value={dealId} />
@@ -136,6 +166,13 @@ export function DocumentsPanel({
           {!selectedDocument ? (
             <div className="flex min-h-[540px] items-center justify-center px-6 text-sm text-black/50 dark:text-white/55">
               Upload or paste a source to preview it here.
+            </div>
+          ) : selectedStatus?.state === "parsing" || selectedStatus?.state === "extracting" ? (
+            <div className="flex min-h-[540px] items-center justify-center px-6 text-center">
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-foreground">{selectedStatus.label}</p>
+                <p className="text-sm text-black/55 dark:text-white/60">{selectedStatus.detail}</p>
+              </div>
             </div>
           ) : selectedDocument.errorMessage ? (
             <div className="flex min-h-[540px] items-center justify-center px-6">

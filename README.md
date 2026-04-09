@@ -109,6 +109,42 @@ pnpm run start:prd
 - Billing entitlements resolve from Prisma/Postgres. Stripe drives checkout, subscriptions, invoices, and the customer portal.
 - When `DATABASE_URL` is unset, the app falls back to the local file-backed seed store. The Playwright tier matrix uses this mode together with `HELLOBRAND_DEV_PLAN` and the non-production E2E auth cookie.
 
+## Document AI notes for HelloBrand
+
+These are the important Google Document AI rules and product decisions for this repo.
+
+- Keep all HelloBrand Document AI processors in the same region. The current setup is `us`, and `DOCUMENT_AI_LOCATION` must match the processor region.
+- Use processor IDs, not processor version IDs, in app config. Google expects production callers to hit the processor and let the processor's default version control rollout.
+- Current intended processor routing is:
+  - invoices -> `DOCUMENT_AI_INVOICE_PROCESSOR_ID`
+  - contracts / influencer agreements -> `DOCUMENT_AI_CONTRACT_PROCESSOR_ID`
+  - briefs / decks -> `DOCUMENT_AI_BRIEF_PROCESSOR_ID`
+  - layout-first parsing fallback -> `DOCUMENT_AI_LAYOUT_PROCESSOR_ID`
+  - OCR fallback -> `DOCUMENT_AI_OCR_PROCESSOR_ID`
+- The app must continue normalizing Document AI output into HelloBrand's internal extraction schema. Do not let raw vendor entities write directly into canonical deal terms.
+- Invoice Parser is the best fit for invoices and should stay the primary invoice extraction path.
+- Layout Parser is the best general parsing fallback for PDFs, HTML, DOCX, PPTX, XLSX, and similar files. OCR is still useful when layout parsing returns weak text or when the source is image-heavy.
+- Custom extractors are required for contracts and briefs. If a custom extractor has no entity schema defined, Google rejects requests with `INVALID_ARGUMENT` and a field violation on `entity_types`.
+- Custom extractor field names are effectively permanent. Choose descriptive snake_case names the first time and keep them aligned with the app mappers.
+- For HelloBrand, keep custom extractor schemas tight. Start with coarse, high-value fields and let app code handle downstream normalization and merge logic.
+- Label all occurrences of an entity in training documents, even if the field is logically single-value. Inconsistent labeling lowers quality quickly.
+- Do not manually "fix" OCR text during annotation. If OCR is wrong in the document, label the detected text rather than inventing a corrected value.
+- Brief and contract processors should be trained and evaluated separately. They have different layouts, different signal density, and different review requirements.
+- Review-item UX is expected for weak extractions. Briefs and decks are less structurally consistent than invoices, so `review_needed` is a normal outcome, not necessarily a processor failure.
+- Supported file types and synchronous page limits vary by processor. Treat larger or more complex uploads carefully and prefer layout/OCR ingestion before assuming a custom extractor can handle every source file directly.
+
+### Document AI operational checklist
+
+- After changing any processor schema or training data in Google Cloud, rerun the local verification scripts before relying on the new behavior:
+  - `doppler run -- pnpm exec tsx scripts/verify-document-ai.ts`
+  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-invoice.ts`
+  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-contract.ts`
+  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-brief.ts`
+- Keep representative local fixtures in `example-docs/` for smoke tests. That folder is intentionally gitignored.
+- If local auth is used, Application Default Credentials must be configured with:
+  - `gcloud auth application-default login`
+  - `gcloud auth application-default set-quota-project hellobrand-490702`
+
 ## API surface
 
 - `GET /api/p`
