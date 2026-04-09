@@ -225,6 +225,10 @@ export function createSeedStore(): AppStore {
         createdAt: now
       }
     ],
+    documentRuns: [],
+    documentArtifacts: [],
+    documentFieldEvidence: [],
+    documentReviewItems: [],
     extractionResults: [
       {
         id: "extract-1",

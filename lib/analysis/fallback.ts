@@ -548,15 +548,18 @@ export function classifyDocumentHeuristically(
   const lower = `${fileName}\n${text}`.toLowerCase();
 
   if (
+    /invoice number|amount due|bill to|balance due/.test(lower) ||
+    (/\binvoice\b/.test(lower) && /\bdue date\b/.test(lower))
+  ) {
+    return { documentKind: "invoice", confidence: 0.92 };
+  }
+
+  if (
     /governing law|indemnif|term and termination|compensation|brand shall pay|creator agreement|agreement/.test(
       lower
     )
   ) {
     return { documentKind: "contract", confidence: 0.95 };
-  }
-
-  if (/invoice|amount due|invoice number|bill to/.test(lower)) {
-    return { documentKind: "invoice", confidence: 0.92 };
   }
 
   if (/deliverables|content requirements|posting schedule|asset delivery/.test(lower)) {

@@ -191,20 +191,132 @@ export type ExtractionResult = {
     fileSizeBytes: number;
     extractedChars: number;
   };
+  _vendor?: {
+    processor: string;
+    payload: Record<string, unknown>;
+  };
 };
+
+export type ExtractDocumentTextOptions = {
+  preferDocumentAi?: boolean;
+};
+
+async function extractTextWithDocumentAi(
+  buffer: Buffer,
+  mimeType: string,
+  fileName: string
+): Promise<ExtractionResult | null> {
+  const lowerFileName = fileName.toLowerCase();
+
+  if (
+    mimeType !== "application/pdf" &&
+    mimeType !==
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+    !lowerFileName.endsWith(".pdf") &&
+    !lowerFileName.endsWith(".docx")
+  ) {
+    return null;
+  }
+
+  const {
+    hasDocumentAiProcessor,
+    processDocumentWithDocumentAi
+  } = await import("@/lib/document-ai");
+
+  const processors: Array<"layout" | "ocr"> = [];
+
+  if (
+    hasDocumentAiProcessor("layout") &&
+    (mimeType === "application/pdf" ||
+      mimeType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      lowerFileName.endsWith(".pdf") ||
+      lowerFileName.endsWith(".docx"))
+  ) {
+    processors.push("layout");
+  }
+
+  if (
+    hasDocumentAiProcessor("ocr") &&
+    (mimeType === "application/pdf" || lowerFileName.endsWith(".pdf"))
+  ) {
+    processors.push("ocr");
+  }
+
+  if (processors.length === 0) {
+    return null;
+  }
+
+  const failures: string[] = [];
+
+  for (const processor of processors) {
+    const startedAt = Date.now();
+
+    try {
+      const response = await processDocumentWithDocumentAi({
+        processor,
+        bytes: buffer,
+        mimeType,
+        imagelessMode: true,
+        fieldMaskPaths: ["text"]
+      });
+
+      if (!response.fullText.trim()) {
+        failures.push(`${processor} returned empty text`);
+        continue;
+      }
+
+      return {
+        rawText: response.fullText,
+        normalizedText: normalizeDocumentText(response.fullText),
+        _debug: {
+          parser: `document-ai:${processor}`,
+          durationMs: Date.now() - startedAt,
+          fileSizeBytes: buffer.length,
+          extractedChars: response.fullText.length
+        },
+        _vendor: {
+          processor,
+          payload: response.rawResponse
+        }
+      };
+    } catch (error) {
+      failures.push(
+        `${processor} failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  throw new UnreadableDocumentError(failures.join(" | "));
+}
 
 export async function extractDocumentText(
   buffer: Buffer,
   mimeType: string,
-  fileName: string
+  fileName: string,
+  options?: ExtractDocumentTextOptions
 ): Promise<ExtractionResult> {
   const startedAt = Date.now();
   const fileSizeBytes = buffer.length;
+  const failures: string[] = [];
 
   function debugMeta(parser: string, text: string) {
     const durationMs = Date.now() - startedAt;
     console.info(`[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`);
     return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
+  }
+
+  if (options?.preferDocumentAi) {
+    try {
+      const result = await extractTextWithDocumentAi(buffer, mimeType, fileName);
+      if (result) {
+        return result;
+      }
+    } catch (documentAiError) {
+      failures.push(
+        documentAiError instanceof Error ? documentAiError.message : String(documentAiError)
+      );
+    }
   }
 
   if (
@@ -227,7 +339,7 @@ export async function extractDocumentText(
           _debug: debugMeta("pdf-parse", result.text)
         };
       } catch (pdfParseError) {
-        const messages = [pdfJsError, pdfParseError]
+        const messages = [...failures, pdfJsError, pdfParseError]
           .map((error) => (error instanceof Error ? error.message : String(error)))
           .filter(Boolean)
           .join(" | ");

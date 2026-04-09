@@ -259,6 +259,10 @@ model Document {
   sections         DocumentSection[]
   extractionResult ExtractionResult?
   evidence         ExtractionEvidence[]
+  runs             DocumentRun[]
+  artifacts        DocumentArtifact[]
+  fieldEvidence    DocumentFieldEvidence[]
+  reviewItems      DocumentReviewItem[]
   summaries        Summary[]
   jobs             Job[]
   intakeDocument   IntakeDocument?
@@ -277,6 +281,8 @@ model DocumentSection {
 
   document Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
   evidence ExtractionEvidence[]
+  fieldEvidence DocumentFieldEvidence[]
+  reviewItems DocumentReviewItem[]
 
   @@index([documentId, chunkIndex])
 }
@@ -307,6 +313,93 @@ model ExtractionEvidence {
   section  DocumentSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
   @@index([documentId])
+}
+
+model DocumentRun {
+  id             String   @id
+  documentId     String
+  status         String
+  stepStateJson  Json
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failedAt       DateTime?
+  failureMessage String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  document      Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  artifacts     DocumentArtifact[]
+  fieldEvidence DocumentFieldEvidence[]
+  reviewItems   DocumentReviewItem[]
+
+  @@index([documentId, createdAt])
+  @@index([documentId, updatedAt])
+}
+
+model DocumentArtifact {
+  id         String   @id @default(uuid())
+  documentId String
+  runId      String
+  step       String
+  kind       String
+  processor  String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  document      Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  run           DocumentRun             @relation(fields: [runId], references: [id], onDelete: Cascade)
+  fieldEvidence DocumentFieldEvidence[]
+  reviewItems   DocumentReviewItem[]
+
+  @@index([documentId, runId, createdAt])
+  @@index([runId, step, kind])
+}
+
+model DocumentFieldEvidence {
+  id         String   @id @default(uuid())
+  documentId String
+  runId      String
+  fieldPath  String
+  snippet    String
+  sourceType String
+  sectionId  String?
+  artifactId String?
+  confidence Float?
+  createdAt  DateTime @default(now())
+
+  document Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  run      DocumentRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  section  DocumentSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  artifact DocumentArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([documentId, fieldPath, createdAt])
+  @@index([runId, fieldPath, createdAt])
+}
+
+model DocumentReviewItem {
+  id             String   @id @default(uuid())
+  documentId     String
+  runId          String
+  fieldPath      String
+  status         String
+  reason         String
+  title          String
+  detail         String
+  confidence     Float?
+  suggestedValue Json?
+  currentValue   Json?
+  sectionId      String?
+  artifactId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  document Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  run      DocumentRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  section  DocumentSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  artifact DocumentArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+
+  @@index([documentId, status, createdAt])
+  @@index([runId, status, createdAt])
 }
 
 model Summary {

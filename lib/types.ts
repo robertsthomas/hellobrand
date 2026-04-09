@@ -53,6 +53,19 @@ export interface DocumentProcessingRunState {
   lastError: string | null;
 }
 
+export type DocumentRunStatus = "pending" | "processing" | "ready" | "failed" | "superseded";
+export type DocumentArtifactKind =
+  | "text_extraction"
+  | "classification"
+  | "sections"
+  | "raw_vendor_output"
+  | "normalized_extraction"
+  | "risk_analysis"
+  | "summary";
+export type DocumentEvidenceSourceType = "document" | "section" | "vendor_entity";
+export type DocumentReviewItemStatus = "open" | "resolved" | "dismissed";
+export type DocumentReviewItemReason = "low_confidence" | "conflict";
+
 export type IntakeProcessingStageId =
   | "extracting"
   | "structuring"
@@ -695,6 +708,61 @@ export interface ExtractionResultRecord {
   createdAt: string;
 }
 
+export interface DocumentRunRecord {
+  id: string;
+  documentId: string;
+  status: DocumentRunStatus;
+  stepStateJson: DocumentProcessingRunState;
+  startedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  failureMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentArtifactRecord {
+  id: string;
+  documentId: string;
+  runId: string;
+  step: JobType;
+  kind: DocumentArtifactKind;
+  processor: string | null;
+  payload: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface DocumentFieldEvidenceRecord {
+  id: string;
+  documentId: string;
+  runId: string;
+  fieldPath: string;
+  snippet: string;
+  sourceType: DocumentEvidenceSourceType;
+  sectionId: string | null;
+  artifactId: string | null;
+  confidence: number | null;
+  createdAt: string;
+}
+
+export interface DocumentReviewItemRecord {
+  id: string;
+  documentId: string;
+  runId: string;
+  fieldPath: string;
+  status: DocumentReviewItemStatus;
+  reason: DocumentReviewItemReason;
+  title: string;
+  detail: string;
+  confidence: number | null;
+  suggestedValue: unknown | null;
+  currentValue: unknown | null;
+  sectionId: string | null;
+  artifactId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SummaryRecord {
   id: string;
   dealId: string;
@@ -1073,6 +1141,10 @@ export interface DealAggregate {
   emailDrafts: EmailDraftRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];
+  documentRuns: DocumentRunRecord[];
+  documentArtifacts: DocumentArtifactRecord[];
+  documentFieldEvidence: DocumentFieldEvidenceRecord[];
+  documentReviewItems: DocumentReviewItemRecord[];
   extractionResults: ExtractionResultRecord[];
   extractionEvidence: ExtractionEvidenceRecord[];
   summaries: SummaryRecord[];
@@ -1105,6 +1177,10 @@ export interface AppStore {
   invoiceReminderTouchpoints: InvoiceReminderTouchpointRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];
+  documentRuns: DocumentRunRecord[];
+  documentArtifacts: DocumentArtifactRecord[];
+  documentFieldEvidence: DocumentFieldEvidenceRecord[];
+  documentReviewItems: DocumentReviewItemRecord[];
   extractionResults: ExtractionResultRecord[];
   extractionEvidence: ExtractionEvidenceRecord[];
   summaries: SummaryRecord[];

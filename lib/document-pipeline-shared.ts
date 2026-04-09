@@ -34,7 +34,9 @@ export const DOCUMENT_PIPELINE_STEPS: JobType[] = [
 ];
 
 export function createEmptyTerms(
-  deal: Pick<DealRecord, "brandName" | "campaignName">
+  deal:
+    | Pick<DealRecord, "brandName" | "campaignName">
+    | { brandName: string | null; campaignName: string | null }
 ): Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt"> {
   return {
     brandName: deal.brandName,

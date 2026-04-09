@@ -1,7 +1,6 @@
 import {
   analyzeCreatorRisks,
   buildCreatorSummary,
-  classifyDocumentHeuristically,
   extractBriefData,
   extractStructuredTerms,
   mergeExtractionResults,
@@ -33,6 +32,18 @@ import {
   withPreferredCreatorName,
   writeGenerationSnapshot
 } from "@/lib/document-pipeline-shared";
+import {
+  extractContractTermsWithDocumentAiDetailed,
+  hasMeaningfulContractExtraction
+} from "@/lib/document-ai-contract";
+import {
+  extractInvoiceTermsWithDocumentAiDetailed,
+  hasMeaningfulInvoiceExtraction
+} from "@/lib/document-ai-invoice";
+import {
+  classifyDocumentForRouting,
+  resolveDocumentRoutingDecision
+} from "@/lib/document-routing";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
@@ -43,9 +54,14 @@ import { readStoredBytes } from "@/lib/storage";
 import type {
   DealAggregate,
   DocumentKind,
+  DocumentArtifactKind,
+  DocumentEvidenceSourceType,
+  DocumentReviewItemReason,
+  DocumentReviewItemRecord,
   DocumentRecord,
   DocumentSectionRecord,
   ExtractionPipelineResult,
+  FieldEvidence,
   JobType,
   PendingExtractionData,
   Viewer
@@ -178,6 +194,132 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document processing failed.";
 }
 
+function asArtifactPayload(value: unknown): Record<string, unknown> | null {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = JSON.parse(JSON.stringify(value)) as unknown;
+  if (normalized && typeof normalized === "object" && !Array.isArray(normalized)) {
+    return normalized as Record<string, unknown>;
+  }
+
+  return { value: normalized };
+}
+
+function getEvidenceSourceType(entry: FieldEvidence): DocumentEvidenceSourceType {
+  if (!entry.sectionKey) {
+    return "document";
+  }
+
+  return entry.sectionKey.startsWith("section:") ? "section" : "vendor_entity";
+}
+
+function resolveSectionId(
+  sections: DocumentSectionRecord[],
+  sectionKey: string | null | undefined
+) {
+  if (!sectionKey?.startsWith("section:")) {
+    return null;
+  }
+
+  return (
+    sections.find((section) => `section:${section.chunkIndex}` === sectionKey)?.id ?? null
+  );
+}
+
+function buildReviewItems(input: {
+  extraction: ExtractionPipelineResult;
+  sections: DocumentSectionRecord[];
+  artifactId: string | null;
+}) {
+  const items: Omit<
+    DocumentReviewItemRecord,
+    "id" | "documentId" | "runId" | "createdAt" | "updatedAt"
+  >[] = [];
+  const seen = new Set<string>();
+
+  function addReviewItem(
+    fieldPath: string,
+    reason: DocumentReviewItemReason,
+    detail: string,
+    confidence: number | null,
+    sectionId: string | null
+  ) {
+    const key = `${fieldPath}:${reason}:${sectionId ?? "none"}`;
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    items.push({
+      fieldPath,
+      status: "open",
+      reason,
+      title:
+        reason === "conflict"
+          ? `Review conflicting ${fieldPath}`
+          : `Review low-confidence ${fieldPath}`,
+      detail,
+      confidence,
+      suggestedValue:
+        fieldPath in input.extraction.data
+          ? (input.extraction.data as Record<string, unknown>)[fieldPath]
+          : null,
+      currentValue: null,
+      sectionId,
+      artifactId: input.artifactId
+    });
+  }
+
+  for (const evidence of input.extraction.evidence ?? []) {
+    const confidence = evidence.confidence;
+    if (typeof confidence === "number" && confidence >= 0.65) {
+      continue;
+    }
+
+    addReviewItem(
+      evidence.fieldPath,
+      "low_confidence",
+      evidence.snippet
+        ? `Extraction evidence for ${evidence.fieldPath} had low confidence: ${evidence.snippet}`
+        : `Extraction evidence for ${evidence.fieldPath} had low confidence.`,
+      confidence ?? null,
+      resolveSectionId(input.sections, evidence.sectionKey)
+    );
+  }
+
+  for (const fieldPath of input.extraction.conflicts ?? []) {
+    addReviewItem(
+      fieldPath,
+      "conflict",
+      `Multiple competing values were detected for ${fieldPath}.`,
+      input.extraction.confidence,
+      null
+    );
+  }
+
+  return items;
+}
+
+async function saveArtifact(input: {
+  documentId: string;
+  runId: string;
+  step: JobType;
+  kind: DocumentArtifactKind;
+  processor?: string | null;
+  payload: unknown;
+}) {
+  return getRepository().createDocumentArtifact({
+    documentId: input.documentId,
+    runId: input.runId,
+    step: input.step,
+    kind: input.kind,
+    processor: input.processor ?? null,
+    payload: asArtifactPayload(input.payload)
+  });
+}
+
 async function queueAssistantSnapshotRefresh(viewer: Viewer, dealId?: string | null) {
   const { refreshAssistantSnapshotsForViewer } = await import("@/lib/assistant/snapshots");
   await refreshAssistantSnapshotsForViewer(viewer, { dealId });
@@ -208,9 +350,14 @@ async function updateCurrentRunState(
 ) {
   const document = await loadDocumentForRun(documentId, runId);
   const state = getDocumentProcessingRunState(document) ?? createDocumentProcessingRunState(runId);
-  return getRepository().updateDocument(documentId, {
-    processingRunStateJson: updater(state)
+  const nextState = updater(state);
+  const updated = await getRepository().updateDocument(documentId, {
+    processingRunStateJson: nextState
   });
+  await getRepository().updateDocumentRun(runId, {
+    stepStateJson: nextState
+  });
+  return updated;
 }
 
 async function markStepComplete(documentId: string, runId: string, step: JobType) {
@@ -241,6 +388,16 @@ export async function failDocumentProcessingRun(input: {
       step: input.failedStep ?? null,
       message: input.message
     })
+  });
+
+  await getRepository().updateDocumentRun(input.runId, {
+    status: "failed",
+    stepStateJson: markDocumentPipelineRunFailed(state, {
+      step: input.failedStep ?? null,
+      message: input.message
+    }),
+    failedAt: new Date().toISOString(),
+    failureMessage: input.message
   });
 
   if (process.env.DATABASE_URL) {
@@ -300,6 +457,13 @@ async function executePipelineStep<T>(
     failureReason: null
   });
   const startedAt = Date.now();
+
+  await repository.updateDocumentRun(input.runId, {
+    status: "processing",
+    startedAt: document.processingStartedAt ?? new Date().toISOString(),
+    failedAt: null,
+    failureMessage: null
+  });
 
   logDocumentPipeline("info", "stage_start", {
     dealId: document.dealId,
@@ -374,6 +538,142 @@ async function loadExtractionFromRecords(document: DocumentRecord) {
   });
 }
 
+async function runLegacyExtractFields(input: {
+  document: DocumentRecord;
+  sections: DocumentSectionRecord[];
+  preferredCreatorName: string;
+  viewer: Viewer;
+}) {
+  const llmPlan = selectSectionsForLlm(input.sections, input.document.documentKind);
+  const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
+
+  logDocumentPipeline("info", "llm_section_plan", {
+    dealId: input.document.dealId,
+    documentId: input.document.id,
+    fileName: input.document.fileName,
+    model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
+    fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
+    usingFreeModel: llmPlan.usingFreeModel,
+    selectedSectionCount: llmPlan.selected.length,
+    totalSectionCount: input.sections.length,
+    concurrency: llmPlan.concurrency,
+    selectedSections: llmPlan.selected.map((section) => ({
+      chunkIndex: section.chunkIndex,
+      title: section.title,
+      chars: section.content.length
+    }))
+  });
+
+  const partialExtractions = await mapWithConcurrency(
+    input.sections,
+    llmPlan.concurrency,
+    async (section) => {
+      const fallback = extractStructuredTerms(
+        section.content,
+        [section],
+        input.document.documentKind
+      );
+
+      if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
+        return fallback;
+      }
+
+      try {
+        return await extractSectionWithLlm(section, input.document.documentKind, fallback);
+      } catch {
+        return fallback;
+      }
+    }
+  );
+
+  logDocumentPipeline("info", "field_extraction_complete", {
+    dealId: input.document.dealId,
+    documentId: input.document.id,
+    fileName: input.document.fileName,
+    sectionCount: input.sections.length,
+    extractionCount: partialExtractions.length,
+    usedLlm: hasLlmKey(),
+    extractionRoute: "legacy"
+  });
+
+  const extraction = mergeExtractionResults(partialExtractions as ExtractionPipelineResult[]);
+  const sanitizedExtraction = finalizeDocumentExtraction(
+    input.document.normalizedText ?? "",
+    extraction,
+    input.preferredCreatorName
+  );
+
+  if (
+    input.document.documentKind === "campaign_brief" ||
+    input.document.documentKind === "deliverables_brief" ||
+    input.document.documentKind === "pitch_deck"
+  ) {
+    const fallbackBrief = extractBriefData(
+      input.document.normalizedText ?? "",
+      input.document.documentKind
+    );
+    if (fallbackBrief) {
+      fallbackBrief.sourceDocumentIds = [input.document.id];
+      let briefData = fallbackBrief;
+
+      if (hasLlmKey()) {
+        try {
+          briefData = await extractBriefWithLlm(
+            input.document.normalizedText ?? "",
+            input.document.documentKind,
+            fallbackBrief
+          );
+        } catch {
+          // Keep fallback brief data.
+        }
+      }
+
+      sanitizedExtraction.data.briefData = briefData;
+    }
+  }
+
+  const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
+    sanitizedExtraction.data.brandName
+  );
+
+  if (categoryEnrichment?.category) {
+    const previousCategory = sanitizedExtraction.data.brandCategory;
+    sanitizedExtraction.data.brandCategory = categoryEnrichment.category;
+    sanitizedExtraction.evidence = [
+      ...sanitizedExtraction.evidence,
+      {
+        fieldPath: "brandCategory",
+        snippet:
+          categoryEnrichment.snippet ??
+          `${categoryEnrichment.brandName} matched ${categoryEnrichment.category}.`,
+        sectionKey: null,
+        confidence: categoryEnrichment.confidence
+      }
+    ];
+
+    if (previousCategory && previousCategory !== categoryEnrichment.category) {
+      sanitizedExtraction.evidence.push({
+        fieldPath: "brandCategory",
+        snippet: `${categoryEnrichment.brandName} company enrichment overrides a conflicting detected category.`,
+        sectionKey: null,
+        confidence: categoryEnrichment.confidence
+      });
+    }
+
+    logDocumentPipeline("info", "brand_category_enriched", {
+      dealId: input.document.dealId,
+      documentId: input.document.id,
+      brandName: categoryEnrichment.brandName,
+      previousCategory,
+      enrichedCategory: categoryEnrichment.category,
+      confidence: categoryEnrichment.confidence,
+      website: categoryEnrichment.website
+    });
+  }
+
+  return sanitizedExtraction;
+}
+
 export async function runExtractTextStep(documentId: string, runId: string) {
   return executePipelineStep({ documentId, runId, step: "extract_text" }, async ({ document }) => {
     logDocumentPipeline("info", "pipeline_start", {
@@ -399,7 +699,8 @@ export async function runExtractTextStep(documentId: string, runId: string) {
         : await extractDocumentText(
             await readStoredBytes(document.storagePath),
             document.mimeType,
-            document.fileName
+            document.fileName,
+            { preferDocumentAi: true }
           );
 
     await assertCurrentRun(document.id, runId);
@@ -411,6 +712,30 @@ export async function runExtractTextStep(documentId: string, runId: string) {
       errorMessage: null
     });
 
+    await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "extract_text",
+      kind: "text_extraction",
+      processor: extractionSource._debug?.parser ?? null,
+      payload: {
+        rawText: extractionSource.rawText,
+        normalizedText: extractionSource.normalizedText,
+        debug: extractionSource._debug ?? null
+      }
+    });
+
+    if (extractionSource._vendor) {
+      await saveArtifact({
+        documentId: document.id,
+        runId,
+        step: "extract_text",
+        kind: "raw_vendor_output",
+        processor: extractionSource._vendor.processor,
+        payload: extractionSource._vendor.payload
+      });
+    }
+
     return extractionSource;
   });
 }
@@ -421,15 +746,48 @@ export async function runClassifyDocumentStep(documentId: string, runId: string)
       throw new Error("Normalized document text not found.");
     }
 
-    const classification = classifyDocumentHeuristically(
-      document.normalizedText,
-      document.fileName
-    );
+    const classification = classifyDocumentForRouting({
+      text: document.normalizedText,
+      fileName: document.fileName
+    });
+
+    const routing = resolveDocumentRoutingDecision({
+      document: {
+        ...document,
+        documentKind: classification.documentKind,
+        classificationConfidence: classification.confidence
+      }
+    });
+
+    logDocumentPipeline("info", "document_routed", {
+      dealId: document.dealId,
+      documentId: document.id,
+      fileName: document.fileName,
+      documentKind: classification.documentKind,
+      confidence: classification.confidence,
+      extractionRoute: routing.extractionRoute,
+      processor: routing.processor,
+      fallbackRoute: routing.fallbackRoute,
+      reasons: routing.reasons,
+      runId
+    });
 
     await assertCurrentRun(document.id, runId);
     await getRepository().updateDocument(document.id, {
       documentKind: classification.documentKind,
       classificationConfidence: classification.confidence
+    });
+
+    await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "classify_document",
+      kind: "classification",
+      processor: "heuristic_router",
+      payload: {
+        classification,
+        routing
+      }
     });
 
     return classification;
@@ -457,6 +815,18 @@ export async function runSectionDocumentStep(documentId: string, runId: string) 
     await assertCurrentRun(document.id, runId);
     await getRepository().replaceDocumentSections(document.id, sections);
 
+    await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "section_document",
+      kind: "sections",
+      processor: "fallback_sectioner",
+      payload: {
+        sectionCount: sections.length,
+        sections
+      }
+    });
+
     return sections;
   });
 }
@@ -470,66 +840,163 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
     const repository = getRepository();
     const sections = await repository.listDocumentSections(document.id);
     const preferredCreatorName = await getPreferredCreatorNameForViewer(viewer);
-    const llmPlan = selectSectionsForLlm(sections, document.documentKind);
-    const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
+    const routing = resolveDocumentRoutingDecision({ document });
+    let sanitizedExtraction: ExtractionPipelineResult;
+    let rawVendorArtifactId: string | null = null;
 
-    logDocumentPipeline("info", "llm_section_plan", {
+    logDocumentPipeline("info", "document_routed", {
       dealId: document.dealId,
       documentId: document.id,
       fileName: document.fileName,
-      model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
-      fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
-      usingFreeModel: llmPlan.usingFreeModel,
-      selectedSectionCount: llmPlan.selected.length,
-      totalSectionCount: sections.length,
-      concurrency: llmPlan.concurrency,
-      selectedSections: llmPlan.selected.map((section) => ({
-        chunkIndex: section.chunkIndex,
-        title: section.title,
-        chars: section.content.length
-      })),
+      documentKind: document.documentKind,
+      confidence: document.classificationConfidence,
+      extractionRoute: routing.extractionRoute,
+      processor: routing.processor,
+      fallbackRoute: routing.fallbackRoute,
+      reasons: routing.reasons,
       runId
     });
 
-    const partialExtractions = await mapWithConcurrency(
-      sections,
-      llmPlan.concurrency,
-      async (section) => {
-        const fallback = extractStructuredTerms(
-          section.content,
-          [section],
-          document.documentKind
+    if (routing.extractionRoute === "document_ai_contract") {
+      let contractExtraction: ExtractionPipelineResult | null = null;
+
+      try {
+        const detailedContractExtraction = await extractContractTermsWithDocumentAiDetailed({
+          bytes: await readStoredBytes(document.storagePath),
+          mimeType: document.mimeType,
+          deal: {
+            brandName: null,
+            campaignName: null
+          }
+        });
+        contractExtraction = detailedContractExtraction.extraction;
+        const rawVendorArtifact = await saveArtifact({
+          documentId: document.id,
+          runId,
+          step: "extract_fields",
+          kind: "raw_vendor_output",
+          processor: detailedContractExtraction.processor,
+          payload: detailedContractExtraction.rawResponse
+        });
+        rawVendorArtifactId = rawVendorArtifact.id;
+      } catch (error) {
+        logDocumentPipeline("error", "document_ai_contract_failed", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          error: getErrorMessage(error),
+          runId
+        });
+      }
+
+      if (contractExtraction && hasMeaningfulContractExtraction(contractExtraction)) {
+        sanitizedExtraction = finalizeDocumentExtraction(
+          document.normalizedText,
+          contractExtraction,
+          preferredCreatorName
         );
 
-        if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
-          return fallback;
-        }
-
-        try {
-          return await extractSectionWithLlm(section, document.documentKind, fallback);
-        } catch {
-          return fallback;
-        }
+        logDocumentPipeline("info", "field_extraction_complete", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          sectionCount: sections.length,
+          extractionCount: 1,
+          usedLlm: false,
+          extractionRoute: routing.extractionRoute,
+          processor: routing.processor,
+          runId
+        });
+      } else {
+        logDocumentPipeline("info", "document_ai_contract_fallback", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          extractionRoute: "legacy",
+          reason: contractExtraction ? "empty_contract_extraction" : "contract_processor_failed",
+          runId
+        });
+        sanitizedExtraction = await runLegacyExtractFields({
+          document,
+          sections,
+          preferredCreatorName,
+          viewer
+        });
       }
-    );
+    } else if (routing.extractionRoute === "document_ai_invoice") {
+      let invoiceExtraction: ExtractionPipelineResult | null = null;
 
-    logDocumentPipeline("info", "field_extraction_complete", {
-      dealId: document.dealId,
-      documentId: document.id,
-      fileName: document.fileName,
-      sectionCount: sections.length,
-      extractionCount: partialExtractions.length,
-      usedLlm: hasLlmKey(),
-      extractionRoute: "legacy",
-      runId
-    });
+      try {
+        const detailedInvoiceExtraction = await extractInvoiceTermsWithDocumentAiDetailed({
+          bytes: await readStoredBytes(document.storagePath),
+          mimeType: document.mimeType,
+          deal: {
+            brandName: null,
+            campaignName: null
+          }
+        });
+        invoiceExtraction = detailedInvoiceExtraction.extraction;
+        const rawVendorArtifact = await saveArtifact({
+          documentId: document.id,
+          runId,
+          step: "extract_fields",
+          kind: "raw_vendor_output",
+          processor: detailedInvoiceExtraction.processor,
+          payload: detailedInvoiceExtraction.rawResponse
+        });
+        rawVendorArtifactId = rawVendorArtifact.id;
+      } catch (error) {
+        logDocumentPipeline("error", "document_ai_invoice_failed", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          error: getErrorMessage(error),
+          runId
+        });
+      }
 
-    const extraction = mergeExtractionResults(partialExtractions as ExtractionPipelineResult[]);
-    const sanitizedExtraction = finalizeDocumentExtraction(
-      document.normalizedText,
-      extraction,
-      preferredCreatorName
-    );
+      if (invoiceExtraction && hasMeaningfulInvoiceExtraction(invoiceExtraction)) {
+        sanitizedExtraction = finalizeDocumentExtraction(
+          document.normalizedText,
+          invoiceExtraction,
+          preferredCreatorName
+        );
+
+        logDocumentPipeline("info", "field_extraction_complete", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          sectionCount: sections.length,
+          extractionCount: 1,
+          usedLlm: false,
+          extractionRoute: routing.extractionRoute,
+          processor: routing.processor,
+          runId
+        });
+      } else {
+        logDocumentPipeline("info", "document_ai_invoice_fallback", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          extractionRoute: "legacy",
+          reason: invoiceExtraction ? "empty_invoice_extraction" : "invoice_processor_failed",
+          runId
+        });
+        sanitizedExtraction = await runLegacyExtractFields({
+          document,
+          sections,
+          preferredCreatorName,
+          viewer
+        });
+      }
+    } else {
+      sanitizedExtraction = await runLegacyExtractFields({
+        document,
+        sections,
+        preferredCreatorName,
+        viewer
+      });
+    }
     const extractionEvidence = Array.isArray(sanitizedExtraction.evidence)
       ? sanitizedExtraction.evidence
       : [];
@@ -548,72 +1015,6 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
       runId
     });
 
-    if (
-      document.documentKind === "campaign_brief" ||
-      document.documentKind === "deliverables_brief" ||
-      document.documentKind === "pitch_deck"
-    ) {
-      const fallbackBrief = extractBriefData(document.normalizedText, document.documentKind);
-      if (fallbackBrief) {
-        fallbackBrief.sourceDocumentIds = [document.id];
-        let briefData = fallbackBrief;
-
-        if (hasLlmKey()) {
-          try {
-            briefData = await extractBriefWithLlm(
-              document.normalizedText,
-              document.documentKind,
-              fallbackBrief
-            );
-          } catch {
-            // Keep fallback brief data.
-          }
-        }
-
-        sanitizedExtraction.data.briefData = briefData;
-      }
-    }
-
-    const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
-      sanitizedExtraction.data.brandName
-    );
-
-    if (categoryEnrichment?.category) {
-      const previousCategory = sanitizedExtraction.data.brandCategory;
-      sanitizedExtraction.data.brandCategory = categoryEnrichment.category;
-      sanitizedExtraction.evidence = [
-        ...sanitizedExtraction.evidence,
-        {
-          fieldPath: "brandCategory",
-          snippet:
-            categoryEnrichment.snippet ??
-            `${categoryEnrichment.brandName} matched ${categoryEnrichment.category}.`,
-          sectionKey: null,
-          confidence: categoryEnrichment.confidence
-        }
-      ];
-
-      if (previousCategory && previousCategory !== categoryEnrichment.category) {
-        sanitizedExtraction.evidence.push({
-          fieldPath: "brandCategory",
-          snippet: `${categoryEnrichment.brandName} company enrichment overrides a conflicting detected category.`,
-          sectionKey: null,
-          confidence: categoryEnrichment.confidence
-        });
-      }
-
-      logDocumentPipeline("info", "brand_category_enriched", {
-        dealId: document.dealId,
-        documentId: document.id,
-        brandName: categoryEnrichment.brandName,
-        previousCategory,
-        enrichedCategory: categoryEnrichment.category,
-        confidence: categoryEnrichment.confidence,
-        website: categoryEnrichment.website,
-        runId
-      });
-    }
-
     await assertCurrentRun(document.id, runId);
     await repository.upsertExtractionResult(document.id, sanitizedExtraction);
     await repository.replaceExtractionEvidence(
@@ -626,6 +1027,38 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           null,
         confidence: entry.confidence
       }))
+    );
+
+    const normalizedArtifact = await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "extract_fields",
+      kind: "normalized_extraction",
+      processor: sanitizedExtraction.model,
+      payload: sanitizedExtraction
+    });
+
+    await repository.replaceDocumentFieldEvidence(
+      document.id,
+      runId,
+      extractionEvidence.map((entry) => ({
+        fieldPath: entry.fieldPath,
+        snippet: entry.snippet,
+        sourceType: getEvidenceSourceType(entry),
+        sectionId: resolveSectionId(sections, entry.sectionKey),
+        artifactId: rawVendorArtifactId ?? normalizedArtifact.id,
+        confidence: entry.confidence
+      }))
+    );
+
+    await repository.replaceDocumentReviewItems(
+      document.id,
+      runId,
+      buildReviewItems({
+        extraction: sanitizedExtraction,
+        sections,
+        artifactId: normalizedArtifact.id
+      })
     );
 
     return sanitizedExtraction;
@@ -745,6 +1178,17 @@ export async function runAnalyzeRisksStep(documentId: string, runId: string) {
     await assertCurrentRun(document.id, runId);
     await getRepository().replaceRiskFlagsForDocument(document.dealId, document.id, risks);
 
+    await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "analyze_risks",
+      kind: "risk_analysis",
+      processor: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "fallback_risk_analysis",
+      payload: {
+        risks
+      }
+    });
+
     return risks;
   });
 }
@@ -777,6 +1221,24 @@ export async function runGenerateSummaryStep(documentId: string, runId: string) 
     await repository.updateDocument(document.id, {
       processingStatus: "ready",
       errorMessage: null
+    });
+    await repository.updateDocumentRun(runId, {
+      status: "ready",
+      completedAt: new Date().toISOString(),
+      failedAt: null,
+      failureMessage: null
+    });
+
+    await saveArtifact({
+      documentId: document.id,
+      runId,
+      step: "generate_summary",
+      kind: "summary",
+      processor: hasLlmKey() ? getLlmRoute("generate_summary").primary : "fallback_summary",
+      payload: {
+        summary,
+        riskCount: risks.length
+      }
     });
 
     if (process.env.DATABASE_URL) {

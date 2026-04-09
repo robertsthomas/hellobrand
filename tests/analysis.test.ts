@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 import {
   classifyDocumentHeuristically,
@@ -190,6 +192,10 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
+      documentRuns: seed.documentRuns,
+      documentArtifacts: seed.documentArtifacts,
+      documentFieldEvidence: seed.documentFieldEvidence,
+      documentReviewItems: seed.documentReviewItems,
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
@@ -232,6 +238,10 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
+      documentRuns: seed.documentRuns,
+      documentArtifacts: seed.documentArtifacts,
+      documentFieldEvidence: seed.documentFieldEvidence,
+      documentReviewItems: seed.documentReviewItems,
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
@@ -276,6 +286,10 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
+      documentRuns: seed.documentRuns,
+      documentArtifacts: seed.documentArtifacts,
+      documentFieldEvidence: seed.documentFieldEvidence,
+      documentReviewItems: seed.documentReviewItems,
       extractionResults: seed.extractionResults,
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,

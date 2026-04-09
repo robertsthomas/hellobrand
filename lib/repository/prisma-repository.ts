@@ -19,6 +19,10 @@ import type {
   DealAggregate,
   DealRecord,
   DealTermsRecord,
+  DocumentArtifactRecord,
+  DocumentFieldEvidenceRecord,
+  DocumentReviewItemRecord,
+  DocumentRunRecord,
   DocumentRecord,
   DocumentSectionRecord,
   DraftIntent,
@@ -307,6 +311,100 @@ function toEvidenceRecord(entry: {
   return {
     ...entry,
     createdAt: iso(entry.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toDocumentRunRecord(run: {
+  id: string;
+  documentId: string;
+  status: string;
+  stepStateJson: unknown;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  failedAt: Date | null;
+  failureMessage: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): DocumentRunRecord {
+  return {
+    ...run,
+    status: run.status as DocumentRunRecord["status"],
+    stepStateJson: run.stepStateJson as DocumentRunRecord["stepStateJson"],
+    startedAt: iso(run.startedAt),
+    completedAt: iso(run.completedAt),
+    failedAt: iso(run.failedAt),
+    createdAt: iso(run.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(run.updatedAt) ?? new Date().toISOString()
+  };
+}
+
+function toDocumentArtifactRecord(artifact: {
+  id: string;
+  documentId: string;
+  runId: string;
+  step: string;
+  kind: string;
+  processor: string | null;
+  payload: unknown;
+  createdAt: Date;
+}): DocumentArtifactRecord {
+  return {
+    ...artifact,
+    step: artifact.step as DocumentArtifactRecord["step"],
+    kind: artifact.kind as DocumentArtifactRecord["kind"],
+    processor: artifact.processor ?? null,
+    payload:
+      artifact.payload && typeof artifact.payload === "object"
+        ? (artifact.payload as DocumentArtifactRecord["payload"])
+        : null,
+    createdAt: iso(artifact.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toDocumentFieldEvidenceRecord(entry: {
+  id: string;
+  documentId: string;
+  runId: string;
+  fieldPath: string;
+  snippet: string;
+  sourceType: string;
+  sectionId: string | null;
+  artifactId: string | null;
+  confidence: number | null;
+  createdAt: Date;
+}): DocumentFieldEvidenceRecord {
+  return {
+    ...entry,
+    sourceType: entry.sourceType as DocumentFieldEvidenceRecord["sourceType"],
+    createdAt: iso(entry.createdAt) ?? new Date().toISOString()
+  };
+}
+
+function toDocumentReviewItemRecord(entry: {
+  id: string;
+  documentId: string;
+  runId: string;
+  fieldPath: string;
+  status: string;
+  reason: string;
+  title: string;
+  detail: string;
+  confidence: number | null;
+  suggestedValue: unknown;
+  currentValue: unknown;
+  sectionId: string | null;
+  artifactId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): DocumentReviewItemRecord {
+  return {
+    ...entry,
+    status: entry.status as DocumentReviewItemRecord["status"],
+    reason: entry.reason as DocumentReviewItemRecord["reason"],
+    suggestedValue: entry.suggestedValue ?? null,
+    currentValue: entry.currentValue ?? null,
+    createdAt: iso(entry.createdAt) ?? new Date().toISOString(),
+    updatedAt: iso(entry.updatedAt) ?? new Date().toISOString()
   };
 }
 
@@ -660,14 +758,43 @@ export class PrismaRepository {
 
     const documentIds = deal.documents.map((document) => document.id);
     let sections: Awaited<ReturnType<typeof prisma.documentSection.findMany>> = [];
+    let documentRuns: Awaited<ReturnType<typeof prisma.documentRun.findMany>> = [];
+    let documentArtifacts: Awaited<ReturnType<typeof prisma.documentArtifact.findMany>> = [];
+    let documentFieldEvidence: Awaited<ReturnType<typeof prisma.documentFieldEvidence.findMany>> =
+      [];
+    let documentReviewItems: Awaited<ReturnType<typeof prisma.documentReviewItem.findMany>> = [];
     let extractionResults: Awaited<ReturnType<typeof prisma.extractionResult.findMany>> = [];
     let extractionEvidence: Awaited<ReturnType<typeof prisma.extractionEvidence.findMany>> = [];
 
     if (documentIds.length > 0) {
-      [sections, extractionResults, extractionEvidence] = await prisma.$transaction([
+      [
+        sections,
+        documentRuns,
+        documentArtifacts,
+        documentFieldEvidence,
+        documentReviewItems,
+        extractionResults,
+        extractionEvidence
+      ] = await prisma.$transaction([
         prisma.documentSection.findMany({
           where: { documentId: { in: documentIds } },
           orderBy: [{ chunkIndex: "asc" }]
+        }),
+        prisma.documentRun.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
+        }),
+        prisma.documentArtifact.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
+        }),
+        prisma.documentFieldEvidence.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
+        }),
+        prisma.documentReviewItem.findMany({
+          where: { documentId: { in: documentIds } },
+          orderBy: { createdAt: "desc" }
         }),
         prisma.extractionResult.findMany({
           where: { documentId: { in: documentIds } },
@@ -712,6 +839,10 @@ export class PrismaRepository {
       emailDrafts: deal.emailDrafts.map(toEmailDraftRecord),
       jobs: deal.jobs.map(toJobRecord),
       documentSections: sections.map(toSectionRecord),
+      documentRuns: documentRuns.map(toDocumentRunRecord),
+      documentArtifacts: documentArtifacts.map(toDocumentArtifactRecord),
+      documentFieldEvidence: documentFieldEvidence.map(toDocumentFieldEvidenceRecord),
+      documentReviewItems: documentReviewItems.map(toDocumentReviewItemRecord),
       extractionResults: extractionResults.map(toExtractionResultRecord),
       extractionEvidence: extractionEvidence.map(toEvidenceRecord),
       summaries,
@@ -1176,6 +1307,211 @@ export class PrismaRepository {
     });
 
     return sections.map(toSectionRecord);
+  }
+
+  async createDocumentRun(
+    run: Omit<DocumentRunRecord, "createdAt" | "updatedAt">
+  ) {
+    const saved = await prisma.documentRun.create({
+      data: {
+        id: run.id,
+        documentId: run.documentId,
+        status: run.status,
+        stepStateJson: toJsonValue(run.stepStateJson),
+        startedAt: run.startedAt ? new Date(run.startedAt) : null,
+        completedAt: run.completedAt ? new Date(run.completedAt) : null,
+        failedAt: run.failedAt ? new Date(run.failedAt) : null,
+        failureMessage: run.failureMessage
+      }
+    });
+
+    return toDocumentRunRecord(saved);
+  }
+
+  async updateDocumentRun(
+    runId: string,
+    patch: Partial<Omit<DocumentRunRecord, "id" | "documentId" | "createdAt" | "updatedAt">>
+  ) {
+    try {
+      const saved = await prisma.documentRun.update({
+        where: { id: runId },
+        data: {
+          status: patch.status,
+          stepStateJson:
+            patch.stepStateJson === undefined ? undefined : toJsonValue(patch.stepStateJson),
+          startedAt:
+            patch.startedAt === undefined
+              ? undefined
+              : patch.startedAt
+                ? new Date(patch.startedAt)
+                : null,
+          completedAt:
+            patch.completedAt === undefined
+              ? undefined
+              : patch.completedAt
+                ? new Date(patch.completedAt)
+                : null,
+          failedAt:
+            patch.failedAt === undefined
+              ? undefined
+              : patch.failedAt
+                ? new Date(patch.failedAt)
+                : null,
+          failureMessage:
+            patch.failureMessage === undefined ? undefined : patch.failureMessage
+        }
+      });
+
+      return toDocumentRunRecord(saved);
+    } catch {
+      return null;
+    }
+  }
+
+  async getDocumentRun(runId: string) {
+    const run = await prisma.documentRun.findUnique({ where: { id: runId } });
+    return run ? toDocumentRunRecord(run) : null;
+  }
+
+  async listDocumentRuns(documentId: string) {
+    const runs = await prisma.documentRun.findMany({
+      where: { documentId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return runs.map(toDocumentRunRecord);
+  }
+
+  async createDocumentArtifact(
+    artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">
+  ) {
+    const saved = await prisma.documentArtifact.create({
+      data: {
+        documentId: artifact.documentId,
+        runId: artifact.runId,
+        step: artifact.step,
+        kind: artifact.kind,
+        processor: artifact.processor,
+        payload: toNullableJsonValue(artifact.payload)
+      }
+    });
+
+    return toDocumentArtifactRecord(saved);
+  }
+
+  async listDocumentArtifacts(
+    documentId: string,
+    options?: { runId?: string }
+  ) {
+    const artifacts = await prisma.documentArtifact.findMany({
+      where: {
+        documentId,
+        runId: options?.runId
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return artifacts.map(toDocumentArtifactRecord);
+  }
+
+  async replaceDocumentFieldEvidence(
+    documentId: string,
+    runId: string,
+    evidence: Omit<DocumentFieldEvidenceRecord, "id" | "documentId" | "runId" | "createdAt">[]
+  ) {
+    await prisma.documentFieldEvidence.deleteMany({
+      where: { documentId, runId }
+    });
+
+    if (evidence.length > 0) {
+      await prisma.documentFieldEvidence.createMany({
+        data: evidence.map((entry) => ({
+          documentId,
+          runId,
+          fieldPath: entry.fieldPath,
+          snippet: entry.snippet,
+          sourceType: entry.sourceType,
+          sectionId: entry.sectionId,
+          artifactId: entry.artifactId,
+          confidence: entry.confidence
+        }))
+      });
+    }
+
+    const saved = await prisma.documentFieldEvidence.findMany({
+      where: { documentId, runId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return saved.map(toDocumentFieldEvidenceRecord);
+  }
+
+  async listDocumentFieldEvidence(
+    documentId: string,
+    options?: { runId?: string; fieldPath?: string }
+  ) {
+    const evidence = await prisma.documentFieldEvidence.findMany({
+      where: {
+        documentId,
+        runId: options?.runId,
+        fieldPath: options?.fieldPath
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return evidence.map(toDocumentFieldEvidenceRecord);
+  }
+
+  async replaceDocumentReviewItems(
+    documentId: string,
+    runId: string,
+    items: Omit<DocumentReviewItemRecord, "id" | "documentId" | "runId" | "createdAt" | "updatedAt">[]
+  ) {
+    await prisma.documentReviewItem.deleteMany({
+      where: { documentId, runId }
+    });
+
+    if (items.length > 0) {
+      await prisma.documentReviewItem.createMany({
+        data: items.map((entry) => ({
+          documentId,
+          runId,
+          fieldPath: entry.fieldPath,
+          status: entry.status,
+          reason: entry.reason,
+          title: entry.title,
+          detail: entry.detail,
+          confidence: entry.confidence,
+          suggestedValue: toNullableJsonValue(entry.suggestedValue),
+          currentValue: toNullableJsonValue(entry.currentValue),
+          sectionId: entry.sectionId,
+          artifactId: entry.artifactId
+        }))
+      });
+    }
+
+    const saved = await prisma.documentReviewItem.findMany({
+      where: { documentId, runId },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return saved.map(toDocumentReviewItemRecord);
+  }
+
+  async listDocumentReviewItems(
+    documentId: string,
+    options?: { runId?: string; status?: DocumentReviewItemRecord["status"] }
+  ) {
+    const items = await prisma.documentReviewItem.findMany({
+      where: {
+        documentId,
+        runId: options?.runId,
+        status: options?.status
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return items.map(toDocumentReviewItemRecord);
   }
 
   async upsertExtractionResult(

@@ -19,6 +19,10 @@ import type {
   DealAggregate,
   DealRecord,
   DealTermsRecord,
+  DocumentArtifactRecord,
+  DocumentFieldEvidenceRecord,
+  DocumentReviewItemRecord,
+  DocumentRunRecord,
   DocumentRecord,
   DocumentSectionRecord,
   DraftIntent,
@@ -172,6 +176,10 @@ function normalizeStore(store: Partial<AppStore>): AppStore {
       type: job.type ?? "generate_summary"
     })),
     documentSections: store.documentSections ?? [],
+    documentRuns: store.documentRuns ?? [],
+    documentArtifacts: store.documentArtifacts ?? [],
+    documentFieldEvidence: store.documentFieldEvidence ?? [],
+    documentReviewItems: store.documentReviewItems ?? [],
     extractionResults: store.extractionResults ?? [],
     extractionEvidence: store.extractionEvidence ?? [],
     summaries: (store.summaries ?? []).map((summary) => normalizeSummaryRecord(summary))
@@ -231,6 +239,26 @@ function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate {
     jobs: sortNewestFirst(store.jobs.filter((job) => job.dealId === deal.id)),
     documentSections: store.documentSections.filter((section) =>
       documents.some((document) => document.id === section.documentId)
+    ),
+    documentRuns: sortNewestFirst(
+      store.documentRuns.filter((run) =>
+        documents.some((document) => document.id === run.documentId)
+      )
+    ),
+    documentArtifacts: sortNewestFirst(
+      store.documentArtifacts.filter((artifact) =>
+        documents.some((document) => document.id === artifact.documentId)
+      )
+    ),
+    documentFieldEvidence: sortNewestFirst(
+      store.documentFieldEvidence.filter((entry) =>
+        documents.some((document) => document.id === entry.documentId)
+      )
+    ),
+    documentReviewItems: sortNewestFirst(
+      store.documentReviewItems.filter((entry) =>
+        documents.some((document) => document.id === entry.documentId)
+      )
     ),
     extractionResults: sortNewestFirst(
       store.extractionResults.filter((result) =>
@@ -386,6 +414,24 @@ export class FileRepository {
     store.summaries = store.summaries.filter((entry) => entry.dealId !== dealId);
     store.documentSections = store.documentSections.filter(
       (entry) => !documentIds.includes(entry.documentId)
+    );
+    const deletedRunIds = store.documentRuns
+      .filter((entry) => documentIds.includes(entry.documentId))
+      .map((entry) => entry.id);
+    store.documentRuns = store.documentRuns.filter(
+      (entry) => !documentIds.includes(entry.documentId)
+    );
+    store.documentArtifacts = store.documentArtifacts.filter(
+      (entry) =>
+        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
+    );
+    store.documentFieldEvidence = store.documentFieldEvidence.filter(
+      (entry) =>
+        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
+    );
+    store.documentReviewItems = store.documentReviewItems.filter(
+      (entry) =>
+        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
     );
     store.extractionResults = store.extractionResults.filter(
       (entry) => !documentIds.includes(entry.documentId)
@@ -614,6 +660,160 @@ export class FileRepository {
     return store.documentSections
       .filter((section) => section.documentId === documentId)
       .sort((left, right) => left.chunkIndex - right.chunkIndex);
+  }
+
+  async createDocumentRun(run: Omit<DocumentRunRecord, "createdAt" | "updatedAt">) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    const next: DocumentRunRecord = {
+      ...run,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    store.documentRuns.unshift(next);
+    await saveStore(store);
+    return next;
+  }
+
+  async updateDocumentRun(
+    runId: string,
+    patch: Partial<Omit<DocumentRunRecord, "id" | "documentId" | "createdAt" | "updatedAt">>
+  ) {
+    const store = await ensureStore();
+    const index = store.documentRuns.findIndex((entry) => entry.id === runId);
+
+    if (index === -1) {
+      return null;
+    }
+
+    store.documentRuns[index] = {
+      ...store.documentRuns[index],
+      ...patch,
+      updatedAt: new Date().toISOString()
+    };
+
+    await saveStore(store);
+    return store.documentRuns[index];
+  }
+
+  async getDocumentRun(runId: string) {
+    const store = await ensureStore();
+    return store.documentRuns.find((entry) => entry.id === runId) ?? null;
+  }
+
+  async listDocumentRuns(documentId: string) {
+    const store = await ensureStore();
+    return sortNewestFirst(store.documentRuns.filter((entry) => entry.documentId === documentId));
+  }
+
+  async createDocumentArtifact(
+    artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">
+  ) {
+    const store = await ensureStore();
+    const next: DocumentArtifactRecord = {
+      ...artifact,
+      id: randomUUID(),
+      createdAt: new Date().toISOString()
+    };
+
+    store.documentArtifacts.unshift(next);
+    await saveStore(store);
+    return next;
+  }
+
+  async listDocumentArtifacts(documentId: string, options?: { runId?: string }) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.documentArtifacts.filter(
+        (entry) => entry.documentId === documentId && (!options?.runId || entry.runId === options.runId)
+      )
+    );
+  }
+
+  async replaceDocumentFieldEvidence(
+    documentId: string,
+    runId: string,
+    evidence: Omit<DocumentFieldEvidenceRecord, "id" | "documentId" | "runId" | "createdAt">[]
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    store.documentFieldEvidence = store.documentFieldEvidence.filter(
+      (entry) => !(entry.documentId === documentId && entry.runId === runId)
+    );
+    store.documentFieldEvidence.push(
+      ...evidence.map((entry) => ({
+        ...entry,
+        id: randomUUID(),
+        documentId,
+        runId,
+        createdAt: now
+      }))
+    );
+    await saveStore(store);
+    return sortNewestFirst(
+      store.documentFieldEvidence.filter(
+        (entry) => entry.documentId === documentId && entry.runId === runId
+      )
+    );
+  }
+
+  async listDocumentFieldEvidence(
+    documentId: string,
+    options?: { runId?: string; fieldPath?: string }
+  ) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.documentFieldEvidence.filter(
+        (entry) =>
+          entry.documentId === documentId &&
+          (!options?.runId || entry.runId === options.runId) &&
+          (!options?.fieldPath || entry.fieldPath === options.fieldPath)
+      )
+    );
+  }
+
+  async replaceDocumentReviewItems(
+    documentId: string,
+    runId: string,
+    items: Omit<DocumentReviewItemRecord, "id" | "documentId" | "runId" | "createdAt" | "updatedAt">[]
+  ) {
+    const store = await ensureStore();
+    const now = new Date().toISOString();
+    store.documentReviewItems = store.documentReviewItems.filter(
+      (entry) => !(entry.documentId === documentId && entry.runId === runId)
+    );
+    store.documentReviewItems.push(
+      ...items.map((entry) => ({
+        ...entry,
+        id: randomUUID(),
+        documentId,
+        runId,
+        createdAt: now,
+        updatedAt: now
+      }))
+    );
+    await saveStore(store);
+    return sortNewestFirst(
+      store.documentReviewItems.filter(
+        (entry) => entry.documentId === documentId && entry.runId === runId
+      )
+    );
+  }
+
+  async listDocumentReviewItems(
+    documentId: string,
+    options?: { runId?: string; status?: DocumentReviewItemRecord["status"] }
+  ) {
+    const store = await ensureStore();
+    return sortNewestFirst(
+      store.documentReviewItems.filter(
+        (entry) =>
+          entry.documentId === documentId &&
+          (!options?.runId || entry.runId === options.runId) &&
+          (!options?.status || entry.status === options.status)
+      )
+    );
   }
 
   async upsertExtractionResult(

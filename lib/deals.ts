@@ -673,12 +673,31 @@ async function startDocumentProcessingRun(documentId: string) {
   }
 
   const runId = randomUUID();
+  const startedAt = new Date().toISOString();
+
+  if (document.processingRunId) {
+    await repository.updateDocumentRun(document.processingRunId, {
+      status: "superseded"
+    });
+  }
+
+  await repository.createDocumentRun({
+    id: runId,
+    documentId,
+    status: "pending",
+    stepStateJson: createDocumentProcessingRunState(runId),
+    startedAt,
+    completedAt: null,
+    failedAt: null,
+    failureMessage: null
+  });
+
   await repository.updateDocument(documentId, {
     processingStatus: "pending",
     errorMessage: null,
     processingRunId: runId,
     processingRunStateJson: createDocumentProcessingRunState(runId),
-    processingStartedAt: new Date().toISOString()
+    processingStartedAt: startedAt
   });
 
   return { runId, documentId };
