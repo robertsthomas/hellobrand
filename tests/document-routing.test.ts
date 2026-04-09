@@ -8,6 +8,10 @@ vi.mock("@/lib/document-ai", () => ({
 
 afterEach(() => {
   hasDocumentAiProcessorMock.mockReset();
+  delete process.env.DOCUMENT_PIPELINE_V2_FORCE_LEGACY;
+  delete process.env.DOCUMENT_PIPELINE_V2_ALLOWED_KINDS;
+  delete process.env.DOCUMENT_PIPELINE_V2_COHORT_PERCENT;
+  delete process.env.DOCUMENT_PIPELINE_V2_ALLOWED_USER_IDS;
 });
 
 describe("document routing", () => {
@@ -36,6 +40,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-1",
+        dealId: "deal-1",
+        userId: "user-1",
         documentKind: "invoice",
         classificationConfidence: 0.92,
         fileName: "invoice.pdf",
@@ -47,7 +54,8 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_invoice",
       processor: "invoice",
-      fallbackRoute: "legacy"
+      fallbackRoute: "legacy",
+      rolloutEnabled: true
     });
   });
 
@@ -57,6 +65,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-2",
+        dealId: "deal-2",
+        userId: "user-2",
         documentKind: "contract",
         classificationConfidence: 0.91,
         fileName: "agreement.pdf",
@@ -68,7 +79,8 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_contract",
       processor: "contract",
-      fallbackRoute: "legacy"
+      fallbackRoute: "legacy",
+      rolloutEnabled: true
     });
   });
 
@@ -78,6 +90,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-3",
+        dealId: "deal-3",
+        userId: "user-3",
         documentKind: "campaign_brief",
         classificationConfidence: 0.89,
         fileName: "brief.pdf",
@@ -89,7 +104,8 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_brief",
       processor: "brief",
-      fallbackRoute: "legacy"
+      fallbackRoute: "legacy",
+      rolloutEnabled: true
     });
   });
 
@@ -99,6 +115,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-4",
+        dealId: "deal-4",
+        userId: "user-4",
         documentKind: "invoice",
         classificationConfidence: 0.92,
         fileName: "pasted-invoice.txt",
@@ -121,6 +140,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-5",
+        dealId: "deal-5",
+        userId: "user-5",
         documentKind: "contract",
         classificationConfidence: 0.92,
         fileName: "pasted-agreement.txt",
@@ -143,6 +165,9 @@ describe("document routing", () => {
 
     const decision = resolveDocumentRoutingDecision({
       document: {
+        id: "doc-6",
+        dealId: "deal-6",
+        userId: "user-6",
         documentKind: "campaign_brief",
         classificationConfidence: 0.9,
         fileName: "pasted-brief.txt",
@@ -157,5 +182,57 @@ describe("document routing", () => {
       fallbackRoute: null
     });
     expect(decision.reasons).toContain("brief_processor_requires_file");
+  });
+
+  it("disables Document AI routing when the rollout is forced to legacy", async () => {
+    process.env.DOCUMENT_PIPELINE_V2_FORCE_LEGACY = "1";
+    hasDocumentAiProcessorMock.mockReturnValue(true);
+    const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
+
+    const decision = resolveDocumentRoutingDecision({
+      document: {
+        id: "doc-7",
+        dealId: "deal-7",
+        userId: "user-7",
+        documentKind: "invoice",
+        classificationConfidence: 0.95,
+        fileName: "invoice.pdf",
+        normalizedText: "Invoice Number INV-001",
+        sourceType: "file"
+      }
+    });
+
+    expect(decision).toMatchObject({
+      extractionRoute: "legacy",
+      processor: null,
+      rolloutEnabled: false
+    });
+    expect(decision.reasons).toContain("rollout:force_legacy");
+  });
+
+  it("disables Document AI routing when the document kind is not enabled for rollout", async () => {
+    process.env.DOCUMENT_PIPELINE_V2_ALLOWED_KINDS = "invoice";
+    hasDocumentAiProcessorMock.mockReturnValue(true);
+    const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
+
+    const decision = resolveDocumentRoutingDecision({
+      document: {
+        id: "doc-8",
+        dealId: "deal-8",
+        userId: "user-8",
+        documentKind: "contract",
+        classificationConfidence: 0.9,
+        fileName: "agreement.pdf",
+        normalizedText: "Creator agreement",
+        sourceType: "file"
+      }
+    });
+
+    expect(decision).toMatchObject({
+      extractionRoute: "legacy",
+      processor: null,
+      rolloutEnabled: false
+    });
+    expect(decision.reasons).toContain("rollout:document_kind_not_enabled");
   });
 });

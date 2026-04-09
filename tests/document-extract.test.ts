@@ -15,6 +15,7 @@ vi.mock("@/lib/document-ai", () => ({
 afterEach(() => {
   processDocumentWithDocumentAiMock.mockReset();
   hasDocumentAiProcessorMock.mockReset();
+  delete process.env.DOCUMENT_PIPELINE_V2_FORCE_LEGACY;
 });
 
 describe("extractDocumentText", () => {
@@ -59,5 +60,24 @@ describe("extractDocumentText", () => {
     );
     expect(result._debug?.parser).toBe("document-ai:layout");
     expect(result.normalizedText).toContain("Northstar Skin agreement");
+  });
+
+  test("skips Document AI parsing when rollout is forced to legacy", async () => {
+    process.env.DOCUMENT_PIPELINE_V2_FORCE_LEGACY = "1";
+    hasDocumentAiProcessorMock.mockImplementation((kind: string) => kind === "layout");
+
+    const buffer = await readFile(
+      "/Users/thomasroberts/Desktop/projects/hellobrand/public/sample-documents/northstar-skin-spring-glow-campaign-contract.pdf"
+    );
+
+    const result = await extractDocumentText(
+      buffer,
+      "application/pdf",
+      "northstar-skin-spring-glow-campaign-contract.pdf",
+      { preferDocumentAi: true }
+    );
+
+    expect(processDocumentWithDocumentAiMock).not.toHaveBeenCalled();
+    expect(result._debug?.parser).toBe("pdfjs-dist");
   });
 });

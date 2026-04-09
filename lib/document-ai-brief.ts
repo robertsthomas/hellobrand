@@ -346,6 +346,8 @@ export async function extractBriefTermsWithDocumentAiDetailed(input: {
   return {
     extraction,
     rawResponse: response.rawResponse,
-    processor: response.processorName
+    processor: response.processorName,
+    pageCount: response.pageCount,
+    entityCount: response.entityCount
   };
 }

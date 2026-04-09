@@ -307,6 +307,8 @@ export async function extractInvoiceTermsWithDocumentAiDetailed(input: {
       deal: input.deal
     }),
     rawResponse: response.rawResponse,
-    processor: response.processor
+    processor: response.processor,
+    pageCount: response.pageCount,
+    entityCount: response.entityCount
   };
 }

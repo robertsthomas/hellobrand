@@ -4,6 +4,10 @@ import path from "node:path";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
+import {
+  estimateDocumentAiCostUsd,
+  isDocumentAiParsingEnabled
+} from "@/lib/document-pipeline-rollout";
 import { getRuntimePath } from "@/lib/runtime-path";
 import { slugify } from "@/lib/utils";
 
@@ -190,6 +194,8 @@ export type ExtractionResult = {
     durationMs: number;
     fileSizeBytes: number;
     extractedChars: number;
+    pageCount?: number | null;
+    estimatedCostUsd?: number | null;
   };
   _vendor?: {
     processor: string;
@@ -199,6 +205,11 @@ export type ExtractionResult = {
 
 export type ExtractDocumentTextOptions = {
   preferDocumentAi?: boolean;
+  rollout?: {
+    dealId?: string | null;
+    documentId?: string | null;
+    userId?: string | null;
+  };
 };
 
 async function extractTextWithDocumentAi(
@@ -273,7 +284,9 @@ async function extractTextWithDocumentAi(
           parser: `document-ai:${processor}`,
           durationMs: Date.now() - startedAt,
           fileSizeBytes: buffer.length,
-          extractedChars: response.fullText.length
+          extractedChars: response.fullText.length,
+          pageCount: response.pageCount,
+          estimatedCostUsd: estimateDocumentAiCostUsd(processor, response.pageCount)
         },
         _vendor: {
           processor,
@@ -307,10 +320,18 @@ export async function extractDocumentText(
   }
 
   if (options?.preferDocumentAi) {
+    const canUseDocumentAi = isDocumentAiParsingEnabled({
+      dealId: options.rollout?.dealId,
+      documentId: options.rollout?.documentId,
+      userId: options.rollout?.userId,
+      fileName
+    });
     try {
-      const result = await extractTextWithDocumentAi(buffer, mimeType, fileName);
-      if (result) {
-        return result;
+      if (canUseDocumentAi) {
+        const result = await extractTextWithDocumentAi(buffer, mimeType, fileName);
+        if (result) {
+          return result;
+        }
       }
     } catch (documentAiError) {
       failures.push(

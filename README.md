@@ -60,6 +60,11 @@ doppler secrets upload .env --project hellobrand --config dev
    - `DOCUMENT_AI_INVOICE_PROCESSOR_ID`
    - `DOCUMENT_AI_LAYOUT_PROCESSOR_ID`
    - `DOCUMENT_AI_OCR_PROCESSOR_ID`
+   - optional rollout controls:
+     - `DOCUMENT_PIPELINE_V2_FORCE_LEGACY`
+     - `DOCUMENT_PIPELINE_V2_ALLOWED_KINDS`
+     - `DOCUMENT_PIPELINE_V2_COHORT_PERCENT`
+     - `DOCUMENT_PIPELINE_V2_ALLOWED_USER_IDS`
    Authentication can come from either local ADC (`gcloud auth application-default login`) or a Doppler secret named `GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`.
 8. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
 9. For Stripe-backed billing flows, set:
@@ -144,6 +149,7 @@ These are the important Google Document AI rules and product decisions for this 
 - If local auth is used, Application Default Credentials must be configured with:
   - `gcloud auth application-default login`
   - `gcloud auth application-default set-quota-project hellobrand-490702`
+- Rollout controls are documented in [docs/document-pipeline-rollout.md](/Users/thomasroberts/Desktop/projects/hellobrand/docs/document-pipeline-rollout.md). Use those env vars to limit v2 by document kind, stable cohort percentage, or an internal user allowlist before broad cutover.
 
 ## API surface
 

@@ -299,6 +299,8 @@ export async function processDocumentWithDocumentAi(input: {
       response,
       document,
       fullText,
+      pageCount: document?.pages?.length ?? 0,
+      entityCount: document?.entities?.length ?? 0,
       rawResponse: toSerializableDocumentAiResponse(response)
     };
   } catch (error) {

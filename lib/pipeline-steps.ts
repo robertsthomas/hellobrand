@@ -48,6 +48,7 @@ import {
   classifyDocumentForRouting,
   resolveDocumentRoutingDecision
 } from "@/lib/document-routing";
+import { estimateDocumentAiCostUsd } from "@/lib/document-pipeline-rollout";
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
@@ -328,6 +329,27 @@ async function saveArtifact(input: {
   });
 }
 
+async function saveObservabilityArtifact(input: {
+  documentId: string;
+  runId: string;
+  step: JobType;
+  processor?: string | null;
+  payload: Record<string, unknown>;
+}) {
+  try {
+    await saveArtifact({
+      documentId: input.documentId,
+      runId: input.runId,
+      step: input.step,
+      kind: "observability",
+      processor: input.processor ?? null,
+      payload: input.payload
+    });
+  } catch {
+    // Observability writes should not fail the pipeline.
+  }
+}
+
 async function queueAssistantSnapshotRefresh(viewer: Viewer, dealId?: string | null) {
   const { refreshAssistantSnapshotsForViewer } = await import("@/lib/assistant/snapshots");
   await refreshAssistantSnapshotsForViewer(viewer, { dealId });
@@ -496,6 +518,19 @@ async function executePipelineStep<T>(
       runId: input.runId,
       durationMs: Date.now() - startedAt
     });
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId: input.runId,
+      step: input.step,
+      payload: {
+        event: "step_result",
+        failed: false,
+        skipped: false,
+        durationMs: Date.now() - startedAt,
+        jobId: job.id,
+        attemptCount: 1
+      }
+    });
 
     return {
       skipped: false as const,
@@ -517,6 +552,20 @@ async function executePipelineStep<T>(
       runId: input.runId,
       durationMs: Date.now() - startedAt,
       error: message
+    });
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId: input.runId,
+      step: input.step,
+      payload: {
+        event: "step_result",
+        failed: true,
+        skipped: false,
+        durationMs: Date.now() - startedAt,
+        jobId: job.id,
+        attemptCount: 1,
+        error: message
+      }
     });
 
     if (isSupersededError(error)) {
@@ -708,7 +757,14 @@ export async function runExtractTextStep(documentId: string, runId: string) {
             await readStoredBytes(document.storagePath),
             document.mimeType,
             document.fileName,
-            { preferDocumentAi: true }
+            {
+              preferDocumentAi: true,
+              rollout: {
+                dealId: document.dealId,
+                documentId: document.id,
+                userId: document.userId
+              }
+            }
           );
 
     await assertCurrentRun(document.id, runId);
@@ -730,6 +786,22 @@ export async function runExtractTextStep(documentId: string, runId: string) {
         rawText: extractionSource.rawText,
         normalizedText: extractionSource.normalizedText,
         debug: extractionSource._debug ?? null
+      }
+    });
+
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId,
+      step: "extract_text",
+      processor: extractionSource._debug?.parser ?? null,
+      payload: {
+        event: "extract_text_metrics",
+        parser: extractionSource._debug?.parser ?? null,
+        durationMs: extractionSource._debug?.durationMs ?? null,
+        fileSizeBytes: extractionSource._debug?.fileSizeBytes ?? null,
+        extractedChars: extractionSource._debug?.extractedChars ?? null,
+        pageCount: extractionSource._debug?.pageCount ?? null,
+        estimatedCostUsd: extractionSource._debug?.estimatedCostUsd ?? 0
       }
     });
 
@@ -798,6 +870,23 @@ export async function runClassifyDocumentStep(documentId: string, runId: string)
       }
     });
 
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId,
+      step: "classify_document",
+      processor: routing.processor,
+      payload: {
+        event: "routing_decision",
+        documentKind: classification.documentKind,
+        confidence: classification.confidence,
+        extractionRoute: routing.extractionRoute,
+        fallbackRoute: routing.fallbackRoute,
+        rolloutEnabled: routing.rolloutEnabled,
+        cohortBucket: routing.cohortBucket,
+        reasons: routing.reasons
+      }
+    });
+
     return classification;
   });
 }
@@ -851,6 +940,11 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
     const routing = resolveDocumentRoutingDecision({ document });
     let sanitizedExtraction: ExtractionPipelineResult;
     let rawVendorArtifactId: string | null = null;
+    let routeProcessor: string | null = null;
+    let pageCount: number | null = null;
+    let entityCount: number | null = null;
+    let usedFallback = false;
+    let fallbackReason: string | null = null;
 
     logDocumentPipeline("info", "document_routed", {
       dealId: document.dealId,
@@ -887,6 +981,9 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           payload: detailedBriefExtraction.rawResponse
         });
         rawVendorArtifactId = rawVendorArtifact.id;
+        routeProcessor = detailedBriefExtraction.processor;
+        pageCount = detailedBriefExtraction.pageCount;
+        entityCount = detailedBriefExtraction.entityCount;
       } catch (error) {
         logDocumentPipeline("error", "document_ai_brief_failed", {
           dealId: document.dealId,
@@ -923,12 +1020,14 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
+        usedFallback = true;
+        fallbackReason = briefExtraction ? "empty_brief_extraction" : "brief_processor_failed";
         logDocumentPipeline("info", "document_ai_brief_fallback", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
           extractionRoute: "legacy",
-          reason: briefExtraction ? "empty_brief_extraction" : "brief_processor_failed",
+          reason: fallbackReason,
           runId
         });
         sanitizedExtraction = await runLegacyExtractFields({
@@ -960,6 +1059,9 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           payload: detailedContractExtraction.rawResponse
         });
         rawVendorArtifactId = rawVendorArtifact.id;
+        routeProcessor = detailedContractExtraction.processor;
+        pageCount = detailedContractExtraction.pageCount;
+        entityCount = detailedContractExtraction.entityCount;
       } catch (error) {
         logDocumentPipeline("error", "document_ai_contract_failed", {
           dealId: document.dealId,
@@ -989,12 +1091,14 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
+        usedFallback = true;
+        fallbackReason = contractExtraction ? "empty_contract_extraction" : "contract_processor_failed";
         logDocumentPipeline("info", "document_ai_contract_fallback", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
           extractionRoute: "legacy",
-          reason: contractExtraction ? "empty_contract_extraction" : "contract_processor_failed",
+          reason: fallbackReason,
           runId
         });
         sanitizedExtraction = await runLegacyExtractFields({
@@ -1026,6 +1130,9 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           payload: detailedInvoiceExtraction.rawResponse
         });
         rawVendorArtifactId = rawVendorArtifact.id;
+        routeProcessor = detailedInvoiceExtraction.processor;
+        pageCount = detailedInvoiceExtraction.pageCount;
+        entityCount = detailedInvoiceExtraction.entityCount;
       } catch (error) {
         logDocumentPipeline("error", "document_ai_invoice_failed", {
           dealId: document.dealId,
@@ -1055,12 +1162,14 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
+        usedFallback = true;
+        fallbackReason = invoiceExtraction ? "empty_invoice_extraction" : "invoice_processor_failed";
         logDocumentPipeline("info", "document_ai_invoice_fallback", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
           extractionRoute: "legacy",
-          reason: invoiceExtraction ? "empty_invoice_extraction" : "invoice_processor_failed",
+          reason: fallbackReason,
           runId
         });
         sanitizedExtraction = await runLegacyExtractFields({
@@ -1132,15 +1241,39 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
       }))
     );
 
+    const reviewItems = buildReviewItems({
+      extraction: sanitizedExtraction,
+      sections,
+      artifactId: normalizedArtifact.id
+    });
+
     await repository.replaceDocumentReviewItems(
       document.id,
       runId,
-      buildReviewItems({
-        extraction: sanitizedExtraction,
-        sections,
-        artifactId: normalizedArtifact.id
-      })
+      reviewItems
     );
+
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId,
+      step: "extract_fields",
+      processor: routeProcessor ?? sanitizedExtraction.model,
+      payload: {
+        event: "extract_fields_metrics",
+        extractionRoute: routing.extractionRoute,
+        processor: routeProcessor ?? routing.processor,
+        fallbackRoute: routing.fallbackRoute,
+        usedFallback,
+        fallbackReason,
+        pageCount,
+        entityCount,
+        evidenceCount: extractionEvidence.length,
+        conflictCount: sanitizedExtraction.conflicts.length,
+        reviewItemCount: reviewItems.length,
+        confidence: sanitizedExtraction.confidence,
+        estimatedCostUsd: estimateDocumentAiCostUsd(routing.processor, pageCount)
+      }
+    });
 
     return sanitizedExtraction;
   });
@@ -1296,13 +1429,46 @@ export async function runGenerateSummaryStep(documentId: string, runId: string) 
       }
     });
 
-    if (process.env.DATABASE_URL) {
-      await syncIntakeSessionForDealId(document.dealId);
-    }
-
+    const runArtifacts = await repository.listDocumentArtifacts(document.id, { runId });
+    const estimatedCostUsd = Number(
+      runArtifacts
+        .filter((artifact) => artifact.kind === "observability")
+        .reduce((sum, artifact) => {
+          const value = artifact.payload?.estimatedCostUsd;
+          return sum + (typeof value === "number" ? value : 0);
+        }, 0)
+        .toFixed(4)
+    );
+    const pagesProcessed = runArtifacts
+      .filter((artifact) => artifact.kind === "observability")
+      .reduce((sum, artifact) => {
+        const value = artifact.payload?.pageCount;
+        return sum + (typeof value === "number" ? value : 0);
+      }, 0);
     const totalDurationMs = document.processingStartedAt
       ? Date.now() - new Date(document.processingStartedAt).getTime()
       : 0;
+
+    await saveObservabilityArtifact({
+      documentId: document.id,
+      runId,
+      step: "generate_summary",
+      payload: {
+        event: "run_summary",
+        documentStatus: "ready",
+        totalDurationMs,
+        estimatedCostUsd,
+        pagesProcessed,
+        riskCount: risks.length,
+        summaryLength: summary.body.length,
+        extractionConfidence: extraction.confidence ?? null,
+        deliverablesCount: extraction.data.deliverables?.length ?? 0
+      }
+    });
+
+    if (process.env.DATABASE_URL) {
+      await syncIntakeSessionForDealId(document.dealId);
+    }
 
     logDocumentPipeline("info", "pipeline_complete", {
       dealId: document.dealId,

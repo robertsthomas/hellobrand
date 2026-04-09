@@ -1,6 +1,7 @@
 import { classifyDocumentHeuristically } from "@/lib/analysis/fallback";
 import { hasDocumentAiProcessor } from "@/lib/document-ai";
 import type { DocumentAiProcessorKind } from "@/lib/document-ai";
+import { evaluateDocumentPipelineRollout } from "@/lib/document-pipeline-rollout";
 import type {
   DocumentClassificationResult,
   DocumentKind,
@@ -18,6 +19,8 @@ export interface DocumentRoutingDecision {
   extractionRoute: DocumentExtractionRoute;
   processor: DocumentAiProcessorKind | null;
   fallbackRoute: DocumentExtractionRoute | null;
+  rolloutEnabled: boolean;
+  cohortBucket: number;
   reasons: string[];
 }
 
@@ -60,7 +63,14 @@ export function resolveDocumentRoutingDecision(input: {
   document:
     | Pick<
         DocumentRecord,
-        "documentKind" | "classificationConfidence" | "fileName" | "normalizedText" | "sourceType"
+        | "id"
+        | "dealId"
+        | "userId"
+        | "documentKind"
+        | "classificationConfidence"
+        | "fileName"
+        | "normalizedText"
+        | "sourceType"
       >
     | null;
 }) {
@@ -73,6 +83,27 @@ export function resolveDocumentRoutingDecision(input: {
     confidence: input.document.classificationConfidence
   };
   const reasons: string[] = [`classified:${classification.documentKind}`];
+  const rollout = evaluateDocumentPipelineRollout({
+    documentKind: classification.documentKind,
+    dealId: input.document.dealId,
+    documentId: input.document.id,
+    userId: input.document.userId,
+    fileName: input.document.fileName
+  });
+
+  reasons.push(...rollout.reasons.map((reason) => `rollout:${reason}`));
+
+  if (!rollout.enabled) {
+    return {
+      classification,
+      extractionRoute: "legacy" as const,
+      processor: null,
+      fallbackRoute: null,
+      rolloutEnabled: false,
+      cohortBucket: rollout.cohortBucket,
+      reasons
+    };
+  }
 
   if (classification.documentKind === "invoice") {
     if (input.document.sourceType === "pasted_text") {
@@ -82,6 +113,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "legacy" as const,
         processor: null,
         fallbackRoute: null,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -93,6 +126,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "document_ai_invoice" as const,
         processor: "invoice" as const,
         fallbackRoute: "legacy" as const,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -108,6 +143,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "legacy" as const,
         processor: null,
         fallbackRoute: null,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -119,6 +156,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "document_ai_contract" as const,
         processor: "contract" as const,
         fallbackRoute: "legacy" as const,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -138,6 +177,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "legacy" as const,
         processor: null,
         fallbackRoute: null,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -149,6 +190,8 @@ export function resolveDocumentRoutingDecision(input: {
         extractionRoute: "document_ai_brief" as const,
         processor: "brief" as const,
         fallbackRoute: "legacy" as const,
+        rolloutEnabled: true,
+        cohortBucket: rollout.cohortBucket,
         reasons
       };
     }
@@ -161,6 +204,8 @@ export function resolveDocumentRoutingDecision(input: {
     extractionRoute: "legacy" as const,
     processor: null,
     fallbackRoute: null,
+    rolloutEnabled: true,
+    cohortBucket: rollout.cohortBucket,
     reasons
   };
 }

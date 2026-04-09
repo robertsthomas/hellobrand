@@ -61,7 +61,8 @@ export type DocumentArtifactKind =
   | "raw_vendor_output"
   | "normalized_extraction"
   | "risk_analysis"
-  | "summary";
+  | "summary"
+  | "observability";
 export type DocumentEvidenceSourceType = "document" | "section" | "vendor_entity";
 export type DocumentReviewItemStatus = "open" | "resolved" | "dismissed";
 export type DocumentReviewItemReason = "low_confidence" | "conflict";
