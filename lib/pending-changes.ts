@@ -1,20 +1,22 @@
 import { humanizeToken } from "@/lib/utils";
 import type {
   DealTermsRecord,
+  ExtractionPipelineResult,
   PendingChangesSummary,
   PendingExtractionData,
   TermsDiffEntry
 } from "@/lib/types";
 
-const SKIP_FIELDS = new Set([
+const INTERNAL_SKIP_FIELDS = new Set([
   "id",
   "dealId",
   "createdAt",
   "updatedAt",
   "manuallyEditedFields",
-  "briefData",
   "pendingExtraction"
 ]);
+
+const DIFF_SKIP_FIELDS = new Set([...INTERNAL_SKIP_FIELDS, "briefData"]);
 
 const JSON_ARRAY_FIELDS = new Set([
   "deliverables",
@@ -37,6 +39,33 @@ const NUMBER_FIELDS = new Set([
   "netTermsDays",
   "revisionRounds"
 ]);
+
+const AUTO_APPLY_CONFIDENCE_THRESHOLD = 0.8;
+
+function topLevelField(fieldPath: string) {
+  return fieldPath.split(".")[0] ?? fieldPath;
+}
+
+function toPendingExtractionData(terms: DealTermsRecord): PendingExtractionData {
+  const {
+    id: _id,
+    dealId: _dealId,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    pendingExtraction: _pendingExtraction,
+    ...rest
+  } = terms;
+
+  return rest;
+}
+
+function setPendingField(
+  target: PendingExtractionData,
+  key: keyof PendingExtractionData,
+  value: unknown
+) {
+  (target as Record<string, unknown>)[key] = value;
+}
 
 function fieldType(key: string): TermsDiffEntry["fieldType"] {
   if (JSON_ARRAY_FIELDS.has(key)) return "json_array";
@@ -118,6 +147,117 @@ function valuesAreDifferent(current: unknown, proposed: unknown): boolean {
   return current !== proposed;
 }
 
+function buildPendingCandidate(
+  currentTerms: DealTermsRecord,
+  extraction: ExtractionPipelineResult
+) {
+  const manuallyEdited = new Set(currentTerms.manuallyEditedFields ?? []);
+  const conflicts = new Set((extraction.conflicts ?? []).map((fieldPath) => topLevelField(fieldPath)));
+  const confidenceByField = new Map<string, number>();
+
+  for (const evidence of extraction.evidence ?? []) {
+    if (typeof evidence.confidence !== "number") {
+      continue;
+    }
+
+    const field = topLevelField(evidence.fieldPath);
+    const existing = confidenceByField.get(field);
+    if (existing === undefined || evidence.confidence > existing) {
+      confidenceByField.set(field, evidence.confidence);
+    }
+  }
+
+  const result = toPendingExtractionData(currentTerms);
+
+  for (const key of Object.keys(result) as Array<keyof PendingExtractionData>) {
+    if (INTERNAL_SKIP_FIELDS.has(key)) {
+      continue;
+    }
+
+    const proposedValue = extraction.data[key as keyof ExtractionPipelineResult["data"]];
+    const currentValue = currentTerms[key as keyof DealTermsRecord];
+
+    if (isEmptyValue(proposedValue)) {
+      setPendingField(result, key, currentValue);
+      continue;
+    }
+
+    if (isWorseIdentityValue(key, currentValue, proposedValue)) {
+      setPendingField(result, key, currentValue);
+      continue;
+    }
+
+    if (!valuesAreDifferent(currentValue, proposedValue)) {
+      setPendingField(result, key, currentValue);
+      continue;
+    }
+
+    const fieldConfidence = confidenceByField.get(key) ?? extraction.confidence ?? null;
+    const requiresReview =
+      conflicts.has(key) ||
+      manuallyEdited.has(key) ||
+      (typeof fieldConfidence === "number" && fieldConfidence < AUTO_APPLY_CONFIDENCE_THRESHOLD);
+
+    setPendingField(result, key, requiresReview ? currentValue : proposedValue);
+  }
+
+  return result;
+}
+
+export function planExtractionMerge(
+  currentTerms: DealTermsRecord,
+  extraction: ExtractionPipelineResult
+) {
+  const autoApplied = buildPendingCandidate(currentTerms, extraction);
+  const mergedTerms: PendingExtractionData = {
+    ...toPendingExtractionData(currentTerms),
+    ...autoApplied
+  };
+
+  const pending: PendingExtractionData = { ...mergedTerms };
+
+  for (const key of Object.keys(pending) as Array<keyof PendingExtractionData>) {
+    if (INTERNAL_SKIP_FIELDS.has(key)) {
+      continue;
+    }
+
+    const proposedValue = extraction.data[key as keyof ExtractionPipelineResult["data"]];
+    const mergedValue = mergedTerms[key];
+
+    if (isEmptyValue(proposedValue)) {
+      setPendingField(pending, key, mergedValue);
+      continue;
+    }
+
+    if (isWorseIdentityValue(key, currentTerms[key as keyof DealTermsRecord], proposedValue)) {
+      setPendingField(pending, key, mergedValue);
+      continue;
+    }
+
+    setPendingField(
+      pending,
+      key,
+      valuesAreDifferent(mergedValue, proposedValue) ? proposedValue : mergedValue
+    );
+  }
+
+  return {
+    autoApplied,
+    pending,
+    hasPendingChanges: hasMeaningfulChanges(
+      {
+        ...mergedTerms,
+        id: currentTerms.id,
+        dealId: currentTerms.dealId,
+        createdAt: currentTerms.createdAt,
+        updatedAt: currentTerms.updatedAt,
+        pendingExtraction: currentTerms.pendingExtraction
+      },
+      pending
+    )
+  };
+}
+
 export function computeTermsDiff(
   currentTerms: DealTermsRecord,
   pendingExtraction: PendingExtractionData
@@ -128,7 +268,7 @@ export function computeTermsDiff(
   for (const key of Object.keys(pendingExtraction) as Array<
     keyof PendingExtractionData
   >) {
-    if (SKIP_FIELDS.has(key)) continue;
+    if (DIFF_SKIP_FIELDS.has(key)) continue;
 
     const currentValue = currentTerms[key as keyof DealTermsRecord];
     const proposedValue = pendingExtraction[key];
@@ -164,7 +304,7 @@ export function hasMeaningfulChanges(
   for (const key of Object.keys(mergedExtraction) as Array<
     keyof PendingExtractionData
   >) {
-    if (SKIP_FIELDS.has(key)) continue;
+    if (INTERNAL_SKIP_FIELDS.has(key)) continue;
 
     const currentValue = currentTerms[key as keyof DealTermsRecord];
     const proposedValue = mergedExtraction[key];
@@ -194,6 +334,9 @@ export function buildAppliedTerms(
   acceptedFields: string[]
 ): Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt"> {
   const accepted = new Set(acceptedFields);
+  const nextManualEdits = Array.from(
+    new Set([...(currentTerms.manuallyEditedFields ?? []), ...acceptedFields])
+  );
   const result: Record<string, unknown> = {};
 
   for (const key of Object.keys(currentTerms) as Array<
@@ -214,6 +357,8 @@ export function buildAppliedTerms(
       result[key] = currentTerms[key];
     }
   }
+
+  result.manuallyEditedFields = nextManualEdits;
 
   return result as Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt">;
 }

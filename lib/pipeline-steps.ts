@@ -51,7 +51,11 @@ import {
 import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
-import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
+import {
+  coalesceExtractions,
+  hasMeaningfulChanges,
+  planExtractionMerge
+} from "@/lib/pending-changes";
 import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getRepository } from "@/lib/repository";
 import { readStoredBytes } from "@/lib/storage";
@@ -1158,72 +1162,46 @@ export async function runMergeResultsStep(documentId: string, runId: string) {
     const isIntakeDocument =
       latestAggregate.deal.confirmedAt &&
       document.createdAt <= latestAggregate.deal.confirmedAt;
-    const shouldMergeDirectly = isFirstDocument || isIntakeDocument;
+    const currentTerms = withPreferredCreatorName(existingTerms, preferredCreatorName) as DealAggregate["terms"] extends infer T
+      ? NonNullable<T>
+      : never;
+    const mergePlan = planExtractionMerge(currentTerms, extraction);
+    const nextTerms = mergeTerms(currentTerms, mergePlan.autoApplied, {
+      manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
+    });
 
-    if (shouldMergeDirectly) {
-      const nextTerms = mergeTerms(
-        withPreferredCreatorName(existingTerms, preferredCreatorName),
-        extraction.data,
-        {
-          manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-        }
-      );
+    const shouldPersistTerms =
+      isFirstDocument ||
+      isIntakeDocument ||
+      hasMeaningfulChanges(currentTerms, mergePlan.autoApplied);
+
+    if (shouldPersistTerms) {
       await repository.upsertTerms(document.dealId, nextTerms);
       if (process.env.DATABASE_URL) {
         await syncPaymentRecordForDeal(document.dealId, nextTerms);
       }
-
-      await repository.updateDeal(viewer.id, document.dealId, {
-        analyzedAt: new Date().toISOString(),
-        nextDeliverableDate: earliestDeliverableDate(nextTerms),
-        brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
-        campaignName: nextTerms.campaignName ?? latestAggregate.deal.campaignName
-      });
-    } else {
-      const mergedFull = mergeTerms(
-        createEmptyTerms(latestAggregate.deal),
-        extraction.data
-      );
-      const { pendingExtraction: _pendingExtraction, ...mergedExtraction } = mergedFull;
-      const pendingCandidate = mergedExtraction as PendingExtractionData;
-
-      if (!hasMeaningfulChanges(latestAggregate.terms!, pendingCandidate)) {
-        const nextTerms = mergeTerms(
-          withPreferredCreatorName(existingTerms, preferredCreatorName),
-          extraction.data,
-          {
-            manuallyEditedFields: latestAggregate.terms?.manuallyEditedFields ?? []
-          }
-        );
-        await repository.upsertTerms(document.dealId, nextTerms);
-        if (process.env.DATABASE_URL) {
-          await syncPaymentRecordForDeal(document.dealId, nextTerms);
-        }
-
-        await repository.updateDeal(viewer.id, document.dealId, {
-          analyzedAt: new Date().toISOString(),
-          nextDeliverableDate: earliestDeliverableDate(existingTerms),
-          brandName: existingTerms.brandName ?? latestAggregate.deal.brandName,
-          campaignName: existingTerms.campaignName ?? latestAggregate.deal.campaignName
-        });
-      } else {
-        const existingPending = latestAggregate.terms?.pendingExtraction as PendingExtractionData | null;
-
-        const pendingData = existingPending
-          ? coalesceExtractions(existingPending, extraction.data, (base, patch) => {
-              const full = { ...base, pendingExtraction: null };
-              const merged = mergeTerms(full, patch);
-              const { pendingExtraction: _pending, ...rest } = merged;
-              return rest as PendingExtractionData;
-            })
-          : pendingCandidate;
-
-        await repository.savePendingExtraction(document.dealId, pendingData);
-        await repository.updateDeal(viewer.id, document.dealId, {
-          analyzedAt: new Date().toISOString()
-        });
-      }
     }
+
+    if (mergePlan.hasPendingChanges) {
+      const existingPending = latestAggregate.terms?.pendingExtraction as PendingExtractionData | null;
+      const pendingData = existingPending
+        ? coalesceExtractions(existingPending, mergePlan.pending, (base, patch) => {
+            const full = { ...base, pendingExtraction: null };
+            const merged = mergeTerms(full, patch);
+            const { pendingExtraction: _pending, ...rest } = merged;
+            return rest as PendingExtractionData;
+          })
+        : mergePlan.pending;
+
+      await repository.savePendingExtraction(document.dealId, pendingData);
+    }
+
+    await repository.updateDeal(viewer.id, document.dealId, {
+      analyzedAt: new Date().toISOString(),
+      nextDeliverableDate: earliestDeliverableDate(nextTerms),
+      brandName: nextTerms.brandName ?? latestAggregate.deal.brandName,
+      campaignName: nextTerms.campaignName ?? latestAggregate.deal.campaignName
+    });
 
     await assertCurrentRun(document.id, runId);
     return extraction;
