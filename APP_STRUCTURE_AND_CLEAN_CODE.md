@@ -176,7 +176,10 @@ See [docs/architecture/repo-map.md](/Users/thomasroberts/Desktop/projects/hellob
 These boundaries reflect the repo as it exists today and should be treated as the active convention.
 
 - `app/server-actions/`: authenticated action entrypoints grouped by surface
-- `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: primary domain commands and orchestration
+- `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: thin barrels over domain submodules
+- `lib/deals/`: deal domain modules — `service` (CRUD + summaries), `documents` (pipeline + uploads), `terms`, `drafts`, `pending-changes`, `shared` (internal helpers)
+- `lib/intake/`: intake domain modules — `index` (session lifecycle, drafts, batch), `normalization/` (evidence cleaning and record normalization)
+- `lib/intake-normalization.ts`: thin barrel over `lib/intake/normalization/`
 - `lib/analysis/`: extraction, fallback parsing, LLM orchestration, and summary generation
 - `lib/email/`: provider-agnostic email domain logic, AI helpers, repository helpers, and smart inbox behavior
   - `lib/email/service.ts`: thin entry point re-exporting viewer-facing inbox actions
@@ -697,8 +700,6 @@ Billing is now a first-class domain slice and should follow these boundaries.
 
 The following files are beyond the "easy to understand in one pass" bar and should be treated as refactor targets when touched next:
 
-- `lib/deals.ts`
-- `lib/intake.ts`
 - `lib/billing/service.ts`
 - `lib/analysis/llm.ts`
 - `app/app/page.tsx`
@@ -718,6 +719,8 @@ Recent examples of the preferred direction in this repo:
 - email service split: `lib/email/service.ts` became a thin entry point over `service-sync`, `service-connect`, `service-ai`, and `service-shared` modules
 - email repository split: `lib/email/repository.ts` broke into `repository/shared`, `repository/accounts`, `repository/threads`, and `repository/candidates`
 - inbox UI split: `components/inbox-workspace.tsx` became a composition-only orchestrator delegating to `components/inbox-workspace/` subcomponents (`InboxThreadList`, `InboxThreadDetail`, `InboxReplyComposer`, `InboxMessageView`) with pure helpers extracted to `formatters.ts` and `helpers.ts`
+- deals domain split: `lib/deals.ts` became a thin barrel over `lib/deals/service`, `documents`, `terms`, `drafts`, `pending-changes`, and `shared`
+- intake domain split: `lib/intake.ts` moved into `lib/intake/index.ts` and `lib/intake-normalization.ts` moved into `lib/intake/normalization/`, with original paths kept as thin re-export barrels
 - inbox state was split out of `components/inbox-workspace.tsx` into feature hooks for thread selection, reply composition, candidate discovery, and thread-detail state
 - profile and settings payload shaping moved into `lib/profile-draft.ts`
 - onboarding normalization moved into `lib/onboarding-draft.ts`
