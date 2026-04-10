@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
+import {
+  buildNormalizedIntakeRecord,
+  INTAKE_NORMALIZED_VERSION
+} from "@/lib/intake-normalization";
 import { createSeedStore } from "@/lib/repository/seed";
 import type { DealAggregate } from "@/lib/types";
 
@@ -410,6 +413,101 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.title).toBeNull();
     expect(normalized?.primaryContact.email).toBeNull();
     expect(normalized?.primaryContact.phone).toBeNull();
+  });
+
+  test("uses structured brief contact when a persisted contact matches the creator profile", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Lunchables",
+      agencyName: null,
+      briefData: {
+        campaignOverview: "Back to school lunch content.",
+        messagingPoints: [],
+        talkingPoints: [],
+        creativeConceptOverview: null,
+        brandGuidelines: null,
+        approvalRequirements: null,
+        targetAudience: null,
+        toneAndStyle: null,
+        doNotMention: [],
+        brandContactName: "Jordan Ellis",
+        brandContactTitle: "Partnerships Manager",
+        brandContactEmail: "jordan@lunchables.com",
+        brandContactPhone: "312-555-0199",
+        sourceDocumentIds: ["brief-document"]
+      }
+    };
+    aggregate.summaries = [
+      {
+        ...aggregate.summaries[0],
+        id: "persisted-intake",
+        version: INTAKE_NORMALIZED_VERSION,
+        body: JSON.stringify({
+          primaryContact: {
+            organizationType: "brand",
+            name: "Thomas Roberts",
+            title: "Creator",
+            email: "thomas@example.com",
+            phone: "909-743-1880"
+          }
+        })
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate, {
+      excludedPrimaryContactEmails: ["thomas@example.com"],
+      excludedPrimaryContactNames: ["Thomas Roberts"]
+    });
+
+    expect(normalized?.primaryContact.organizationType).toBe("brand");
+    expect(normalized?.primaryContact.name).toBe("Jordan Ellis");
+    expect(normalized?.primaryContact.title).toBe("Partnerships Manager");
+    expect(normalized?.primaryContact.email).toBe("jordan@lunchables.com");
+    expect(normalized?.primaryContact.phone).toBe("312-555-0199");
+  });
+
+  test("uses structured brief contact when the previous normalized contact was empty", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Lunchables",
+      agencyName: null,
+      briefData: {
+        campaignOverview: "Back to school lunch content.",
+        messagingPoints: [],
+        talkingPoints: [],
+        creativeConceptOverview: null,
+        brandGuidelines: null,
+        approvalRequirements: null,
+        targetAudience: null,
+        toneAndStyle: null,
+        doNotMention: [],
+        brandContactEmail: "jordan@lunchables.com",
+        sourceDocumentIds: ["brief-document"]
+      }
+    };
+    aggregate.summaries = [
+      {
+        ...aggregate.summaries[0],
+        id: "persisted-intake-empty-contact",
+        version: INTAKE_NORMALIZED_VERSION,
+        body: JSON.stringify({
+          primaryContact: {
+            organizationType: "brand",
+            name: null,
+            title: null,
+            email: null,
+            phone: null
+          }
+        })
+      }
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.primaryContact.organizationType).toBe("brand");
+    expect(normalized?.primaryContact.email).toBe("jordan@lunchables.com");
   });
 
   test("does not use a generic campaign label as the contract title", () => {

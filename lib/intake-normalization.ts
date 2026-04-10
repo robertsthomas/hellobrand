@@ -316,6 +316,148 @@ function sanitizeContactTitle(value: string | null | undefined) {
   return normalized;
 }
 
+function emptyPrimaryContact(agencyName: string | null, brandName: string | null): IntakePrimaryContact {
+  return {
+    organizationType: agencyName ? "agency" : brandName ? "brand" : null,
+    name: null,
+    title: null,
+    email: null,
+    phone: null
+  };
+}
+
+function cleanContactCandidate(
+  contact: IntakePrimaryContact,
+  excludedEmails: Set<string>,
+  excludedNames: Set<string>
+) {
+  if (
+    isExcludedContactEmail(contact.email, excludedEmails) ||
+    isExcludedContactName(contact.name, excludedNames)
+  ) {
+    return null;
+  }
+
+  const name = sanitizeContactName(contact.name);
+  const title = sanitizeContactTitle(contact.title);
+  const email = presentText(contact.email);
+  const phone = presentText(contact.phone);
+  if (!name && !email && !phone) {
+    return null;
+  }
+
+  return {
+    organizationType: contact.organizationType,
+    name,
+    title,
+    email,
+    phone
+  } satisfies IntakePrimaryContact;
+}
+
+function contactFromBriefData(
+  aggregate: DealAggregate,
+  agencyName: string | null,
+  brandName: string | null,
+  excludedEmails: Set<string>,
+  excludedNames: Set<string>
+) {
+  const briefData = aggregate.terms?.briefData;
+  if (!briefData) {
+    return null;
+  }
+
+  const agencyContact = cleanContactCandidate(
+    {
+      organizationType: "agency",
+      name: briefData.agencyContactName ?? null,
+      title: briefData.agencyContactTitle ?? null,
+      email: briefData.agencyContactEmail ?? null,
+      phone: briefData.agencyContactPhone ?? null
+    },
+    excludedEmails,
+    excludedNames
+  );
+  if (agencyContact) {
+    return agencyContact;
+  }
+
+  const brandContact = cleanContactCandidate(
+    {
+      organizationType: "brand",
+      name: briefData.brandContactName ?? null,
+      title: briefData.brandContactTitle ?? null,
+      email: briefData.brandContactEmail ?? null,
+      phone: briefData.brandContactPhone ?? null
+    },
+    excludedEmails,
+    excludedNames
+  );
+  if (brandContact) {
+    return brandContact;
+  }
+
+  const linksAndAssets = (briefData.linksAndAssets ?? []).join("\n");
+  const linkEmail = extractEmails(linksAndAssets).find(
+    (email) => !isExcludedContactEmail(email, excludedEmails)
+  );
+  const linkPhone = extractPhones(linksAndAssets)[0] ?? null;
+  return cleanContactCandidate(
+    {
+      organizationType: agencyName ? "agency" : brandName ? "brand" : null,
+      name: null,
+      title: null,
+      email: linkEmail ?? null,
+      phone: linkPhone
+    },
+    excludedEmails,
+    excludedNames
+  );
+}
+
+function contactFromExtractionEvidence(
+  aggregate: DealAggregate,
+  agencyName: string | null,
+  brandName: string | null,
+  excludedEmails: Set<string>,
+  excludedNames: Set<string>
+) {
+  const emailSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
+    "primaryContact.email",
+    "briefData.agencyContactEmail",
+    "briefData.brandContactEmail"
+  ]);
+  const nameSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
+    "primaryContact.name",
+    "briefData.agencyContactName",
+    "briefData.brandContactName"
+  ]);
+  const titleSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
+    "primaryContact.title",
+    "briefData.agencyContactTitle",
+    "briefData.brandContactTitle"
+  ]);
+  const phoneSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
+    "primaryContact.phone",
+    "briefData.agencyContactPhone",
+    "briefData.brandContactPhone"
+  ]);
+  const email = extractEmails(emailSnippet ?? "")[0] ?? emailSnippet;
+  const phone = extractPhones(phoneSnippet ?? "")[0] ?? phoneSnippet;
+
+  return cleanContactCandidate(
+    {
+      organizationType: agencyName ? "agency" : brandName ? "brand" : null,
+      name: nameSnippet,
+      title: titleSnippet,
+      email,
+      phone
+    },
+    excludedEmails,
+    excludedNames
+  );
+}
+
 function extractPrimaryContact(
   aggregate: DealAggregate,
   agencyName: string | null,
@@ -326,28 +468,31 @@ function extractPrimaryContact(
   const excludedNames = buildExcludedContactNames(options);
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.primaryContact;
   if (persisted) {
-    const persistedEmail = presentText(persisted.email);
-    const persistedName = presentText(persisted.name);
-    if (
-      isExcludedContactEmail(persistedEmail, excludedEmails) ||
-      isExcludedContactName(persistedName, excludedNames)
-    ) {
-      return {
+    const persistedContact = cleanContactCandidate(
+      {
         organizationType: persisted.organizationType ?? (agencyName ? "agency" : "brand"),
-        name: null,
-        title: null,
-        email: null,
-        phone: null
-      };
+        name: persisted.name,
+        title: persisted.title,
+        email: persisted.email,
+        phone: persisted.phone
+      },
+      excludedEmails,
+      excludedNames
+    );
+
+    if (persistedContact) {
+      return persistedContact;
     }
 
-    return {
-      organizationType: persisted.organizationType ?? (agencyName ? "agency" : "brand"),
-      name: persistedName,
-      title: presentText(persisted.title),
-      email: persistedEmail,
-      phone: presentText(persisted.phone)
-    };
+    // Continue into current extraction data so a newly uploaded brief/contract can replace
+    // an old empty or creator-profile contact that was previously persisted.
+  }
+
+  const structuredContact =
+    contactFromBriefData(aggregate, agencyName, brandName, excludedEmails, excludedNames) ??
+    contactFromExtractionEvidence(aggregate, agencyName, brandName, excludedEmails, excludedNames);
+  if (structuredContact) {
+    return structuredContact;
   }
 
   const documents = [...aggregate.documents].sort(
@@ -425,13 +570,7 @@ function extractPrimaryContact(
     }
   }
 
-  return {
-    organizationType: agencyName ? "agency" : brandName ? "brand" : null,
-    name: null,
-    title: null,
-    email: null,
-    phone: null
-  };
+  return emptyPrimaryContact(agencyName, brandName);
 }
 
 function extractLikelyBrandFromFileNames(fileNames: string[]) {

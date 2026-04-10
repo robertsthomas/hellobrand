@@ -12,7 +12,7 @@ import { getDealForViewer } from "@/lib/deals";
 import { fail, ok } from "@/lib/http";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ dealId: string }> }
 ) {
   try {
@@ -26,8 +26,10 @@ export async function POST(
       return fail("Deal not found.", 404);
     }
 
+    const body = (await request.json().catch(() => null)) as { mode?: string } | null;
+    const mode = body?.mode === "summary" ? "summary" : "brief";
     const brief = hasLlmKey()
-      ? await generateBriefWithLlm(aggregate)
+      ? await generateBriefWithLlm(aggregate, { mode })
       : buildFallbackBrief(aggregate);
     await recordViewerUsage(viewer, "brief_generations_monthly");
 

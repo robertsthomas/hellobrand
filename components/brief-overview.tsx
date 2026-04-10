@@ -37,6 +37,10 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
+function safeItems(items: string[] | null | undefined) {
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
 export function BriefOverview({
   dealId,
   briefData,
@@ -110,6 +114,47 @@ export function BriefOverview({
             </div>
           )}
 
+          {briefData.campaignObjective && (
+            <div className="md:col-span-2">
+              <Section title="Objective">
+                <ProseText content={briefData.campaignObjective} className="text-sm text-foreground" />
+              </Section>
+            </div>
+          )}
+
+          {(briefData.productName || briefData.productDescription) && (
+            <Section title="Product">
+              {briefData.productName ? (
+                <ProseText content={briefData.productName} className="text-sm font-medium text-foreground" />
+              ) : null}
+              {briefData.productDescription ? (
+                <ProseText content={briefData.productDescription} className="mt-1 text-sm text-foreground" />
+              ) : null}
+            </Section>
+          )}
+
+          {(briefData.deliverablesSummary || safeItems(briefData.deliverablePlatforms).length > 0) && (
+            <Section title="Deliverables">
+              {briefData.deliverablesSummary ? (
+                <ProseText content={briefData.deliverablesSummary} className="text-sm text-foreground" />
+              ) : null}
+              <BulletList items={safeItems(briefData.deliverablePlatforms)} />
+            </Section>
+          )}
+
+          {(briefData.postingSchedule || briefData.campaignLiveDate || briefData.draftDueDate || briefData.contentDueDate) && (
+            <Section title="Key Dates">
+              <BulletList
+                items={[
+                  briefData.postingSchedule ? `Posting schedule: ${briefData.postingSchedule}` : null,
+                  briefData.campaignLiveDate ? `Live date: ${briefData.campaignLiveDate}` : null,
+                  briefData.draftDueDate ? `Draft due: ${briefData.draftDueDate}` : null,
+                  briefData.contentDueDate ? `Content due: ${briefData.contentDueDate}` : null
+                ].filter((item): item is string => Boolean(item))}
+              />
+            </Section>
+          )}
+
           {briefData.messagingPoints.length > 0 && (
             <Section title="Messaging Points">
               <BulletList items={briefData.messagingPoints} />
@@ -122,12 +167,30 @@ export function BriefOverview({
             </Section>
           )}
 
+          {safeItems(briefData.contentPillars).length > 0 && (
+            <Section title="Content Pillars">
+              <BulletList items={safeItems(briefData.contentPillars)} />
+            </Section>
+          )}
+
+          {safeItems(briefData.requiredElements).length > 0 && (
+            <Section title="Required Elements">
+              <BulletList items={safeItems(briefData.requiredElements)} />
+            </Section>
+          )}
+
           {briefData.creativeConceptOverview && (
             <div className="md:col-span-2">
               <Section title="Creative Concept">
                 <ProseText content={briefData.creativeConceptOverview} className="text-sm text-foreground" />
               </Section>
             </div>
+          )}
+
+          {briefData.visualDirection && (
+            <Section title="Visual Direction">
+              <ProseText content={briefData.visualDirection} className="text-sm text-foreground" />
+            </Section>
           )}
 
           {briefData.brandGuidelines && (
@@ -139,6 +202,12 @@ export function BriefOverview({
           {briefData.approvalRequirements && (
             <Section title="Approval Requirements">
               <ProseText content={briefData.approvalRequirements} className="text-sm text-foreground" />
+            </Section>
+          )}
+
+          {briefData.revisionRequirements && (
+            <Section title="Revision Requirements">
+              <ProseText content={briefData.revisionRequirements} className="text-sm text-foreground" />
             </Section>
           )}
 
@@ -154,10 +223,52 @@ export function BriefOverview({
             </Section>
           )}
 
+          {briefData.usageNotes && (
+            <Section title="Usage Notes">
+              <ProseText content={briefData.usageNotes} className="text-sm text-foreground" />
+            </Section>
+          )}
+
+          {safeItems(briefData.disclosureRequirements).length > 0 && (
+            <Section title="Disclosure Requirements">
+              <BulletList items={safeItems(briefData.disclosureRequirements)} />
+            </Section>
+          )}
+
           {briefData.doNotMention.length > 0 && (
             <Section title="Do Not Mention">
               <BulletList items={briefData.doNotMention} />
             </Section>
+          )}
+
+          {safeItems(briefData.competitorRestrictions).length > 0 && (
+            <Section title="Competitor Restrictions">
+              <BulletList items={safeItems(briefData.competitorRestrictions)} />
+            </Section>
+          )}
+
+          {(briefData.promoCode || safeItems(briefData.linksAndAssets).length > 0) && (
+            <Section title="Links & Codes">
+              <BulletList
+                items={[
+                  briefData.promoCode ? `Promo code: ${briefData.promoCode}` : null,
+                  ...safeItems(briefData.linksAndAssets)
+                ].filter((item): item is string => Boolean(item))}
+              />
+            </Section>
+          )}
+
+          {(briefData.paymentNotes || briefData.campaignNotes) && (
+            <div className="md:col-span-2">
+              <Section title="Notes">
+                {briefData.paymentNotes ? (
+                  <ProseText content={`Payment notes: ${briefData.paymentNotes}`} className="text-sm text-foreground" />
+                ) : null}
+                {briefData.campaignNotes ? (
+                  <ProseText content={briefData.campaignNotes} className="mt-1 text-sm text-foreground" />
+                ) : null}
+              </Section>
+            </div>
           )}
         </div>
       </div>

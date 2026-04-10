@@ -38,6 +38,22 @@ describe("document ai brief mapping", () => {
             mentionText: "Launch a back-to-school creator push.",
             confidence: 0.92
           },
+          { type: "brand_name", mentionText: "Lunchables", confidence: 0.91 },
+          {
+            type: "campaign_name",
+            mentionText: "Back to School Lunchbox",
+            confidence: 0.9
+          },
+          {
+            type: "product_name",
+            mentionText: "Lunchables Dunkables",
+            confidence: 0.89
+          },
+          {
+            type: "campaign_objective",
+            mentionText: "Drive awareness for back-to-school lunches.",
+            confidence: 0.88
+          },
           {
             type: "messaging_points",
             mentionText: "Lunchables are convenient\nKeep the tone playful",
@@ -64,6 +80,46 @@ describe("document ai brief mapping", () => {
             confidence: 0.9
           },
           {
+            type: "required_elements",
+            mentionText: "Show product in lunchbox\nInclude #ad",
+            confidence: 0.87
+          },
+          {
+            type: "deliverables_summary",
+            mentionText: "1 TikTok video and 2 Instagram stories",
+            confidence: 0.86
+          },
+          {
+            type: "deliverable_platforms",
+            mentionText: "TikTok\nInstagram",
+            confidence: 0.85
+          },
+          {
+            type: "content_due_date",
+            mentionText: "2026-05-01",
+            confidence: 0.84
+          },
+          {
+            type: "brand_contact_name",
+            mentionText: "Jordan Ellis",
+            confidence: 0.87
+          },
+          {
+            type: "brand_contact_title",
+            mentionText: "Partnerships Manager",
+            confidence: 0.86
+          },
+          {
+            type: "brand_contact_email",
+            mentionText: "jordan@lunchables.com",
+            confidence: 0.86
+          },
+          {
+            type: "usage_notes",
+            mentionText: "Organic reposting on brand social channels.",
+            confidence: 0.83
+          },
+          {
             type: "target_audience",
             mentionText: "US parents with school-age kids.",
             confidence: 0.8
@@ -83,9 +139,21 @@ describe("document ai brief mapping", () => {
     });
 
     expect(extraction.model).toBe("document_ai:brief_custom_extractor");
+    expect(extraction.data.brandName).toBe("Lunchables");
+    expect(extraction.data.campaignName).toBe("Back to School Lunchbox");
+    expect(extraction.data.deliverables.map((deliverable) => deliverable.title)).toEqual([
+      "TikTok Video",
+      "Instagram Stories"
+    ]);
+    expect(extraction.data.deliverables[0]?.dueDate).toBe("2026-05-01");
+    expect(extraction.data.usageRights).toBe("Organic reposting on brand social channels.");
     expect(extraction.data.briefData?.campaignOverview).toBe(
       "Launch a back-to-school creator push."
     );
+    expect(extraction.data.briefData?.campaignObjective).toBe(
+      "Drive awareness for back-to-school lunches."
+    );
+    expect(extraction.data.briefData?.productName).toBe("Lunchables Dunkables");
     expect(extraction.data.briefData?.messagingPoints).toEqual([
       "Lunchables are convenient",
       "Keep the tone playful"
@@ -94,6 +162,17 @@ describe("document ai brief mapping", () => {
       "Show product in use",
       "Mention easy lunch prep"
     ]);
+    expect(extraction.data.briefData?.requiredElements).toEqual([
+      "Show product in lunchbox",
+      "Include #ad"
+    ]);
+    expect(extraction.data.briefData?.deliverablePlatforms).toEqual([
+      "TikTok",
+      "Instagram"
+    ]);
+    expect(extraction.data.briefData?.brandContactName).toBe("Jordan Ellis");
+    expect(extraction.data.briefData?.brandContactTitle).toBe("Partnerships Manager");
+    expect(extraction.data.briefData?.brandContactEmail).toBe("jordan@lunchables.com");
     expect(extraction.data.briefData?.doNotMention).toEqual([
       "Guaranteed nutrition claims",
       "Negative competitor comparisons"

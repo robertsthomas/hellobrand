@@ -36,6 +36,21 @@ describe("document ai contract mapping", () => {
             mentionText: "KHC - Lunchables Core CLP 2026",
             confidence: 0.93
           },
+          {
+            type: "campaign_agency",
+            mentionText: "Collectively Inc.",
+            confidence: 0.9
+          },
+          {
+            type: "creator_name",
+            mentionText: "The Roberts Casa",
+            confidence: 0.9
+          },
+          {
+            type: "campaign_live_date",
+            mentionText: "2026-05-15",
+            confidence: 0.89
+          },
           { type: "payment_amount", mentionText: "USD 5000", confidence: 0.97 },
           { type: "currency_type", mentionText: "USD", confidence: 0.91 },
           { type: "payment_terms", mentionText: "Net 30", confidence: 0.92 },
@@ -99,6 +114,11 @@ describe("document ai contract mapping", () => {
             type: "governing_law",
             mentionText: "New York",
             confidence: 0.9
+          },
+          {
+            type: "legal_clauses",
+            mentionText: "Confidentiality applies to campaign materials.",
+            confidence: 0.88
           }
         ]
       }
@@ -106,7 +126,10 @@ describe("document ai contract mapping", () => {
 
     expect(extraction.model).toBe("document_ai:contract_custom_extractor");
     expect(extraction.data.brandName).toBe("Lunchables");
+    expect(extraction.data.agencyName).toBe("Collectively Inc.");
+    expect(extraction.data.creatorName).toBe("The Roberts Casa");
     expect(extraction.data.campaignName).toBe("KHC - Lunchables Core CLP 2026");
+    expect(extraction.data.campaignDateWindow?.startDate).toBe("2026-05-15");
     expect(extraction.data.paymentAmount).toBe(5000);
     expect(extraction.data.currency).toBe("USD");
     expect(extraction.data.paymentTerms).toBe("Net 30");
@@ -117,6 +140,7 @@ describe("document ai contract mapping", () => {
     expect(extraction.data.revisionRounds).toBe(2);
     expect(extraction.data.terminationNotice).toBe("7 days");
     expect(extraction.data.governingLaw).toBe("New York");
+    expect(extraction.data.notes).toContain("Confidentiality applies");
     expect(extraction.evidence.some((entry) => entry.fieldPath === "paymentAmount")).toBe(true);
     expect(hasMeaningfulContractExtraction(extraction)).toBe(true);
   });

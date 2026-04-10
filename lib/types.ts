@@ -286,14 +286,42 @@ export interface NormalizedIntakeRecord {
 
 export interface BriefData {
   campaignOverview: string | null;
+  campaignObjective?: string | null;
   messagingPoints: string[];
   talkingPoints: string[];
   creativeConceptOverview: string | null;
+  contentPillars?: string[];
+  requiredElements?: string[];
   brandGuidelines: string | null;
   approvalRequirements: string | null;
+  revisionRequirements?: string | null;
   targetAudience: string | null;
   toneAndStyle: string | null;
+  visualDirection?: string | null;
   doNotMention: string[];
+  productName?: string | null;
+  productDescription?: string | null;
+  deliverablesSummary?: string | null;
+  deliverablePlatforms?: string[];
+  postingSchedule?: string | null;
+  campaignLiveDate?: string | null;
+  draftDueDate?: string | null;
+  contentDueDate?: string | null;
+  usageNotes?: string | null;
+  disclosureRequirements?: string[];
+  competitorRestrictions?: string[];
+  linksAndAssets?: string[];
+  promoCode?: string | null;
+  paymentNotes?: string | null;
+  campaignNotes?: string | null;
+  brandContactName?: string | null;
+  brandContactTitle?: string | null;
+  brandContactEmail?: string | null;
+  brandContactPhone?: string | null;
+  agencyContactName?: string | null;
+  agencyContactTitle?: string | null;
+  agencyContactEmail?: string | null;
+  agencyContactPhone?: string | null;
   sourceDocumentIds: string[];
 }
 

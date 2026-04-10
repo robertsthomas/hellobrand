@@ -458,17 +458,49 @@ export function mapDocumentAiContractToExtraction(input: {
   const terms = createEmptyTerms(input.deal);
 
   const brandNameEntities = collectEntities(entities, "brand_name");
+  const agencyEntities = collectEntities(entities, "campaign_agency", "agency_name");
+  const creatorNameEntities = collectEntities(entities, "creator_name");
+  const creatorHandleEntities = collectEntities(entities, "creator_handle");
   const campaignNameEntities = collectEntities(entities, "campaign_name");
+  const campaignLiveDateEntities = collectEntities(entities, "campaign_live_date");
+  const campaignMetadataEntities = collectEntities(entities, "campaign_metadata");
+  const campaignNotesEntities = collectEntities(entities, "campaign_notes");
+  const primaryContactNameEntities = collectEntities(
+    entities,
+    "primary_contact_name",
+    "brand_contact_name",
+    "agency_contact_name"
+  );
+  const primaryContactTitleEntities = collectEntities(
+    entities,
+    "primary_contact_title",
+    "brand_contact_title",
+    "agency_contact_title"
+  );
+  const primaryContactEmailEntities = collectEntities(
+    entities,
+    "primary_contact_email",
+    "brand_contact_email",
+    "agency_contact_email"
+  );
+  const primaryContactPhoneEntities = collectEntities(
+    entities,
+    "primary_contact_phone",
+    "brand_contact_phone",
+    "agency_contact_phone"
+  );
   const paymentAmountEntities = collectEntities(entities, "payment_amount");
   const currencyEntities = collectEntities(entities, "currency", "currency_type");
   const paymentTermsEntities = collectEntities(entities, "payment_terms");
   const paymentStructureEntities = collectEntities(entities, "payment_structure");
   const paymentTriggerEntities = collectEntities(entities, "payment_trigger");
   const netTermsEntities = collectEntities(entities, "net_terms_days");
+  const paymentOtherEntities = collectEntities(entities, "campaign_payment_other", "payment_other");
   const usageRightsEntities = collectEntities(entities, "usage_rights");
   const usageDurationEntities = collectEntities(entities, "usage_duration");
   const usageTerritoryEntities = collectEntities(entities, "usage_territory");
   const paidUsageEntities = collectEntities(entities, "paid_usage_allowed");
+  const signatureRequiredEntities = collectEntities(entities, "signature_required");
   const whitelistingEntities = collectEntities(entities, "whitelisting_allowed");
   const exclusivityEntities = collectEntities(entities, "exclusivity_summary");
   const exclusivityCategoryEntities = collectEntities(entities, "exclusivity_category");
@@ -478,10 +510,18 @@ export function mapDocumentAiContractToExtraction(input: {
   const terminationEntities = collectEntities(entities, "termination_summary");
   const terminationNoticeEntities = collectEntities(entities, "termination_notice");
   const governingLawEntities = collectEntities(entities, "governing_law");
+  const legalClauseEntities = collectEntities(entities, "legal_clauses");
   const notesEntities = collectEntities(entities, "notes", "note", "additional_notes");
 
   const brandNameEntity = pickBestEntity(brandNameEntities);
+  const agencyEntity = pickBestEntity(agencyEntities);
+  const creatorNameEntity = pickBestEntity(creatorNameEntities);
   const campaignNameEntity = pickBestEntity(campaignNameEntities);
+  const campaignLiveDateEntity = pickBestEntity(campaignLiveDateEntities);
+  const primaryContactNameEntity = pickBestEntity(primaryContactNameEntities);
+  const primaryContactTitleEntity = pickBestEntity(primaryContactTitleEntities);
+  const primaryContactEmailEntity = pickBestEntity(primaryContactEmailEntities);
+  const primaryContactPhoneEntity = pickBestEntity(primaryContactPhoneEntities);
   const paymentAmountEntity = pickBestEntity(paymentAmountEntities);
   const currencyEntity = pickBestEntity(currencyEntities);
   const paymentTermsEntity = pickBestEntity(paymentTermsEntities);
@@ -491,6 +531,7 @@ export function mapDocumentAiContractToExtraction(input: {
   const usageDurationEntity = pickBestEntity(usageDurationEntities);
   const usageTerritoryEntity = pickBestEntity(usageTerritoryEntities);
   const paidUsageEntity = pickBestEntity(paidUsageEntities);
+  const signatureRequiredEntity = pickBestEntity(signatureRequiredEntities);
   const whitelistingEntity = pickBestEntity(whitelistingEntities);
   const exclusivityCategoryEntity = pickBestEntity(exclusivityCategoryEntities);
   const exclusivityDurationEntity = pickBestEntity(exclusivityDurationEntities);
@@ -499,6 +540,8 @@ export function mapDocumentAiContractToExtraction(input: {
   const governingLawEntity = pickBestEntity(governingLawEntities);
 
   terms.brandName = brandNameEntity ? entityText(input.document, brandNameEntity) : terms.brandName;
+  terms.agencyName = agencyEntity ? entityText(input.document, agencyEntity) : null;
+  terms.creatorName = creatorNameEntity ? entityText(input.document, creatorNameEntity) : null;
   terms.campaignName = campaignNameEntity
     ? entityText(input.document, campaignNameEntity)
     : terms.campaignName;
@@ -549,20 +592,73 @@ export function mapDocumentAiContractToExtraction(input: {
     ? entityText(input.document, terminationNoticeEntity)
     : null;
   terms.governingLaw = governingLawEntity ? entityText(input.document, governingLawEntity) : null;
-  terms.notes = combineClauseEntities(input.document, notesEntities);
+  terms.campaignDateWindow = campaignLiveDateEntity
+    ? {
+        startDate: entityText(input.document, campaignLiveDateEntity),
+        endDate: null,
+        postingWindow: entityText(input.document, campaignLiveDateEntity)
+      }
+    : null;
+  terms.notes = [
+    combineClauseEntities(input.document, notesEntities),
+    combineClauseEntities(input.document, campaignMetadataEntities)
+      ? `Campaign metadata: ${combineClauseEntities(input.document, campaignMetadataEntities)}`
+      : null,
+    combineClauseEntities(input.document, campaignNotesEntities)
+      ? `Campaign notes: ${combineClauseEntities(input.document, campaignNotesEntities)}`
+      : null,
+    primaryContactNameEntity ||
+    primaryContactTitleEntity ||
+    primaryContactEmailEntity ||
+    primaryContactPhoneEntity
+      ? [
+          "Primary contact:",
+          entityText(input.document, primaryContactNameEntity),
+          entityText(input.document, primaryContactTitleEntity),
+          entityText(input.document, primaryContactEmailEntity),
+          entityText(input.document, primaryContactPhoneEntity)
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : null,
+    combineClauseEntities(input.document, paymentOtherEntities)
+      ? `Payment notes: ${combineClauseEntities(input.document, paymentOtherEntities)}`
+      : null,
+    combineClauseEntities(input.document, creatorHandleEntities)
+      ? `Creator handle: ${combineClauseEntities(input.document, creatorHandleEntities)}`
+      : null,
+    signatureRequiredEntity
+      ? `Signature required: ${entityBoolean(input.document, signatureRequiredEntity) ? "Yes" : "No"}`
+      : null,
+    combineClauseEntities(input.document, legalClauseEntities)
+      ? `Legal clauses: ${combineClauseEntities(input.document, legalClauseEntities)}`
+      : null
+  ].filter(Boolean).join("\n\n") || null;
 
   pushEvidence(evidence, "brandName", input.document, brandNameEntity);
+  pushEvidence(evidence, "agencyName", input.document, agencyEntity);
+  pushEvidence(evidence, "creatorName", input.document, creatorNameEntity);
+  pushEvidenceForEntities(evidence, "notes", input.document, creatorHandleEntities);
   pushEvidence(evidence, "campaignName", input.document, campaignNameEntity);
+  pushEvidence(evidence, "campaignDateWindow", input.document, campaignLiveDateEntity);
+  pushEvidenceForEntities(evidence, "notes", input.document, campaignMetadataEntities);
+  pushEvidenceForEntities(evidence, "notes", input.document, campaignNotesEntities);
+  pushEvidence(evidence, "primaryContact.name", input.document, primaryContactNameEntity);
+  pushEvidence(evidence, "primaryContact.title", input.document, primaryContactTitleEntity);
+  pushEvidence(evidence, "primaryContact.email", input.document, primaryContactEmailEntity);
+  pushEvidence(evidence, "primaryContact.phone", input.document, primaryContactPhoneEntity);
   pushEvidence(evidence, "paymentAmount", input.document, paymentAmountEntity);
   pushEvidence(evidence, "currency", input.document, currencyEntity);
   pushEvidence(evidence, "paymentTerms", input.document, paymentTermsEntity);
   pushEvidence(evidence, "paymentStructure", input.document, paymentStructureEntity);
   pushEvidence(evidence, "paymentTrigger", input.document, paymentTriggerEntity);
+  pushEvidenceForEntities(evidence, "notes", input.document, paymentOtherEntities);
   pushEvidence(evidence, "netTermsDays", input.document, netTermsEntity);
   pushEvidenceForEntities(evidence, "usageRights", input.document, usageRightsEntities);
   pushEvidence(evidence, "usageDuration", input.document, usageDurationEntity);
   pushEvidence(evidence, "usageTerritory", input.document, usageTerritoryEntity);
   pushEvidence(evidence, "usageRightsPaidAllowed", input.document, paidUsageEntity);
+  pushEvidence(evidence, "notes", input.document, signatureRequiredEntity);
   pushEvidence(evidence, "whitelistingAllowed", input.document, whitelistingEntity);
   pushEvidenceForEntities(evidence, "exclusivity", input.document, exclusivityEntities);
   pushEvidence(evidence, "exclusivityCategory", input.document, exclusivityCategoryEntity);
@@ -572,10 +668,20 @@ export function mapDocumentAiContractToExtraction(input: {
   pushEvidenceForEntities(evidence, "termination", input.document, terminationEntities);
   pushEvidence(evidence, "terminationNotice", input.document, terminationNoticeEntity);
   pushEvidence(evidence, "governingLaw", input.document, governingLawEntity);
+  pushEvidenceForEntities(evidence, "notes", input.document, legalClauseEntities);
   pushEvidenceForEntities(evidence, "notes", input.document, notesEntities);
 
   addConflictIfNeeded(conflicts, "brandName", brandNameEntities, input.document, entityText);
+  addConflictIfNeeded(conflicts, "agencyName", agencyEntities, input.document, entityText);
+  addConflictIfNeeded(conflicts, "creatorName", creatorNameEntities, input.document, entityText);
   addConflictIfNeeded(conflicts, "campaignName", campaignNameEntities, input.document, entityText);
+  addConflictIfNeeded(
+    conflicts,
+    "primaryContact.email",
+    primaryContactEmailEntities,
+    input.document,
+    entityText
+  );
   addConflictIfNeeded(
     conflicts,
     "paymentAmount",

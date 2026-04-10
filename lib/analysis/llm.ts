@@ -1456,7 +1456,11 @@ function buildBriefContext(aggregate: DealAggregate) {
   return JSON.stringify(context, null, 2);
 }
 
-export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<GeneratedBrief> {
+export async function generateBriefWithLlm(
+  aggregate: DealAggregate,
+  options: { mode?: "brief" | "summary" } = {}
+): Promise<GeneratedBrief> {
+  const mode = options.mode ?? "brief";
   const payload = await requestStructured(
     "generate_brief",
     briefGenerationSystemPrompt(),
@@ -1467,7 +1471,10 @@ export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<Ge
       },
       {
         tag: "task",
-        content: "Generate the creator-facing campaign brief from the partnership context above."
+        content:
+          mode === "summary"
+            ? "Generate a concise creator-facing summary of the uploaded campaign brief data from the partnership context above. Prioritize key brief terms: objective, deliverables, dates, messaging, creative requirements, approvals, usage notes, disclosures, and avoid-list items. Do not invent missing details."
+            : "Generate the creator-facing campaign brief from the partnership context above."
       }
     ]),
     generatedBriefResponseSchema,
@@ -1483,6 +1490,6 @@ export async function generateBriefWithLlm(aggregate: DealAggregate): Promise<Ge
   return {
     sections: sections.length > 0 ? sections : [],
     generatedAt: new Date().toISOString(),
-    modelVersion: `llm:${getLlmModel("generate_brief")}`
+    modelVersion: `llm:${mode}:${getLlmModel("generate_brief")}`
   };
 }

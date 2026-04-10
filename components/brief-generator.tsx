@@ -105,12 +105,18 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hasUploadedBrief = Boolean(briefData);
+  const actionLabel = hasUploadedBrief ? "Generate brief summary" : "Generate brief";
 
   const generate = useCallback(async () => {
     setIsGenerating(true);
     setErrorMessage(null);
     try {
-      const response = await fetch(`/api/p/${dealId}/brief`, { method: "POST" });
+      const response = await fetch(`/api/p/${dealId}/brief`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: hasUploadedBrief ? "summary" : "brief" })
+      });
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error ?? "Failed to generate brief");
@@ -135,7 +141,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
     } finally {
       setIsGenerating(false);
     }
-  }, [dealId]);
+  }, [dealId, hasUploadedBrief]);
 
   const toggleEdit = useCallback((id: string) => {
     setEditingIds((prev) => {
@@ -171,10 +177,12 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-              Generate Campaign Brief
+              {hasUploadedBrief ? "Generate Brief Summary" : "Generate Campaign Brief"}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Synthesize all partnership context into a polished, section-structured brief.
+              {hasUploadedBrief
+                ? "Summarize the uploaded brand brief into key creator-facing terms."
+                : "Synthesize all partnership context into a polished, section-structured brief."}
             </p>
           </div>
           <button
@@ -188,7 +196,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {isGenerating ? "Generating..." : "Generate brief"}
+            {isGenerating ? "Generating..." : actionLabel}
           </button>
         </div>
         {errorMessage ? (
@@ -211,7 +219,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
-              Campaign Brief
+              {hasUploadedBrief ? "Brief Summary" : "Campaign Brief"}
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">
               Generated {new Date(brief.generatedAt).toLocaleString()} · {brief.modelVersion}
@@ -229,7 +237,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
-              Regenerate
+              {hasUploadedBrief ? "Regenerate summary" : "Regenerate"}
             </button>
             <button
               type="button"
