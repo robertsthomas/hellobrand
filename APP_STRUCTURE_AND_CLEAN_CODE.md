@@ -4,6 +4,20 @@ This document defines how the app should be organized, how logic should be separ
 
 The goal is not just style. The goal is to make the codebase easy to read, easy to test, and hard to break as the app grows.
 
+## Phase 0 Baseline
+
+This guide is the architectural baseline for the cleanup plan.
+
+What Phase 0 establishes:
+
+- one written source of truth for module ownership
+- a short onboarding map for new developers
+- a standard top-of-file header comment convention
+- naming rules for common file roles
+- a default path for future refactors so cleanup work stays consistent
+
+This document is intentionally prescriptive. If a new change conflicts with it, either follow the guide or update the guide in the same change.
+
 ## Principles
 
 1. Keep files small enough to understand in one pass.
@@ -15,6 +29,23 @@ The goal is not just style. The goal is to make the codebase easy to read, easy 
 7. Prefer shared helpers over copied logic.
 8. Prefer stable, typed boundaries over ad hoc JSON shape handling.
 9. Give every piece of state one clear owner.
+
+## Quick Placement Guide
+
+When adding or moving code, use this table first.
+
+| If the code is primarily... | Put it in... | Notes |
+| --- | --- | --- |
+| route entry, metadata, layout, redirect, or composition | `app/` | keep route files thin |
+| authenticated mutation entrypoint | `app/server-actions/` | validate input, call one domain path |
+| reusable rendering or client interaction | `components/` | avoid business rules here |
+| feature-local client orchestration | `components/use-*.ts` or feature-local hook files | prefer local ownership over global state |
+| domain rules, orchestration, normalization, or transforms | `lib/` | React should not live here |
+| persistence adapters or database mapping | `lib/repository/` | hide Prisma/file-store details |
+| document extraction, prompt building, and result merging | `lib/analysis/` | split fallback, prompts, and merging logic |
+| schema definition or migrations | `prisma/` | no application logic here |
+
+If a file fits multiple rows, it is usually too large or doing too much.
 
 ## High-Level App Structure
 
@@ -104,6 +135,39 @@ Rules:
 - Do not hide business rules in migration SQL.
 - Application logic should not depend on ad hoc SQL in route handlers.
 - If a manual migration is applied outside Prisma, resolve the migration history explicitly.
+
+## Repo Map
+
+This is the shortest useful description of the current repo shape.
+
+- `app/`
+  - Next.js route tree
+  - `app/api/` for HTTP route handlers
+  - `app/server-actions/` for authenticated mutation entrypoints
+  - `app/app/` for signed-in product routes
+- `components/`
+  - shared UI components
+  - feature components
+  - `components/ui/` for low-level primitives
+  - `components/patterns/` for repeated screen-level composition patterns
+- `lib/`
+  - domain logic and integration code
+  - current domain clusters include `analysis`, `assistant`, `billing`, `email`, `repository`, `stores`
+- `prisma/`
+  - schema and migration history
+- `tests/`
+  - Vitest coverage for domain seams and Playwright E2E coverage under `tests/e2e/`
+- `docs/`
+  - durable project docs, rollout notes, and architecture references
+
+The preferred future direction is:
+
+- fewer catch-all files at the root of `lib/`
+- fewer catch-all files at the root of `components/`
+- more feature-local folders once a feature has multiple moving parts
+- stable barrels only when they reduce churn without hiding ownership
+
+See [docs/architecture/repo-map.md](/Users/thomasroberts/Desktop/projects/hellobrand/docs/architecture/repo-map.md) for the onboarding version of this map.
 
 ## Current Repo-Specific Boundaries
 
@@ -243,6 +307,89 @@ Examples:
 
 - `app/actions.ts` can remain a barrel if the real logic lives elsewhere.
 - Re-exporting is fine when it reduces churn for import sites.
+
+## Naming Rules
+
+Use file names to describe the job, not the implementation detail.
+
+Preferred names:
+
+- `service`: orchestration with side effects and domain decisions
+- `repository`: persistence reads and writes behind a stable interface
+- `mapper`: database or transport record conversion only
+- `normalizer`: one-way cleanup into a stable internal shape
+- `builder`: deterministic output assembly from existing inputs
+- `config`: constants and environment lookups
+- `types`: shared types for one domain, not the whole app
+- `actions`: server action entrypoints only
+- `route`: HTTP boundary only
+
+Avoid:
+
+- `helpers` for large mixed modules
+- `utils` for domain-specific behavior that deserves a real name
+- `new-*`, `final-*`, `temp-*`, or `v2-*` as long-lived file names unless the rollout itself is the domain
+
+When a feature outgrows one file, prefer a folder with explicit names over numbered or vaguely named files.
+
+Good:
+
+- `lib/email/threads/service.ts`
+- `lib/email/threads/repository.ts`
+- `lib/email/threads/mapper.ts`
+
+Bad:
+
+- `lib/email/helpers.ts`
+- `lib/email/misc.ts`
+- `lib/email/final-service.ts`
+
+## File Header Standard
+
+Every non-trivial file in `app/`, `components/`, `lib/`, and `prisma/` should begin with a short header comment describing what it owns.
+
+The header should answer three things:
+
+1. What this file is responsible for
+2. What should stay out of this file
+3. Any unusually important boundary or invariant
+
+Preferred format:
+
+```ts
+/**
+ * Owns billing portal session creation for authenticated viewers.
+ * Keep Stripe webhook reconciliation and entitlement writes in billing-domain services.
+ */
+```
+
+For React components:
+
+```tsx
+/**
+ * Renders the workspace invoice editor shell and local UI interactions.
+ * Keep invoice persistence, numbering, and reminder scheduling in lib/invoices.
+ */
+```
+
+For route handlers:
+
+```ts
+/**
+ * HTTP boundary for intake draft mutations.
+ * Validate request input here, then delegate domain behavior to lib/intake.
+ */
+```
+
+Rules:
+
+- Keep headers short, usually one or two sentences
+- Do not narrate obvious syntax
+- Do not repeat TypeScript signatures in prose
+- Add or update the header when the file responsibility changes
+- Prioritize headers for files over roughly 150 lines, shared modules, route handlers, and server actions
+
+Not every tiny leaf file needs a header immediately, but all hotspot files and all newly split files should have one.
 
 ## UI Rules
 
@@ -451,6 +598,25 @@ Whenever a shared helper is introduced, add a test that proves:
 - `prisma/`: schema and migrations only
 - `lib/*-metadata.ts`: shared config and lookup data
 
+## Onboarding Rules
+
+The repo should be understandable to a new developer within their first week.
+
+To support that goal:
+
+- the first question should be "what layer owns this?" before "where can I squeeze this in?"
+- each hot path should have one obvious entry module
+- comments should describe ownership and invariants, not implementation trivia
+- docs should point to stable folders, not one-off temporary files
+- file moves should preserve discoverability through thin barrels until imports are migrated deliberately
+
+If a new developer cannot quickly answer these questions, the structure still needs work:
+
+- Where does write logic for this feature live?
+- Where does read-model composition live?
+- Where do I change the data shape safely?
+- Which tests protect this area?
+
 ## Accepted Exceptions
 
 Some current patterns are acceptable even though they are not the end-state ideal.
@@ -555,6 +721,15 @@ Before merging a change, check:
 - Is the public API smaller than the implementation?
 - Did I add or update tests for the seam I touched?
 - Would a new developer know where to put the next related change?
+
+## Phase 0 Exit Criteria
+
+Phase 0 is complete when:
+
+- this guide is the source of truth for structure and ownership
+- the repo has a short onboarding map in `docs/architecture/`
+- new refactor work can use a consistent header comment convention
+- future phases can reduce file size and improve modularity without debating the target layout each time
 
 ## Short Version
 

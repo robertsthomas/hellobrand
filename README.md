@@ -28,6 +28,11 @@ HelloBrand is a creator-first partnership workspace for influencers and solo cre
 - Inngest worker route for async document processing
 - OpenRouter-first LLM stage support with section extraction, risk analysis, and summary refinement
 
+## Architecture docs
+
+- [App structure and clean code guide](/Users/thomasroberts/Desktop/projects/hellobrand/APP_STRUCTURE_AND_CLEAN_CODE.md)
+- [Repo map](/Users/thomasroberts/Desktop/projects/hellobrand/docs/architecture/repo-map.md)
+
 ## Local setup
 
 1. Install Node.js 20+.
