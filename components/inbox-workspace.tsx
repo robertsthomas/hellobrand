@@ -1,41 +1,31 @@
+/**
+ * This file runs the inbox workspace UI as a composition-only orchestrator.
+ * It owns client state, effects, and callbacks while delegating rendering to
+ * focused subcomponents under components/inbox-workspace/.
+ *
+ * Rendering is split into:
+ *  - InboxThreadList: left panel thread list
+ *  - InboxThreadDetail: right panel conversation view
+ *  - InboxReplyComposer: reply composer + AI drafting controls
+ *
+ * Pure helpers live in ./formatters.ts and ./helpers.ts
+ */
 "use client";
 
-/**
- * This file runs the inbox workspace UI.
- * It pulls together thread views, reply interactions, and client state while the actual inbox rules and persistence live in `lib/email`.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
 import {
-  AlertTriangle,
-  ArrowUpDown,
-  ArrowLeft,
-  ChevronDown,
-  CircleDot,
-  File,
-  FileImage,
-  MailSearch,
-  FileText,
-  FileVideo,
   Inbox,
   Info,
-  LoaderCircle,
-  SlidersHorizontal,
-  MoreHorizontal,
-  Paperclip,
+  MailSearch,
   Plus,
-  Send,
-  ShieldAlert,
-  Sparkles,
   X,
-  XCircle
+  XCircle,
 } from "lucide-react";
 
 import { AppTooltip } from "@/components/app-tooltip";
-import { AttachmentDocumentPreview } from "@/components/attachment-document-preview";
-import { InboxActionItemRow } from "@/components/inbox-action-item-row";
 import { InboxFilterDialog } from "@/components/inbox-filter-dialog";
 import { InboxPrivateNotesDialog } from "@/components/inbox-private-notes-dialog";
 import { InboxSelect } from "@/components/inbox-select";
@@ -47,880 +37,51 @@ import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
 import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
 import { useInboxThreadSelection } from "@/components/use-inbox-thread-selection";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
 import { normalizeInboxSort, sortInboxThreadItems, type InboxSortOption } from "@/lib/email/inbox-sort";
 import { buildReplySuggestionThreadVersion } from "@/lib/email/reply-suggestion-version";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import type {
   DealRecord,
   EmailActionItemRecord,
-  EmailAttachmentRecord,
-  EmailDealEventRecord,
-  EmailMessageRecord,
-  EmailParticipant,
   EmailThreadDetail,
   EmailThreadListItem,
-  EmailThreadPreviewStateRecord,
-  EmailThreadWorkflowState,
   NegotiationStance,
-  ProfileRecord
+  ProfileRecord,
 } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
 
-function providerLabel(provider: string) {
-  switch (provider) {
-    case "gmail":
-      return "Gmail";
-    case "outlook":
-      return "Outlook";
-    case "yahoo":
-      return "Yahoo";
-    default:
-      return provider;
-  }
-}
-
-function workflowStateLabel(state: EmailThreadWorkflowState) {
-  switch (state) {
-    case "unlinked":
-      return "Needs linking";
-    case "needs_review":
-      return "Needs review";
-    case "needs_reply":
-      return "Needs reply";
-    case "draft_ready":
-      return "Draft ready";
-    case "waiting_on_them":
-      return "Waiting";
-    case "closed":
-      return "Closed";
-    default:
-      return state;
-  }
-}
-
-function workflowBadgeClass(state: EmailThreadWorkflowState) {
-  switch (state) {
-    case "unlinked":
-      return "bg-[#f5f3ff] text-[#5b21b6]";
-    case "needs_review":
-      return "bg-[#fff7ed] text-[#9a3412]";
-    case "needs_reply":
-      return "bg-[#eff6ff] text-[#1d4ed8]";
-    case "draft_ready":
-      return "bg-[#ecfdf3] text-[#047857]";
-    case "waiting_on_them":
-      return "bg-secondary/50 text-muted-foreground";
-    case "closed":
-      return "bg-secondary/40 text-muted-foreground";
-    default:
-      return "bg-secondary/40 text-muted-foreground";
-  }
-}
-
-function inboxSortLabel(sort: InboxSortOption) {
-  switch (sort) {
-    case "oldest":
-      return "Oldest first";
-    case "subject":
-      return "Subject A-Z";
-    case "newest":
-    default:
-      return "Newest first";
-  }
-}
-
-function buildActionItemReplyPrompt(item: EmailActionItemRecord) {
-  const contextLines = [
-    `Draft an email reply that addresses this action item: ${item.action}.`,
-    item.dueDate ? `Target due date: ${formatDate(item.dueDate)}.` : null,
-    item.sourceText ? `Relevant email context: "${item.sourceText}".` : null,
-    `Use the linked workspace context for tone and facts, answer the request directly, and do not invent missing details.`
-  ].filter(Boolean);
-
-  return contextLines.join(" ");
-}
-
-function isLegacyThreadSummary(value: string | null | undefined) {
-  const summary = value?.trim();
-  if (!summary) {
-    return false;
-  }
-
-  if (summary.length > 700) {
-    return true;
-  }
-
-  return [
-    "what they are asking you to do",
-    "what the other side is committing",
-    "unresolved or not specified in the thread",
-    "suggested next steps for you"
-  ].some((marker) => summary.toLowerCase().includes(marker));
-}
-
-function threadSearchText(item: EmailThreadListItem) {
-  return [
-    item.thread.subject,
-    item.thread.snippet,
-    item.account.emailAddress,
-    item.account.provider,
-    ...item.thread.participants.flatMap((participant) => [
-      participant.name ?? "",
-      participant.email,
-    ]),
-    ...item.links.map((link) => link.campaignName),
-  ]
-    .join(" ")
-    .toLowerCase();
-}
-
-function threadPreviewText(item: EmailThreadListItem) {
-  return item.thread.snippet || "No preview available.";
-}
-
-function cleanWorkspaceText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function removeReplyPrefixes(subject: string) {
-  return cleanWorkspaceText(subject.replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi, ""));
-}
-
-function stripWorkspaceSuffixes(subject: string) {
-  return cleanWorkspaceText(
-    removeReplyPrefixes(subject).replace(/\b(partnership|collaboration|campaign)\b/gi, "")
-  );
-}
-
-function inferBrandNameFromParticipant(participant: EmailParticipant | null | undefined) {
-  if (!participant) {
-    return null;
-  }
-
-  const participantName = cleanWorkspaceText((participant.name ?? "").replace(/[<>]/g, ""));
-  if (participantName && !participantName.includes("@")) {
-    return participantName;
-  }
-
-  const domain = participant.email.split("@")[1] ?? "";
-  const root = domain.split(".")[0] ?? "";
-  if (!root) {
-    return null;
-  }
-
-  return root
-    .split(/[-_]+/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
-
-function inferWorkspaceDraftFromThread(item: EmailThreadListItem) {
-  const externalParticipant =
-    item.thread.participants.find(
-      (participant) =>
-        participant.email.toLowerCase() !== item.account.emailAddress.toLowerCase()
-    ) ?? item.thread.participants[0] ?? null;
-  const brandName = (inferBrandNameFromParticipant(externalParticipant) ?? "Inbox lead").slice(
-    0,
-    120
-  );
-  const cleanedSubject = stripWorkspaceSuffixes(item.thread.subject);
-  const campaignName =
-    (cleanedSubject.length >= 2 ? cleanedSubject : `${brandName} partnership`).slice(0, 120);
-
-  return {
-    brandName,
-    campaignName,
-    notes: `Created from inbox thread: ${item.thread.subject}`.slice(0, 5000)
-  };
-}
-
-function latestUpdatedAt(items: Array<{ updatedAt: string }>) {
-  return items.reduce<string | null>((latest, item) => {
-    if (!latest || item.updatedAt > latest) {
-      return item.updatedAt;
-    }
-
-    return latest;
-  }, null);
-}
-
-function missingReplySignatureFields(profile: ProfileRecord | null) {
-  if (!profile) {
-    return ["creator name", "business name or handle", "default sign-off"];
-  }
-
-  return [
-    !profile.creatorLegalName?.trim() && "creator name",
-    !profile.businessName?.trim() && "business name or handle",
-    !profile.preferredSignature?.trim() && "default sign-off"
-  ].filter(Boolean) as string[];
-}
-
-function hasUnseenPreviewSection(latestAt: string | null, seenAt: string | null | undefined) {
-  if (!latestAt) {
-    return false;
-  }
-
-  return !seenAt || latestAt > seenAt;
-}
-
-function isPreviewSectionCleared(latestAt: string | null, clearedAt: string | null | undefined) {
-  if (!latestAt || !clearedAt) {
-    return false;
-  }
-
-  return latestAt <= clearedAt;
-}
-
-type PreviewUpdateEntry = {
-  id: string;
-  title: string;
-  body: string;
-  updatedAt: string;
-  href?: string;
-  ctaLabel?: string;
-};
-
-function normalizePreviewUpdateBody(body: string) {
-  return cleanWorkspaceText(body).toLowerCase();
-}
-
-function combineEventUpdateTitles(titles: string[]) {
-  const uniqueTitles = Array.from(new Set(titles));
-  if (uniqueTitles.length <= 1) {
-    return uniqueTitles[0] ?? "Email update";
-  }
-
-  const labels = uniqueTitles.map((title) => {
-    switch (title) {
-      case "Action requested from the creator":
-        return "asks";
-      case "Usage rights or exclusivity update":
-        return "usage rights";
-      case "Deliverable-related update":
-        return "deliverables";
-      case "Timeline or scheduling update":
-        return "timeline";
-      case "Payment-related update":
-        return "payment";
-      case "Approval status update":
-        return "approval";
-      case "New attachment added to linked thread":
-        return "attachments";
-      default:
-        return title.toLowerCase();
-    }
-  });
-
-  if (labels.length === 2) {
-    return `Email mentions ${labels[0]} and ${labels[1]}`;
-  }
-
-  return `Email mentions ${labels.slice(0, -1).join(", ")}, and ${labels.at(-1)}`;
-}
-
-type DraftPromptSuggestion = {
-  id: string;
-  label: string;
-  prompt: string;
-};
-
-type DraftPromptSuggestionCacheEntry = {
-  version: string;
-  suggestions: DraftPromptSuggestion[];
-};
-
-type ThreadCopilotInsightCacheEntry = {
-  risks: RiskSuggestion[];
-  documents: DocumentSuggestion[];
-};
-
-type RiskSuggestion = {
-  id: string;
-  label: string;
-  detail: string;
-};
-
-type DocumentSuggestion = {
-  id: string;
-  fileName: string;
-  documentKind: string;
-};
-
-type ThreadInvoiceAttachment = {
-  dealId: string;
-  documentId: string;
-  fileName: string;
-  invoiceNumber: string;
-  status: string;
-};
-
-const DRAFT_REFINEMENT_OPTIONS = {
-  length: [
-    {
-      label: "Shorter",
-      instruction: "Revise the current draft to be materially shorter and tighter while preserving the same intent and asks. Cut roughly 25 to 40 percent of the length, remove repetition, and keep only the strongest points."
-    },
-    {
-      label: "Longer",
-      instruction: "Revise the current draft to be materially longer and more detailed while preserving the same intent and asks. Expand it by roughly 30 to 60 percent, add 2 to 4 meaningful sentences, and make the added detail specific and useful rather than filler."
-    }
-  ],
-  tone: [
-    {
-      label: "Formal",
-      instruction: "Revise the current draft to sound noticeably more formal and polished while keeping the same message. Use more precise business language, tighten casual phrasing, and make the tonal shift obvious."
-    },
-    {
-      label: "Relaxed",
-      instruction: "Revise the current draft to sound noticeably more relaxed and conversational while keeping it professional. Soften stiff phrasing and make the tone shift obvious."
-    },
-    {
-      label: "Warm",
-      instruction: "Revise the current draft to feel noticeably warmer and more personable while keeping the same core message. Add more human warmth and appreciation so the change is easy to feel."
-    }
-  ],
-  focus: [
-    {
-      label: "Clarify asks",
-      instruction: "Revise the current draft to focus much more clearly on the questions or clarifications you need from the brand. Make the asks explicit, easy to scan, and hard to miss."
-    },
-    {
-      label: "Protect terms",
-      instruction: "Revise the current draft to focus much more on protecting boundaries, scope, timing, and commercial terms. Make the protection of the creator's position noticeably stronger."
-    },
-    {
-      label: "Close next steps",
-      instruction: "Revise the current draft to end with much clearer next steps and a stronger call to action. The close should feel noticeably more decisive and action-oriented."
-    }
-  ]
-} as const;
-
-const DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY =
-  "hellobrand:inbox:draft-prompt-suggestions";
-const THREAD_ACTION_BUTTON_CLASS =
-  "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60";
-const INBOX_SIGNATURE_BANNER_DISMISS_KEY =
-  "hellobrand:inbox:signature-banner:dismissed";
-
-function loadDraftPromptSuggestionCache() {
-  if (typeof window === "undefined") {
-    return {} as Record<string, DraftPromptSuggestionCacheEntry>;
-  }
-
-  try {
-    const raw = window.sessionStorage.getItem(DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY);
-    if (!raw) {
-      return {} as Record<string, DraftPromptSuggestionCacheEntry>;
-    }
-
-    const parsed = JSON.parse(raw) as Record<
-      string,
-      Partial<DraftPromptSuggestionCacheEntry> | undefined
-    >;
-
-    return Object.fromEntries(
-      Object.entries(parsed).filter(([, value]) => {
-        return (
-          Boolean(value?.version) &&
-          Array.isArray(value?.suggestions)
-        );
-      })
-    ) as Record<string, DraftPromptSuggestionCacheEntry>;
-  } catch {
-    return {} as Record<string, DraftPromptSuggestionCacheEntry>;
-  }
-}
-
-function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSuggestion {
-  switch (stance) {
-    case "firm":
-      return {
-        id: "tone-firm",
-        label: "Keep it direct",
-        prompt:
-          "Write the reply in a firm, direct tone. Protect our current position, avoid unnecessary concessions, and only make commitments already supported by the linked workspace context.",
-      };
-    case "exploratory":
-      return {
-        id: "tone-exploratory",
-        label: "Lead with questions",
-        prompt:
-          "Write the reply in an exploratory tone. Ask clarifying questions where the thread or workspace context is incomplete, and avoid locking in details that are not yet confirmed.",
-      };
-    case "collaborative":
-    default:
-      return {
-        id: "tone-collaborative",
-        label: "Keep it balanced",
-        prompt:
-          "Write the reply in a collaborative tone. Keep it constructive, move the conversation forward, and align the response with the linked workspace context and current thread.",
-      };
-  }
-}
-
-function replyStyleLabel(stance: NegotiationStance) {
-  switch (stance) {
-    case "firm":
-      return "Direct";
-    case "exploratory":
-      return "Clarifying";
-    case "collaborative":
-    default:
-      return "Balanced";
-  }
-}
-
-function participantLabel(participant: EmailParticipant | null | undefined) {
-  if (!participant) {
-    return "Unknown sender";
-  }
-
-  return participant.name?.trim() || participant.email;
-}
-
-function initialsFromParticipant(participant: EmailParticipant | null | undefined) {
-  const label = participantLabel(participant);
-  const words = label
-    .replace(/<.*?>/g, "")
-    .split(/[\s@._-]+/)
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (words.length === 0) {
-    return "?";
-  }
-
-  return words.map((word) => word[0]?.toUpperCase() ?? "").join("");
-}
-
-function formatAttachmentSize(sizeBytes: number) {
-  if (!sizeBytes || sizeBytes <= 0) {
-    return "Unknown size";
-  }
-
-  const units = ["B", "KB", "MB", "GB"];
-  let value = sizeBytes;
-  let unitIndex = 0;
-
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-
-  const formatted =
-    value >= 10 || unitIndex === 0 ? Math.round(value).toString() : value.toFixed(1);
-
-  return `${formatted}${units[unitIndex]}`;
-}
-
-function attachmentIcon(attachment: EmailAttachmentRecord) {
-  if (attachment.mimeType.startsWith("image/")) {
-    return FileImage;
-  }
-
-  if (attachment.mimeType.startsWith("video/")) {
-    return FileVideo;
-  }
-
-  if (
-    attachment.mimeType.includes("pdf") ||
-    attachment.mimeType.includes("document") ||
-    attachment.mimeType.includes("sheet") ||
-    attachment.mimeType.includes("text")
-  ) {
-    return FileText;
-  }
-
-  return File;
-}
-
-function messagePreview(message: EmailMessageRecord) {
-  const body = message.textBody?.trim();
-  if (!body) {
-    return "No preview available.";
-  }
-
-  return body.replace(/\s+/g, " ").slice(0, 140);
-}
-
-function sanitizeEmailHtml(html: string) {
-  if (typeof window === "undefined") {
-    return html;
-  }
-
-  const parser = new DOMParser();
-  const document = parser.parseFromString(html, "text/html");
-  const blockedSelectors = [
-    "script",
-    "style",
-    "iframe",
-    "frame",
-    "frameset",
-    "object",
-    "embed",
-    "applet",
-    "form",
-    "input",
-    "button",
-    "select",
-    "textarea",
-    "link",
-    "meta",
-    "base"
-  ];
-
-  for (const selector of blockedSelectors) {
-    document.querySelectorAll(selector).forEach((node) => node.remove());
-  }
-
-  document.querySelectorAll("img").forEach((node) => node.remove());
-
-  document.querySelectorAll("*").forEach((element) => {
-    for (const attribute of Array.from(element.attributes)) {
-      const name = attribute.name.toLowerCase();
-      const value = attribute.value.trim();
-
-      if (name.startsWith("on")) {
-        element.removeAttribute(attribute.name);
-        continue;
-      }
-
-      if (name === "srcdoc") {
-        element.removeAttribute(attribute.name);
-        continue;
-      }
-
-      if (name === "href") {
-        if (!/^(https?:|mailto:|tel:|#)/i.test(value)) {
-          element.removeAttribute(attribute.name);
-        } else if (element.tagName.toLowerCase() === "a") {
-          element.setAttribute("target", "_blank");
-          element.setAttribute("rel", "noreferrer noopener");
-        }
-        continue;
-      }
-
-      if (name === "src") {
-        if (!/^https?:/i.test(value)) {
-          element.removeAttribute(attribute.name);
-        }
-        continue;
-      }
-    }
-  });
-
-  return document.body.innerHTML.trim();
-}
-
-function EmailMessageBody({ message }: { message: EmailMessageRecord }) {
-  const sanitizedHtml = useMemo(
-    () => (message.htmlBody?.trim() ? sanitizeEmailHtml(message.htmlBody) : null),
-    [message.htmlBody]
-  );
-  const textBody = message.textBody?.trim();
-
-  if (sanitizedHtml) {
-    return (
-      <div
-        className="max-w-none text-[13px] leading-6 text-foreground [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-black/12 [&_blockquote]:pl-4 [&_br]:leading-6 [&_div]:max-w-full [&_hr]:my-5 [&_li]:my-1 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-4 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_table]:my-4 [&_table]:w-full [&_td]:align-top [&_th]:align-top [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6"
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
-    );
-  }
-
-  return (
-    <div className="whitespace-pre-wrap text-[13px] leading-7 text-foreground">
-      {textBody || "No text body available."}
-    </div>
-  );
-}
-
-function attachmentPreviewMode(attachment: EmailAttachmentRecord) {
-  if (attachment.mimeType.startsWith("image/")) {
-    return "image" as const;
-  }
-
-  if (attachment.mimeType.startsWith("video/")) {
-    return "video" as const;
-  }
-
-  if (
-    attachment.mimeType.includes("pdf") ||
-    attachment.filename.toLowerCase().endsWith(".pdf")
-  ) {
-    return "pdf" as const;
-  }
-
-  if (
-    attachment.mimeType.startsWith("text/") ||
-    attachment.filename.toLowerCase().endsWith(".txt")
-  ) {
-    return "text" as const;
-  }
-
-  return "download" as const;
-}
-
-function AttachmentShelf({
-  attachments,
-  onImportAttachment,
-  importingAttachmentId
-}: {
-  attachments: EmailAttachmentRecord[];
-  onImportAttachment?: (attachmentId: string) => void;
-  importingAttachmentId?: string | null;
-}) {
-  const [previewAttachment, setPreviewAttachment] = useState<EmailAttachmentRecord | null>(null);
-
-  if (attachments.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="mt-5 border border-black/8 bg-[#fbfbf8] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center bg-white text-foreground shadow-sm dark:bg-white/10 dark:text-white">
-            <Paperclip className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold text-foreground">Attachments</p>
-            <p className="text-[11px] text-muted-foreground">
-              {attachments.length} file{attachments.length === 1 ? "" : "s"} in this message
-            </p>
-          </div>
-        </div>
-        <span className="bg-white px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-sm dark:bg-white/10">
-          Synced
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {attachments.map((attachment) => {
-          const Icon = attachmentIcon(attachment);
-
-          return (
-            <div
-              key={attachment.id}
-              className="border border-black/8 bg-white p-3 shadow-[0_1px_0_rgba(17,24,39,0.04)] dark:border-white/10 dark:bg-[#161a20]"
-            >
-              <button
-                type="button"
-                onClick={() => setPreviewAttachment(attachment)}
-                className="w-full text-left transition hover:bg-secondary/20"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-secondary/50 text-foreground dark:bg-white/10 dark:text-white">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-foreground">
-                      {attachment.filename}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
-                      {attachment.mimeType.split("/")[1] || "file"}
-                    </p>
-                  </div>
-                </div>
-              </button>
-              {onImportAttachment ? (
-                <div className="mt-3 border-t border-black/6 pt-3">
-                  <button
-                    type="button"
-                    onClick={() => onImportAttachment(attachment.id)}
-                    disabled={importingAttachmentId === attachment.id}
-                    className="inline-flex h-8 items-center border border-black/10 px-3 text-[11px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
-                  >
-                    {importingAttachmentId === attachment.id
-                      ? "Importing..."
-                      : "Import to workspace"}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
-      <AttachmentPreviewDialog
-        attachment={previewAttachment}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPreviewAttachment(null);
-          }
-        }}
-      />
-    </div>
-  );
-}
-
-function AttachmentPreviewDialog({
-  attachment,
-  onOpenChange
-}: {
-  attachment: EmailAttachmentRecord | null;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const mode = attachment ? attachmentPreviewMode(attachment) : null;
-  const previewUrl = attachment
-    ? `/api/email/attachments/${attachment.id}`
-    : "";
-  const downloadUrl = attachment
-    ? `/api/email/attachments/${attachment.id}?download=1`
-    : "";
-
-  return (
-    <Dialog open={Boolean(attachment)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100vh-3rem)] max-w-[min(1100px,calc(100vw-2rem))] overflow-hidden p-0">
-        {attachment ? (
-          <div className="flex h-[min(82vh,900px)] flex-col">
-            <DialogHeader className="shrink-0 border-b border-black/8 px-6 py-4 text-left">
-              <DialogTitle className="pr-10 text-base">{attachment.filename}</DialogTitle>
-              <DialogDescription className="flex items-center gap-2 text-[12px]">
-                <span>{attachment.mimeType}</span>
-                <span>·</span>
-                <span>{formatAttachmentSize(attachment.sizeBytes)}</span>
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="min-h-0 flex-1 bg-[#f6f6f1]">
-              {mode === "image" ? (
-                <div className="flex h-full items-center justify-center p-4">
-                  <img
-                    src={previewUrl}
-                    alt={attachment.filename}
-                    className="max-h-full max-w-full object-contain shadow-lg"
-                  />
-                </div>
-              ) : mode === "video" ? (
-                <div className="flex h-full items-center justify-center p-4">
-                  <video
-                    controls
-                    className="max-h-full max-w-full bg-black shadow-lg"
-                    src={previewUrl}
-                  />
-                </div>
-              ) : mode === "pdf" || mode === "text" ? (
-                <AttachmentDocumentPreview
-                  kind={mode}
-                  previewUrl={previewUrl}
-                  downloadUrl={downloadUrl}
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                  <p className="max-w-md text-sm text-muted-foreground">
-                    This file type may not render inline in the browser. Open it in a new tab to preview or download it.
-                  </p>
-                  <a
-                    href={downloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex border border-black/10 bg-white px-4 py-2 text-sm font-medium text-foreground transition hover:border-black/20"
-                  >
-                    Open in new tab
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {mode !== "download" ? (
-              <div className="shrink-0 border-t border-black/8 px-6 py-3">
-                <a
-                  href={downloadUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex text-[12px] font-medium text-foreground underline-offset-4 hover:underline"
-                >
-                  Open in new tab
-                </a>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MessageStrip({
-  message,
-  isOutbound,
-  onImportAttachment,
-  importingAttachmentId
-}: {
-  message: EmailMessageRecord;
-  isOutbound: boolean;
-  onImportAttachment?: (attachmentId: string) => void;
-  importingAttachmentId?: string | null;
-}) {
-  return (
-    <div className="border border-black/8 bg-white px-4 py-3 shadow-[0_4px_16px_rgba(17,24,39,0.03)] dark:border-white/10 dark:bg-white/[0.02]">
-      <div className="flex items-start gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center text-xs font-semibold ${
-            isOutbound ? "bg-foreground text-background" : "bg-secondary/60 text-foreground"
-          }`}
-        >
-          {isOutbound ? "You" : initialsFromParticipant(message.from)}
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-[13px] font-semibold text-foreground">
-              {isOutbound ? "You" : participantLabel(message.from)}
-            </p>
-            <span className="bg-secondary/65 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-              {isOutbound ? "Sent" : "Received"}
-            </span>
-          </div>
-          <p className="mt-1 line-clamp-1 text-[13px] text-muted-foreground">
-            {messagePreview(message)}
-          </p>
-        </div>
-        <p className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-          {formatDate(message.receivedAt || message.sentAt)}
-        </p>
-      </div>
-      {message.attachments.length > 0 ? (
-        <AttachmentShelf
-          attachments={message.attachments}
-          onImportAttachment={onImportAttachment}
-          importingAttachmentId={importingAttachmentId}
-        />
-      ) : null}
-    </div>
-  );
-}
+import { inboxSortLabel, providerLabel } from "./inbox-workspace/formatters";
+import {
+  type DraftPromptSuggestion,
+  type DraftPromptSuggestionCacheEntry,
+  type PreviewUpdateEntry,
+  type RiskSuggestion,
+  type DocumentSuggestion,
+  type ThreadInvoiceAttachment,
+  buildActionItemReplyPrompt,
+  cleanWorkspaceText,
+  combineEventUpdateTitles,
+  DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY,
+  hasUnseenPreviewSection,
+  INBOX_SIGNATURE_BANNER_DISMISS_KEY,
+  inferWorkspaceDraftFromThread,
+  isLegacyThreadSummary,
+  isPreviewSectionCleared,
+  latestUpdatedAt,
+  loadDraftPromptSuggestionCache,
+  missingReplySignatureFields,
+  normalizePreviewUpdateBody,
+  THREAD_ACTION_BUTTON_CLASS,
+  threadSearchText,
+} from "./inbox-workspace/helpers";
+import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
+import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
+import { InboxReplyComposer } from "./inbox-workspace/InboxReplyComposer";
 
 export function InboxWorkspace({
   threads,
@@ -936,7 +97,7 @@ export function InboxWorkspace({
 }: {
   threads: EmailThreadListItem[];
   selectedThread: EmailThreadDetail | null;
-  threadPreviewStates: Record<string, EmailThreadPreviewStateRecord>;
+  threadPreviewStates: Record<string, import("@/lib/types").EmailThreadPreviewStateRecord>;
   deals: DealRecord[];
   hasConnectedAccounts: boolean;
   connectedProviders: string[];
@@ -985,7 +146,7 @@ export function InboxWorkspace({
     Record<string, DraftPromptSuggestionCacheEntry>
   >(loadDraftPromptSuggestionCache);
   const [threadCopilotInsightCache, setThreadCopilotInsightCache] = useState<
-    Record<string, ThreadCopilotInsightCacheEntry>
+    Record<string, { risks: RiskSuggestion[]; documents: DocumentSuggestion[] }>
   >({});
   const [loadingSuggestionThreadIds, setLoadingSuggestionThreadIds] = useState<
     Record<string, true>
@@ -1904,7 +1065,6 @@ export function InboxWorkspace({
       return currentAiSuggestions;
     }
 
-    // Static fallbacks while AI suggestions load
     return [
       { id: "fallback-0", label: "Ask for more details on deliverables", prompt: "Ask the brand to clarify the deliverables, timeline, or creative direction." },
       { id: "fallback-1", label: "Push back on the terms politely", prompt: "Politely push back on terms that feel unfavorable. Suggest alternatives." },
@@ -2124,1030 +1284,131 @@ export function InboxWorkspace({
             </section>
           ) : (
             <div className="grid min-h-0 flex-1 overflow-hidden gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
-              <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${mobileDetailOpen ? "hidden xl:flex" : ""}`}>
-                <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex flex-1 flex-wrap gap-2 sm:gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setIsFilterDialogOpen(true)}
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 sm:flex-none"
-                      >
-                        <SlidersHorizontal className="h-4 w-4" />
-                        <span>Filters</span>
-                        {activeFilterCount > 0 ? (
-                          <span className="border border-black/10 px-2 py-0.5 text-[11px] text-muted-foreground">
-                            {activeFilterCount}
-                          </span>
-                        ) : null}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsSortDialogOpen(true)}
-                        className="inline-flex h-9 flex-1 items-center justify-center gap-2 border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:border-black/20 sm:flex-none"
-                      >
-                        <ArrowUpDown className="h-4 w-4" />
-                        <span>{inboxSortLabel(selectedFilters.sort)}</span>
-                      </button>
-                    </div>
-                    <span className="shrink-0 bg-secondary/60 px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                      {filteredThreads.length}
-                    </span>
-                  </div>
-                </div>
+              <InboxThreadList
+                filteredThreads={filteredThreads}
+                activeThreadId={activeThreadId}
+                threadPreviewStates={threadPreviewStates}
+                query={query}
+                onQueryChange={setQuery}
+                activeFilterCount={activeFilterCount}
+                sortLabel={inboxSortLabel(selectedFilters.sort)}
+                onOpenFilters={() => setIsFilterDialogOpen(true)}
+                onOpenSort={() => setIsSortDialogOpen(true)}
+                onLoadThread={(threadId) => void loadThread(threadId)}
+                onPrefetchThread={(threadId) => void prefetchThread(threadId)}
+                onPrefetchThreadSuggestions={(thread) => void prefetchThreadSuggestions(thread)}
+                mobileDetailOpen={mobileDetailOpen}
+              />
 
-                <div className="min-h-0 flex-1 overflow-y-auto bg-white dark:bg-transparent">
-                  {filteredThreads.length === 0 ? (
-                    <div className="px-5 py-8 text-sm text-muted-foreground">
-                      No inbox threads match your search.
-                    </div>
-                  ) : filteredThreads.map((item) => {
-                    const active = item.thread.id === activeThreadId;
-                    const itemPreviewState = threadPreviewStates[item.thread.id];
-                    const threadHasUnseenUpdates =
-                      item.importantEventCount > 0 &&
-                      hasUnseenPreviewSection(
-                        item.latestImportantEventAt,
-                        itemPreviewState?.previewUpdatesSeenAt
-                      );
-                    const threadHasUnseenActionItems =
-                      item.pendingActionItemCount > 0 &&
-                      hasUnseenPreviewSection(
-                        item.latestPendingActionItemAt,
-                        itemPreviewState?.actionItemsSeenAt
-                      );
-
-                    return (
-                      <button
-                        key={item.thread.id}
-                        type="button"
-                        onClick={() => {
-                          void prefetchThreadSuggestions(item.thread);
-                          void loadThread(item.thread.id);
-                        }}
-                        onMouseEnter={() => void prefetchThread(item.thread.id)}
-                        onFocus={() => void prefetchThread(item.thread.id)}
-                        className={`block w-full border-b border-black/6 px-4 py-3 text-left transition dark:border-white/8 ${
-                          active ? "bg-secondary/30" : "hover:bg-secondary/20"
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center bg-secondary/50 text-sm font-semibold text-foreground">
-                            {initialsFromParticipant(item.thread.participants[0])}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-[13px] font-semibold leading-5 text-foreground">
-                                  {participantLabel(item.thread.participants[0])}
-                                </p>
-                                <p className="truncate text-[12px] text-foreground/90">
-                                  {item.thread.subject}
-                                </p>
-                              </div>
-                              <p className="shrink-0 text-right text-[11px] text-muted-foreground">
-                                {formatDate(item.thread.lastMessageAt)}
-                              </p>
-                            </div>
-
-                            <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
-                              {item.thread.snippet || "No preview available."}
-                            </p>
-
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
-                                {providerLabel(item.account.provider)}
-                              </span>
-                              <span className={`px-2.5 py-1 text-[10px] font-medium ${workflowBadgeClass(item.thread.workflowState)}`}>
-                                {workflowStateLabel(item.thread.workflowState)}
-                              </span>
-                              {item.savedDraft ? (
-                                <span className="bg-[#ecfdf3] px-2.5 py-1 text-[10px] font-medium text-[#047857]">
-                                  {item.savedDraft.status === "ready" ? "Draft ready" : "Draft saved"}
-                                </span>
-                              ) : null}
-                              {item.noteCount > 0 ? (
-                                <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                                  {item.noteCount} note{item.noteCount === 1 ? "" : "s"}
-                                </span>
-                              ) : null}
-                              {item.importantEventCount > 0 ? (
-                                <span className="inline-flex items-center gap-1.5 bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
-                                  {threadHasUnseenUpdates ? (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-[#3152a3]" />
-                                  ) : null}
-                                  {item.importantEventCount} update{item.importantEventCount === 1 ? "" : "s"}
-                                </span>
-                              ) : null}
-                              {item.pendingActionItemCount > 0 ? (
-                                <span className="inline-flex items-center gap-1.5 bg-[#fef3f2] px-2.5 py-1 text-[10px] font-medium text-[#b42318]">
-                                  {threadHasUnseenActionItems ? (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-[#b42318]" />
-                                  ) : null}
-                                  {item.pendingActionItemCount} action{item.pendingActionItemCount === 1 ? "" : "s"}
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white xl:mr-28 dark:border-white/10 dark:bg-white/[0.03] ${!mobileDetailOpen ? "hidden xl:flex" : ""}`}>
-                {!selectedThread ? (
+              {!selectedThread ? (
+                <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white xl:mr-28 dark:border-white/10 dark:bg-white/[0.03] ${!mobileDetailOpen ? "hidden xl:flex" : ""}`}>
                   <div className="px-6 py-10 text-[13px] text-muted-foreground">
                     <button
                       type="button"
                       onClick={() => setMobileDetailOpen(false)}
                       className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground xl:hidden"
                     >
-                      <ArrowLeft className="h-4 w-4" />
-                      Back to threads
+                      {"<"} Back to threads
                     </button>
                     <p>Select a thread to see the full conversation.</p>
                   </div>
-                ) : (
-                  <div className="flex h-full min-h-0 flex-col">
-                    <div className="shrink-0 border-b border-black/8 px-6 py-5 dark:border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => setMobileDetailOpen(false)}
-                        className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-foreground xl:hidden"
-                      >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to threads
-                      </button>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="bg-white px-3 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-sm">
-                              {providerLabel(selectedThread.account.provider)}
-                            </span>
-                            <span className="bg-white px-3 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
-                              {selectedThread.account.emailAddress}
-                            </span>
-                            <span className={`px-3 py-1 text-[10px] font-medium ${workflowBadgeClass(selectedThread.thread.workflowState)}`}>
-                              {workflowStateLabel(selectedThread.thread.workflowState)}
-                            </span>
-                          </div>
-                          <h2 className="mt-3 max-w-4xl text-[22px] font-semibold tracking-[-0.04em] text-foreground">
-                            {selectedThread.thread.subject}
-                          </h2>
-                        </div>
+                </section>
+              ) : (
+                <div className="flex h-full min-h-0 flex-col">
+                  <InboxThreadDetail
+                    selectedThread={selectedThread}
+                    isThreadLoading={isThreadLoading}
+                    mobileDetailOpen={mobileDetailOpen}
+                    onMobileBack={() => setMobileDetailOpen(false)}
+                    isActionMenuOpen={isActionMenuOpen}
+                    onToggleActionMenu={() => setIsActionMenuOpen((c) => !c)}
+                    onSummarizeThread={() => void summarizeThread()}
+                    isSummarizing={isSummarizing}
+                    hasThreadSummary={hasThreadSummary}
+                    onViewSummary={() => setSummaryDialogOpen(true)}
+                    replyStance={replyStance}
+                    onSetReplyStance={setReplyStance}
+                    onOpenNotes={() => setIsNotesDialogOpen(true)}
+                    onOpenLinkModal={() => setLinkModalOpen(true)}
+                    isUpdatingWorkflow={isUpdatingWorkflow}
+                    onUpdateWorkflowState={(state) => void updateWorkflowState(state as import("@/lib/types").EmailThreadWorkflowState)}
+                    arePreviewUpdatesOpen={arePreviewUpdatesOpen}
+                    onPreviewUpdatesOpenChange={handlePreviewUpdatesOpenChange}
+                    shouldShowPreviewUpdates={shouldShowPreviewUpdates}
+                    selectedThreadUpdates={selectedThreadUpdates}
+                    hasUnseenPreviewUpdates={hasUnseenPreviewUpdates}
+                    latestPreviewUpdateAt={latestPreviewUpdateAt}
+                    onClearPreviewUpdates={(at) => void clearPreviewUpdates(at)}
+                    areActionItemsOpen={areActionItemsOpen}
+                    onActionItemsOpenChange={handleActionItemsOpenChange}
+                    hasUnseenActionItems={hasUnseenActionItems}
+                    latestActionItemAt={latestActionItemAt}
+                    onGenerateReplyFromActionItem={(item) => void generateReplyFromActionItem(item)}
+                    isDrafting={isDrafting}
+                    currentCopilotInsights={currentCopilotInsights}
+                    earlierMessages={earlierMessages}
+                    latestMessage={latestMessage}
+                    importingAttachmentId={importingAttachmentId}
+                    onImportAttachment={(id) => void importAttachmentToWorkspace(id)}
+                    onPrefetchThread={(threadId) => void prefetchThread(threadId)}
+                  />
 
-                        <div className="relative shrink-0" ref={actionMenuRef}>
-                          <button
-                            type="button"
-                            onClick={() => setIsActionMenuOpen((current) => !current)}
-                            className="inline-flex h-8 w-8 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
-                            aria-label="Thread actions"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </button>
-
-                          {isActionMenuOpen ? (
-                            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-56 border border-black/8 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-[#161a20]">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    if (hasThreadSummary) {
-                                      setSummaryDialogOpen(true);
-                                      return;
-                                    }
-
-                                    void summarizeThread();
-                                  }}
-                                  disabled={isSummarizing && !hasThreadSummary}
-                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                {isSummarizing && !hasThreadSummary
-                                  ? "Summarizing..."
-                                  : hasThreadSummary
-                                    ? "View summary"
-                                    : "Generate summary"}
-                              </button>
-                              <div className="border-b border-black/6 pb-1 mb-1">
-                                <p className="px-3 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                                  Reply style
-                                </p>
-                                <div className="flex gap-1 px-3 py-1">
-                                  {(["firm", "collaborative", "exploratory"] as const).map((s) => (
-                                    <button
-                                      key={s}
-                                      type="button"
-                                      onClick={() => setReplyStance(s)}
-                                      className={`px-2 py-1 text-[10px] font-medium transition ${
-                                        replyStance === s
-                                          ? "bg-foreground text-background"
-                                          : "bg-secondary/60 text-foreground hover:bg-secondary/85"
-                                      }`}
-                                    >
-                                      {replyStyleLabel(s)}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsActionMenuOpen(false);
-                                  setIsNotesDialogOpen(true);
-                                }}
-                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
-                              >
-                                Private notes
-                                {selectedThread.noteCount > 0 ? ` (${selectedThread.noteCount})` : ""}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsActionMenuOpen(false);
-                                  setLinkModalOpen(true);
-                                }}
-                                className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80"
-                              >
-                                Link partnership
-                              </button>
-                              <div className="border-t border-black/6 pt-1 mt-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    void updateWorkflowState("needs_review");
-                                  }}
-                                  disabled={isUpdatingWorkflow}
-                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
-                                >
-                                  Mark needs review
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    void updateWorkflowState("waiting_on_them");
-                                  }}
-                                  disabled={isUpdatingWorkflow}
-                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
-                                >
-                                  Mark waiting
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    void updateWorkflowState("closed");
-                                  }}
-                                  disabled={isUpdatingWorkflow}
-                                  className="block w-full px-3 py-2 text-left text-[12px] text-foreground transition hover:bg-secondary/80 disabled:opacity-60"
-                                >
-                                  Mark closed
-                                </button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-                        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                          <div className="space-y-5">
-                            {isThreadLoading ? (
-                              <div className="border border-black/8 px-5 py-4 text-[12px] text-muted-foreground">
-                                Loading thread...
-                              </div>
-                            ) : null}
-
-                            <section className="border border-black/6 px-4 py-3">
-                              <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                Workspace context
-                              </p>
-                              <div className="mt-3 space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="text-[12px] font-semibold text-foreground">
-                                      Primary workspace
-                                    </p>
-                                    <p className="mt-1 text-[12px] text-muted-foreground">
-                                      {selectedThread.primaryLink
-                                        ? `${selectedThread.primaryLink.campaignName} · ${selectedThread.primaryLink.brandName}`
-                                        : "No primary workspace linked yet."}
-                                    </p>
-                                  </div>
-                                  {selectedThread.primaryLink ? (
-                                    <span className="bg-[#eff6ff] px-2.5 py-1 text-[10px] font-medium text-[#1d4ed8]">
-                                      Primary
-                                    </span>
-                                  ) : null}
-                                </div>
-                                {selectedThread.referenceLinks.length > 0 ? (
-                                  <div>
-                                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                      References
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                      {selectedThread.referenceLinks.map((link) => (
-                                        <span
-                                          key={link.id}
-                                          className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
-                                        >
-                                          {link.campaignName}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ) : null}
-                                {selectedThread.savedDraft ? (
-                                  <div className="border-t border-black/6 pt-3 text-[12px] text-muted-foreground">
-                                    Saved draft status:{" "}
-                                    <span className="font-medium text-foreground">
-                                      {selectedThread.savedDraft.status === "ready" ? "Ready" : "In progress"}
-                                    </span>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </section>
-
-                            {shouldShowPreviewUpdates ? (
-                              <Collapsible
-                                open={arePreviewUpdatesOpen}
-                                onOpenChange={(open) =>
-                                  handlePreviewUpdatesOpenChange(
-                                    open,
-                                    hasUnseenPreviewUpdates,
-                                    latestPreviewUpdateAt
-                                  )
-                                }
-                              >
-                                <section className="border border-black/6 px-4 py-3">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <CollapsibleTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="flex min-w-0 flex-1 items-center justify-between text-left"
-                                        aria-label={
-                                          arePreviewUpdatesOpen
-                                            ? "Collapse preview updates"
-                                            : "Expand preview updates"
-                                        }
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                            Updates
-                                          </p>
-                                          {hasUnseenPreviewUpdates ? (
-                                            <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
-                                          ) : null}
-                                        </div>
-                                        <ChevronDown
-                                          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${arePreviewUpdatesOpen ? "rotate-180" : ""}`}
-                                        />
-                                      </button>
-                                    </CollapsibleTrigger>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        void clearPreviewUpdates(latestPreviewUpdateAt)
-                                      }
-                                      disabled={hasUnseenPreviewUpdates}
-                                      className="shrink-0 text-[11px] font-medium text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                      Clear
-                                    </button>
-                                  </div>
-                                  <CollapsibleContent className="mt-2 space-y-2">
-                                    {selectedThreadUpdates.map((update) => (
-                                      <div key={update.id} className="border-l-2 border-black/8 pl-3">
-                                        <p className="text-[12px] font-medium text-foreground">{update.title}</p>
-                                        <p className="text-[11px] text-muted-foreground">{update.body}</p>
-                                        {update.href && update.ctaLabel ? (
-                                          <a
-                                            href={update.href}
-                                            className="mt-1 inline-flex text-[11px] font-medium text-foreground underline-offset-4 hover:underline"
-                                          >
-                                            {update.ctaLabel}
-                                          </a>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                  </CollapsibleContent>
-                                </section>
-                              </Collapsible>
-                            ) : null}
-
-                            {selectedThread.actionItems.length > 0 ? (
-                              <Collapsible
-                                open={areActionItemsOpen}
-                                onOpenChange={(open) =>
-                                  handleActionItemsOpenChange(
-                                    open,
-                                    hasUnseenActionItems,
-                                    latestActionItemAt
-                                  )
-                                }
-                              >
-                                <section className="border border-black/6 px-4 py-3">
-                                  <CollapsibleTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="flex w-full items-center justify-between text-left"
-                                      aria-label={areActionItemsOpen ? "Collapse action items" : "Expand action items"}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                          Action items ({selectedThread.actionItems.length})
-                                        </p>
-                                        {hasUnseenActionItems ? (
-                                          <span className="h-1.5 w-1.5 rounded-full bg-foreground/70" />
-                                        ) : null}
-                                      </div>
-                                      <ChevronDown
-                                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${areActionItemsOpen ? "rotate-180" : ""}`}
-                                      />
-                                    </button>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="mt-2 space-y-2">
-                                    {selectedThread.actionItems.map((item) => (
-                                      <InboxActionItemRow
-                                        key={item.id}
-                                        item={item}
-                                        onGenerateReply={(actionItem) => {
-                                          void generateReplyFromActionItem(actionItem);
-                                        }}
-                                        isGeneratingReply={isDrafting}
-                                      />
-                                    ))}
-                                  </CollapsibleContent>
-                                </section>
-                              </Collapsible>
-                            ) : null}
-
-                            {selectedThread.promiseDiscrepancies.length > 0 ? (
-                              <section className="border border-black/6 px-4 py-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                  Discrepancies
-                                </p>
-                                <div className="mt-2 space-y-2">
-                                  {selectedThread.promiseDiscrepancies.map((d, i) => (
-                                    <div key={`${d.field}-${i}`} className="border-l-2 border-amber-300 pl-3">
-                                      <p className="text-[12px] font-medium text-foreground">
-                                        {d.field}: email says &ldquo;{d.emailClaim}&rdquo;
-                                      </p>
-                                      <p className="text-[11px] text-muted-foreground">
-                                        Contract says &ldquo;{d.contractValue}&rdquo;
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </section>
-                            ) : null}
-
-                            {selectedThread.crossDealConflicts.length > 0 ? (
-                              <section className="border border-[#fecaca]/60 bg-[#fef2f2] px-5 py-4">
-                                <div className="flex items-center gap-2">
-                                  <ShieldAlert className="h-4 w-4 text-[#dc2626]" />
-                                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#dc2626]">
-                                    Cross-deal conflicts
-                                  </p>
-                                </div>
-                                <div className="mt-3 space-y-3">
-                                  {selectedThread.crossDealConflicts.map((conflict, i) => (
-                                    <div key={`conflict-${i}`} className="border-l-2 border-[#ef4444] pl-3">
-                                      <div className="flex items-center gap-2">
-                                        <p className="text-[12px] font-semibold text-foreground">
-                                          {conflict.title}
-                                        </p>
-                                        <span className={`px-2 py-0.5 text-[10px] font-medium ${
-                                          conflict.severity === "high"
-                                            ? "bg-[#fecaca] text-[#991b1b]"
-                                            : conflict.severity === "medium"
-                                            ? "bg-[#fef3c7] text-[#92400e]"
-                                            : "bg-[#e0e7ff] text-[#3730a3]"
-                                        }`}>
-                                          {conflict.severity}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-[12px] text-muted-foreground">
-                                        {conflict.detail}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </section>
-                            ) : null}
-
-                            {(currentCopilotInsights.risks.length > 0 ||
-                              currentCopilotInsights.documents.length > 0) ? (
-                              <section className="border border-black/6 px-4 py-3">
-                                <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                  Copilot context
-                                </p>
-                                {currentCopilotInsights.risks.length > 0 ? (
-                                  <div className="mt-3 space-y-2">
-                                    {currentCopilotInsights.risks.map((risk) => (
-                                      <div key={risk.id} className="border-l-2 border-black/8 pl-3">
-                                        <p className="text-[12px] font-medium text-foreground">{risk.label}</p>
-                                        <p className="text-[11px] text-muted-foreground">{risk.detail}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                                {currentCopilotInsights.documents.length > 0 ? (
-                                  <div className="mt-3 border-t border-black/6 pt-3">
-                                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                                      Suggested documents
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                      {currentCopilotInsights.documents.map((document) => (
-                                        <span
-                                          key={document.id}
-                                          className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground"
-                                        >
-                                          {document.fileName}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ) : null}
-                              </section>
-                            ) : null}
-
-                            {earlierMessages.length > 0 ? (
-                              <section className="space-y-3">
-                                {earlierMessages.map((message) => (
-                                  <MessageStrip
-                                    key={message.id}
-                                    message={message}
-                                    isOutbound={message.direction === "outbound"}
-                                    onImportAttachment={
-                                      selectedThread.primaryLink && message.direction === "inbound"
-                                        ? importAttachmentToWorkspace
-                                        : undefined
-                                    }
-                                    importingAttachmentId={importingAttachmentId}
-                                  />
-                                ))}
-                              </section>
-                            ) : null}
-
-                            {latestMessage ? (
-                              <section className="bg-white">
-                                <div className="border-b border-black/8 px-6 py-3">
-                                  <div className="flex items-start gap-4">
-                                    <div
-                                      className={`flex h-12 w-12 shrink-0 items-center justify-center text-sm font-semibold ${
-                                        latestMessage.direction === "outbound"
-                                          ? "bg-foreground text-background"
-                                          : "bg-secondary/60 text-foreground"
-                                      }`}
-                                    >
-                                      {latestMessage.direction === "outbound"
-                                        ? "You"
-                                        : initialsFromParticipant(latestMessage.from)}
-                                    </div>
-
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-[14px] font-semibold text-foreground">
-                                        {latestMessage.direction === "outbound"
-                                          ? "You"
-                                          : participantLabel(latestMessage.from)}
-                                      </p>
-                                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                        {latestMessage.direction === "outbound"
-                                          ? `To: ${latestMessage.to.map(participantLabel).join(", ")}`
-                                          : latestMessage.from?.email || ""}
-                                      </p>
-                                    </div>
-
-                                    <p className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                                      {formatDate(latestMessage.receivedAt || latestMessage.sentAt)}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="px-8 py-7">
-                                  <EmailMessageBody message={latestMessage} />
-
-                                  <AttachmentShelf
-                                    attachments={latestMessage.attachments}
-                                    onImportAttachment={
-                                      selectedThread.primaryLink && latestMessage.direction === "inbound"
-                                        ? importAttachmentToWorkspace
-                                        : undefined
-                                    }
-                                    importingAttachmentId={importingAttachmentId}
-                                  />
-                                </div>
-                              </section>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {/* Reply composer — pinned to bottom */}
-                        <div className="border-t border-black/8 bg-white px-5 py-4">
-                          <div className="space-y-3">
-                            {replyJourney === "ai_generated" &&
-                            replySignatureMissingFields.length > 0 &&
-                            isReplySignatureBannerVisible ? (
-                              <div className="flex items-start justify-between gap-3 border border-black/8 bg-[#f7f4ed] px-3 py-2">
-                                <p className="text-[12px] leading-5 text-foreground">
-                                  <span className="font-semibold">
-                                    Missing {replySignatureMissingFields.join(", ")}
-                                  </span>{" "}
-                                  in your creator profile.{" "}
-                                  <Link
-                                    href="/app/settings/profile"
-                                    className="font-medium underline underline-offset-4 transition hover:text-primary"
-                                  >
-                                    Set up your creator profile
-                                  </Link>{" "}
-                                  to improve your email signature.
-                                </p>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    window.localStorage.setItem(
-                                      INBOX_SIGNATURE_BANNER_DISMISS_KEY,
-                                      replySignatureBannerStateKey
-                                    );
-                                    setIsReplySignatureBannerVisible(false);
-                                  }}
-                                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-black/8 bg-white text-muted-foreground transition hover:bg-secondary"
-                                  aria-label="Dismiss inbox signature reminder"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            ) : null}
-                            <div className="border border-black/8 bg-foreground/[0.02] px-4 py-3 text-sm text-muted-foreground">
-                              <div>
-                                <Textarea
-                                  ref={replyBodyRef}
-                                  rows={1}
-                                  value={replyBody}
-                                  onChange={(event) => {
-                                    handleReplyBodyChange(
-                                      event.currentTarget.value,
-                                      event.currentTarget
-                                    );
-                                  }}
-                                  placeholder={
-                                    replyJourney === "ai_set"
-                                      ? 'Refine your prompt, then click "Generate"...'
-                                      : 'Type a reply or click "AI Reply" to generate one...'
-                                  }
-                                  className="h-6 min-h-0 overflow-hidden rounded-none border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
-                                />
-                                {isDrafting ? (
-                                  <span className="mt-2 flex items-center gap-2 text-[11px] text-primary">
-                                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                                    Writing draft...
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div ref={aiReplyControlRef} className="flex items-stretch">
-                                  <button
-                                    type="button"
-                                    onClick={() => void draftReply()}
-                                    disabled={isDrafting}
-                                    className={`inline-flex h-9 items-center gap-2 border px-3 text-[12px] font-medium transition disabled:opacity-60 ${
-                                      shouldHighlightAiReply
-                                        ? "animate-pulse border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                                        : "border-black/10 text-foreground hover:bg-black/[0.03]"
-                                    }`}
-                                  >
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    {isDrafting
-                                      ? "Replying..."
-                                      : replyJourney === "ai_generated"
-                                        ? "Regenerate"
-                                      : replyJourney === "ai_set"
-                                        ? "Generate"
-                                        : "AI Reply"}
-                                  </button>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button
-                                        type="button"
-                                        aria-label="Open AI reply options"
-                                        className="inline-flex h-9 w-8 items-center justify-center border border-l-0 border-black/10 text-muted-foreground transition hover:bg-black/[0.03] hover:text-foreground"
-                                      >
-                                        <ChevronDown className="h-3 w-3" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                  <DropdownMenuContent
-                                    align="end"
-                                    side="top"
-                                    sideOffset={4}
-                                    style={
-                                      aiReplyMenuWidth ? { width: `${aiReplyMenuWidth}px` } : undefined
-                                    }
-                                    className="rounded-none border-black/10 p-0"
-                                  >
-                                    <DropdownMenuItem
-                                      onSelect={() => setPromptCommandOpen(true)}
-                                      className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
-                                    >
-                                      Add prompt
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onSelect={clearDraftComposer}
-                                      disabled={!canClearReplyText}
-                                      className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
-                                    >
-                                      Clear text
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                                {isDrafting ? (
-                                  <button
-                                    type="button"
-                                    onClick={cancelDraftReply}
-                                    className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
-                                  >
-                                    Cancel
-                                  </button>
-                                ) : null}
-                                {canRefineGeneratedReply ? (
-                                  <>
-                                    <Popover
-                                      open={openRefinementPopover === "length"}
-                                      onOpenChange={(open) =>
-                                        setOpenRefinementPopover(open ? "length" : null)
-                                      }
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
-                                        >
-                                          Length
-                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent
-                                        align="start"
-                                        side="top"
-                                        className="w-40 rounded-none border-black/10 p-1"
-                                      >
-                                        <div className="space-y-1">
-                                          {DRAFT_REFINEMENT_OPTIONS.length.map((option) => (
-                                            <button
-                                              key={option.label}
-                                              type="button"
-                                              onClick={() => void refineGeneratedDraft(option.instruction)}
-                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
-                                            >
-                                              {option.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-                                    <Popover
-                                      open={openRefinementPopover === "tone"}
-                                      onOpenChange={(open) =>
-                                        setOpenRefinementPopover(open ? "tone" : null)
-                                      }
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
-                                        >
-                                          Tone
-                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent
-                                        align="start"
-                                        side="top"
-                                        className="w-40 rounded-none border-black/10 p-1"
-                                      >
-                                        <div className="space-y-1">
-                                          {DRAFT_REFINEMENT_OPTIONS.tone.map((option) => (
-                                            <button
-                                              key={option.label}
-                                              type="button"
-                                              onClick={() => void refineGeneratedDraft(option.instruction)}
-                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
-                                            >
-                                              {option.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-                                    <Popover
-                                      open={openRefinementPopover === "focus"}
-                                      onOpenChange={(open) =>
-                                        setOpenRefinementPopover(open ? "focus" : null)
-                                      }
-                                    >
-                                      <PopoverTrigger asChild>
-                                        <button
-                                          type="button"
-                                          className="inline-flex h-9 min-w-[92px] items-center justify-between gap-2 border border-black/10 bg-secondary/20 px-3 text-[12px] font-medium text-foreground transition hover:border-black/25 hover:bg-secondary/28"
-                                        >
-                                          Focus
-                                          <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                        </button>
-                                      </PopoverTrigger>
-                                      <PopoverContent
-                                        align="start"
-                                        side="top"
-                                        className="w-44 rounded-none border-black/10 p-1"
-                                      >
-                                        <div className="space-y-1">
-                                          {DRAFT_REFINEMENT_OPTIONS.focus.map((option) => (
-                                            <button
-                                              key={option.label}
-                                              type="button"
-                                              onClick={() => void refineGeneratedDraft(option.instruction)}
-                                              className="block w-full rounded-none px-3 py-2 text-left text-[12px] font-medium text-foreground transition hover:bg-black/[0.03]"
-                                            >
-                                              {option.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </PopoverContent>
-                                    </Popover>
-                                  </>
-                                ) : null}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void saveDraft("in_progress")}
-                                  disabled={isSavingDraft || !replyBody.trim()}
-                                  className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
-                                >
-                                  {isSavingDraft ? "Saving..." : "Save draft"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void markDraftReady()}
-                                  disabled={isSavingDraft || !replyBody.trim()}
-                                  className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
-                                >
-                                  Mark ready
-                                </button>
-                                {canAttachInvoice ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setIsInvoiceAttached((current) => !current)}
-                                    className={`inline-flex h-9 items-center gap-2 border px-3 text-[12px] font-medium transition ${
-                                      isInvoiceAttached
-                                        ? "border-foreground bg-foreground text-background"
-                                        : "border-black/10 text-foreground hover:bg-black/[0.03]"
-                                    }`}
-                                  >
-                                    <Paperclip className="h-3.5 w-3.5" />
-                                    {isInvoiceAttached ? "Invoice attached" : "Attach invoice"}
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  onClick={() => void sendReply()}
-                                  disabled={!canSendReply || isSendingReply}
-                                  className="inline-flex h-9 items-center gap-2 bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-40"
-                                >
-                                  <Send className="h-3.5 w-3.5" />
-                                  {isSendingReply ? "Sending..." : "Send"}
-                                </button>
-                              </div>
-                            </div>
-                            {selectedThreadInvoiceAttachment ? (
-                              <div className="flex flex-wrap items-center justify-between gap-3 border border-black/8 bg-secondary/10 px-4 py-3 text-[12px] text-muted-foreground">
-                                <div>
-                                  <p className="font-medium text-foreground">
-                                    {selectedThreadInvoiceAttachment.invoiceNumber}
-                                  </p>
-                                  <p>
-                                    {selectedThreadInvoiceAttachment.fileName}
-                                  </p>
-                                  {!canAttachInvoice ? (
-                                    <p className="mt-1">This invoice has been voided and will not be attached.</p>
-                                  ) : null}
-                                </div>
-                                <Link
-                                  href={`/api/documents/${selectedThreadInvoiceAttachment.documentId}/content`}
-                                  target="_blank"
-                                  className="inline-flex border-b border-black/20 pb-1 text-[12px] font-medium text-foreground transition hover:border-black/50"
-                                >
-                                  Preview invoice
-                                </Link>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                    </div>
-                  </div>
-                )}
-              </section>
+                  <InboxReplyComposer
+                    replyBody={replyBody}
+                    replyBodyRef={replyBodyRef}
+                    replyJourney={replyJourney}
+                    isDrafting={isDrafting}
+                    shouldHighlightAiReply={shouldHighlightAiReply}
+                    canRefineGeneratedReply={canRefineGeneratedReply}
+                    canClearReplyText={canClearReplyText}
+                    canSendReply={canSendReply}
+                    isSavingDraft={isSavingDraft}
+                    isSendingReply={isSendingReply}
+                    replySignatureMissingFields={replySignatureMissingFields}
+                    isReplySignatureBannerVisible={isReplySignatureBannerVisible}
+                    replySignatureBannerStateKey={replySignatureBannerStateKey}
+                    isInvoiceAttached={isInvoiceAttached}
+                    canAttachInvoice={canAttachInvoice}
+                    selectedThreadInvoiceAttachment={selectedThreadInvoiceAttachment}
+                    aiReplyControlRef={aiReplyControlRef}
+                    aiReplyMenuWidth={aiReplyMenuWidth}
+                    promptActionControlRef={promptActionControlRef}
+                    promptActionMenuWidth={promptActionMenuWidth}
+                    openRefinementPopover={openRefinementPopover}
+                    draftInstructions={draftInstructions}
+                    trimmedDraftInstructions={trimmedDraftInstructions}
+                    isPromptCommandOpen={isPromptCommandOpen}
+                    isLoadingSuggestions={isLoadingSuggestions}
+                    promptSuggestions={promptSuggestions}
+                    onReplyBodyChange={handleReplyBodyChange}
+                    onDraftReply={() => void draftReply()}
+                    onCancelDraftReply={cancelDraftReply}
+                    onClearDraftComposer={clearDraftComposer}
+                    onRefineGeneratedDraft={(instruction) => void refineGeneratedDraft(instruction)}
+                    onSaveDraft={(status) => void saveDraft(status as "in_progress" | "ready")}
+                    onMarkDraftReady={() => void markDraftReady()}
+                    onSendReply={() => void sendReply()}
+                    onSetInvoiceAttached={(v) => setIsInvoiceAttached(v)}
+                    onSetOpenRefinementPopover={setOpenRefinementPopover}
+                    onSetPromptCommandOpen={setPromptCommandOpen}
+                    onSetDraftInstructions={setDraftInstructions}
+                    onApplyPromptToNextDraft={applyPromptToNextDraft}
+                    onClearPromptDialog={clearPromptDialog}
+                    onRunPromptForDraft={() => void runPromptForDraft()}
+                    onDismissSignatureBanner={() => {
+                      window.localStorage.setItem(
+                        INBOX_SIGNATURE_BANNER_DISMISS_KEY,
+                        replySignatureBannerStateKey
+                      );
+                      setIsReplySignatureBannerVisible(false);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      <CommandDialog
-        open={isPromptCommandOpen}
-        onOpenChange={setPromptCommandOpen}
-        title="Add draft prompt"
-        description="Add guidance for the AI draft reply."
-      >
-        <CommandInput
-          value={draftInstructions}
-          onValueChange={setDraftInstructions}
-          placeholder="Tone, boundaries, points to mention..."
-          aria-label="Additional prompt for AI draft"
-        />
-        <CommandList className="max-h-[240px]">
-          <CommandEmpty>
-            <p className="text-[13px] text-muted-foreground">Type a custom prompt or pick a suggestion below.</p>
-          </CommandEmpty>
-          <CommandGroup heading="Suggestions">
-            {isLoadingSuggestions && promptSuggestions.length === 0 ? (
-              <div className="flex items-center gap-2 px-3 py-3 text-[13px] text-muted-foreground">
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                Generating suggestions...
-              </div>
-            ) : (
-              promptSuggestions.map((suggestion) => (
-                <CommandItem
-                  key={suggestion.id}
-                  value={suggestion.label}
-                  onSelect={() => setDraftInstructions(suggestion.prompt)}
-                >
-                  {suggestion.label}
-                </CommandItem>
-              ))
-            )}
-          </CommandGroup>
-        </CommandList>
-        <div className="flex items-center justify-between border-t border-black/8 px-4 py-3 dark:border-white/10">
-          <p className="text-[12px] text-muted-foreground">
-            Applies to the next draft only.
-          </p>
-          <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={clearPromptDialog}
-              className="inline-flex h-8 items-center px-3 text-[12px] font-medium text-muted-foreground transition hover:text-foreground"
-            >
-              Clear
-            </button>
-            <div ref={promptActionControlRef} className="flex items-stretch">
-              <button
-                type="button"
-                onClick={applyPromptToNextDraft}
-                disabled={!trimmedDraftInstructions}
-                className="inline-flex h-8 items-center bg-primary px-4 text-[12px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Add prompt
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Open prompt actions"
-                    disabled={!trimmedDraftInstructions || isDrafting}
-                    className="inline-flex h-8 w-8 items-center justify-center border-l border-white/15 bg-primary text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  side="top"
-                  sideOffset={4}
-                  style={
-                    promptActionMenuWidth
-                      ? { width: `${promptActionMenuWidth}px` }
-                      : undefined
-                  }
-                  className="rounded-none border-black/10 p-0"
-                >
-                  <DropdownMenuItem
-                    onSelect={() => void runPromptForDraft()}
-                    className="w-full rounded-none px-3 py-2.5 text-[12px] font-medium"
-                  >
-                    Use prompt
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </div>
-      </CommandDialog>
 
       <Dialog open={isSummaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -3547,18 +1808,18 @@ export function InboxWorkspace({
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-[13px] font-semibold text-foreground">
-                                {participantLabel(item.thread.participants[0])}
+                                {item.thread.participants[0]?.name?.trim() || item.thread.participants[0]?.email || "Unknown"}
                               </p>
                               <p className="truncate text-[12px] text-foreground/90">
                                 {item.thread.subject}
                               </p>
                             </div>
                             <p className="shrink-0 text-[11px] text-muted-foreground">
-                              {formatDate(item.thread.lastMessageAt)}
+                              {new Date(item.thread.lastMessageAt).toLocaleDateString()}
                             </p>
                           </div>
                           <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
-                            {threadPreviewText(item)}
+                            {item.thread.snippet || "No preview available."}
                           </p>
                           <div className="mt-3 flex flex-wrap items-center gap-2">
                             <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">

@@ -150,9 +150,11 @@ This is the shortest useful description of the current repo shape.
   - feature components
   - `components/ui/` for low-level primitives
   - `components/patterns/` for repeated screen-level composition patterns
+  - `components/inbox-workspace/` for inbox subcomponents, formatters, and helpers
 - `lib/`
   - domain logic and integration code
   - current domain clusters include `analysis`, `assistant`, `billing`, `email`, `repository`, `stores`
+  - `lib/email/` is further split into focused modules: `repository/`, `service-shared`, `service-sync`, `service-connect`, `service-ai`
 - `prisma/`
   - schema and migration history
 - `tests/`
@@ -177,6 +179,12 @@ These boundaries reflect the repo as it exists today and should be treated as th
 - `lib/deals.ts`, `lib/intake.ts`, `lib/payments.ts`, `lib/profile.ts`: primary domain commands and orchestration
 - `lib/analysis/`: extraction, fallback parsing, LLM orchestration, and summary generation
 - `lib/email/`: provider-agnostic email domain logic, AI helpers, repository helpers, and smart inbox behavior
+  - `lib/email/service.ts`: thin entry point re-exporting viewer-facing inbox actions
+  - `lib/email/service-sync.ts`: email sync and incremental fetch logic
+  - `lib/email/service-connect.ts`: OAuth and webhook handling
+  - `lib/email/service-ai.ts`: AI drafting and summarization
+  - `lib/email/service-shared.ts`: shared email workflow helpers
+  - `lib/email/repository/`: Prisma mapping grouped by domain (`shared`, `accounts`, `threads`, `candidates`)
 - `lib/billing/`: plan catalog metadata, entitlement resolution, Stripe config helpers, checkout and portal orchestration, and webhook reconciliation
 - `lib/assistant/`: prompt assembly, runtime, tool wiring, snapshot generation, and UI block definitions
 - `lib/repository/`: persistence abstraction for Prisma-backed and file-backed modes
@@ -185,6 +193,14 @@ These boundaries reflect the repo as it exists today and should be treated as th
 - `components/ui/`: primitive UI building blocks
 - `components/figma/`: Figma-specific rendering or integration helpers
 - `components/use-*.ts`: feature-local client orchestration hooks for complex UI flows
+- `components/inbox-workspace/`: inbox UI subcomponents
+  - `InboxThreadList.tsx`: left panel thread list
+  - `InboxThreadDetail.tsx`: right panel conversation view
+  - `InboxReplyComposer.tsx`: reply composer with AI drafting controls
+  - `InboxMessageView.tsx`: email message rendering, attachment shelf, and preview
+  - `formatters.ts`: pure display formatting (no React, no hooks)
+  - `helpers.ts`: business logic helpers, types, and constants (no React, no hooks)
+- `components/inbox-workspace.tsx`: composition-only orchestrator that owns state/effects and delegates rendering to `inbox-workspace/` subcomponents
 - `lib/*-draft.ts` and `lib/*-profile.ts`: shared normalization and payload-shaping helpers
 
 ## Recommended Layering
@@ -683,7 +699,6 @@ The following files are beyond the "easy to understand in one pass" bar and shou
 
 - `lib/deals.ts`
 - `lib/intake.ts`
-- `lib/email/service.ts`
 - `lib/billing/service.ts`
 - `lib/analysis/llm.ts`
 - `app/app/page.tsx`
@@ -700,6 +715,9 @@ For these files, the default expectation is:
 
 Recent examples of the preferred direction in this repo:
 
+- email service split: `lib/email/service.ts` became a thin entry point over `service-sync`, `service-connect`, `service-ai`, and `service-shared` modules
+- email repository split: `lib/email/repository.ts` broke into `repository/shared`, `repository/accounts`, `repository/threads`, and `repository/candidates`
+- inbox UI split: `components/inbox-workspace.tsx` became a composition-only orchestrator delegating to `components/inbox-workspace/` subcomponents (`InboxThreadList`, `InboxThreadDetail`, `InboxReplyComposer`, `InboxMessageView`) with pure helpers extracted to `formatters.ts` and `helpers.ts`
 - inbox state was split out of `components/inbox-workspace.tsx` into feature hooks for thread selection, reply composition, candidate discovery, and thread-detail state
 - profile and settings payload shaping moved into `lib/profile-draft.ts`
 - onboarding normalization moved into `lib/onboarding-draft.ts`
