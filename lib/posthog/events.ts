@@ -1,5 +1,7 @@
 import type { PostHog } from "posthog-js";
 
+import { isPostHogClientEnabled } from "@/lib/posthog/config";
+
 export const appActionEventNames = [
   "auth_mode_switched",
   "auth_sign_in_submitted",
@@ -40,5 +42,9 @@ export function captureAppEvent(
   eventName: AppActionEventName,
   properties?: Record<string, unknown>
 ) {
+  if (!isPostHogClientEnabled()) {
+    return;
+  }
+
   posthog?.capture(eventName, properties);
 }

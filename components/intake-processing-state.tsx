@@ -60,8 +60,18 @@ export function IntakeProcessingState({
     return index === -1 ? 0 : index;
   }, [processing.currentStage]);
 
-  const activeLabel = STAGE_LABELS[STAGE_ORDER[activeIndex]] ?? "Processing";
-  const progress = Math.round(((activeIndex + 0.5) / STAGE_ORDER.length) * 100);
+  const isExtractionStarting = status === "queued" || !processing.isRunning;
+  const activeLabel = isExtractionStarting
+    ? "Extraction starting"
+    : STAGE_LABELS[STAGE_ORDER[activeIndex]] ?? "Processing";
+  const statusDescription = isExtractionStarting
+    ? "Queuing your source material for extraction"
+    : documentsCount > 0
+      ? `Analyzing ${documentsCount} source${documentsCount === 1 ? "" : "s"}`
+      : "Analyzing your uploaded source material";
+  const progress = isExtractionStarting
+    ? 8
+    : Math.round(((activeIndex + 0.5) / STAGE_ORDER.length) * 100);
 
   return (
     <section className="w-full py-8">
@@ -79,9 +89,7 @@ export function IntakeProcessingState({
           {activeLabel}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          {documentsCount > 0
-            ? `Analyzing ${documentsCount} source${documentsCount === 1 ? "" : "s"}`
-            : "Analyzing your uploaded source material"}
+          {statusDescription}
         </p>
 
         {/* Progress bar */}

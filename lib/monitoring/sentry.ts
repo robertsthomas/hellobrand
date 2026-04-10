@@ -14,6 +14,19 @@ type MonitoringContext = {
   fingerprint?: string[];
 };
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+const isLocalAppUrl =
+  appUrl.startsWith("http://localhost") ||
+  appUrl.startsWith("http://127.0.0.1");
+const isSentryEnabled =
+  process.env.NODE_ENV !== "development" &&
+  !isLocalAppUrl &&
+  process.env.SENTRY_ENVIRONMENT !== "development" &&
+  process.env.SENTRY_ENVIRONMENT !== "dev" &&
+  process.env.VERCEL_ENV !== "development" &&
+  process.env.DOPPLER_CONFIG !== "dev" &&
+  process.env.DOPPLER_ENVIRONMENT !== "dev";
+
 function toError(error: unknown) {
   if (error instanceof Error) {
     return error;
@@ -31,6 +44,10 @@ function isExpectedStatus(status: number | undefined) {
 }
 
 export function captureHandledError(error: unknown, context: MonitoringContext) {
+  if (!isSentryEnabled) {
+    return;
+  }
+
   if (!context.captureExpected && isExpectedStatus(context.status)) {
     return;
   }

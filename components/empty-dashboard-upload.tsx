@@ -283,12 +283,22 @@ export function EmptyDashboardUpload({
 
   async function startAnalysisInBackground(
     optimisticNotificationId: string,
-    generationId: string
+    generationId: string,
+    onSessionReady?: (sessionId: string) => void,
+    onStartFailed?: (sessionId: string) => void
   ): Promise<string | null> {
+    let navigationSessionId: string | null = null;
+
     try {
       const createdSessionIds: string[] = [];
       const processedLocalWorkspaceIds: string[] = [];
       const createdServerQueuedWorkspaces: ServerQueuedWorkspaceItem[] = [];
+
+      const firstServerQueuedSessionId = serverQueuedWorkspaces[0]?.sessionId ?? null;
+      if (firstServerQueuedSessionId) {
+        navigationSessionId = firstServerQueuedSessionId;
+        onSessionReady?.(firstServerQueuedSessionId);
+      }
 
       for (const workspace of localWorkspaces) {
         const payload = await loadLocalWorkspace(workspace.localId);
@@ -301,6 +311,12 @@ export function EmptyDashboardUpload({
           campaignName: workspace.campaignName
         });
 
+        createdSessionIds.push(sessionId);
+        if (!navigationSessionId) {
+          navigationSessionId = sessionId;
+          onSessionReady?.(sessionId);
+        }
+
         const uploadPayload = await uploadDocumentsViaDirectStorage({
           registerUrl: `/api/intake/${sessionId}/documents/direct/register`,
           completeUrl: `/api/intake/${sessionId}/documents/direct/complete`,
@@ -310,7 +326,6 @@ export function EmptyDashboardUpload({
           startProcessing: false
         });
 
-        createdSessionIds.push(sessionId);
         processedLocalWorkspaceIds.push(workspace.localId);
         createdServerQueuedWorkspaces.push({
           sessionId,
@@ -330,16 +345,18 @@ export function EmptyDashboardUpload({
         setServerQueuedWorkspaces((current) => [...current, ...createdServerQueuedWorkspaces]);
       }
 
+      const sessionIds = [
+        ...serverQueuedWorkspaces.map((workspace) => workspace.sessionId),
+        ...createdSessionIds
+      ];
+
       const response = await fetch("/api/intake/queue/start", {
         method: "POST",
         headers: {
           "content-type": "application/json"
         },
         body: JSON.stringify({
-          sessionIds: [
-            ...serverQueuedWorkspaces.map((workspace) => workspace.sessionId),
-            ...createdSessionIds
-          ]
+          sessionIds
         })
       });
       const payload = await response.json();
@@ -383,6 +400,9 @@ export function EmptyDashboardUpload({
         action: "remove",
         notificationId: optimisticNotificationId
       });
+      if (navigationSessionId) {
+        onStartFailed?.(navigationSessionId);
+      }
       setErrorMessage(error instanceof Error ? error.message : "Could not start analysis.");
       const remaining = readLocalWorkspaceManifest();
       setLocalWorkspaces(remaining);
@@ -437,16 +457,35 @@ export function EmptyDashboardUpload({
       });
     }
 
-    const realSessionId = await startAnalysisInBackground(
-      optimisticNotificationId,
-      generationId
-    );
+    let didNavigate = false;
+    const navigateToProcessing = (sessionId: string) => {
+      if (didNavigate) {
+        return;
+      }
 
-    if (realSessionId) {
-      router.push(`/app/intake/${realSessionId}?starting=1`);
-    } else {
-      setIsSubmitting(false);
-    }
+      didNavigate = true;
+      router.push(`/app/intake/${sessionId}?starting=1`);
+    };
+
+    void startAnalysisInBackground(
+      optimisticNotificationId,
+      generationId,
+      navigateToProcessing,
+      (sessionId) => {
+        if (didNavigate) {
+          router.replace(`/app/intake/${sessionId}`);
+        }
+      }
+    ).then((realSessionId) => {
+      if (realSessionId) {
+        navigateToProcessing(realSessionId);
+        return;
+      }
+
+      if (!didNavigate) {
+        setIsSubmitting(false);
+      }
+    });
   }
 
   return (

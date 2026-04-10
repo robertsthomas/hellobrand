@@ -277,6 +277,98 @@ export function toSerializableDocumentAiResponse(response: DocumentAiProcessResp
   return JSON.parse(JSON.stringify(response)) as Record<string, unknown>;
 }
 
+function shouldLogDocumentAiResponse() {
+  return (
+    process.env.DEBUG_DOCUMENT_AI_RESPONSE === "1" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function shouldLogRawDocumentAiResponse() {
+  return (
+    process.env.DEBUG_DOCUMENT_AI_RAW_RESPONSE === "1" &&
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function summarizeDocumentAiEntity(
+  document: DocumentAiDocument,
+  entity: protos.google.cloud.documentai.v1.Document.IEntity
+) {
+  return {
+    type: entity.type ?? null,
+    mentionText: entityTextPreview(documentAiEntityText(document, entity), 500),
+    normalizedText: entityTextPreview(entity.normalizedValue?.text ?? null, 500),
+    confidence: typeof entity.confidence === "number" ? entity.confidence : null,
+    pageRefs:
+      entity.pageAnchor?.pageRefs?.map((pageRef) => ({
+        page: pageRef.page ?? null
+      })) ?? []
+  };
+}
+
+function documentAiEntityText(
+  document: DocumentAiDocument,
+  entity: protos.google.cloud.documentai.v1.Document.IEntity
+) {
+  return (
+    entity.mentionText ??
+    entity.textAnchor?.content ??
+    extractDocumentAiTextAnchor(document, entity.textAnchor) ??
+    entity.normalizedValue?.text ??
+    null
+  );
+}
+
+function entityTextPreview(value: string | null | undefined, maxLength: number) {
+  const normalized = value?.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength)}...`
+    : normalized;
+}
+
+function logDocumentAiResponse(input: {
+  processor: DocumentAiProcessorKind;
+  processorName: string;
+  mimeType: string;
+  document: DocumentAiDocument | null;
+  fullText: string;
+  rawResponse: Record<string, unknown>;
+}) {
+  if (!shouldLogDocumentAiResponse()) {
+    return;
+  }
+
+  const entities = input.document?.entities ?? [];
+  const summary: Record<string, unknown> = {
+    at: new Date().toISOString(),
+    processor: input.processor,
+    processorName: input.processorName,
+    mimeType: input.mimeType,
+    pages: input.document?.pages?.length ?? 0,
+    entities: entities.length,
+    textLength: input.fullText.length,
+    textPreview: entityTextPreview(input.fullText, 1200),
+    entityPreview: entities
+      .slice(0, 50)
+      .map((entity) => summarizeDocumentAiEntity(input.document ?? {}, entity))
+  };
+
+  if (entities.length > 50) {
+    summary.entityPreviewTruncated = entities.length - 50;
+  }
+
+  if (shouldLogRawDocumentAiResponse()) {
+    summary.rawResponse = input.rawResponse;
+  }
+
+  console.info("[document-ai] process_response", summary);
+}
+
 export async function processDocumentWithDocumentAi(input: {
   processor: DocumentAiProcessorKind;
   bytes: Buffer | Uint8Array;
@@ -310,11 +402,20 @@ export async function processDocumentWithDocumentAi(input: {
 
     const document = response.document ?? null;
     const fullText = getDocumentAiFullText(document);
+    const rawResponse = toSerializableDocumentAiResponse(response);
 
     debug.complete({
       pages: document?.pages?.length ?? 0,
       entities: document?.entities?.length ?? 0,
       textLength: fullText.length
+    });
+    logDocumentAiResponse({
+      processor: input.processor,
+      processorName,
+      mimeType: input.mimeType,
+      document,
+      fullText,
+      rawResponse
     });
 
     return {
@@ -325,7 +426,7 @@ export async function processDocumentWithDocumentAi(input: {
       fullText,
       pageCount: document?.pages?.length ?? 0,
       entityCount: document?.entities?.length ?? 0,
-      rawResponse: toSerializableDocumentAiResponse(response)
+      rawResponse
     };
   } catch (error) {
     debug.fail(error, {

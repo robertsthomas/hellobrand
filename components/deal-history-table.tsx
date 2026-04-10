@@ -546,9 +546,9 @@ export function DealHistoryTable({
           <div className="flex items-center gap-1">
             <Button
               type="button"
-              variant="outline"
+              variant="link"
               size="sm"
-              className="h-10 rounded-full px-4 sm:h-8 sm:px-3"
+              className="h-auto px-1 py-0 text-muted-foreground underline hover:text-foreground disabled:no-underline"
               disabled={safePage <= 1}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
             >
@@ -570,9 +570,9 @@ export function DealHistoryTable({
               ))}
             <Button
               type="button"
-              variant="outline"
+              variant="link"
               size="sm"
-              className="h-10 rounded-full px-4 sm:h-8 sm:px-3"
+              className="h-auto px-1 py-0 text-muted-foreground underline hover:text-foreground disabled:no-underline"
               disabled={safePage >= totalPages}
               onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
             >

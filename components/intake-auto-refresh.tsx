@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
-import type { IntakeSessionStatus } from "@/lib/types";
+import type {
+  DealAggregate,
+  DocumentArtifactRecord,
+  IntakeSessionStatus
+} from "@/lib/types";
 
 function logClientRefresh(event: string, details: Record<string, unknown>) {
   if (process.env.NODE_ENV === "production") {
@@ -13,6 +17,46 @@ function logClientRefresh(event: string, details: Record<string, unknown>) {
   }
 
   console.info(`[client-intake-refresh] ${event}`, details);
+}
+
+function isDocumentAiArtifact(artifact: DocumentArtifactRecord) {
+  return artifact.kind === "raw_vendor_output" && Boolean(artifact.payload);
+}
+
+function logDocumentAiBrowserResponses(
+  aggregate: DealAggregate | null | undefined,
+  loggedArtifactIds: Set<string>
+) {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  const artifacts = aggregate?.documentArtifacts?.filter(isDocumentAiArtifact) ?? [];
+  if (artifacts.length === 0) {
+    return;
+  }
+
+  const documentNames = new Map(
+    (aggregate?.documents ?? []).map((document) => [document.id, document.fileName])
+  );
+
+  for (const artifact of [...artifacts].reverse()) {
+    if (loggedArtifactIds.has(artifact.id)) {
+      continue;
+    }
+
+    loggedArtifactIds.add(artifact.id);
+    console.info("[document-ai] browser_response", {
+      artifactId: artifact.id,
+      documentId: artifact.documentId,
+      documentName: documentNames.get(artifact.documentId) ?? null,
+      runId: artifact.runId,
+      step: artifact.step,
+      processor: artifact.processor,
+      createdAt: artifact.createdAt,
+      response: artifact.payload
+    });
+  }
 }
 
 export function IntakeAutoRefresh({
@@ -31,6 +75,7 @@ export function IntakeAutoRefresh({
   const pendingSessionId = useIntakeUiStore((state) => state.sessionId);
   const isSubmitting = useIntakeUiStore((state) => state.isSubmitting);
   const lastKnownStatus = useRef(status);
+  const loggedDocumentAiArtifactIds = useRef(new Set<string>());
   const [remoteStatus, setRemoteStatus] = useState<IntakeSessionStatus>(status);
   const shouldPoll =
     forcePolling ||
@@ -63,11 +108,13 @@ export function IntakeAutoRefresh({
         const payload = await response.json();
         const nextStatus = payload?.session?.status as IntakeSessionStatus | undefined;
         const nextProcessing = payload?.processing;
+        const aggregate = payload?.aggregate as DealAggregate | null | undefined;
 
         if (!nextStatus || disposed) {
           return;
         }
 
+        logDocumentAiBrowserResponses(aggregate, loggedDocumentAiArtifactIds.current);
         setRemoteStatus(nextStatus);
 
         // Broadcast processing snapshot so IntakeProcessingState can update stages

@@ -1,4 +1,4 @@
-import { isPostHogConfigured } from "@/lib/posthog/config";
+import { isPostHogClientEnabled, isPostHogConfigured } from "@/lib/posthog/config";
 import { publicFunnelEventNames, publicFunnelEventSchema } from "@/lib/validation";
 
 export type PublicFunnelEventName = (typeof publicFunnelEventNames)[number];
@@ -24,7 +24,7 @@ export function trackPublicFunnelEvent(
   name: PublicFunnelEventName,
   payload: Record<string, unknown> = {}
 ) {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || !isPostHogClientEnabled()) {
     return;
   }
 

@@ -30,13 +30,14 @@ export function StartQueuedAnalysisButton({
     setIsSubmitting(true);
     setErrorMessage(null);
     const optimisticNotificationId = `optimistic-workspace-processing:${Date.now()}`;
+    const optimisticSessionId = sessionIds[0] ?? optimisticNotificationId;
 
     dispatchWorkspaceGenerationNotification({
       action: "upsert",
       notification: buildWorkspaceNotificationItem({
         id: optimisticNotificationId,
-        sessionId: sessionIds[0] ?? optimisticNotificationId,
-        dealId: sessionIds[0] ?? optimisticNotificationId,
+        sessionId: optimisticSessionId,
+        dealId: optimisticSessionId,
         draftBrandName: "Your",
         draftCampaignName: "workspace",
         eventType: "workspace.processing_started"
@@ -44,6 +45,8 @@ export function StartQueuedAnalysisButton({
     });
 
     try {
+      router.push(`/app/intake/${optimisticSessionId}?starting=1`);
+
       const response = await fetch("/api/intake/queue/start", {
         method: "POST",
         headers: {
@@ -70,13 +73,16 @@ export function StartQueuedAnalysisButton({
         })
       });
 
-      router.push(`/app/intake/${payload.session.id}`);
+      if (payload.session.id !== optimisticSessionId) {
+        router.replace(`/app/intake/${payload.session.id}?starting=1`);
+      }
       router.refresh();
     } catch (error) {
       dispatchWorkspaceGenerationNotification({
         action: "remove",
         notificationId: optimisticNotificationId
       });
+      router.replace(`/app/intake/${optimisticSessionId}`);
       setErrorMessage(
         error instanceof Error ? error.message : "Could not start analysis."
       );
