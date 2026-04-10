@@ -30,6 +30,14 @@ const DOCUMENT_AI_PROCESSOR_ENV_KEYS: Record<DocumentAiProcessorKind, string> = 
   ocr: "DOCUMENT_AI_OCR_PROCESSOR_ID"
 };
 
+const DOCUMENT_AI_PROCESSOR_VERSION_ENV_KEYS: Record<DocumentAiProcessorKind, string> = {
+  brief: "DOCUMENT_AI_BRIEF_PROCESSOR_VERSION_ID",
+  contract: "DOCUMENT_AI_CONTRACT_PROCESSOR_VERSION_ID",
+  invoice: "DOCUMENT_AI_INVOICE_PROCESSOR_VERSION_ID",
+  layout: "DOCUMENT_AI_LAYOUT_PROCESSOR_VERSION_ID",
+  ocr: "DOCUMENT_AI_OCR_PROCESSOR_VERSION_ID"
+};
+
 let documentAiClientCache:
   | {
       cacheKey: string;
@@ -110,6 +118,10 @@ export function getDocumentAiProcessorId(kind: DocumentAiProcessorKind) {
   return normalizeEnv(process.env[DOCUMENT_AI_PROCESSOR_ENV_KEYS[kind]]);
 }
 
+export function getDocumentAiProcessorVersionId(kind: DocumentAiProcessorKind) {
+  return normalizeEnv(process.env[DOCUMENT_AI_PROCESSOR_VERSION_ENV_KEYS[kind]]);
+}
+
 export function hasDocumentAiProcessor(kind: DocumentAiProcessorKind) {
   return Boolean(getDocumentAiProjectToken() && getDocumentAiProcessorId(kind));
 }
@@ -133,7 +145,12 @@ export function getDocumentAiProcessorName(kind: DocumentAiProcessorKind) {
     );
   }
 
-  return `projects/${projectToken}/locations/${getDocumentAiLocation()}/processors/${processorId}`;
+  const processorName = `projects/${projectToken}/locations/${getDocumentAiLocation()}/processors/${processorId}`;
+  const processorVersionId = getDocumentAiProcessorVersionId(kind);
+
+  return processorVersionId
+    ? `${processorName}/processorVersions/${processorVersionId}`
+    : processorName;
 }
 
 export function getDocumentAiConfigSummary() {
@@ -148,6 +165,13 @@ export function getDocumentAiConfigSummary() {
       invoice: getDocumentAiProcessorId("invoice"),
       layout: getDocumentAiProcessorId("layout"),
       ocr: getDocumentAiProcessorId("ocr")
+    },
+    processorVersions: {
+      brief: getDocumentAiProcessorVersionId("brief"),
+      contract: getDocumentAiProcessorVersionId("contract"),
+      invoice: getDocumentAiProcessorVersionId("invoice"),
+      layout: getDocumentAiProcessorVersionId("layout"),
+      ocr: getDocumentAiProcessorVersionId("ocr")
     }
   };
 }

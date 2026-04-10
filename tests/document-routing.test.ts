@@ -54,7 +54,6 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_invoice",
       processor: "invoice",
-      fallbackRoute: "legacy",
       rolloutEnabled: true
     });
   });
@@ -79,7 +78,6 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_contract",
       processor: "contract",
-      fallbackRoute: "legacy",
       rolloutEnabled: true
     });
   });
@@ -104,12 +102,11 @@ describe("document routing", () => {
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_brief",
       processor: "brief",
-      fallbackRoute: "legacy",
       rolloutEnabled: true
     });
   });
 
-  it("keeps pasted-text invoices on the legacy path", async () => {
+  it("marks pasted-text invoices as unsupported for Document AI extraction", async () => {
     hasDocumentAiProcessorMock.mockReturnValue(true);
     const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
 
@@ -127,14 +124,13 @@ describe("document routing", () => {
     });
 
     expect(decision).toMatchObject({
-      extractionRoute: "legacy",
-      processor: null,
-      fallbackRoute: null
+      extractionRoute: "unsupported",
+      processor: null
     });
     expect(decision.reasons).toContain("invoice_processor_requires_file");
   });
 
-  it("keeps pasted-text contracts on the legacy path", async () => {
+  it("marks pasted-text contracts as unsupported for Document AI extraction", async () => {
     hasDocumentAiProcessorMock.mockReturnValue(true);
     const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
 
@@ -152,14 +148,13 @@ describe("document routing", () => {
     });
 
     expect(decision).toMatchObject({
-      extractionRoute: "legacy",
-      processor: null,
-      fallbackRoute: null
+      extractionRoute: "unsupported",
+      processor: null
     });
     expect(decision.reasons).toContain("contract_processor_requires_file");
   });
 
-  it("keeps pasted-text briefs on the legacy path", async () => {
+  it("marks pasted-text briefs as unsupported for Document AI extraction", async () => {
     hasDocumentAiProcessorMock.mockReturnValue(true);
     const { resolveDocumentRoutingDecision } = await import("@/lib/document-routing");
 
@@ -177,9 +172,8 @@ describe("document routing", () => {
     });
 
     expect(decision).toMatchObject({
-      extractionRoute: "legacy",
-      processor: null,
-      fallbackRoute: null
+      extractionRoute: "unsupported",
+      processor: null
     });
     expect(decision.reasons).toContain("brief_processor_requires_file");
   });
@@ -203,7 +197,7 @@ describe("document routing", () => {
     });
 
     expect(decision).toMatchObject({
-      extractionRoute: "legacy",
+      extractionRoute: "unsupported",
       processor: null,
       rolloutEnabled: false
     });
@@ -229,7 +223,7 @@ describe("document routing", () => {
     });
 
     expect(decision).toMatchObject({
-      extractionRoute: "legacy",
+      extractionRoute: "unsupported",
       processor: null,
       rolloutEnabled: false
     });

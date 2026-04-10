@@ -80,4 +80,20 @@ describe("extractDocumentText", () => {
     expect(processDocumentWithDocumentAiMock).not.toHaveBeenCalled();
     expect(result._debug?.parser).toBe("pdfjs-dist");
   });
+
+  test("fails instead of falling back when Document AI is required", async () => {
+    process.env.DOCUMENT_PIPELINE_V2_FORCE_LEGACY = "1";
+    hasDocumentAiProcessorMock.mockImplementation((kind: string) => kind === "layout");
+
+    await expect(
+      extractDocumentText(
+        Buffer.from("fake-pdf"),
+        "application/pdf",
+        "northstar-skin-spring-glow-campaign-contract.pdf",
+        { preferDocumentAi: true, requireDocumentAi: true }
+      )
+    ).rejects.toThrow("Document AI parsing is not enabled for this document.");
+
+    expect(processDocumentWithDocumentAiMock).not.toHaveBeenCalled();
+  });
 });

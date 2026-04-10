@@ -23,7 +23,15 @@ const originalEnv = {
   DOCUMENT_AI_BRIEF_PROCESSOR_ID: process.env.DOCUMENT_AI_BRIEF_PROCESSOR_ID,
   DOCUMENT_AI_INVOICE_PROCESSOR_ID: process.env.DOCUMENT_AI_INVOICE_PROCESSOR_ID,
   DOCUMENT_AI_LAYOUT_PROCESSOR_ID: process.env.DOCUMENT_AI_LAYOUT_PROCESSOR_ID,
-  DOCUMENT_AI_OCR_PROCESSOR_ID: process.env.DOCUMENT_AI_OCR_PROCESSOR_ID
+  DOCUMENT_AI_OCR_PROCESSOR_ID: process.env.DOCUMENT_AI_OCR_PROCESSOR_ID,
+  DOCUMENT_AI_CONTRACT_PROCESSOR_VERSION_ID:
+    process.env.DOCUMENT_AI_CONTRACT_PROCESSOR_VERSION_ID,
+  DOCUMENT_AI_BRIEF_PROCESSOR_VERSION_ID: process.env.DOCUMENT_AI_BRIEF_PROCESSOR_VERSION_ID,
+  DOCUMENT_AI_INVOICE_PROCESSOR_VERSION_ID:
+    process.env.DOCUMENT_AI_INVOICE_PROCESSOR_VERSION_ID,
+  DOCUMENT_AI_LAYOUT_PROCESSOR_VERSION_ID:
+    process.env.DOCUMENT_AI_LAYOUT_PROCESSOR_VERSION_ID,
+  DOCUMENT_AI_OCR_PROCESSOR_VERSION_ID: process.env.DOCUMENT_AI_OCR_PROCESSOR_VERSION_ID
 };
 
 async function loadDocumentAiModule() {
@@ -59,6 +67,19 @@ describe("document ai foundation", () => {
 
     expect(getDocumentAiProcessorName("contract")).toBe(
       "projects/966263516070/locations/us/processors/contract-processor"
+    );
+  });
+
+  it("uses a pinned processor version when configured", async () => {
+    process.env.GOOGLE_CLOUD_PROJECT_NUMBER = "966263516070";
+    process.env.DOCUMENT_AI_LOCATION = "us";
+    process.env.DOCUMENT_AI_CONTRACT_PROCESSOR_ID = "contract-processor";
+    process.env.DOCUMENT_AI_CONTRACT_PROCESSOR_VERSION_ID = "contract-version";
+
+    const { getDocumentAiProcessorName } = await loadDocumentAiModule();
+
+    expect(getDocumentAiProcessorName("contract")).toBe(
+      "projects/966263516070/locations/us/processors/contract-processor/processorVersions/contract-version"
     );
   });
 

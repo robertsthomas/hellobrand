@@ -37,10 +37,6 @@ function asBoolean(value: unknown) {
   return typeof value === "boolean" ? value : false;
 }
 
-function asString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
-}
-
 function payloadOf(artifact: DocumentArtifactRecord) {
   return artifact.payload ?? {};
 }
@@ -150,7 +146,7 @@ export function summarizeDocumentRunObservability(input: {
       }
 
       const payload = payloadOf(artifact);
-      return asBoolean(payload.usedFallback) || Boolean(asString(payload.fallbackRoute));
+      return asBoolean(payload.usedFallback);
     }).length,
     processorsUsed: summarizeProcessors(artifacts),
     stages: collectStageMetrics(artifacts)

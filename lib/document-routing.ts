@@ -9,7 +9,7 @@ import type {
 } from "@/lib/types";
 
 export type DocumentExtractionRoute =
-  | "legacy"
+  | "unsupported"
   | "document_ai_invoice"
   | "document_ai_contract"
   | "document_ai_brief";
@@ -18,7 +18,6 @@ export interface DocumentRoutingDecision {
   classification: DocumentClassificationResult;
   extractionRoute: DocumentExtractionRoute;
   processor: DocumentAiProcessorKind | null;
-  fallbackRoute: DocumentExtractionRoute | null;
   rolloutEnabled: boolean;
   cohortBucket: number;
   reasons: string[];
@@ -96,9 +95,8 @@ export function resolveDocumentRoutingDecision(input: {
   if (!rollout.enabled) {
     return {
       classification,
-      extractionRoute: "legacy" as const,
+      extractionRoute: "unsupported" as const,
       processor: null,
-      fallbackRoute: null,
       rolloutEnabled: false,
       cohortBucket: rollout.cohortBucket,
       reasons
@@ -110,9 +108,8 @@ export function resolveDocumentRoutingDecision(input: {
       reasons.push("invoice_processor_requires_file");
       return {
         classification,
-        extractionRoute: "legacy" as const,
+        extractionRoute: "unsupported" as const,
         processor: null,
-        fallbackRoute: null,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -125,7 +122,6 @@ export function resolveDocumentRoutingDecision(input: {
         classification,
         extractionRoute: "document_ai_invoice" as const,
         processor: "invoice" as const,
-        fallbackRoute: "legacy" as const,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -140,9 +136,8 @@ export function resolveDocumentRoutingDecision(input: {
       reasons.push("contract_processor_requires_file");
       return {
         classification,
-        extractionRoute: "legacy" as const,
+        extractionRoute: "unsupported" as const,
         processor: null,
-        fallbackRoute: null,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -155,7 +150,6 @@ export function resolveDocumentRoutingDecision(input: {
         classification,
         extractionRoute: "document_ai_contract" as const,
         processor: "contract" as const,
-        fallbackRoute: "legacy" as const,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -174,9 +168,8 @@ export function resolveDocumentRoutingDecision(input: {
       reasons.push("brief_processor_requires_file");
       return {
         classification,
-        extractionRoute: "legacy" as const,
+        extractionRoute: "unsupported" as const,
         processor: null,
-        fallbackRoute: null,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -189,7 +182,6 @@ export function resolveDocumentRoutingDecision(input: {
         classification,
         extractionRoute: "document_ai_brief" as const,
         processor: "brief" as const,
-        fallbackRoute: "legacy" as const,
         rolloutEnabled: true,
         cohortBucket: rollout.cohortBucket,
         reasons
@@ -201,9 +193,8 @@ export function resolveDocumentRoutingDecision(input: {
 
   return {
     classification,
-    extractionRoute: "legacy" as const,
+    extractionRoute: "unsupported" as const,
     processor: null,
-    fallbackRoute: null,
     rolloutEnabled: true,
     cohortBucket: rollout.cohortBucket,
     reasons

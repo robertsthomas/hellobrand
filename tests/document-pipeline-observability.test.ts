@@ -48,7 +48,7 @@ describe("document pipeline observability", () => {
             event: "extract_fields_metrics",
             estimatedCostUsd: 0.15,
             pageCount: 5,
-            usedFallback: true
+            usedFallback: false
           },
           createdAt: "2026-04-09T12:00:10.000Z"
         },
@@ -127,7 +127,7 @@ describe("document pipeline observability", () => {
     expect(summary?.pagesProcessed).toBe(10);
     expect(summary?.extractionConfidence).toBe(0.88);
     expect(summary?.openReviewItems).toBe(2);
-    expect(summary?.fallbackCount).toBe(1);
+    expect(summary?.fallbackCount).toBe(0);
     expect(summary?.processorsUsed).toEqual(["document-ai:layout", "contract", "document_ai:contract_custom_extractor"]);
     expect(summary?.stages.extract_text?.durationMs).toBe(1200);
   });

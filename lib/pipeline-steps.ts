@@ -1,15 +1,10 @@
 import {
   analyzeCreatorRisks,
   buildCreatorSummary,
-  extractBriefData,
-  extractStructuredTerms,
-  mergeExtractionResults,
   splitIntoSections
 } from "@/lib/analysis/fallback";
 import {
   analyzeRisksWithLlm,
-  extractBriefWithLlm,
-  extractSectionWithLlm,
   generateSummaryWithLlm,
   getLlmRoute,
   hasLlmKey
@@ -57,12 +52,10 @@ import {
   hasMeaningfulChanges,
   planExtractionMerge
 } from "@/lib/pending-changes";
-import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getRepository } from "@/lib/repository";
 import { readStoredBytes } from "@/lib/storage";
 import type {
   DealAggregate,
-  DocumentKind,
   DocumentArtifactKind,
   DocumentEvidenceSourceType,
   DocumentReviewItemReason,
@@ -81,118 +74,6 @@ export class DocumentRunSupersededError extends Error {
     super(`Document processing run superseded for document ${documentId} (${runId}).`);
     this.name = "DocumentRunSupersededError";
   }
-}
-
-function llmSectionLimits() {
-  const model = getLlmRoute("extract_section").primary.toLowerCase();
-  const usingFreeModel =
-    model.includes("openrouter/free") || model.includes(":free") || model.includes("/free");
-
-  return usingFreeModel
-    ? { maxSections: 6, concurrency: 2, usingFreeModel: true }
-    : { maxSections: 14, concurrency: 6, usingFreeModel: false };
-}
-
-function scoreSectionForLlm(
-  section: { title: string; content: string; chunkIndex: number },
-  documentKind: DocumentKind
-) {
-  const title = section.title.toLowerCase();
-  const content = section.content.toLowerCase();
-  let score = Math.min(section.content.length, 4000) / 100;
-
-  if (title === "general") {
-    score -= 15;
-  }
-
-  if (section.content.length < 80) {
-    score -= 12;
-  }
-
-  const keywordGroups: Record<DocumentKind | "shared", string[]> = {
-    shared: [
-      "payment",
-      "compensation",
-      "rate",
-      "fee",
-      "deliverable",
-      "usage",
-      "rights",
-      "whitelist",
-      "exclusiv",
-      "revision",
-      "termination",
-      "campaign",
-      "brand"
-    ],
-    contract: ["agreement", "term", "services", "scope", "content", "payment terms"],
-    deliverables_brief: ["deliverables", "timeline", "post", "story", "reel", "tiktok"],
-    campaign_brief: ["brief", "messaging", "concept", "brand guidelines"],
-    pitch_deck: ["overview", "campaign", "deliverables", "brand"],
-    invoice: ["invoice", "amount", "total", "net", "payment", "client"],
-    email_thread: ["subject:", "from:", "usage", "rate", "deadline", "follow up"],
-    unknown: ["agreement", "campaign", "deliverables", "payment"]
-  };
-
-  for (const keyword of keywordGroups.shared) {
-    if (title.includes(keyword) || content.includes(keyword)) {
-      score += 8;
-    }
-  }
-
-  for (const keyword of keywordGroups[documentKind]) {
-    if (title.includes(keyword) || content.includes(keyword)) {
-      score += 10;
-    }
-  }
-
-  return score;
-}
-
-function selectSectionsForLlm(
-  sections: Array<{ title: string; content: string; chunkIndex: number }>,
-  documentKind: DocumentKind
-) {
-  const limits = llmSectionLimits();
-  const selected = [...sections]
-    .map((section) => ({
-      section,
-      score: scoreSectionForLlm(section, documentKind)
-    }))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, limits.maxSections)
-    .sort((left, right) => left.section.chunkIndex - right.section.chunkIndex)
-    .map((entry) => entry.section);
-
-  return {
-    ...limits,
-    selected
-  };
-}
-
-async function mapWithConcurrency<TInput, TOutput>(
-  values: TInput[],
-  concurrency: number,
-  worker: (value: TInput, index: number) => Promise<TOutput>
-) {
-  const results = new Array<TOutput>(values.length);
-  let nextIndex = 0;
-
-  async function runWorker() {
-    while (nextIndex < values.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await worker(values[currentIndex], currentIndex);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () =>
-      runWorker()
-    )
-  );
-
-  return results;
 }
 
 function isSupersededError(error: unknown): error is DocumentRunSupersededError {
@@ -595,142 +476,6 @@ async function loadExtractionFromRecords(document: DocumentRecord) {
   });
 }
 
-async function runLegacyExtractFields(input: {
-  document: DocumentRecord;
-  sections: DocumentSectionRecord[];
-  preferredCreatorName: string;
-  viewer: Viewer;
-}) {
-  const llmPlan = selectSectionsForLlm(input.sections, input.document.documentKind);
-  const llmSectionIds = new Set(llmPlan.selected.map((section) => section.chunkIndex));
-
-  logDocumentPipeline("info", "llm_section_plan", {
-    dealId: input.document.dealId,
-    documentId: input.document.id,
-    fileName: input.document.fileName,
-    model: hasLlmKey() ? getLlmRoute("extract_section").primary : null,
-    fallbacks: hasLlmKey() ? getLlmRoute("extract_section").fallbacks : [],
-    usingFreeModel: llmPlan.usingFreeModel,
-    selectedSectionCount: llmPlan.selected.length,
-    totalSectionCount: input.sections.length,
-    concurrency: llmPlan.concurrency,
-    selectedSections: llmPlan.selected.map((section) => ({
-      chunkIndex: section.chunkIndex,
-      title: section.title,
-      chars: section.content.length
-    }))
-  });
-
-  const partialExtractions = await mapWithConcurrency(
-    input.sections,
-    llmPlan.concurrency,
-    async (section) => {
-      const fallback = extractStructuredTerms(
-        section.content,
-        [section],
-        input.document.documentKind
-      );
-
-      if (!hasLlmKey() || !llmSectionIds.has(section.chunkIndex)) {
-        return fallback;
-      }
-
-      try {
-        return await extractSectionWithLlm(section, input.document.documentKind, fallback);
-      } catch {
-        return fallback;
-      }
-    }
-  );
-
-  logDocumentPipeline("info", "field_extraction_complete", {
-    dealId: input.document.dealId,
-    documentId: input.document.id,
-    fileName: input.document.fileName,
-    sectionCount: input.sections.length,
-    extractionCount: partialExtractions.length,
-    usedLlm: hasLlmKey(),
-    extractionRoute: "legacy"
-  });
-
-  const extraction = mergeExtractionResults(partialExtractions as ExtractionPipelineResult[]);
-  const sanitizedExtraction = finalizeDocumentExtraction(
-    input.document.normalizedText ?? "",
-    extraction,
-    input.preferredCreatorName
-  );
-
-  if (
-    input.document.documentKind === "campaign_brief" ||
-    input.document.documentKind === "deliverables_brief" ||
-    input.document.documentKind === "pitch_deck"
-  ) {
-    const fallbackBrief = extractBriefData(
-      input.document.normalizedText ?? "",
-      input.document.documentKind
-    );
-    if (fallbackBrief) {
-      fallbackBrief.sourceDocumentIds = [input.document.id];
-      let briefData = fallbackBrief;
-
-      if (hasLlmKey()) {
-        try {
-          briefData = await extractBriefWithLlm(
-            input.document.normalizedText ?? "",
-            input.document.documentKind,
-            fallbackBrief
-          );
-        } catch {
-          // Keep fallback brief data.
-        }
-      }
-
-      sanitizedExtraction.data.briefData = briefData;
-    }
-  }
-
-  const categoryEnrichment = await enrichBrandCategoryWithPeopleDataLabs(
-    sanitizedExtraction.data.brandName
-  );
-
-  if (categoryEnrichment?.category) {
-    const previousCategory = sanitizedExtraction.data.brandCategory;
-    sanitizedExtraction.data.brandCategory = categoryEnrichment.category;
-    sanitizedExtraction.evidence = [
-      ...sanitizedExtraction.evidence,
-      {
-        fieldPath: "brandCategory",
-        snippet:
-          categoryEnrichment.snippet ??
-          `${categoryEnrichment.brandName} matched ${categoryEnrichment.category}.`,
-        sectionKey: null,
-        confidence: categoryEnrichment.confidence
-      }
-    ];
-
-    if (previousCategory && previousCategory !== categoryEnrichment.category) {
-      sanitizedExtraction.evidence.push({
-        fieldPath: "brandCategory",
-        snippet: `${categoryEnrichment.brandName} company enrichment overrides a conflicting detected category.`,
-        sectionKey: null,
-        confidence: categoryEnrichment.confidence
-      });
-    }
-
-    logDocumentPipeline("info", "brand_category_enriched", {
-      dealId: input.document.dealId,
-      documentId: input.document.id,
-      brandName: categoryEnrichment.brandName,
-      previousCategory,
-      enrichedCategory: categoryEnrichment.category,
-      confidence: categoryEnrichment.confidence,
-      website: categoryEnrichment.website
-    });
-  }
-
-  return sanitizedExtraction;
-}
-
 export async function runExtractTextStep(documentId: string, runId: string) {
   return executePipelineStep({ documentId, runId, step: "extract_text" }, async ({ document }) => {
     logDocumentPipeline("info", "pipeline_start", {
@@ -759,6 +504,7 @@ export async function runExtractTextStep(documentId: string, runId: string) {
             document.fileName,
             {
               preferDocumentAi: true,
+              requireDocumentAi: true,
               rollout: {
                 dealId: document.dealId,
                 documentId: document.id,
@@ -847,7 +593,6 @@ export async function runClassifyDocumentStep(documentId: string, runId: string)
       confidence: classification.confidence,
       extractionRoute: routing.extractionRoute,
       processor: routing.processor,
-      fallbackRoute: routing.fallbackRoute,
       reasons: routing.reasons,
       runId
     });
@@ -880,7 +625,6 @@ export async function runClassifyDocumentStep(documentId: string, runId: string)
         documentKind: classification.documentKind,
         confidence: classification.confidence,
         extractionRoute: routing.extractionRoute,
-        fallbackRoute: routing.fallbackRoute,
         rolloutEnabled: routing.rolloutEnabled,
         cohortBucket: routing.cohortBucket,
         reasons: routing.reasons
@@ -943,8 +687,6 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
     let routeProcessor: string | null = null;
     let pageCount: number | null = null;
     let entityCount: number | null = null;
-    let usedFallback = false;
-    let fallbackReason: string | null = null;
 
     logDocumentPipeline("info", "document_routed", {
       dealId: document.dealId,
@@ -954,7 +696,6 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
       confidence: document.classificationConfidence,
       extractionRoute: routing.extractionRoute,
       processor: routing.processor,
-      fallbackRoute: routing.fallbackRoute,
       reasons: routing.reasons,
       runId
     });
@@ -992,6 +733,7 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           error: getErrorMessage(error),
           runId
         });
+        throw error;
       }
 
       if (briefExtraction && hasMeaningfulBriefExtraction(briefExtraction)) {
@@ -1020,22 +762,16 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
-        usedFallback = true;
-        fallbackReason = briefExtraction ? "empty_brief_extraction" : "brief_processor_failed";
-        logDocumentPipeline("info", "document_ai_brief_fallback", {
+        const reason = briefExtraction ? "empty_brief_extraction" : "brief_processor_failed";
+        logDocumentPipeline("error", "document_ai_brief_rejected", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
-          extractionRoute: "legacy",
-          reason: fallbackReason,
+          extractionRoute: routing.extractionRoute,
+          reason,
           runId
         });
-        sanitizedExtraction = await runLegacyExtractFields({
-          document,
-          sections,
-          preferredCreatorName,
-          viewer
-        });
+        throw new Error(`Document AI brief extraction failed: ${reason}.`);
       }
     } else if (routing.extractionRoute === "document_ai_contract") {
       let contractExtraction: ExtractionPipelineResult | null = null;
@@ -1070,6 +806,7 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           error: getErrorMessage(error),
           runId
         });
+        throw error;
       }
 
       if (contractExtraction && hasMeaningfulContractExtraction(contractExtraction)) {
@@ -1091,22 +828,18 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
-        usedFallback = true;
-        fallbackReason = contractExtraction ? "empty_contract_extraction" : "contract_processor_failed";
-        logDocumentPipeline("info", "document_ai_contract_fallback", {
+        const reason = contractExtraction
+          ? "empty_contract_extraction"
+          : "contract_processor_failed";
+        logDocumentPipeline("error", "document_ai_contract_rejected", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
-          extractionRoute: "legacy",
-          reason: fallbackReason,
+          extractionRoute: routing.extractionRoute,
+          reason,
           runId
         });
-        sanitizedExtraction = await runLegacyExtractFields({
-          document,
-          sections,
-          preferredCreatorName,
-          viewer
-        });
+        throw new Error(`Document AI contract extraction failed: ${reason}.`);
       }
     } else if (routing.extractionRoute === "document_ai_invoice") {
       let invoiceExtraction: ExtractionPipelineResult | null = null;
@@ -1141,6 +874,7 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           error: getErrorMessage(error),
           runId
         });
+        throw error;
       }
 
       if (invoiceExtraction && hasMeaningfulInvoiceExtraction(invoiceExtraction)) {
@@ -1162,30 +896,29 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
           runId
         });
       } else {
-        usedFallback = true;
-        fallbackReason = invoiceExtraction ? "empty_invoice_extraction" : "invoice_processor_failed";
-        logDocumentPipeline("info", "document_ai_invoice_fallback", {
+        const reason = invoiceExtraction ? "empty_invoice_extraction" : "invoice_processor_failed";
+        logDocumentPipeline("error", "document_ai_invoice_rejected", {
           dealId: document.dealId,
           documentId: document.id,
           fileName: document.fileName,
-          extractionRoute: "legacy",
-          reason: fallbackReason,
+          extractionRoute: routing.extractionRoute,
+          reason,
           runId
         });
-        sanitizedExtraction = await runLegacyExtractFields({
-          document,
-          sections,
-          preferredCreatorName,
-          viewer
-        });
+        throw new Error(`Document AI invoice extraction failed: ${reason}.`);
       }
     } else {
-      sanitizedExtraction = await runLegacyExtractFields({
-        document,
-        sections,
-        preferredCreatorName,
-        viewer
+      logDocumentPipeline("error", "document_ai_route_unsupported", {
+        dealId: document.dealId,
+        documentId: document.id,
+        fileName: document.fileName,
+        extractionRoute: routing.extractionRoute,
+        reasons: routing.reasons,
+        runId
       });
+      throw new Error(
+        `Document AI extraction is not available for ${document.documentKind}: ${routing.reasons.join(", ")}.`
+      );
     }
     const extractionEvidence = Array.isArray(sanitizedExtraction.evidence)
       ? sanitizedExtraction.evidence
@@ -1262,9 +995,7 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
         event: "extract_fields_metrics",
         extractionRoute: routing.extractionRoute,
         processor: routeProcessor ?? routing.processor,
-        fallbackRoute: routing.fallbackRoute,
-        usedFallback,
-        fallbackReason,
+        usedFallback: false,
         pageCount,
         entityCount,
         evidenceCount: extractionEvidence.length,
@@ -1351,7 +1082,7 @@ export async function runAnalyzeRisksStep(documentId: string, runId: string) {
     const fallbackRisks = analyzeCreatorRisks(
       document.normalizedText,
       document.id,
-      extraction as ReturnType<typeof extractStructuredTerms>
+      extraction as Parameters<typeof analyzeCreatorRisks>[2]
     );
     const risks = !hasLlmKey()
       ? fallbackRisks
@@ -1391,7 +1122,7 @@ export async function runGenerateSummaryStep(documentId: string, runId: string) 
     const extraction = await loadExtractionFromRecords(document);
     const risks = await repository.listRiskFlagsForDocument(document.dealId, document.id);
     const fallbackSummary = buildCreatorSummary(
-      extraction as ReturnType<typeof extractStructuredTerms>,
+      extraction as Parameters<typeof buildCreatorSummary>[0],
       risks
     );
     const summary = !hasLlmKey()

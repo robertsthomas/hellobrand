@@ -38,7 +38,12 @@ type TermsData = Omit<
   DealTermsRecord,
   "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"
 >;
-type LlmTask = "extract_section" | "analyze_risks" | "generate_summary" | "generate_brief";
+type LlmTask =
+  | "extract_section"
+  | "analyze_risks"
+  | "generate_summary"
+  | "generate_brief"
+  | "consolidate_clauses";
 type LlmRoute = {
   primary: string;
   fallbacks: string[];
@@ -109,6 +114,38 @@ const generatedBriefResponseSchema = z.object({
   ).default([])
 });
 
+const clauseConsolidationResponseSchema = z.object({
+  usageRights: z.string().trim().nullable().optional(),
+  exclusivity: z.string().trim().nullable().optional(),
+  deliverablesSummary: z.string().trim().nullable().optional(),
+  termination: z.string().trim().nullable().optional(),
+  notes: z.string().trim().nullable().optional()
+});
+
+export interface ClauseConsolidationInput {
+  usageRights: string[];
+  exclusivity: string[];
+  deliverables: string[];
+  termination: string[];
+  notes: string[];
+  fallback: {
+    usageRights: string | null;
+    exclusivity: string | null;
+    deliverablesSummary: string | null;
+    termination: string | null;
+    notes: string | null;
+  };
+}
+
+export interface ClauseConsolidationResult {
+  usageRights: string | null;
+  exclusivity: string | null;
+  deliverablesSummary: string | null;
+  termination: string | null;
+  notes: string | null;
+  model: string;
+}
+
 function shouldLogLlmDebug() {
   return process.env.DEBUG_DOCUMENT_PIPELINE === "1" || process.env.NODE_ENV !== "production";
 }
@@ -152,6 +189,7 @@ function taskSpecificModel(task: LlmTask) {
       return process.env.OPENROUTER_MODEL_RISKS || null;
     case "generate_summary":
     case "generate_brief":
+    case "consolidate_clauses":
       return process.env.OPENROUTER_MODEL_CONTENT || null;
     default:
       return null;
@@ -166,6 +204,7 @@ function taskSpecificFallbacks(task: LlmTask) {
       return parseModelList(process.env.OPENROUTER_MODEL_RISKS_FALLBACKS);
     case "generate_summary":
     case "generate_brief":
+    case "consolidate_clauses":
       return parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS);
     default:
       return [];
@@ -191,6 +230,10 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
       fallbacks: ["openai/gpt-5-mini"]
     },
     generate_brief: {
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-mini"]
+    },
+    consolidate_clauses: {
       primary: "google/gemini-3-flash-preview",
       fallbacks: ["openai/gpt-5-mini"]
     }
@@ -641,6 +684,70 @@ function briefGenerationSystemPrompt() {
       tag: "output_contract",
       content:
         'Return JSON: { "sections": [{ "id": "campaign-overview", "title": "...", "content": "...", "items": ["..."] }] }.'
+    }
+  ]);
+}
+
+function clauseConsolidationSystemPrompt() {
+  return joinPromptSections([
+    {
+      tag: "role",
+      content:
+        "You consolidate repeated creator partnership contract clauses after Google Document AI extraction. You are not an extractor. You rewrite only the provided extracted snippets into concise, faithful summaries."
+    },
+    {
+      tag: "rules",
+      content: promptNumbered([
+        "Use only the provided snippets. Do not add legal interpretation, risk analysis, or missing terms.",
+        "If snippets repeat the same idea, deduplicate them.",
+        "If snippets conflict, preserve the conflict in neutral language instead of choosing one side.",
+        "Keep important conditions, durations, territories, exceptions, quantities, and party obligations.",
+        "Return null for a field when there are no snippets for that field.",
+        "Keep deliverables summary concise. Do not replace structured deliverable quantities when they are already clear.",
+        "Write in plain text only. No markdown bullets, no numbered lists, no headings."
+      ])
+    },
+    {
+      tag: "output_contract",
+      content:
+        'Return JSON: { "usageRights": "...", "exclusivity": "...", "deliverablesSummary": "...", "termination": "...", "notes": "..." }.'
+    }
+  ]);
+}
+
+function clauseConsolidationUserPrompt(input: ClauseConsolidationInput) {
+  return joinPromptSections([
+    {
+      tag: "context",
+      content: promptBullets([
+        `Today: ${isoDateContext()}`,
+        "Source: Google Document AI custom extractor entities",
+        "Task: summarize repeated occurrences for downstream deal terms"
+      ])
+    },
+    {
+      tag: "fallback_values",
+      content: promptQuotedText(JSON.stringify(input.fallback, null, 2))
+    },
+    {
+      tag: "usage_rights_snippets",
+      content: promptQuotedText(JSON.stringify(input.usageRights, null, 2))
+    },
+    {
+      tag: "exclusivity_snippets",
+      content: promptQuotedText(JSON.stringify(input.exclusivity, null, 2))
+    },
+    {
+      tag: "deliverables_snippets",
+      content: promptQuotedText(JSON.stringify(input.deliverables, null, 2))
+    },
+    {
+      tag: "termination_snippets",
+      content: promptQuotedText(JSON.stringify(input.termination, null, 2))
+    },
+    {
+      tag: "notes_snippets",
+      content: promptQuotedText(JSON.stringify(input.notes, null, 2))
     }
   ]);
 }
@@ -1160,6 +1267,44 @@ export async function generateSimplifiedSummaryWithLlm(input: {
         : toPlainDealSummary(asString(payload.body) ?? input.fallback.body)) ??
       input.fallback.body,
     version: `llm:${input.targetType}:${getLlmModel("generate_summary")}`
+  };
+}
+
+export async function consolidateClausesWithLlm(
+  input: ClauseConsolidationInput
+): Promise<ClauseConsolidationResult> {
+  const payload = await requestStructured(
+    "consolidate_clauses",
+    clauseConsolidationSystemPrompt(),
+    clauseConsolidationUserPrompt(input),
+    clauseConsolidationResponseSchema,
+    input.fallback,
+    {
+      requestType: "consolidate_clauses",
+      usageRightsCount: input.usageRights.length,
+      exclusivityCount: input.exclusivity.length,
+      deliverablesCount: input.deliverables.length,
+      terminationCount: input.termination.length,
+      notesCount: input.notes.length
+    }
+  );
+
+  return {
+    usageRights:
+      toPlainDealSummary(asString(payload.usageRights) ?? "") ??
+      input.fallback.usageRights,
+    exclusivity:
+      toPlainDealSummary(asString(payload.exclusivity) ?? "") ??
+      input.fallback.exclusivity,
+    deliverablesSummary:
+      toPlainDealSummary(asString(payload.deliverablesSummary) ?? "") ??
+      input.fallback.deliverablesSummary,
+    termination:
+      toPlainDealSummary(asString(payload.termination) ?? "") ??
+      input.fallback.termination,
+    notes:
+      toPlainDealSummary(asString(payload.notes) ?? "") ?? input.fallback.notes,
+    model: getLlmModel("consolidate_clauses")
   };
 }
 

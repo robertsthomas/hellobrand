@@ -10,6 +10,7 @@ export type AiTaskKey =
   | "analyze_risks"
   | "generate_summary"
   | "generate_brief"
+  | "consolidate_clauses"
   | "email_summary"
   | "email_draft"
   | "email_suggestions"
@@ -198,6 +199,18 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     routeVersion: "brief.route.v3",
     throttle: true
   },
+  consolidate_clauses: {
+    taskKey: "consolidate_clauses",
+    featureKey: "document_analysis",
+    routeClass: "speed",
+    primary: "google/gemini-3-flash-preview",
+    fallbacks: ["openai/gpt-5-mini"],
+    maxTokens: 2048,
+    cacheTtlSeconds: 60 * 60 * 24 * 30,
+    cachePromptVersion: "clause-consolidation.v1",
+    routeVersion: "clause-consolidation.route.v1",
+    throttle: true
+  },
   email_summary: {
     taskKey: "email_summary",
     featureKey: "premium_inbox",
@@ -356,6 +369,7 @@ function getTaskSpecificEnvVar(taskKey: AiTaskKey): string | null {
       return "OPENROUTER_MODEL_RISKS";
     case "generate_summary":
     case "generate_brief":
+    case "consolidate_clauses":
       return "OPENROUTER_MODEL_CONTENT";
     case "email_summary":
     case "email_draft":
@@ -381,6 +395,7 @@ function taskEnvFallbacks(taskKey: AiTaskKey) {
       ]);
     case "generate_summary":
     case "generate_brief":
+    case "consolidate_clauses":
       return uniqueModels([
         ...parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS),
         ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)

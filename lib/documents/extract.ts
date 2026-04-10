@@ -205,6 +205,7 @@ export type ExtractionResult = {
 
 export type ExtractDocumentTextOptions = {
   preferDocumentAi?: boolean;
+  requireDocumentAi?: boolean;
   rollout?: {
     dealId?: string | null;
     documentId?: string | null;
@@ -326,17 +327,31 @@ export async function extractDocumentText(
       userId: options.rollout?.userId,
       fileName
     });
+
+    if (!canUseDocumentAi) {
+      failures.push("Document AI parsing is not enabled for this document.");
+      if (options.requireDocumentAi) {
+        throw new UnreadableDocumentError(failures.join(" | "));
+      }
+    }
+
     try {
       if (canUseDocumentAi) {
         const result = await extractTextWithDocumentAi(buffer, mimeType, fileName);
         if (result) {
           return result;
         }
+
+        failures.push("Document AI has no configured text processor for this document.");
       }
     } catch (documentAiError) {
       failures.push(
         documentAiError instanceof Error ? documentAiError.message : String(documentAiError)
       );
+    }
+
+    if (options.requireDocumentAi && failures.length > 0) {
+      throw new UnreadableDocumentError(failures.join(" | "));
     }
   }
 

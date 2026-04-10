@@ -138,4 +138,71 @@ describe("document ai contract mapping", () => {
 
     expect(extraction.conflicts).toContain("brandName");
   });
+
+  it("combines repeated clause-like entities and preserves each evidence snippet", () => {
+    const extraction = mapDocumentAiContractToExtraction({
+      deal: {
+        brandName: null,
+        campaignName: null
+      },
+      document: {
+        text: "Usage one Usage two Termination one Termination two",
+        entities: [
+          {
+            type: "usage_rights",
+            mentionText: "Organic usage on brand social channels",
+            textAnchor: { textSegments: [{ startIndex: 0, endIndex: 9 }] },
+            confidence: 0.8
+          },
+          {
+            type: "usage_rights",
+            mentionText: "Paid amplification for 30 days",
+            textAnchor: { textSegments: [{ startIndex: 10, endIndex: 19 }] },
+            confidence: 0.9
+          },
+          {
+            type: "termination_summary",
+            mentionText: "Brand may terminate for creator breach",
+            textAnchor: { textSegments: [{ startIndex: 20, endIndex: 35 }] },
+            confidence: 0.82
+          },
+          {
+            type: "termination_summary",
+            mentionText: "Creator may terminate for non-payment",
+            textAnchor: { textSegments: [{ startIndex: 36, endIndex: 51 }] },
+            confidence: 0.78
+          },
+          {
+            type: "deliverables_summary",
+            mentionText: "1 TikTok video",
+            confidence: 0.85
+          },
+          {
+            type: "deliverables_summary",
+            mentionText: "2 Instagram stories",
+            confidence: 0.84
+          }
+        ]
+      }
+    });
+
+    expect(extraction.data.usageRights).toContain(
+      "1. Organic usage on brand social channels"
+    );
+    expect(extraction.data.usageRights).toContain("2. Paid amplification for 30 days");
+    expect(extraction.data.termination).toContain("1. Brand may terminate for creator breach");
+    expect(extraction.data.termination).toContain("2. Creator may terminate for non-payment");
+    expect(extraction.data.deliverables.map((deliverable) => deliverable.title)).toEqual([
+      "TikTok Video",
+      "Instagram Stories"
+    ]);
+    expect(extraction.evidence.filter((entry) => entry.fieldPath === "usageRights")).toHaveLength(
+      2
+    );
+    expect(extraction.evidence.filter((entry) => entry.fieldPath === "termination")).toHaveLength(
+      2
+    );
+    expect(extraction.conflicts).not.toContain("usageRights");
+    expect(extraction.conflicts).not.toContain("exclusivity");
+  });
 });

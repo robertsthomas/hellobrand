@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { protos } from "@google-cloud/documentai";
 
+import {
+  consolidateClausesWithLlm,
+  hasLlmKey
+} from "@/lib/analysis/llm";
 import { createEmptyTerms } from "@/lib/document-pipeline-shared";
 import {
   extractDocumentAiTextAnchor,
@@ -14,6 +18,14 @@ type DocumentAiEntity = protos.google.cloud.documentai.v1.Document.IEntity;
 
 const CONTRACT_SCHEMA_VERSION = "document-ai-contract-v1";
 const CONTRACT_MODEL = "document_ai:contract_custom_extractor";
+
+const CONSOLIDATED_CLAUSE_FIELDS = [
+  "usageRights",
+  "exclusivity",
+  "deliverables",
+  "termination",
+  "notes"
+] as const;
 
 function normalizeString(value: string | null | undefined) {
   const trimmed = value?.trim();
@@ -89,6 +101,72 @@ function pickBestEntity(entities: DocumentAiEntity[]) {
   })[0] ?? null;
 }
 
+function entityPosition(entity: DocumentAiEntity) {
+  const segment = entity.textAnchor?.textSegments?.[0];
+  const rawStart = segment?.startIndex;
+  if (typeof rawStart === "number") {
+    return rawStart;
+  }
+
+  if (typeof rawStart === "string") {
+    const parsed = Number.parseInt(rawStart, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  const page = entity.pageAnchor?.pageRefs?.[0]?.page;
+  if (typeof page === "number") {
+    return page * 1_000_000;
+  }
+
+  if (typeof page === "string") {
+    const parsed = Number.parseInt(page, 10);
+    if (Number.isFinite(parsed)) {
+      return parsed * 1_000_000;
+    }
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function orderEntitiesByDocumentPosition(entities: DocumentAiEntity[]) {
+  return entities
+    .map((entity, index) => ({ entity, index }))
+    .sort((left, right) => {
+      const positionDelta = entityPosition(left.entity) - entityPosition(right.entity);
+      return positionDelta === 0 ? left.index - right.index : positionDelta;
+    })
+    .map(({ entity }) => entity);
+}
+
+function collectDistinctEntityTexts(document: DocumentAiDocument, entities: DocumentAiEntity[]) {
+  const seen = new Set<string>();
+  const values: string[] = [];
+
+  for (const entity of orderEntitiesByDocumentPosition(entities)) {
+    const text = entityText(document, entity);
+    const key = text?.toLowerCase();
+    if (!text || !key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    values.push(text);
+  }
+
+  return values;
+}
+
+function combineClauseEntities(document: DocumentAiDocument, entities: DocumentAiEntity[]) {
+  const values = collectDistinctEntityTexts(document, entities);
+  if (values.length <= 1) {
+    return values[0] ?? null;
+  }
+
+  return values.map((value, index) => `${index + 1}. ${value}`).join("\n");
+}
+
 function pushEvidence(
   evidence: FieldEvidence[],
   fieldPath: string,
@@ -112,6 +190,17 @@ function pushEvidence(
       : null,
     confidence: getConfidence(entity)
   });
+}
+
+function pushEvidenceForEntities(
+  evidence: FieldEvidence[],
+  fieldPath: string,
+  document: DocumentAiDocument,
+  entities: DocumentAiEntity[]
+) {
+  for (const entity of orderEntitiesByDocumentPosition(entities)) {
+    pushEvidence(evidence, fieldPath, document, entity);
+  }
 }
 
 function averageConfidence(evidence: FieldEvidence[]) {
@@ -152,7 +241,12 @@ function parseDeliverablesFromSummary(summary: string | null) {
     return [];
   }
 
-  const deliverables: ReturnType<typeof createEmptyTerms>["deliverables"] = [];
+  const deliverableMatches: Array<{
+    index: number;
+    channel: string;
+    noun: string;
+    quantity: number;
+  }> = [];
   const patterns = [
     {
       pattern: /(\d+)\s+instagram\s+(post|story|stories|reel|reels)/gi,
@@ -172,17 +266,26 @@ function parseDeliverablesFromSummary(summary: string | null) {
     for (const match of summary.matchAll(pattern)) {
       const quantity = Number.parseInt(match[1] ?? "1", 10);
       const noun = match[2] ?? "deliverable";
-      deliverables.push({
-        id: randomUUID(),
-        title: `${channel} ${noun}`.replace(/\b\w/g, (value) => value.toUpperCase()),
-        dueDate: null,
+      deliverableMatches.push({
+        index: match.index ?? Number.MAX_SAFE_INTEGER,
         channel,
-        quantity: Number.isFinite(quantity) ? quantity : 1,
-        status: "pending",
-        description: null
+        noun,
+        quantity: Number.isFinite(quantity) ? quantity : 1
       });
     }
   }
+
+  const deliverables: ReturnType<typeof createEmptyTerms>["deliverables"] = deliverableMatches
+    .sort((left, right) => left.index - right.index)
+    .map((match) => ({
+      id: randomUUID(),
+      title: `${match.channel} ${match.noun}`.replace(/\b\w/g, (value) => value.toUpperCase()),
+      dueDate: null,
+      channel: match.channel,
+      quantity: match.quantity,
+      status: "pending",
+      description: null
+    }));
 
   if (deliverables.length === 0) {
     deliverables.push({
@@ -208,6 +311,141 @@ export function hasMeaningfulContractExtraction(extraction: ExtractionPipelineRe
       extraction.data.usageRights ||
       extraction.data.deliverables.length > 0
   );
+}
+
+function collectEvidenceSnippets(extraction: ExtractionPipelineResult, fieldPath: string) {
+  const seen = new Set<string>();
+  const snippets: string[] = [];
+
+  for (const entry of extraction.evidence) {
+    if (entry.fieldPath !== fieldPath) {
+      continue;
+    }
+
+    const snippet = normalizeString(entry.snippet);
+    const key = snippet?.toLowerCase();
+    if (!snippet || !key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    snippets.push(snippet);
+  }
+
+  return snippets;
+}
+
+function hasRepeatedClauseEvidence(snippetsByField: Record<string, string[]>) {
+  return CONSOLIDATED_CLAUSE_FIELDS.some((field) => snippetsByField[field]?.length > 1);
+}
+
+function appendUniqueNote(notes: string | null, nextNote: string | null) {
+  const cleanedNext = normalizeString(nextNote);
+  if (!cleanedNext) {
+    return notes;
+  }
+
+  const cleanedExisting = normalizeString(notes);
+  if (!cleanedExisting) {
+    return cleanedNext;
+  }
+
+  if (cleanedExisting.toLowerCase().includes(cleanedNext.toLowerCase())) {
+    return cleanedExisting;
+  }
+
+  return `${cleanedExisting}\n\n${cleanedNext}`;
+}
+
+function updateGenericDeliverableSummary(
+  deliverables: ExtractionPipelineResult["data"]["deliverables"],
+  summary: string | null
+) {
+  const cleanedSummary = normalizeString(summary);
+  if (!cleanedSummary) {
+    return deliverables;
+  }
+
+  if (deliverables.length === 0) {
+    return [
+      {
+        id: randomUUID(),
+        title: "Contract deliverable",
+        dueDate: null,
+        channel: null,
+        quantity: 1,
+        status: "pending" as const,
+        description: cleanedSummary
+      }
+    ];
+  }
+
+  if (deliverables.length === 1 && deliverables[0]?.title === "Contract deliverable") {
+    return [
+      {
+        ...deliverables[0],
+        description: cleanedSummary
+      }
+    ];
+  }
+
+  return deliverables;
+}
+
+export async function consolidateContractClausesWithLlm(
+  extraction: ExtractionPipelineResult
+): Promise<ExtractionPipelineResult> {
+  const snippetsByField = {
+    usageRights: collectEvidenceSnippets(extraction, "usageRights"),
+    exclusivity: collectEvidenceSnippets(extraction, "exclusivity"),
+    deliverables: collectEvidenceSnippets(extraction, "deliverables"),
+    termination: collectEvidenceSnippets(extraction, "termination"),
+    notes: collectEvidenceSnippets(extraction, "notes")
+  };
+
+  if (!hasLlmKey() || !hasRepeatedClauseEvidence(snippetsByField)) {
+    return extraction;
+  }
+
+  try {
+    const consolidated = await consolidateClausesWithLlm({
+      ...snippetsByField,
+      fallback: {
+        usageRights: extraction.data.usageRights,
+        exclusivity: extraction.data.exclusivity,
+        deliverablesSummary: snippetsByField.deliverables.join("\n") || null,
+        termination: extraction.data.termination,
+        notes: extraction.data.notes
+      }
+    });
+    const deliverablesSummary = normalizeString(consolidated.deliverablesSummary);
+    const notesWithConsolidation = appendUniqueNote(
+      appendUniqueNote(extraction.data.notes, consolidated.notes),
+      deliverablesSummary ? `Deliverables: ${deliverablesSummary}` : null
+    );
+
+    return {
+      ...extraction,
+      model: `${extraction.model}+llm:${consolidated.model}`,
+      data: {
+        ...extraction.data,
+        usageRights: normalizeString(consolidated.usageRights) ?? extraction.data.usageRights,
+        exclusivity: normalizeString(consolidated.exclusivity) ?? extraction.data.exclusivity,
+        deliverables: updateGenericDeliverableSummary(
+          extraction.data.deliverables,
+          deliverablesSummary
+        ),
+        termination: normalizeString(consolidated.termination) ?? extraction.data.termination,
+        notes: notesWithConsolidation
+      }
+    };
+  } catch (error) {
+    console.warn("[document-ai-contract] clause_consolidation_failed", {
+      at: new Date().toISOString(),
+      error: error instanceof Error ? error.message : "Unknown clause consolidation error"
+    });
+    return extraction;
+  }
 }
 
 export function mapDocumentAiContractToExtraction(input: {
@@ -240,6 +478,7 @@ export function mapDocumentAiContractToExtraction(input: {
   const terminationEntities = collectEntities(entities, "termination_summary");
   const terminationNoticeEntities = collectEntities(entities, "termination_notice");
   const governingLawEntities = collectEntities(entities, "governing_law");
+  const notesEntities = collectEntities(entities, "notes", "note", "additional_notes");
 
   const brandNameEntity = pickBestEntity(brandNameEntities);
   const campaignNameEntity = pickBestEntity(campaignNameEntities);
@@ -249,17 +488,13 @@ export function mapDocumentAiContractToExtraction(input: {
   const paymentStructureEntity = pickBestEntity(paymentStructureEntities);
   const paymentTriggerEntity = pickBestEntity(paymentTriggerEntities);
   const netTermsEntity = pickBestEntity(netTermsEntities);
-  const usageRightsEntity = pickBestEntity(usageRightsEntities);
   const usageDurationEntity = pickBestEntity(usageDurationEntities);
   const usageTerritoryEntity = pickBestEntity(usageTerritoryEntities);
   const paidUsageEntity = pickBestEntity(paidUsageEntities);
   const whitelistingEntity = pickBestEntity(whitelistingEntities);
-  const exclusivityEntity = pickBestEntity(exclusivityEntities);
   const exclusivityCategoryEntity = pickBestEntity(exclusivityCategoryEntities);
   const exclusivityDurationEntity = pickBestEntity(exclusivityDurationEntities);
-  const deliverablesSummaryEntity = pickBestEntity(deliverablesSummaryEntities);
   const revisionRoundsEntity = pickBestEntity(revisionRoundsEntities);
-  const terminationEntity = pickBestEntity(terminationEntities);
   const terminationNoticeEntity = pickBestEntity(terminationNoticeEntities);
   const governingLawEntity = pickBestEntity(governingLawEntities);
 
@@ -277,7 +512,7 @@ export function mapDocumentAiContractToExtraction(input: {
     ? entityText(input.document, paymentTriggerEntity)
     : null;
   terms.netTermsDays = netTermsEntity ? entityNumber(input.document, netTermsEntity) : null;
-  terms.usageRights = usageRightsEntity ? entityText(input.document, usageRightsEntity) : null;
+  terms.usageRights = combineClauseEntities(input.document, usageRightsEntities);
   terms.usageDuration = usageDurationEntity
     ? entityText(input.document, usageDurationEntity)
     : null;
@@ -290,7 +525,7 @@ export function mapDocumentAiContractToExtraction(input: {
   terms.whitelistingAllowed = whitelistingEntity
     ? entityBoolean(input.document, whitelistingEntity)
     : null;
-  terms.exclusivity = exclusivityEntity ? entityText(input.document, exclusivityEntity) : null;
+  terms.exclusivity = combineClauseEntities(input.document, exclusivityEntities);
   terms.exclusivityApplies = terms.exclusivity ? true : null;
   terms.exclusivityCategory = exclusivityCategoryEntity
     ? entityText(input.document, exclusivityCategoryEntity)
@@ -299,7 +534,7 @@ export function mapDocumentAiContractToExtraction(input: {
     ? entityText(input.document, exclusivityDurationEntity)
     : null;
   terms.deliverables = parseDeliverablesFromSummary(
-    deliverablesSummaryEntity ? entityText(input.document, deliverablesSummaryEntity) : null
+    combineClauseEntities(input.document, deliverablesSummaryEntities)
   );
   terms.revisionRounds = revisionRoundsEntity
     ? entityNumber(input.document, revisionRoundsEntity)
@@ -308,12 +543,13 @@ export function mapDocumentAiContractToExtraction(input: {
     revisionRoundsEntity && terms.revisionRounds !== null
       ? `${terms.revisionRounds} rounds`
       : null;
-  terms.termination = terminationEntity ? entityText(input.document, terminationEntity) : null;
+  terms.termination = combineClauseEntities(input.document, terminationEntities);
   terms.terminationAllowed = terms.termination ? true : null;
   terms.terminationNotice = terminationNoticeEntity
     ? entityText(input.document, terminationNoticeEntity)
     : null;
   terms.governingLaw = governingLawEntity ? entityText(input.document, governingLawEntity) : null;
+  terms.notes = combineClauseEntities(input.document, notesEntities);
 
   pushEvidence(evidence, "brandName", input.document, brandNameEntity);
   pushEvidence(evidence, "campaignName", input.document, campaignNameEntity);
@@ -323,19 +559,20 @@ export function mapDocumentAiContractToExtraction(input: {
   pushEvidence(evidence, "paymentStructure", input.document, paymentStructureEntity);
   pushEvidence(evidence, "paymentTrigger", input.document, paymentTriggerEntity);
   pushEvidence(evidence, "netTermsDays", input.document, netTermsEntity);
-  pushEvidence(evidence, "usageRights", input.document, usageRightsEntity);
+  pushEvidenceForEntities(evidence, "usageRights", input.document, usageRightsEntities);
   pushEvidence(evidence, "usageDuration", input.document, usageDurationEntity);
   pushEvidence(evidence, "usageTerritory", input.document, usageTerritoryEntity);
   pushEvidence(evidence, "usageRightsPaidAllowed", input.document, paidUsageEntity);
   pushEvidence(evidence, "whitelistingAllowed", input.document, whitelistingEntity);
-  pushEvidence(evidence, "exclusivity", input.document, exclusivityEntity);
+  pushEvidenceForEntities(evidence, "exclusivity", input.document, exclusivityEntities);
   pushEvidence(evidence, "exclusivityCategory", input.document, exclusivityCategoryEntity);
   pushEvidence(evidence, "exclusivityDuration", input.document, exclusivityDurationEntity);
-  pushEvidence(evidence, "deliverables", input.document, deliverablesSummaryEntity);
+  pushEvidenceForEntities(evidence, "deliverables", input.document, deliverablesSummaryEntities);
   pushEvidence(evidence, "revisionRounds", input.document, revisionRoundsEntity);
-  pushEvidence(evidence, "termination", input.document, terminationEntity);
+  pushEvidenceForEntities(evidence, "termination", input.document, terminationEntities);
   pushEvidence(evidence, "terminationNotice", input.document, terminationNoticeEntity);
   pushEvidence(evidence, "governingLaw", input.document, governingLawEntity);
+  pushEvidenceForEntities(evidence, "notes", input.document, notesEntities);
 
   addConflictIfNeeded(conflicts, "brandName", brandNameEntities, input.document, entityText);
   addConflictIfNeeded(conflicts, "campaignName", campaignNameEntities, input.document, entityText);
@@ -348,8 +585,6 @@ export function mapDocumentAiContractToExtraction(input: {
   );
   addConflictIfNeeded(conflicts, "currency", currencyEntities, input.document, entityText);
   addConflictIfNeeded(conflicts, "paymentTerms", paymentTermsEntities, input.document, entityText);
-  addConflictIfNeeded(conflicts, "usageRights", usageRightsEntities, input.document, entityText);
-  addConflictIfNeeded(conflicts, "exclusivity", exclusivityEntities, input.document, entityText);
 
   return {
     schemaVersion: CONTRACT_SCHEMA_VERSION,
@@ -374,11 +609,13 @@ export async function extractContractTermsWithDocumentAiDetailed(input: {
     fieldMaskPaths: ["text", "entities"]
   });
 
+  const extraction = mapDocumentAiContractToExtraction({
+    document: response.document ?? {},
+    deal: input.deal
+  });
+
   return {
-    extraction: mapDocumentAiContractToExtraction({
-      document: response.document ?? {},
-      deal: input.deal
-    }),
+    extraction: await consolidateContractClausesWithLlm(extraction),
     rawResponse: response.rawResponse,
     processor: response.processor,
     pageCount: response.pageCount,

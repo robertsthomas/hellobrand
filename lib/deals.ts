@@ -2,31 +2,12 @@ import { randomUUID } from "node:crypto";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  analyzeCreatorRisks,
-  buildCreatorSummary,
-  classifyDocumentHeuristically,
-  extractBriefData,
-  extractStructuredTerms,
-  mergeExtractionResults,
-  splitIntoSections
-} from "@/lib/analysis/fallback";
 import { getViewerById } from "@/lib/auth";
 import {
-  buildConflictIntelligencePatch,
   buildConflictResults,
   dealCategoryLabel,
   mergeConflictIntelligence
 } from "@/lib/conflict-intelligence";
-import {
-  analyzeRisksWithLlm,
-  extractBriefWithLlm,
-  extractSectionWithLlm,
-  getLlmRoute,
-  generateSummaryWithLlm,
-  hasLlmKey
-} from "@/lib/analysis/llm";
-import { extractDocumentText, normalizeDocumentText } from "@/lib/documents/extract";
 import { generateEmailDraft } from "@/lib/email/generate";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
 import { syncPaymentRecordForDeal } from "@/lib/payments";
@@ -37,14 +18,11 @@ import {
 import {
   emitNotificationSeedForUser
 } from "@/lib/notification-service";
-import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
-import { enrichBrandCategoryWithPeopleDataLabs } from "@/lib/people-data-labs";
 import { getProfileForViewer } from "@/lib/profile";
 import { getRepository } from "@/lib/repository";
 import { buildGeneratedSummaryVariant } from "@/lib/summary-variants";
 import {
   createSignedUploadTarget,
-  readStoredBytes,
   storeUploadedBytes,
   supportsDirectStorageUploads
 } from "@/lib/storage";
@@ -157,61 +135,6 @@ function withPreferredCreatorName<
   };
 }
 
-function sanitizeCreatorExtractionResult(
-  extraction: ExtractionPipelineResult,
-  creatorName: string
-): ReturnType<typeof mergeExtractionResults> {
-  const brandName = sanitizePartyName(extraction.data.brandName, "brand");
-  const agencyName = sanitizePartyName(extraction.data.agencyName, "agency");
-  const campaignName = sanitizeCampaignName(extraction.data.campaignName);
-
-  return {
-    ...extraction,
-    confidence: extraction.confidence ?? 0.68,
-    data: {
-      ...extraction.data,
-      brandName,
-      campaignName,
-      agencyName:
-        agencyName &&
-        (!brandName || agencyName.toLowerCase() !== brandName.toLowerCase())
-          ? agencyName
-          : null,
-      creatorName,
-      pendingExtraction: null
-    },
-    evidence: (Array.isArray(extraction.evidence) ? extraction.evidence : []).filter(
-      (entry) => entry.fieldPath !== "creatorName"
-    ),
-    conflicts: (Array.isArray(extraction.conflicts) ? extraction.conflicts : []).filter(
-      (fieldPath) => fieldPath !== "creatorName"
-    )
-  };
-}
-
-function finalizeDocumentExtraction(
-  text: string,
-  extraction: ExtractionPipelineResult,
-  creatorName: string
-) {
-  const sanitizedExtraction = sanitizeCreatorExtractionResult(extraction, creatorName);
-  const intelligence = buildConflictIntelligencePatch({
-    text,
-    sectionKey: null,
-    fallbackTerms: sanitizedExtraction.data
-  });
-
-  sanitizedExtraction.data = {
-    ...sanitizedExtraction.data,
-    ...mergeConflictIntelligence(sanitizedExtraction.data, intelligence.patch)
-  };
-  sanitizedExtraction.evidence = [
-    ...sanitizedExtraction.evidence,
-    ...intelligence.evidence
-  ];
-
-  return sanitizedExtraction;
-}
 async function hydrateProfileBackedCreatorName(
   viewer: Viewer,
   aggregate: DealAggregate
@@ -437,125 +360,6 @@ function logDocumentPipeline(
     at: new Date().toISOString(),
     ...details
   });
-}
-
-function llmSectionLimits() {
-  const model = getLlmRoute("extract_section").primary.toLowerCase();
-  const usingFreeModel =
-    model.includes("openrouter/free") || model.includes(":free") || model.includes("/free");
-
-  return usingFreeModel
-    ? { maxSections: 6, concurrency: 2, usingFreeModel: true }
-    : { maxSections: 14, concurrency: 6, usingFreeModel: false };
-}
-
-function scoreSectionForLlm(
-  section: { title: string; content: string; chunkIndex: number },
-  documentKind: DocumentKind
-) {
-  const title = section.title.toLowerCase();
-  const content = section.content.toLowerCase();
-  let score = Math.min(section.content.length, 4000) / 100;
-
-  if (title === "general") {
-    score -= 15;
-  }
-
-  if (section.content.length < 80) {
-    score -= 12;
-  }
-
-  const keywordGroups: Record<DocumentKind | "shared", string[]> = {
-    shared: [
-      "payment",
-      "compensation",
-      "rate",
-      "fee",
-      "deliverable",
-      "usage",
-      "rights",
-      "whitelist",
-      "exclusiv",
-      "revision",
-      "termination",
-      "campaign",
-      "brand"
-    ],
-    contract: [
-      "agreement",
-      "term",
-      "services",
-      "scope",
-      "content",
-      "payment terms"
-    ],
-    deliverables_brief: ["deliverables", "timeline", "post", "story", "reel", "tiktok"],
-    campaign_brief: ["brief", "messaging", "concept", "brand guidelines"],
-    pitch_deck: ["overview", "campaign", "deliverables", "brand"],
-    invoice: ["invoice", "amount", "total", "net", "payment", "client"],
-    email_thread: ["subject:", "from:", "usage", "rate", "deadline", "follow up"],
-    unknown: ["agreement", "campaign", "deliverables", "payment"]
-  };
-
-  for (const keyword of keywordGroups.shared) {
-    if (title.includes(keyword) || content.includes(keyword)) {
-      score += 8;
-    }
-  }
-
-  for (const keyword of keywordGroups[documentKind]) {
-    if (title.includes(keyword) || content.includes(keyword)) {
-      score += 10;
-    }
-  }
-
-  return score;
-}
-
-function selectSectionsForLlm(
-  sections: Array<{ title: string; content: string; chunkIndex: number }>,
-  documentKind: DocumentKind
-) {
-  const limits = llmSectionLimits();
-  const selected = [...sections]
-    .map((section) => ({
-      section,
-      score: scoreSectionForLlm(section, documentKind)
-    }))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, limits.maxSections)
-    .sort((left, right) => left.section.chunkIndex - right.section.chunkIndex)
-    .map((entry) => entry.section);
-
-  return {
-    ...limits,
-    selected
-  };
-}
-
-async function mapWithConcurrency<TInput, TOutput>(
-  values: TInput[],
-  concurrency: number,
-  worker: (value: TInput, index: number) => Promise<TOutput>
-) {
-  const results = new Array<TOutput>(values.length);
-  let nextIndex = 0;
-
-  async function runWorker() {
-    while (nextIndex < values.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await worker(values[currentIndex], currentIndex);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () =>
-      runWorker()
-    )
-  );
-
-  return results;
 }
 
 async function runStage<T>(
