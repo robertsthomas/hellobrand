@@ -1,3 +1,7 @@
+/**
+ * This route handles local development reset behavior.
+ * It exists as a dev-only boundary so that reset logic does not leak into normal product routes.
+ */
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest } from "next/server";
 import { z } from "zod";

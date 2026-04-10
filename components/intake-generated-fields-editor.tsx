@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the generated intake field editor.
+ * It lets the user review and adjust normalized intake data while the extraction and intake rules stay in the intake domain.
+ */
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 

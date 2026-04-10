@@ -1,3 +1,7 @@
+/**
+ * This route handles notification HTTP requests.
+ * It accepts reads and updates here while notification generation and delivery stay in the notification domain modules.
+ */
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";

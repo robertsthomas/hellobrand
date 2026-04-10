@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * This file handles the authenticated feedback submission action.
+ * It keeps the request boundary here and lets the shared feedback code handle validation and persistence.
+ */
 import { ZodError } from "zod";
 
 import { requireViewer } from "@/lib/auth";

@@ -1,3 +1,7 @@
+/**
+ * This file renders the public homepage.
+ * It pulls together the marketing-facing product story while the actual product rules stay in the domain modules.
+ */
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";

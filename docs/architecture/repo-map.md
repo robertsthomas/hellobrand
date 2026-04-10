@@ -132,22 +132,22 @@ If the answer feels like "some of each", split the file before adding more.
 
 ## File Header Standard
 
-Every non-trivial shared file should begin with a short ownership comment.
+Every non-trivial shared file should begin with a short plain-language comment.
 
 Example:
 
 ```ts
 /**
- * Owns intake session write orchestration for authenticated viewers.
- * Keep document extraction heuristics and UI-specific state out of this module.
+ * This file runs intake session writes for authenticated viewers.
+ * It handles the workflow here and leaves document extraction and UI-only state to other modules.
  */
 ```
 
 The comment should describe:
 
-- what the file owns
-- what should stay out
-- any important invariant
+- what the file does
+- what it connects to or delegates to
+- any important boundary a new developer should know
 
 ## Naming Guidance
 

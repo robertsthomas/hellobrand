@@ -1,3 +1,7 @@
+/**
+ * This route handles onboarding and product-guide HTTP requests.
+ * It keeps the request boundary here and relies on the onboarding domain modules for the underlying state changes.
+ */
 import { revalidatePath } from "next/cache";
 import { NextRequest } from "next/server";
 import { ZodError } from "zod";

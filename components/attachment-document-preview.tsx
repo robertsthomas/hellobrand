@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the document attachment preview experience.
+ * It handles preview loading and client-side display state while parsing and extraction stay outside the component.
+ */
 import {
   useDeferredValue,
   useEffect,

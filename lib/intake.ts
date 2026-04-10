@@ -1,3 +1,7 @@
+/**
+ * This file runs the intake flow for a viewer from draft to confirmation.
+ * It connects intake sessions, uploads, queueing, and confirmation so the rest of the app can treat intake as one domain workflow.
+ */
 import { prisma } from "@/lib/prisma";
 import { emitWorkspaceNotificationForCurrentState } from "@/lib/notification-service";
 import { getProfileForViewer } from "@/lib/profile";

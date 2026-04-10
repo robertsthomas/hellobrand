@@ -1,3 +1,7 @@
+/**
+ * This route handles admin-only HTTP requests.
+ * It checks admin access here and then calls the shared admin modules that do the real work.
+ */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";

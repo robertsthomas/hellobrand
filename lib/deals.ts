@@ -1,3 +1,7 @@
+/**
+ * This file runs the main workspace and deal workflows.
+ * It connects documents, summaries, drafts, pending changes, and processing steps so routes can load and update deals without reimplementing the domain logic.
+ */
 import { randomUUID } from "node:crypto";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";

@@ -1,3 +1,7 @@
+/**
+ * This file reads and writes email-related records in Prisma.
+ * It converts database rows into app records so the rest of the inbox code does not need to know about the table shape.
+ */
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";

@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file runs the inbox workspace UI.
+ * It pulls together thread views, reply interactions, and client state while the actual inbox rules and persistence live in `lib/email`.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

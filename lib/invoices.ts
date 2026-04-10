@@ -1,3 +1,7 @@
+/**
+ * This file runs invoice creation, saving, sending history, and reminder scheduling.
+ * It connects invoice records, workspace data, and reminder logic so invoice behavior stays in one place.
+ */
 import { randomUUID } from "node:crypto";
 
 import type {

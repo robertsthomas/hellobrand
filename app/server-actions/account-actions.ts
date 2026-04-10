@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * This file handles authenticated account, profile, and billing server actions.
+ * It validates inputs, triggers redirects or revalidation, and then calls the domain modules that do the real work.
+ */
 import { BillingInterval, PlanTier } from "@prisma/client";
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";

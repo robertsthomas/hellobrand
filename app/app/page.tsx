@@ -1,3 +1,7 @@
+/**
+ * This file renders the signed-in dashboard landing page.
+ * It pulls together the main workspace overview while shared calculations and data rules stay outside the route.
+ */
 import Link from "next/link";
 import { Suspense } from "react";
 import {

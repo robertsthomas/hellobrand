@@ -1,3 +1,7 @@
+/**
+ * This file turns extracted intake data into the normalized record the UI can edit and confirm.
+ * It is where evidence gets cleaned up and merged into one consistent intake shape.
+ */
 import type {
   CampaignDateWindow,
   DealCategory,

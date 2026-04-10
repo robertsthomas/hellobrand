@@ -1,3 +1,7 @@
+/**
+ * This file runs the document pipeline one step at a time.
+ * It connects analysis helpers with run-state persistence so each processing stage can be tracked and resumed safely.
+ */
 import {
   analyzeCreatorRisks,
   buildCreatorSummary,

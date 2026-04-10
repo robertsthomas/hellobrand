@@ -1,3 +1,7 @@
+/**
+ * This route handles creator profile HTTP requests.
+ * It accepts profile reads and updates here while normalization, auditing, and saving stay in the profile domain code.
+ */
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest } from "next/server";
 import { ZodError } from "zod";

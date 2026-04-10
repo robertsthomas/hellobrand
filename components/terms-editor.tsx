@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the deal terms editor.
+ * It manages the local editing and review experience while saving and merge logic stay in the deal domain modules.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, LoaderCircle, Pencil, X } from "lucide-react";

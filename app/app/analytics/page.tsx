@@ -1,3 +1,7 @@
+/**
+ * This file renders the signed-in analytics page.
+ * It connects the analytics UI to plan-gated data and supporting summaries without owning the analytics rules itself.
+ */
 import Link from "next/link";
 import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";

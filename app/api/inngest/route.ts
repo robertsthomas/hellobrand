@@ -1,3 +1,7 @@
+/**
+ * This route handles Inngest callbacks and function execution requests.
+ * It keeps the request boundary here while the workflow behavior itself stays in the Inngest and domain modules.
+ */
 import { serve } from "inngest/next";
 
 import { inngest } from "@/lib/inngest/client";

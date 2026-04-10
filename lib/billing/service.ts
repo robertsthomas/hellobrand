@@ -1,3 +1,7 @@
+/**
+ * This file runs the billing workflows for checkout, portal access, and Stripe reconciliation.
+ * It connects the app's billing records to Stripe events so billing behavior stays in one domain service.
+ */
 import {
   Prisma,
   BillingProvider,

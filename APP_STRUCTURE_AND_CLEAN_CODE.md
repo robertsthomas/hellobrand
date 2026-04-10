@@ -346,20 +346,20 @@ Bad:
 
 ## File Header Standard
 
-Every non-trivial file in `app/`, `components/`, `lib/`, and `prisma/` should begin with a short header comment describing what it owns.
+Every non-trivial file in `app/`, `components/`, `lib/`, and `prisma/` should begin with a short header comment written in plain language.
 
-The header should answer three things:
+The point of the header is that a new developer can open the file and quickly understand:
 
-1. What this file is responsible for
-2. What should stay out of this file
-3. Any unusually important boundary or invariant
+1. what this file does
+2. what other code it connects to or delegates to
+3. what kind of logic should live somewhere else
 
 Preferred format:
 
 ```ts
 /**
- * Owns billing portal session creation for authenticated viewers.
- * Keep Stripe webhook reconciliation and entitlement writes in billing-domain services.
+ * This file creates billing portal sessions for authenticated viewers.
+ * It handles the request boundary here and leaves Stripe reconciliation and entitlement writes to the billing domain services.
  */
 ```
 
@@ -367,8 +367,8 @@ For React components:
 
 ```tsx
 /**
- * Renders the workspace invoice editor shell and local UI interactions.
- * Keep invoice persistence, numbering, and reminder scheduling in lib/invoices.
+ * This file renders the workspace invoice editor.
+ * It manages the local UI here and relies on `lib/invoices` for numbering, reminders, and persistence.
  */
 ```
 
@@ -376,14 +376,15 @@ For route handlers:
 
 ```ts
 /**
- * HTTP boundary for intake draft mutations.
- * Validate request input here, then delegate domain behavior to lib/intake.
+ * This route handles intake draft mutations.
+ * It accepts the HTTP request here and then calls `lib/intake` for the actual intake workflow.
  */
 ```
 
 Rules:
 
 - Keep headers short, usually one or two sentences
+- Prefer natural wording like "This file..." or "This route..."
 - Do not narrate obvious syntax
 - Do not repeat TypeScript signatures in prose
 - Add or update the header when the file responsibility changes

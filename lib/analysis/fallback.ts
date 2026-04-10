@@ -1,3 +1,7 @@
+/**
+ * This file handles the non-LLM fallback path for document analysis.
+ * It uses deterministic heuristics for classification, extraction, merging, and summaries when the pipeline is not relying on a model response.
+ */
 import { randomUUID } from "node:crypto";
 
 import {

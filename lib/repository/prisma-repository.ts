@@ -1,3 +1,7 @@
+/**
+ * This file is the Prisma-backed implementation of the shared repository layer.
+ * It translates database records into the app's stable record types so domain code can work against one interface.
+ */
 import { randomUUID } from "node:crypto";
 
 import { Prisma, SummarySource as PrismaSummarySource, SummaryType as PrismaSummaryType } from "@prisma/client";

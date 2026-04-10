@@ -1,3 +1,7 @@
+/**
+ * This route handles intake HTTP requests.
+ * It connects session, draft, batch, and document requests to the intake workflow code in `lib/intake` and related helpers.
+ */
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";

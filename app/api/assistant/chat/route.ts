@@ -1,3 +1,7 @@
+/**
+ * This route handles assistant HTTP requests.
+ * It turns the request into assistant runtime calls while the assistant logic itself stays in `lib/assistant`.
+ */
 import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from "ai";
 import { NextRequest } from "next/server";
 import { ZodError } from "zod";

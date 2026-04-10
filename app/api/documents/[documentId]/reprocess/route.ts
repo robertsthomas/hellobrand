@@ -1,3 +1,7 @@
+/**
+ * This route handles document content and document reprocessing requests.
+ * It accepts the HTTP request here and then calls the shared document and deal workflow code.
+ */
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";

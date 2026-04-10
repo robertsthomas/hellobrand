@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the empty-dashboard upload and intake entry experience.
+ * It manages the client-side interaction for drafts and uploads while the intake workflow itself stays in `lib/intake`.
+ */
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";

@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * This file handles authenticated intake server actions.
+ * It accepts the mutation requests here and then calls the intake domain code for the actual workflow steps.
+ */
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 

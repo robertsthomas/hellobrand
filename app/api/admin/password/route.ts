@@ -1,3 +1,7 @@
+/**
+ * This route handles admin-only HTTP requests.
+ * It checks admin access here and then calls the shared admin modules that do the real work.
+ */
 import { z } from "zod";
 
 import { requireApiAdminViewer, updateAdminCredentialPassword } from "@/lib/admin-auth";

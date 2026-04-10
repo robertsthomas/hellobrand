@@ -1,3 +1,7 @@
+/**
+ * This file handles LLM-based document and brief analysis.
+ * It builds prompts, chooses models, and normalizes structured LLM responses for the rest of the pipeline.
+ */
 import { z } from "zod";
 
 import { aiCachePolicy, hasAiClient } from "@/lib/ai/gateway";

@@ -1,3 +1,7 @@
+/**
+ * This route handles public event tracking and anonymous upload HTTP requests.
+ * It keeps the public request boundary here and relies on the anonymous analysis modules for throttling, analysis, and claim behavior.
+ */
 import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest } from "next/server";
 

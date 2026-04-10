@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the creator profile editor.
+ * It manages the form experience here and relies on the profile domain code for normalization, auditing, and saving.
+ */
 import type {
   FormEvent,
   InputHTMLAttributes,

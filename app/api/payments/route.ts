@@ -1,3 +1,7 @@
+/**
+ * This route handles workspace payment HTTP requests.
+ * It keeps the request parsing here and relies on the payment and billing modules for the actual payment behavior.
+ */
 import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";

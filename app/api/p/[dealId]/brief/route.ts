@@ -1,3 +1,7 @@
+/**
+ * This route handles authenticated workspace HTTP requests.
+ * It connects partnership reads, writes, and document operations to the shared deal and document domain code.
+ */
 import { NextRequest } from "next/server";
 
 import { buildFallbackBrief } from "@/lib/analysis/fallback";

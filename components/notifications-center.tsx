@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the notifications center.
+ * It manages optimistic client interactions here while notification generation and delivery stay in the notification domain code.
+ */
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";

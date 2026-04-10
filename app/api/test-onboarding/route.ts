@@ -1,3 +1,7 @@
+/**
+ * This route handles onboarding test helpers.
+ * It keeps test-only onboarding behavior isolated from the production onboarding flow.
+ */
 import { fail, ok } from "@/lib/http";
 import { isE2EAuthEnabled } from "@/lib/e2e-auth";
 import {

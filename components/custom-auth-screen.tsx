@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the custom auth screen.
+ * It handles the client-side sign-in and sign-up flow while account bootstrapping and persistence stay in the auth layer.
+ */
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";

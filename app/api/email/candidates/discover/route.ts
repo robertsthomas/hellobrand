@@ -1,3 +1,7 @@
+/**
+ * This route handles inbox and email HTTP requests.
+ * It connects the request to the email domain modules for accounts, threads, attachments, provider callbacks, and workflow actions.
+ */
 import { requireApiViewer } from "@/lib/auth";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { fail, ok } from "@/lib/http";

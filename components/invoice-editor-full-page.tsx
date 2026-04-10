@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the full-page invoice editor.
+ * It manages the local invoice editing experience while numbering, reminders, and persistence stay in `lib/invoices`.
+ */
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";

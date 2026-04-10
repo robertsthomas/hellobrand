@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * This file handles authenticated workspace and deal server actions.
+ * It acts as the mutation boundary and then hands off to the deal and invoice domain modules.
+ */
 import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 

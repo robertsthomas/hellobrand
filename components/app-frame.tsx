@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the signed-in app shell.
+ * It connects navigation, shell-level interactions, and shared frame UI for the authenticated product experience.
+ */
 import { SignOutButton } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";

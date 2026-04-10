@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file renders the admin dashboard client UI.
+ * It handles local admin interactions here and relies on the admin domain modules for the actual admin operations.
+ */
 import { startTransition, useDeferredValue, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";

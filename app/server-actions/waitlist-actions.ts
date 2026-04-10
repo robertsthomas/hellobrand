@@ -1,5 +1,9 @@
 "use server";
 
+/**
+ * This file handles the waitlist signup action.
+ * It accepts the action request here and then calls the email and identity helpers that finish the signup flow.
+ */
 import { clerkClient } from "@clerk/nextjs/server";
 
 import { sendWaitlistConfirmationEmail } from "@/lib/waitlist-email";

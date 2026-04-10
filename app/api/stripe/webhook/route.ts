@@ -1,3 +1,7 @@
+/**
+ * This route handles Stripe webhooks.
+ * It verifies and routes the incoming event here while the billing service handles reconciliation and webhook state updates.
+ */
 import type Stripe from "stripe";
 import { BillingWebhookEventStatus } from "@prisma/client";
 

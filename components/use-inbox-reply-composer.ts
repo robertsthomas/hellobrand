@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * This file manages the client-side state for composing inbox replies.
+ * It connects draft editing, composer transitions, and local UI behavior to the inbox workflow.
+ */
 import {
   useCallback,
   useEffect,

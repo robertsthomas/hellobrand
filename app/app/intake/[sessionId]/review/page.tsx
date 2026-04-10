@@ -1,3 +1,7 @@
+/**
+ * This file renders the intake review screen for a single session.
+ * It connects the editable review UI to the normalized intake data and confirmation flow.
+ */
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { Suspense } from "react";

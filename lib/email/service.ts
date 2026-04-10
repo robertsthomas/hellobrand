@@ -1,3 +1,7 @@
+/**
+ * This file runs the main inbox and email workflows.
+ * It connects viewers, repositories, providers, AI helpers, and stored files so the route handlers can stay thin.
+ */
 import { inngest } from "@/lib/inngest/client";
 import { getViewerById } from "@/lib/auth";
 import { getProfileForViewer } from "@/lib/profile";
