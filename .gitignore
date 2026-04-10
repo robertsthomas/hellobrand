@@ -22,6 +22,7 @@ tests/e2e/.auth
 .env
 .env.*
 !.env.example
+hellobrand-*.json
 
 # Local package manager / machine config
 .npmrc
