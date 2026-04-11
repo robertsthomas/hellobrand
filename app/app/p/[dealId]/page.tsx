@@ -29,55 +29,16 @@ import { DealDetailSkeleton } from "@/components/skeletons";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
-import { getCachedDealForViewer } from "@/lib/cached-data";
 import { dealCategoryLabel } from "@/lib/conflict-intelligence";
-import { getDisplayDealLabels } from "@/lib/deal-labels";
-import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
-import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
-import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
-
-function daysUntil(date: string | null) {
-  if (!date) return null;
-  const diff = new Date(date).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
-function buildNextAction(deal: {
-  status: string;
-  paymentStatus: string;
-  nextDeliverableDate: string | null;
-  riskFlags: Array<{ severity: string }>;
-  pendingExtraction: boolean;
-}) {
-  if (deal.pendingExtraction) {
-    return { label: "Review new changes from re-extraction", tone: "accent" as const, tab: "terms" };
-  }
-  if (deal.paymentStatus === "late") {
-    return { label: "Send payment follow-up", tone: "warning" as const, tab: "deliverables" };
-  }
-  if (deal.riskFlags.some((f) => f.severity === "high")) {
-    return { label: "Review high-risk clauses", tone: "warning" as const, tab: "terms" };
-  }
-  const days = daysUntil(deal.nextDeliverableDate);
-  if (days !== null && days >= 0 && days <= 7) {
-    return { label: "Prepare the next deliverable", tone: "accent" as const, tab: "deliverables" };
-  }
-  if (deal.status === "contract_received") {
-    return { label: "Review contract and confirm terms", tone: "accent" as const, tab: "terms" };
-  }
-  if (deal.paymentStatus === "awaiting_payment") {
-    return { label: "Track payout progress", tone: "neutral" as const, tab: "deliverables" };
-  }
-  return { label: "Partnership is on track", tone: "neutral" as const, tab: "overview" };
-}
-
-function nextActionToneClass(tone: "warning" | "accent" | "neutral") {
-  if (tone === "warning") return "border-clay/20 bg-clay/[0.04] dark:border-clay/25";
-  if (tone === "accent") return "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]";
-  return "border-black/8 bg-sand/35 dark:border-white/10 dark:bg-white/[0.04]";
-}
+import {
+  buildNextAction,
+  buildWorkspaceAttentionItems,
+  buildWorkspaceDisplayState,
+  loadWorkspaceRouteData,
+  nextActionToneClass,
+  resolveWorkspaceTab
+} from "./page-helpers";
 
 export default function WorkspaceDealDetailPage({
   params,
@@ -104,21 +65,17 @@ async function DealDetailContent({
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const viewer = await requireViewer();
   const entitlements = await getViewerEntitlements(viewer);
-
-  const aggregate = await getCachedDealForViewer(viewer, dealId);
+  const hasPremiumInbox = entitlements.features.premium_inbox;
+  const { aggregate, linkedEmailThreads, emailAccounts } = await loadWorkspaceRouteData(
+    viewer,
+    dealId,
+    hasPremiumInbox
+  );
 
   if (!aggregate) {
     notFound();
   }
-
-  const hasPremiumInbox = entitlements.features.premium_inbox;
   const hasBriefGeneration = entitlements.features.brief_generation;
-  const [linkedEmailThreads, emailAccounts] = hasPremiumInbox
-    ? await Promise.all([
-        listLinkedEmailThreadsForViewerDeal(viewer, dealId),
-        listEmailAccountsForViewer(viewer)
-      ])
-    : [[], []];
 
   const {
     deal,
@@ -132,40 +89,19 @@ async function DealDetailContent({
     documentSections,
     extractionResults
   } = aggregate;
-  const normalized = buildNormalizedIntakeRecord(aggregate);
-  const displayLabels = getDisplayDealLabels({
-    brandName: normalized?.brandName ?? deal.brandName,
-    campaignName: normalized?.contractTitle ?? deal.campaignName
-  });
-  const displayCampaignName =
-    displayLabels.campaignName ??
-    normalized?.contractTitle ??
-    deriveWorkspaceTitleFromFileNames(documents.map((document) => document.fileName)) ??
-    deal.campaignName;
-  const displayBrandName = displayLabels.brandName ?? deal.brandName;
-  const nextDeliverableValue = formatDate(deal.nextDeliverableDate);
+  const { normalized, displayCampaignName, displayBrandName, nextDeliverableValue } =
+    buildWorkspaceDisplayState(aggregate);
   const riskCount = riskFlags.length;
-  const highRiskCount = riskFlags.filter((f) => f.severity === "high").length;
   const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
 
   const hasInvoice = Boolean(aggregate.invoiceRecord);
-  const VALID_TABS = hasInvoice
-    ? ["overview", "terms", "deliverables", "invoices", "emails", "documents"]
-    : ["overview", "terms", "deliverables", "emails", "documents"];
-  const TAB_REDIRECTS: Record<string, string> = {
-    ...(hasInvoice ? {} : { invoices: "deliverables" }),
-    risks: "terms",
-    brief: "deliverables",
-    notes: "overview"
-  };
   const rawTab = resolvedSearchParams?.tab ?? "";
-  const resolvedTab = TAB_REDIRECTS[rawTab] ?? rawTab;
   const hasPendingExtraction = Boolean(terms?.pendingExtraction);
-  const currentTab = VALID_TABS.includes(resolvedTab)
-    ? resolvedTab
-    : hasPendingExtraction
-      ? "terms"
-      : "overview";
+  const currentTab = resolveWorkspaceTab({
+    hasInvoice,
+    rawTab,
+    hasPendingExtraction
+  });
 
   const nextAction = buildNextAction({
     status: deal.status,
@@ -174,20 +110,7 @@ async function DealDetailContent({
     riskFlags,
     pendingExtraction: !!terms?.pendingExtraction
   });
-
-  const attentionItems: Array<{ id: string; label: string; detail?: string }> = [];
-  if (terms?.pendingExtraction) {
-    attentionItems.push({ id: "pending", label: "New extraction changes ready to review" });
-  }
-  if (highRiskCount > 0) {
-    attentionItems.push({ id: "risks", label: `${highRiskCount} high-risk clause${highRiskCount === 1 ? "" : "s"} flagged` });
-  }
-  if (deal.paymentStatus === "late") {
-    attentionItems.push({ id: "payment", label: "Payment is overdue" });
-  }
-  if ((aggregate.conflictResults?.length ?? 0) > 0) {
-    attentionItems.push({ id: "conflicts", label: `${aggregate.conflictResults.length} cross-partnership conflict${aggregate.conflictResults.length === 1 ? "" : "s"}` });
-  }
+  const attentionItems = buildWorkspaceAttentionItems(aggregate);
 
   return (
     <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
@@ -460,10 +383,10 @@ async function DealDetailContent({
         <div className="border-t border-black/6 pt-6 dark:border-white/8">
           <DeleteDealDialog
             dealId={deal.id}
-            dealName={displayLabels.campaignName ?? displayCampaignName}
+            dealName={displayCampaignName}
             redirectTo="/app/p/history"
             className="inline-flex items-center gap-2 text-sm font-medium text-black/45 transition hover:text-clay dark:text-white/45 dark:hover:text-clay"
-            triggerLabel={`Delete ${displayLabels.campaignName ?? displayCampaignName}`}
+            triggerLabel={`Delete ${displayCampaignName}`}
           >
             <Trash2 className="h-4 w-4" />
             Delete this partnership

@@ -29,72 +29,13 @@ import {
   confirmIntakeSessionAction,
 } from "@/app/actions";
 import { requireViewer } from "@/lib/auth";
-import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { CURRENCY_OPTIONS } from "@/lib/deal-terms-constants";
-import { cleanDisplayText } from "@/lib/display-text";
-import { getIntakeSessionForViewer } from "@/lib/intake";
-import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-import { formatCurrency } from "@/lib/utils";
 
-function presentText(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function deriveHandleFromEmail(email: string | null | undefined) {
-  const normalized = presentText(email);
-  if (!normalized || !normalized.includes("@")) {
-    return null;
-  }
-
-  return normalized.split("@")[0] ?? null;
-}
-
-function intakeConflictMessagesByField(conflicts: Array<{ type: string; title: string }>) {
-  const messages: Record<string, string[]> = {};
-
-  function push(field: string, message: string) {
-    messages[field] = [...(messages[field] ?? []), message];
-  }
-
-  for (const conflict of conflicts) {
-    if (conflict.type === "category_conflict") {
-      push("brandCategory", conflict.title);
-      push("competitorCategories", conflict.title);
-      continue;
-    }
-
-    if (conflict.type === "competitor_restriction") {
-      push("restrictedCategories", conflict.title);
-      push("competitorCategories", conflict.title);
-      push("brandCategory", conflict.title);
-      continue;
-    }
-
-    if (conflict.type === "exclusivity_overlap") {
-      push("restrictedCategories", conflict.title);
-      push("brandCategory", conflict.title);
-      push("campaignDateWindow", conflict.title);
-      continue;
-    }
-
-    if (conflict.type === "schedule_collision") {
-      push("campaignDateWindow", conflict.title);
-      push("timelineItems", conflict.title);
-      push("deliverables", conflict.title);
-    }
-  }
-
-  return messages;
-}
-
-function dedupeAttentionIds(ids: string[]) {
-  return Array.from(new Set(ids));
-}
+import {
+  buildIntakeReviewPageViewModel,
+  loadIntakeSessionRouteData,
+  shouldRedirectToDeal
+} from "../page-helpers";
 
 export default function IntakeSessionPage({
   params
@@ -115,25 +56,16 @@ async function IntakeReviewContent({
 }) {
   const viewer = await requireViewer();
   const { sessionId } = await params;
-  let sessionData: Awaited<ReturnType<typeof getIntakeSessionForViewer>>;
+  const sessionData = await loadIntakeSessionRouteData(viewer, sessionId);
 
-  try {
-    sessionData = await getIntakeSessionForViewer(viewer, sessionId);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "Intake session not found."
-    ) {
-      redirect("/app");
-    }
-
-    throw error;
+  if (!sessionData) {
+    redirect("/app");
   }
 
   const { session, aggregate, processing, profileDefaults } = sessionData;
-
-  if (session.status === "completed" && aggregate) {
-    redirect(`/app/p/${aggregate.deal.id}`);
+  const dealRedirect = shouldRedirectToDeal(session, aggregate);
+  if (dealRedirect) {
+    redirect(dealRedirect);
   }
 
   const showConfirmation =
@@ -143,99 +75,29 @@ async function IntakeReviewContent({
   }
 
   const analysisRunning = false;
-  const derivedHandle = deriveHandleFromEmail(profileDefaults?.contactEmail ?? viewer.email);
-  const creatorDefault =
-    presentText(profileDefaults?.creatorLegalName) ??
-    presentText(profileDefaults?.displayName) ??
-    presentText(viewer.displayName) ??
-    derivedHandle ??
-    "Creator";
-  const businessDefault =
-    presentText(profileDefaults?.businessName) ??
-    presentText(profileDefaults?.creatorLegalName) ??
-    presentText(profileDefaults?.displayName) ??
-    presentText(viewer.displayName) ??
-    derivedHandle ??
-    "Creator";
-  const contactDefault = presentText(profileDefaults?.contactEmail) ?? viewer.email;
-  const profileConfigured = Boolean(
-    presentText(profileDefaults?.creatorLegalName) ||
-      presentText(profileDefaults?.businessName)
-  );
-  const normalized = buildNormalizedIntakeRecord(aggregate, {
-    excludedPrimaryContactEmails: [viewer.email, profileDefaults?.contactEmail],
-    excludedPrimaryContactNames: profileConfigured
-      ? [
-          profileDefaults?.creatorLegalName,
-          profileDefaults?.displayName,
-          profileDefaults?.businessName,
-          viewer.displayName
-        ]
-      : []
+  const {
+    analyticsHighlights,
+    attentionItems,
+    businessDefault,
+    conflictMessagesByField,
+    conflictResults,
+    contactDefault,
+    contactType,
+    creatorDefault,
+    deliverables,
+    evidenceGroups,
+    initialProfileHandle,
+    initialProfileName,
+    normalized,
+    profileConfigured,
+    riskFlags,
+    summaryCards,
+    timelineItems
+  } = buildIntakeReviewPageViewModel({
+    aggregate,
+    profileDefaults,
+    viewer
   });
-  const deliverables = normalized?.deliverables ?? [];
-  const timelineItems = normalized?.timelineItems ?? [];
-  const evidenceGroups = normalized?.evidenceGroups ?? [];
-  const analyticsHighlights = normalized?.analytics?.highlights ?? [];
-  const conflictResults = aggregate?.conflictResults ?? [];
-  const conflictMessagesByField = intakeConflictMessagesByField(conflictResults);
-  const riskFlags = aggregate?.riskFlags ?? [];
-  const initialProfileName =
-    presentText(profileDefaults?.creatorLegalName) ??
-    presentText(profileDefaults?.displayName) ??
-    presentText(viewer.displayName) ??
-    "";
-  const initialProfileHandle =
-    presentText(profileDefaults?.businessName) ?? derivedHandle ?? "";
-  const contactType =
-    normalized?.primaryContact?.organizationType ??
-    (normalized?.agencyName ? "agency" : "brand");
-  const displayLabels = getDisplayDealLabels({
-    brandName: normalized?.brandName,
-    campaignName: normalized?.contractTitle
-  });
-  const summaryCards = [
-    {
-      label: "Brand",
-      value: displayLabels.brandName ?? (analysisRunning ? "Analyzing..." : "Not detected yet"),
-      loading: analysisRunning && !normalized?.brandName
-    },
-    {
-      label: "Primary contact",
-      value:
-        cleanDisplayText(normalized?.primaryContact?.name) ??
-        cleanDisplayText(normalized?.primaryContact?.email) ??
-        (analysisRunning ? "Analyzing..." : "Not detected yet"),
-      loading:
-        analysisRunning &&
-        !normalized?.primaryContact?.name &&
-        !normalized?.primaryContact?.email
-    },
-    {
-      label: "Payment",
-      value:
-        typeof normalized?.paymentAmount === "number"
-          ? formatCurrency(normalized.paymentAmount, normalized.currency ?? "USD")
-          : analysisRunning
-            ? "Analyzing..."
-            : "Not specified",
-      loading: analysisRunning && typeof normalized?.paymentAmount !== "number"
-    },
-    {
-      label: "Deliverables",
-      value: String(normalized?.deliverableCount ?? 0),
-      loading: analysisRunning && !normalized?.deliverableCount
-    }
-  ];
-
-  const attentionItems = dedupeAttentionIds([
-    ...conflictResults.map((conflict) => ({
-      id: `conflict-${conflict.type}-${conflict.title}`
-    })),
-    ...riskFlags.slice(0, 4).map((flag) => ({
-      id: `${flag.title.trim().toLowerCase()}::${(flag.detail ?? "").trim().toLowerCase()}`
-    }))
-  ].map((item) => item.id));
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

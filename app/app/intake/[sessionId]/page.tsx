@@ -14,7 +14,11 @@ import {
 } from "@/components/intake-flow";
 import { PostHogActionLink } from "@/components/posthog-action-link";
 import { requireViewer } from "@/lib/auth";
-import { getIntakeSessionForViewer } from "@/lib/intake";
+
+import {
+  loadIntakeSessionRouteData,
+  shouldRedirectToDeal
+} from "./page-helpers";
 
 export default function IntakeProcessingPage({
   params,
@@ -41,25 +45,16 @@ async function IntakeProcessingContent({
   const { sessionId } = await params;
   const resolvedSearchParams = await searchParams;
   const isStarting = resolvedSearchParams.starting === "1";
-  let sessionData: Awaited<ReturnType<typeof getIntakeSessionForViewer>>;
+  const sessionData = await loadIntakeSessionRouteData(viewer, sessionId);
 
-  try {
-    sessionData = await getIntakeSessionForViewer(viewer, sessionId);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "Intake session not found."
-    ) {
-      redirect("/app");
-    }
-
-    throw error;
+  if (!sessionData) {
+    redirect("/app");
   }
 
   const { session, aggregate, processing } = sessionData;
-
-  if (session.status === "completed" && aggregate) {
-    redirect(`/app/p/${aggregate.deal.id}`);
+  const dealRedirect = shouldRedirectToDeal(session, aggregate);
+  if (dealRedirect) {
+    redirect(dealRedirect);
   }
 
   if (["ready_for_confirmation", "failed"].includes(session.status)) {
