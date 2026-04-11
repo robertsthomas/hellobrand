@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Deal server action entrypoint.
  * This file keeps the public action exports stable while the implementations live in smaller deal action modules.
@@ -13,20 +11,20 @@ export {
   saveTermsAction,
   saveDealNotesAction,
   confirmTermsReviewAction,
-  generateDraftAction
+  generateDraftAction,
 } from "./deal-workspace-actions";
 export {
   activateSummaryVariantAction,
   restoreSummaryVersionAction,
   applyPendingChangesAction,
   dismissPendingChangesAction,
-  updateDeliverablesAction
+  updateDeliverablesAction,
 } from "./deal-summary-actions";
 export {
   deleteWorkspaceAction,
   deleteWorkspaceConfirmedAction,
   archiveDealAction,
-  unarchiveDealAction
+  unarchiveDealAction,
 } from "./deal-lifecycle-actions";
 export {
   generateInvoiceDraftAction,
@@ -34,5 +32,5 @@ export {
   saveInvoiceDraftAction,
   finalizeInvoiceAction,
   voidInvoiceAction,
-  deleteInvoiceAction
+  deleteInvoiceAction,
 } from "./deal-invoice-actions";
