@@ -1,0 +1,340 @@
+// Inbox sync, linked thread, and email collaboration records.
+
+model EmailDraft {
+  id        String   @id @default(uuid())
+  dealId    String
+  intent    String
+  subject   String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, intent])
+  @@index([dealId])
+}
+
+model ConnectedEmailAccount {
+  id                    String    @id @default(uuid())
+  userId                String
+  provider              String
+  providerAccountId     String
+  emailAddress          String
+  displayName           String?
+  status                String
+  scopes                Json
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  lastSyncAt            DateTime?
+  lastErrorCode         String?
+  lastErrorMessage      String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threads   EmailThread[]
+  syncState EmailSyncState?
+
+  @@unique([userId, provider, providerAccountId])
+  @@index([userId, provider, status])
+}
+
+model EmailThread {
+  id                 String    @id @default(uuid())
+  accountId          String
+  provider           String
+  providerThreadId   String
+  subject            String
+  snippet            String?
+  participantsJson   Json
+  lastMessageAt      DateTime
+  messageCount       Int       @default(0)
+  isContractRelated  Boolean   @default(false)
+  aiSummary          String?
+  aiSummaryUpdatedAt DateTime?
+  workflowState      String    @default("unlinked")
+  draftUpdatedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  account          ConnectedEmailAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  messages         EmailMessage[]
+  dealLinks        DealEmailLink[]
+  candidateMatches EmailDealCandidateMatch[]
+  dealEvents       EmailDealEvent[]
+  termSuggestions  EmailDealTermSuggestion[]
+  actionItems      EmailActionItem[]
+  previewStates    EmailThreadPreviewState[]
+  drafts           EmailThreadDraft[]
+  notes            EmailThreadNote[]
+
+  @@unique([accountId, providerThreadId])
+  @@index([accountId, lastMessageAt])
+  @@index([accountId, workflowState, lastMessageAt])
+}
+
+model EmailMessage {
+  id                String    @id @default(uuid())
+  threadId          String
+  providerMessageId String
+  internetMessageId String?
+  fromJson          Json
+  toJson            Json
+  ccJson            Json
+  bccJson           Json
+  subject           String
+  textBody          String?
+  htmlBody          String?
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  direction         String
+  hasAttachments    Boolean   @default(false)
+  rawStorageKey     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  thread          EmailThread               @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  attachments     EmailAttachment[]
+  dealEvents      EmailDealEvent[]
+  termSuggestions EmailDealTermSuggestion[]
+  actionItems     EmailActionItem[]
+
+  @@unique([threadId, providerMessageId])
+  @@index([threadId, receivedAt])
+}
+
+model EmailAttachment {
+  id                   String   @id @default(uuid())
+  messageId            String
+  providerAttachmentId String
+  filename             String
+  mimeType             String
+  sizeBytes            Int
+  storageKey           String?
+  extractedText        String?
+  createdAt            DateTime @default(now())
+
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, providerAttachmentId])
+  @@index([messageId])
+}
+
+model EmailSyncState {
+  id                     String    @id @default(uuid())
+  accountId              String    @unique
+  providerCursor         String?
+  providerSubscriptionId String?
+  subscriptionExpiresAt  DateTime?
+  lastHistoryId          String?
+  lastSuccessfulSyncAt   DateTime?
+  lastErrorAt            DateTime?
+  lastErrorCode          String?
+  lastErrorMessage       String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  account ConnectedEmailAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model DealEmailLink {
+  id         String   @id @default(uuid())
+  dealId     String
+  threadId   String
+  linkSource String
+  role       String   @default("reference")
+  confidence Float?
+  createdAt  DateTime @default(now())
+
+  deal   Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, threadId])
+  @@index([threadId])
+  @@index([threadId, role])
+}
+
+model EmailThreadDraft {
+  id        String   @id @default(uuid())
+  userId    String
+  threadId  String
+  subject   String
+  body      String
+  status    String
+  source    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@index([threadId, updatedAt])
+}
+
+model EmailThreadNote {
+  id        String   @id @default(uuid())
+  userId    String
+  threadId  String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([userId, threadId, createdAt])
+}
+
+model EmailDealCandidateMatch {
+  id           String    @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  status       String
+  confidence   Float
+  reasonsJson  Json
+  evidenceJson Json
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal   Deal        @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, threadId])
+  @@index([userId, status, updatedAt])
+  @@index([threadId])
+}
+
+model EmailDealEvent {
+  id           String   @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  messageId    String
+  category     String
+  title        String
+  body         String
+  metadataJson Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread  EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, messageId, category])
+  @@index([userId, dealId, createdAt])
+  @@index([threadId, createdAt])
+}
+
+model EmailDealTermSuggestion {
+  id           String   @id @default(uuid())
+  userId       String
+  dealId       String
+  threadId     String
+  messageId    String
+  status       String
+  title        String
+  summary      String
+  patchJson    Json
+  evidenceJson Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread  EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, messageId])
+  @@index([userId, dealId, status, createdAt])
+  @@index([threadId, status, createdAt])
+}
+
+model EmailActionItem {
+  id         String    @id @default(uuid())
+  userId     String
+  dealId     String
+  threadId   String
+  messageId  String
+  action     String
+  dueDate    DateTime?
+  urgency    String
+  status     String
+  sourceText String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  thread  EmailThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  message EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, messageId, action])
+  @@index([userId, dealId, status, createdAt])
+  @@index([userId, status, dueDate])
+  @@index([threadId])
+}
+
+model EmailThreadPreviewState {
+  id                      String    @id @default(uuid())
+  userId                  String
+  threadId                String
+  previewUpdatesSeenAt    DateTime?
+  previewUpdatesClearedAt DateTime?
+  actionItemsSeenAt       DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread EmailThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@index([userId, updatedAt])
+  @@index([threadId])
+}
+
+model BrandContact {
+  id           String    @id @default(uuid())
+  userId       String
+  dealId       String
+  name         String
+  email        String
+  organization String?
+  inferredRole String?
+  lastSeenAt   DateTime?
+  messageCount Int       @default(1)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dealId, email])
+  @@index([userId, dealId])
+}
+
+enum EmailSubscriptionCategory {
+  product_updates
+}
+
+model EmailSubscriptionPreference {
+  id             String                    @id @default(uuid())
+  email          String
+  category       EmailSubscriptionCategory
+  isSubscribed   Boolean                   @default(true)
+  source         String?
+  unsubscribedAt DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([email, category])
+  @@index([category, isSubscribed])
+}

@@ -1,0 +1,35 @@
+// Core user record shared across the product domains.
+
+model User {
+  id          String   @id
+  email       String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile                     Profile?
+  intakeSessions              IntakeSession[]
+  intakeBatches               IntakeBatch[]
+  deals                       Deal[]
+  emailAccounts               ConnectedEmailAccount[]
+  emailCandidateMatches       EmailDealCandidateMatch[]
+  emailDealEvents             EmailDealEvent[]
+  emailTermSuggestions        EmailDealTermSuggestion[]
+  emailActionItems            EmailActionItem[]
+  emailThreadPreviewStates    EmailThreadPreviewState[]
+  emailThreadDrafts           EmailThreadDraft[]
+  emailThreadNotes            EmailThreadNote[]
+  brandContacts               BrandContact[]
+  assistantThreads            AssistantThread[]
+  assistantSnapshots          AssistantContextSnapshot[]
+  billingAccount              BillingAccount?
+  aiUsageEvents               AiUsageEvent[]
+  aiCacheEntries              AiCacheEntry[]
+  onboardingState             UserOnboardingState?
+  appNotifications            AppNotification[]
+  notificationEmailDeliveries NotificationEmailDelivery[]
+  feedbackSubmissions         FeedbackSubmission[]
+  invoiceRecords              InvoiceRecord[]
+  invoiceDeliveryRecords      InvoiceDeliveryRecord[]
+  invoiceReminderTouchpoints  InvoiceReminderTouchpoint[]
+}

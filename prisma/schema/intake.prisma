@@ -1,0 +1,69 @@
+// Intake session, upload, and batching records.
+
+model IntakeSession {
+  id                   String    @id @default(uuid())
+  userId               String
+  dealId               String    @unique
+  status               String
+  errorMessage         String?
+  inputSource          String?
+  draftBrandName       String?
+  draftCampaignName    String?
+  draftNotes           String?
+  draftPastedText      String?
+  draftPastedTextTitle String?
+  duplicateCheckStatus String?
+  duplicateMatchJson   Json?
+  completedAt          DateTime?
+  expiresAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal       Deal              @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  documents  IntakeDocument[]
+  batchGroup IntakeBatchGroup?
+
+  @@index([userId, status])
+}
+
+model IntakeDocument {
+  id              String   @id @default(uuid())
+  intakeSessionId String
+  documentId      String   @unique
+  createdAt       DateTime @default(now())
+
+  intakeSession IntakeSession @relation(fields: [intakeSessionId], references: [id], onDelete: Cascade)
+  document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([intakeSessionId])
+}
+
+model IntakeBatch {
+  id        String   @id @default(uuid())
+  userId    String
+  status    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groups IntakeBatchGroup[]
+
+  @@index([userId])
+}
+
+model IntakeBatchGroup {
+  id              String   @id @default(uuid())
+  batchId         String
+  intakeSessionId String?  @unique
+  label           String
+  confidence      Float?
+  documentIds     Json
+  status          String
+  createdAt       DateTime @default(now())
+
+  batch         IntakeBatch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  intakeSession IntakeSession? @relation(fields: [intakeSessionId], references: [id], onDelete: SetNull)
+
+  @@index([batchId])
+}

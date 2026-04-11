@@ -1,0 +1,51 @@
+// Creator profile, audit, and onboarding records.
+
+model Profile {
+  id                        String   @id @default(uuid())
+  userId                    String   @unique
+  displayName               String?
+  creatorLegalName          String?
+  businessName              String?
+  contactEmail              String?
+  timeZone                  String?
+  preferredSignature        String?
+  payoutDetails             String?
+  defaultCurrency           String?
+  reminderLeadDays          Int?
+  conflictAlertsEnabled     Boolean  @default(true)
+  paymentRemindersEnabled   Boolean  @default(true)
+  emailNotificationsEnabled Boolean  @default(false)
+  accentColor               String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents ProfileAuditEvent[]
+}
+
+model ProfileAuditEvent {
+  id            String   @id @default(uuid())
+  profileId     String
+  actorUserId   String
+  changedFields Json
+  snapshot      Json
+  createdAt     DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt])
+}
+
+model UserOnboardingState {
+  id                           String    @id @default(uuid())
+  userId                       String    @unique
+  profileOnboardingCompletedAt DateTime?
+  profileOnboardingVersion     Int       @default(0)
+  profileOnboardingStateJson   Json?
+  productGuideVersion          Int       @default(0)
+  productGuideStateJson        Json?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

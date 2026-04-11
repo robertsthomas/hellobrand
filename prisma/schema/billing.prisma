@@ -1,0 +1,267 @@
+// Billing plan, subscription, invoice, and payment tracking records.
+
+enum PlanTier {
+  basic
+  standard
+  premium
+}
+
+enum BillingProvider {
+  stripe
+}
+
+enum BillingInterval {
+  month
+  year
+}
+
+enum BillingSubscriptionStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+}
+
+enum BillingTrialStatus {
+  granted
+  active
+  converted
+  expired
+  canceled
+  revoked
+}
+
+enum BillingWebhookEventStatus {
+  pending
+  processing
+  processed
+  ignored
+  failed
+}
+
+model PaymentRecord {
+  id          String    @id @default(uuid())
+  dealId      String    @unique
+  amount      Float?
+  currency    String?
+  invoiceDate DateTime?
+  dueDate     DateTime?
+  paidDate    DateTime?
+  status      String
+  notes       String?
+  source      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceRecord {
+  id                   String    @id @default(uuid())
+  dealId               String    @unique
+  userId               String
+  invoiceNumber        String
+  status               String
+  draftSavedAt         DateTime?
+  finalizedAt          DateTime?
+  sentAt               DateTime?
+  invoiceDate          DateTime?
+  dueDate              DateTime?
+  currency             String?
+  subtotal             Float?
+  notes                String?
+  billToJson           Json
+  issuerJson           Json
+  lineItemsJson        Json
+  pdfDocumentId        String?
+  manualNumberOverride Boolean   @default(false)
+  lastSentThreadId     String?
+  lastSentMessageId    String?
+  lastSentAccountId    String?
+  lastSentToEmail      String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  deal       Deal                    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries InvoiceDeliveryRecord[]
+
+  @@unique([userId, invoiceNumber])
+  @@index([userId, status, updatedAt])
+}
+
+model InvoiceDeliveryRecord {
+  id           String   @id @default(uuid())
+  invoiceId    String
+  dealId       String
+  userId       String
+  provider     String?
+  threadId     String?
+  messageId    String?
+  accountId    String?
+  toEmail      String?
+  subject      String
+  status       String
+  errorMessage String?
+  sentAt       DateTime
+  createdAt    DateTime @default(now())
+
+  invoice InvoiceRecord @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  deal    Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sentAt])
+  @@index([dealId, sentAt])
+  @@index([userId, sentAt])
+}
+
+model InvoiceReminderTouchpoint {
+  id             String   @id @default(uuid())
+  dealId         String
+  userId         String
+  anchorDate     DateTime
+  offsetDays     Int
+  sendOn         DateTime
+  status         String   @default("pending")
+  notificationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([dealId, offsetDays])
+  @@index([userId, status, sendOn])
+  @@index([dealId, status, sendOn])
+}
+
+model BillingAccount {
+  id                        String                     @id @default(uuid())
+  userId                    String                     @unique
+  provider                  BillingProvider            @default(stripe)
+  billingEmail              String?
+  stripeCustomerId          String?                    @unique
+  currentPlanTier           PlanTier?
+  currentPlanInterval       BillingInterval?
+  currentSubscriptionStatus BillingSubscriptionStatus?
+  currentTrialPlanTier      PlanTier?
+  currentTrialStartedAt     DateTime?
+  currentTrialEndsAt        DateTime?
+  currentPeriodStart        DateTime?
+  currentPeriodEnd          DateTime?
+  cancelAtPeriodEnd         Boolean                    @default(false)
+  lastSyncedAt              DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptions BillingSubscription[]
+  trialLedgers  BillingTrialLedger[]
+  usageLedgers  BillingUsageLedger[]
+  aiUsageEvents AiUsageEvent[]
+  webhookEvents BillingWebhookEvent[]
+
+  @@index([currentPlanTier, currentSubscriptionStatus])
+}
+
+model BillingSubscription {
+  id                      String                    @id @default(uuid())
+  billingAccountId        String
+  provider                BillingProvider           @default(stripe)
+  planTier                PlanTier
+  interval                BillingInterval
+  status                  BillingSubscriptionStatus
+  stripeSubscriptionId    String?                   @unique
+  stripeCustomerId        String?
+  stripeProductId         String?
+  stripePriceId           String?
+  stripeCheckoutSessionId String?
+  startedAt               DateTime?
+  currentPeriodStart      DateTime?
+  currentPeriodEnd        DateTime?
+  trialStartedAt          DateTime?
+  trialEndsAt             DateTime?
+  cancelAtPeriodEnd       Boolean                   @default(false)
+  canceledAt              DateTime?
+  endedAt                 DateTime?
+  latestInvoiceId         String?
+  metadataJson            Json?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+
+  billingAccount BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  trialLedgers   BillingTrialLedger[]
+
+  @@index([billingAccountId, status, createdAt])
+  @@index([stripeCustomerId])
+}
+
+model BillingTrialLedger {
+  id                    String             @id @default(uuid())
+  billingAccountId      String
+  billingSubscriptionId String?
+  planTier              PlanTier
+  source                String
+  status                BillingTrialStatus
+  startedAt             DateTime
+  endsAt                DateTime
+  convertedAt           DateTime?
+  expiredAt             DateTime?
+  canceledAt            DateTime?
+  metadataJson          Json?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  billingAccount      BillingAccount       @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+  billingSubscription BillingSubscription? @relation(fields: [billingSubscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([billingAccountId, planTier, status])
+  @@index([billingSubscriptionId])
+  @@index([endsAt])
+}
+
+model BillingUsageLedger {
+  id               String    @id @default(uuid())
+  billingAccountId String
+  featureKey       String
+  windowKey        String
+  quantity         Int       @default(0)
+  limit            Int?
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  metadataJson     Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  billingAccount BillingAccount @relation(fields: [billingAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([billingAccountId, featureKey, windowKey])
+  @@index([billingAccountId, periodEnd])
+}
+
+model BillingWebhookEvent {
+  id               String                    @id @default(uuid())
+  billingAccountId String?
+  provider         BillingProvider           @default(stripe)
+  stripeEventId    String                    @unique
+  stripeEventType  String
+  apiVersion       String?
+  livemode         Boolean                   @default(false)
+  status           BillingWebhookEventStatus @default(pending)
+  processingRuns   Int                       @default(0)
+  lastReceivedAt   DateTime                  @default(now())
+  processedAt      DateTime?
+  errorMessage     String?
+  payloadJson      Json?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  billingAccount BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
+
+  @@index([billingAccountId, createdAt])
+  @@index([status, updatedAt])
+}

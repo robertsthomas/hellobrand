@@ -1,0 +1,139 @@
+// Deal, terms, risk, and summary records for partnership workspaces.
+
+enum SummaryType {
+  legal
+  plain_language
+  short
+}
+
+enum SummarySource {
+  analysis
+  simplification
+}
+
+model Deal {
+  id                  String    @id @default(uuid())
+  userId              String
+  brandName           String
+  campaignName        String
+  status              String
+  statusBeforeArchive String?
+  paymentStatus       String
+  countersignStatus   String
+  summary             String?
+  legalDisclaimer     String
+  nextDeliverableDate DateTime?
+  analyzedAt          DateTime?
+  confirmedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user                       User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intakeSession              IntakeSession?
+  paymentRecord              PaymentRecord?
+  invoiceRecord              InvoiceRecord?
+  documents                  Document[]
+  terms                      DealTerms?
+  riskFlags                  RiskFlag[]
+  emailDrafts                EmailDraft[]
+  assistantThreads           AssistantThread[]
+  assistantSnapshots         AssistantContextSnapshot[]
+  jobs                       Job[]
+  summaries                  Summary[]
+  emailLinks                 DealEmailLink[]
+  emailCandidateMatches      EmailDealCandidateMatch[]
+  emailDealEvents            EmailDealEvent[]
+  emailTermSuggestions       EmailDealTermSuggestion[]
+  emailActionItems           EmailActionItem[]
+  brandContacts              BrandContact[]
+  appNotifications           AppNotification[]
+  invoiceDeliveryRecords     InvoiceDeliveryRecord[]
+  invoiceReminderTouchpoints InvoiceReminderTouchpoint[]
+}
+
+model Summary {
+  id              String         @id @default(uuid())
+  dealId          String
+  documentId      String?
+  body            String
+  version         String
+  summaryType     SummaryType?
+  source          SummarySource?
+  parentSummaryId String?
+  isCurrent       Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+
+  deal     Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([dealId])
+  @@index([dealId, isCurrent])
+  @@index([dealId, summaryType, createdAt])
+}
+
+model DealTerms {
+  id                        String   @id @default(uuid())
+  dealId                    String   @unique
+  brandName                 String?
+  agencyName                String?
+  creatorName               String?
+  campaignName              String?
+  paymentAmount             Float?
+  currency                  String?
+  paymentTerms              String?
+  paymentStructure          String?
+  netTermsDays              Int?
+  paymentTrigger            String?
+  deliverables              Json
+  usageRights               String?
+  usageRightsOrganicAllowed Boolean?
+  usageRightsPaidAllowed    Boolean?
+  whitelistingAllowed       Boolean?
+  usageDuration             String?
+  usageTerritory            String?
+  usageChannels             Json
+  exclusivity               String?
+  exclusivityApplies        Boolean?
+  exclusivityCategory       String?
+  exclusivityDuration       String?
+  exclusivityRestrictions   String?
+  brandCategory             String?
+  competitorCategories      Json
+  restrictedCategories      Json
+  campaignDateWindow        Json?
+  disclosureObligations     Json
+  revisions                 String?
+  revisionRounds            Int?
+  termination               String?
+  terminationAllowed        Boolean?
+  terminationNotice         String?
+  terminationConditions     String?
+  governingLaw              String?
+  notes                     String?
+  manuallyEditedFields      Json     @default("[]")
+  briefData                 Json?
+  pendingExtraction         Json?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+}
+
+model RiskFlag {
+  id               String   @id @default(uuid())
+  dealId           String
+  category         String
+  title            String
+  detail           String
+  severity         String
+  suggestedAction  String?
+  evidence         Json
+  sourceDocumentId String?
+  sourceType       String?
+  sourceMessageId  String?
+  createdAt        DateTime @default(now())
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+}

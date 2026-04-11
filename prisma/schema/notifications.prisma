@@ -1,0 +1,52 @@
+// In-product and email notification delivery records.
+
+model AppNotification {
+  id           String    @id @default(uuid())
+  userId       String
+  category     String
+  eventType    String
+  entityType   String
+  entityId     String
+  sessionId    String?
+  dealId       String?
+  title        String
+  body         String
+  href         String
+  status       String    @default("active")
+  readAt       DateTime?
+  clearedAt    DateTime?
+  supersededAt DateTime?
+  dedupeKey    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deal          Deal?                      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  emailDelivery NotificationEmailDelivery?
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, status, createdAt])
+  @@index([userId, readAt, createdAt])
+  @@index([userId, clearedAt, createdAt])
+  @@index([sessionId, status, createdAt])
+  @@index([dealId, status, createdAt])
+}
+
+model NotificationEmailDelivery {
+  id                String    @id @default(uuid())
+  appNotificationId String    @unique
+  userId            String
+  recipientEmail    String
+  provider          String
+  providerMessageId String?
+  status            String
+  errorMessage      String?
+  sentAt            DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  appNotification AppNotification @relation(fields: [appNotificationId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+}

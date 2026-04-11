@@ -669,7 +669,8 @@ Billing is now a first-class domain slice and should follow these boundaries.
 - `lib/billing/entitlements.ts`: effective tier resolution, feature gating, and usage-limit tracking only
 - `lib/billing/plans.ts`: pricing matrix, plan metadata, and billing page view-model helpers
 - `lib/billing/service.ts`: billing-account orchestration, checkout creation, portal session creation, trial enforcement, and Stripe reconciliation
-- `prisma/schema.prisma`: billing entities, trial ledgers, usage ledgers, and webhook event persistence
+- `prisma/schema/`: billing entities, trial ledgers, usage ledgers, and webhook event persistence, grouped into domain schema files
+- `prisma.config.ts`: tells Prisma to load the schema from the `prisma/schema` folder and keep migrations in `prisma/migrations`
 
 ### Billing rules
 

@@ -1,0 +1,11 @@
+// Prisma generator and datasource configuration.
+// Keep database connection setup and client generation settings in this file.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

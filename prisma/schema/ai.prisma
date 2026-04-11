@@ -1,0 +1,57 @@
+// AI usage and cache records.
+
+model AiUsageEvent {
+  id               String   @id @default(uuid())
+  userId           String?
+  billingAccountId String?
+  featureKey       String
+  taskKey          String
+  provider         String
+  requestedModel   String
+  resolvedModel    String
+  status           String
+  cacheStatus      String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  estimatedCostUsd Float    @default(0)
+  requestKey       String
+  inputHash        String
+  metadataJson     Json?
+  createdAt        DateTime @default(now())
+
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  billingAccount BillingAccount? @relation(fields: [billingAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([billingAccountId, createdAt])
+  @@index([featureKey, taskKey, createdAt])
+  @@index([taskKey, createdAt])
+  @@index([requestKey])
+}
+
+model AiCacheEntry {
+  id               String   @id @default(uuid())
+  userId           String?
+  featureKey       String
+  taskKey          String
+  scopeKey         String
+  inputHash        String
+  promptVersion    String
+  routeVersion     String
+  requestedModel   String
+  resolvedModel    String
+  payloadJson      Json
+  usageJson        Json?
+  estimatedCostUsd Float    @default(0)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([featureKey, taskKey, scopeKey, inputHash, promptVersion, routeVersion])
+  @@index([userId, taskKey, updatedAt])
+  @@index([taskKey, expiresAt])
+  @@index([expiresAt])
+}
