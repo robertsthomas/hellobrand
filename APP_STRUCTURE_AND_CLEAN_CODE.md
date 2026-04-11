@@ -701,7 +701,6 @@ Billing is now a first-class domain slice and should follow these boundaries.
 The following files are beyond the "easy to understand in one pass" bar and should be treated as refactor targets when touched next:
 
 - `lib/billing/service.ts`
-- `lib/analysis/llm.ts`
 - `app/app/page.tsx`
 - `components/custom-auth-screen.tsx`
 - `components/notifications-center.tsx`
@@ -720,7 +719,9 @@ Recent examples of the preferred direction in this repo:
 - email repository split: `lib/email/repository.ts` broke into `repository/shared`, `repository/accounts`, `repository/threads`, and `repository/candidates`
 - inbox UI split: `components/inbox-workspace.tsx` became a composition-only orchestrator delegating to `components/inbox-workspace/` subcomponents (`InboxThreadList`, `InboxThreadDetail`, `InboxReplyComposer`, `InboxMessageView`) with pure helpers extracted to `formatters.ts` and `helpers.ts`
 - deals domain split: `lib/deals.ts` became a thin barrel over `lib/deals/service`, `documents`, `terms`, `drafts`, `pending-changes`, and `shared`
-- intake domain split: `lib/intake.ts` moved into `lib/intake/index.ts` and `lib/intake-normalization.ts` moved into `lib/intake/normalization/`, with original paths kept as thin re-export barrels
+- pipeline split: `lib/pipeline-steps.ts` (1259 lines) became a thin barrel over `lib/pipeline/run-state` (run lifecycle, step executor), `lib/pipeline/artifacts` (artifact persistence, evidence resolution), and `lib/pipeline/steps/` (7 individual pipeline step implementations)
+- analysis LLM split: `lib/analysis/llm.ts` (1499 lines) reduced to ~691 lines of core infrastructure (schemas, routing, model selection, `requestStructured`, orchestration functions), with prompt construction extracted to `lib/analysis/prompts.ts` and response normalization extracted to `lib/analysis/normalizers.ts`
+- analysis fallback split: `lib/analysis/fallback.ts` (1455 lines) became a thin barrel over `lib/analysis/extract/` (heuristic classification, sectioning, text parsing, field extraction, merging), `lib/analysis/risks/` (heuristic risk analysis), and `lib/analysis/summary/` (summary building, brief data extraction, document-level analysis orchestration)
 - inbox state was split out of `components/inbox-workspace.tsx` into feature hooks for thread selection, reply composition, candidate discovery, and thread-detail state
 - profile and settings payload shaping moved into `lib/profile-draft.ts`
 - onboarding normalization moved into `lib/onboarding-draft.ts`
