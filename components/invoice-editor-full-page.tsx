@@ -158,7 +158,6 @@ export function InvoiceEditorFullPage({
       subtotal,
       notes: readFormField("notes") || invoice.notes
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showPreview, lineItems, subtotal, invoice]);
 
   const [emailMenuOpen, setEmailMenuOpen] = useState(false);

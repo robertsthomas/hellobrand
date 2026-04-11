@@ -411,6 +411,22 @@ Rules:
 
 Not every tiny leaf file needs a header immediately, but all hotspot files and all newly split files should have one.
 
+Current enforcement scope:
+
+- `pnpm run lint` now runs Biome for repo linting
+- `pnpm run lint` also runs `scripts/check-architecture.mjs`
+- the architecture check currently enforces header comments for:
+  - `app/server-actions/`
+  - `app/api/`
+  - `app/app/**/page-helpers.ts[x]`
+  - `lib/intake/`
+  - `lib/pipeline/steps/`
+  - `lib/analysis/extract/`
+  - `lib/analysis/llm/`
+  - `prisma/schema/`
+
+Expand this scope only after the newly included area is already clean.
+
 ## UI Rules
 
 ### Components should be predictable

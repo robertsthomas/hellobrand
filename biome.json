@@ -1,0 +1,107 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.11/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/.git/**",
+      "!**/.next/**",
+      "!**/.runtime/**",
+      "!**/node_modules/**",
+      "!**/test-results/**",
+      "!**/output/**",
+      "!**/generations/**",
+      "!public/vendor/pdf.worker.min.mjs"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "es5",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["components/**/*.ts", "components/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@/lib/prisma": "Components must not import the Prisma client directly. Read data at a route, server action, or domain boundary first.",
+                  "next/headers": "Components must not read request headers directly. Keep request state at the route boundary."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["lib/repository/**/*.ts", "lib/repository/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "react": "Repository modules should stay UI-free.",
+                  "react-dom": "Repository modules should stay UI-free.",
+                  "next/headers": "Repository modules should not depend on Next.js request APIs.",
+                  "next/navigation": "Repository modules should not depend on Next.js navigation APIs."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "app/api/**/*.ts",
+        "app/api/**/*.tsx",
+        "app/server-actions/**/*.ts",
+        "app/server-actions/**/*.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/components/**"],
+                    "message": "API routes and server actions should not import UI components."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

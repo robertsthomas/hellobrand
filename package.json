@@ -15,7 +15,8 @@
     "start:dev": "doppler run --config dev -- next start",
     "db:migrate": "doppler run -- pnpm exec prisma migrate dev",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev",
-    "lint": "eslint .",
+    "lint": "biome lint . && node scripts/check-architecture.mjs",
+    "format": "biome format --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:all": "./scripts/run-tests.sh",
@@ -102,6 +103,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.11",
     "@playwright/test": "^1.51.1",
     "@tailwindcss/forms": "^0.5.10",
     "@types/mailparser": "^3.4.6",
@@ -110,8 +112,6 @@
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
     "autoprefixer": "^10.4.20",
-    "eslint": "^9.22.0",
-    "eslint-config-next": "^16.1.7",
     "postcss": "^8.5.3",
     "prisma": "^6.19.2",
     "tailwindcss": "^3.4.17",
