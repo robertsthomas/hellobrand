@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const hasDocumentAiProcessorMock = vi.fn();
 
 vi.mock("@/lib/document-ai", () => ({
-  hasDocumentAiProcessor: hasDocumentAiProcessorMock
+  hasDocumentAiProcessor: hasDocumentAiProcessorMock,
 }));
 
 afterEach(() => {
@@ -26,11 +26,11 @@ describe("document routing", () => {
           Bill To: Lunchables
           Amount Due: $5,000
           This agreement references standard payment terms.
-        `
+        `,
       })
     ).toEqual({
       documentKind: "invoice",
-      confidence: 0.96
+      confidence: 0.96,
     });
   });
 
@@ -46,15 +46,16 @@ describe("document routing", () => {
         documentKind: "invoice",
         classificationConfidence: 0.92,
         fileName: "invoice.pdf",
+        mimeType: "application/pdf",
         normalizedText: "Invoice Number INV-001",
-        sourceType: "file"
-      }
+        sourceType: "file",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_invoice",
       processor: "invoice",
-      rolloutEnabled: true
+      rolloutEnabled: true,
     });
   });
 
@@ -70,15 +71,16 @@ describe("document routing", () => {
         documentKind: "contract",
         classificationConfidence: 0.91,
         fileName: "agreement.pdf",
+        mimeType: "application/pdf",
         normalizedText: "Creator agreement",
-        sourceType: "file"
-      }
+        sourceType: "file",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_contract",
       processor: "contract",
-      rolloutEnabled: true
+      rolloutEnabled: true,
     });
   });
 
@@ -94,15 +96,16 @@ describe("document routing", () => {
         documentKind: "campaign_brief",
         classificationConfidence: 0.89,
         fileName: "brief.pdf",
+        mimeType: "application/pdf",
         normalizedText: "Campaign overview and messaging points",
-        sourceType: "file"
-      }
+        sourceType: "file",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "document_ai_brief",
       processor: "brief",
-      rolloutEnabled: true
+      rolloutEnabled: true,
     });
   });
 
@@ -118,14 +121,15 @@ describe("document routing", () => {
         documentKind: "invoice",
         classificationConfidence: 0.92,
         fileName: "pasted-invoice.txt",
+        mimeType: "text/plain",
         normalizedText: "Invoice Number INV-001",
-        sourceType: "pasted_text"
-      }
+        sourceType: "pasted_text",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "unsupported",
-      processor: null
+      processor: null,
     });
     expect(decision.reasons).toContain("invoice_processor_requires_file");
   });
@@ -142,14 +146,15 @@ describe("document routing", () => {
         documentKind: "contract",
         classificationConfidence: 0.92,
         fileName: "pasted-agreement.txt",
+        mimeType: "text/plain",
         normalizedText: "Creator agreement terms",
-        sourceType: "pasted_text"
-      }
+        sourceType: "pasted_text",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "unsupported",
-      processor: null
+      processor: null,
     });
     expect(decision.reasons).toContain("contract_processor_requires_file");
   });
@@ -166,14 +171,15 @@ describe("document routing", () => {
         documentKind: "campaign_brief",
         classificationConfidence: 0.9,
         fileName: "pasted-brief.txt",
+        mimeType: "text/plain",
         normalizedText: "Campaign overview",
-        sourceType: "pasted_text"
-      }
+        sourceType: "pasted_text",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "unsupported",
-      processor: null
+      processor: null,
     });
     expect(decision.reasons).toContain("brief_processor_requires_file");
   });
@@ -191,15 +197,16 @@ describe("document routing", () => {
         documentKind: "invoice",
         classificationConfidence: 0.95,
         fileName: "invoice.pdf",
+        mimeType: "application/pdf",
         normalizedText: "Invoice Number INV-001",
-        sourceType: "file"
-      }
+        sourceType: "file",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "unsupported",
       processor: null,
-      rolloutEnabled: false
+      rolloutEnabled: false,
     });
     expect(decision.reasons).toContain("rollout:force_legacy");
   });
@@ -217,15 +224,16 @@ describe("document routing", () => {
         documentKind: "contract",
         classificationConfidence: 0.9,
         fileName: "agreement.pdf",
+        mimeType: "application/pdf",
         normalizedText: "Creator agreement",
-        sourceType: "file"
-      }
+        sourceType: "file",
+      },
     });
 
     expect(decision).toMatchObject({
       extractionRoute: "unsupported",
       processor: null,
-      rolloutEnabled: false
+      rolloutEnabled: false,
     });
     expect(decision.reasons).toContain("rollout:document_kind_not_enabled");
   });
