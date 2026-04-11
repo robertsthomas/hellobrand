@@ -6,7 +6,7 @@ import pdfParse from "pdf-parse";
 
 import {
   estimateDocumentAiCostUsd,
-  isDocumentAiParsingEnabled
+  isDocumentAiParsingEnabled,
 } from "@/lib/document-pipeline-rollout";
 import { getRuntimePath } from "@/lib/runtime-path";
 import { slugify } from "@/lib/utils";
@@ -35,10 +35,7 @@ function normalizeLine(line: string) {
 }
 
 export function normalizeDocumentText(value: string) {
-  const lines = value
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map(normalizeLine);
+  const lines = value.replace(/\r\n/g, "\n").split("\n").map(normalizeLine);
 
   const deduped: string[] = [];
   let previous = "";
@@ -88,7 +85,10 @@ export function normalizeDocumentText(value: string) {
     }
   }
 
-  const normalized = reflowed.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const normalized = reflowed
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   if (normalized.length < 120) {
     throw new UnreadableDocumentError(
@@ -100,12 +100,7 @@ export function normalizeDocumentText(value: string) {
 }
 
 function pdfJsStandardFontDataUrl() {
-  return `${path.join(
-    process.cwd(),
-    "node_modules",
-    "pdfjs-dist",
-    "standard_fonts"
-  )}/`;
+  return `${path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts")}/`;
 }
 
 let pdfJsMainThreadWorkerPromise: Promise<void> | null = null;
@@ -136,7 +131,7 @@ async function extractPdfTextWithPdfJs(buffer: Buffer) {
     data: new Uint8Array(buffer),
     stopAtErrors: false,
     isEvalSupported: false,
-    standardFontDataUrl: pdfJsStandardFontDataUrl()
+    standardFontDataUrl: pdfJsStandardFontDataUrl(),
   }).promise;
 
   const pages: string[] = [];
@@ -222,26 +217,23 @@ async function extractTextWithDocumentAi(
 
   if (
     mimeType !== "application/pdf" &&
-    mimeType !==
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+    mimeType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
     !lowerFileName.endsWith(".pdf") &&
     !lowerFileName.endsWith(".docx")
   ) {
     return null;
   }
 
-  const {
-    hasDocumentAiProcessor,
-    processDocumentWithDocumentAi
-  } = await import("@/lib/document-ai");
+  const { hasDocumentAiProcessor, processDocumentWithDocumentAi } = await import(
+    "@/lib/document-ai"
+  );
 
   const processors: Array<"layout" | "ocr"> = [];
 
   if (
     hasDocumentAiProcessor("layout") &&
     (mimeType === "application/pdf" ||
-      mimeType ===
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       lowerFileName.endsWith(".pdf") ||
       lowerFileName.endsWith(".docx"))
   ) {
@@ -270,7 +262,7 @@ async function extractTextWithDocumentAi(
         bytes: buffer,
         mimeType,
         imagelessMode: true,
-        fieldMaskPaths: ["text"]
+        fieldMaskPaths: ["text"],
       });
 
       if (!response.fullText.trim()) {
@@ -287,12 +279,12 @@ async function extractTextWithDocumentAi(
           fileSizeBytes: buffer.length,
           extractedChars: response.fullText.length,
           pageCount: response.pageCount,
-          estimatedCostUsd: estimateDocumentAiCostUsd(processor, response.pageCount)
+          estimatedCostUsd: estimateDocumentAiCostUsd(processor, response.pageCount),
         },
         _vendor: {
           processor,
-          payload: response.rawResponse
-        }
+          payload: response.rawResponse,
+        },
       };
     } catch (error) {
       failures.push(
@@ -316,7 +308,9 @@ export async function extractDocumentText(
 
   function debugMeta(parser: string, text: string) {
     const durationMs = Date.now() - startedAt;
-    console.info(`[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`);
+    console.info(
+      `[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`
+    );
     return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
   }
 
@@ -325,7 +319,7 @@ export async function extractDocumentText(
       dealId: options.rollout?.dealId,
       documentId: options.rollout?.documentId,
       userId: options.rollout?.userId,
-      fileName
+      fileName,
     });
 
     if (!canUseDocumentAi) {
@@ -350,21 +344,18 @@ export async function extractDocumentText(
       );
     }
 
-    if (options.requireDocumentAi && failures.length > 0) {
+    if (options.requireDocumentAi && !canUseDocumentAi) {
       throw new UnreadableDocumentError(failures.join(" | "));
     }
   }
 
-  if (
-    mimeType === "application/pdf" ||
-    fileName.toLowerCase().endsWith(".pdf")
-  ) {
+  if (mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
     try {
       const rawText = await extractPdfTextWithPdfJs(buffer);
       return {
         rawText,
         normalizedText: normalizeDocumentText(rawText),
-        _debug: debugMeta("pdfjs-dist", rawText)
+        _debug: debugMeta("pdfjs-dist", rawText),
       };
     } catch (pdfJsError) {
       try {
@@ -372,7 +363,7 @@ export async function extractDocumentText(
         return {
           rawText: result.text,
           normalizedText: normalizeDocumentText(result.text),
-          _debug: debugMeta("pdf-parse", result.text)
+          _debug: debugMeta("pdf-parse", result.text),
         };
       } catch (pdfParseError) {
         const messages = [...failures, pdfJsError, pdfParseError]
@@ -386,15 +377,14 @@ export async function extractDocumentText(
   }
 
   if (
-    mimeType ===
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     fileName.toLowerCase().endsWith(".docx")
   ) {
     const result = await mammoth.extractRawText({ buffer });
     return {
       rawText: result.value,
       normalizedText: normalizeDocumentText(result.value),
-      _debug: debugMeta("mammoth", result.value)
+      _debug: debugMeta("mammoth", result.value),
     };
   }
 
@@ -403,26 +393,17 @@ export async function extractDocumentText(
     return {
       rawText,
       normalizedText: normalizeDocumentText(rawText),
-      _debug: debugMeta("plaintext", rawText)
+      _debug: debugMeta("plaintext", rawText),
     };
   }
 
-  throw new UnreadableDocumentError(
-    "Only PDF, DOCX, and pasted text are supported in this beta."
-  );
+  throw new UnreadableDocumentError("Only PDF, DOCX, and pasted text are supported in this beta.");
 }
 
-export async function persistExtractedText(
-  dealId: string,
-  fileName: string,
-  text: string
-) {
+export async function persistExtractedText(dealId: string, fileName: string, text: string) {
   const directory = getRuntimePath("extracted");
   await mkdir(directory, { recursive: true });
-  const outputPath = path.join(
-    directory,
-    `${dealId}-${slugify(fileName || "document")}.txt`
-  );
+  const outputPath = path.join(directory, `${dealId}-${slugify(fileName || "document")}.txt`);
 
   await writeFile(outputPath, text, "utf8");
   return outputPath;

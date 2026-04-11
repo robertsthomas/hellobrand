@@ -35,4 +35,4 @@ hellobrand-*.json
 /.clerk/
 
 # opencode config (can include secrets)
-opencode.json
+opencode*.json
