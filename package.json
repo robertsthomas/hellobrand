@@ -27,8 +27,8 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",
+    "@azure-rest/ai-document-intelligence": "^1.1.0",
     "@clerk/nextjs": "^7.0.7",
-    "@google-cloud/documentai": "^9.6.0",
     "@openrouter/ai-sdk-provider": "^2.3.3",
     "@prisma/client": "^6.19.2",
     "@radix-ui/react-accordion": "^1.2.11",

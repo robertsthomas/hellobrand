@@ -6,14 +6,14 @@ import {
   joinPromptSections,
   promptBullets,
   promptNumbered,
-  promptQuotedText
+  promptQuotedText,
 } from "@/lib/ai/prompting";
 import type {
   DocumentKind,
   DocumentSectionInput,
   ExtractionPipelineResult,
   RiskFlagRecord,
-  SummaryType
+  SummaryType,
 } from "@/lib/types";
 
 export interface ClauseConsolidationInput {
@@ -40,7 +40,7 @@ const BRIEF_SECTION_IDS = [
   "brand-guidelines",
   "usage-rights-summary",
   "do-not-mention",
-  "approval-requirements"
+  "approval-requirements",
 ] as const;
 
 export { BRIEF_SECTION_IDS };
@@ -50,7 +50,7 @@ export function extractSectionSystemPrompt() {
     {
       tag: "role",
       content:
-        "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven. Your goal is to extract REAL values from the document, not placeholders."
+        "You extract creator partnership facts from a single document section. You are strict, literal, and evidence-driven. Your goal is to extract REAL values from the document, not placeholders.",
     },
     {
       tag: "rules",
@@ -60,8 +60,8 @@ export function extractSectionSystemPrompt() {
         "Evidence snippets must be copied verbatim from the section: meaningful phrases or full sentences only. No bullets, headings, page labels, or isolated tokens.",
         "Do not resolve cross-document conflicts here. Section extraction is single-document grounding only.",
         "If a fact does not map cleanly to the schema, place it in notes instead of inventing a field.",
-        "Adapt extraction to the document type: contracts yield structured terms, briefs yield deliverable specs and timelines, emails yield proposed terms, invoices yield payment evidence. Do not force fields that don't exist in the document type."
-      ])
+        "Adapt extraction to the document type: contracts yield structured terms, briefs yield deliverable specs and timelines, emails yield proposed terms, invoices yield payment evidence. Do not force fields that don't exist in the document type.",
+      ]),
     },
     {
       tag: "field_extraction_rules",
@@ -75,8 +75,8 @@ export function extractSectionSystemPrompt() {
         "paymentTrigger: The event that causes payment. Examples: 'On signature', 'After final live links', 'After invoice receipt'.",
         "netTermsDays: Numeric day count from 'Net 45', '45 days', 'due within 45 days'. If not stated, null.",
         "deliverables: Content requirements with channels and quantities. Map format specs (Reel, TikTok, Story) to deliverables with channels.",
-        "disclosureObligations: FTC, platform-specific labeling requirements (e.g., #ad, verbal mentions)."
-      ].join("\n")
+        "disclosureObligations: FTC, platform-specific labeling requirements (e.g., #ad, verbal mentions).",
+      ].join("\n"),
     },
     {
       tag: "few_shot_examples",
@@ -133,14 +133,14 @@ export function extractSectionSystemPrompt() {
         "<example_null>",
         "Section text: Influencer: [Insert Name] | Brand: [To Be Determined] | Campaign: [TBD]",
         "Extract: brandName=null, campaignName=null (template placeholders, not actual values)",
-        "</example_null>"
-      ].join("\n")
+        "</example_null>",
+      ].join("\n"),
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON with this shape: { "data": { ...creator_deal_terms_fields }, "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }], "confidence": 0.0 }.'
-    }
+        'Return JSON with this shape: { "data": { ...creator_deal_terms_fields }, "evidence": [{ "fieldPath": "paymentTerms", "snippet": "exact text", "confidence": 0.84 }], "confidence": 0.0 }.',
+    },
   ]);
 }
 
@@ -155,19 +155,19 @@ export function extractSectionUserPrompt(
       content: promptBullets([
         `Today: ${isoDateContext()}`,
         `Document kind: ${documentKind}`,
-        `Section ${section.chunkIndex}: ${section.title}`
-      ])
+        `Section ${section.chunkIndex}: ${section.title}`,
+      ]),
     },
     {
       tag: "section_text",
-      content: promptQuotedText(section.content)
+      content: promptQuotedText(section.content),
     },
     {
       tag: "prior_extraction",
       content: [
         "Overwrite these values ONLY if this section has more specific or contradictory info.",
-        promptQuotedText(JSON.stringify(fallback.data, null, 2))
-      ].join("\n\n")
+        promptQuotedText(JSON.stringify(fallback.data, null, 2)),
+      ].join("\n\n"),
     },
     {
       tag: "task",
@@ -178,9 +178,9 @@ export function extractSectionUserPrompt(
         "",
         "Fields to extract when stated: brandName, campaignName, paymentAmount, currency, paymentTerms, paymentStructure, paymentTrigger, netTermsDays, deliverables, usageRights, usageDuration, usageTerritory, usageChannels, exclusivity, exclusivityDuration, exclusivityCategory, disclosureObligations, revisions, termination, terminationNotice, governingLaw, notes.",
         "",
-        "Return null for any field not explicitly stated."
-      ].join("\n")
-    }
+        "Return null for any field not explicitly stated.",
+      ].join("\n"),
+    },
   ]);
 }
 
@@ -189,7 +189,7 @@ export function analyzeRisksSystemPrompt() {
     {
       tag: "role",
       content:
-        "You flag creator-relevant risks in partnership documents. Only flag items needing creator attention or negotiation."
+        "You flag creator-relevant risks in partnership documents. Only flag items needing creator attention or negotiation.",
     },
     {
       tag: "rules",
@@ -200,8 +200,8 @@ export function analyzeRisksSystemPrompt() {
         "Briefs without contracts: flag missing payment terms, undefined revision limits, open-ended scope.",
         "Invoices/emails/trackers: flag delayed payment triggers, approval blockers, scope creep. Do not invent unstated legal rights.",
         "Decks/moodboards/reports: only flag when they reveal concrete creator risk (undisclosed disclosure requirements, unpaid extra assets).",
-        "Do not restate normal terms as risks. A clear deliverable with a date is not a risk."
-      ])
+        "Do not restate normal terms as risks. A clear deliverable with a date is not a risk.",
+      ]),
     },
     {
       tag: "few_shot_examples",
@@ -219,14 +219,14 @@ export function analyzeRisksSystemPrompt() {
         "<example>",
         'Text: "Creator grants Brand exclusive rights across all social platforms for 12 months."',
         "Good: category=exclusivity, severity=high, evidence=[that exact sentence]",
-        "</example>"
-      ].join("\n")
+        "</example>",
+      ].join("\n"),
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON: { "riskFlags": [{ "category": "usage_rights|exclusivity|payment_terms|deliverables|termination|other", "title": "short label", "detail": "plain-language explanation", "severity": "low|medium|high", "suggestedAction": "practical negotiation step or null", "evidence": ["quoted snippet from document"] }] }.'
-    }
+        'Return JSON: { "riskFlags": [{ "category": "usage_rights|exclusivity|payment_terms|deliverables|termination|other", "title": "short label", "detail": "plain-language explanation", "severity": "low|medium|high", "suggestedAction": "practical negotiation step or null", "evidence": ["quoted snippet from document"] }] }.',
+    },
   ]);
 }
 
@@ -239,28 +239,25 @@ export function analyzeRisksUserPrompt(
   return joinPromptSections([
     {
       tag: "context",
-      content: promptBullets([
-        `Today: ${isoDateContext()}`,
-        `Document kind: ${documentKind}`
-      ])
+      content: promptBullets([`Today: ${isoDateContext()}`, `Document kind: ${documentKind}`]),
     },
     {
       tag: "document_text",
-      content: promptQuotedText(text)
+      content: promptQuotedText(text),
     },
     {
       tag: "extracted_facts",
-      content: promptQuotedText(JSON.stringify(extraction.data, null, 2))
+      content: promptQuotedText(JSON.stringify(extraction.data, null, 2)),
     },
     {
       tag: "prior_risks",
-      content: promptQuotedText(JSON.stringify(fallback, null, 2))
+      content: promptQuotedText(JSON.stringify(fallback, null, 2)),
     },
     {
       tag: "task",
       content:
-        "Return only creator-relevant risk flags directly supported by the document text and extracted facts."
-    }
+        "Return only creator-relevant risk flags directly supported by the document text and extracted facts.",
+    },
   ]);
 }
 
@@ -273,7 +270,7 @@ export function summarySystemPrompt(mode: "default" | "rewrite") {
   return joinPromptSections([
     {
       tag: "role",
-      content: roleDescription
+      content: roleDescription,
     },
     {
       tag: "rules",
@@ -284,14 +281,14 @@ export function summarySystemPrompt(mode: "default" | "rewrite") {
         "Creator-facing plain language. Not legalistic.",
         "Plain text only. No markdown, bullets, asterisks, or underscores.",
         'Required section titles: "What this partnership is", "What you deliver", "What you get paid", "Rights and restrictions", "Watchouts".',
-        "If nothing notable for a section, say so in one sentence. If a fact is missing, write Not specified."
-      ])
+        "If nothing notable for a section, say so in one sentence. If a fact is missing, write Not specified.",
+      ]),
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON: { "sections": [{ "title": "What this partnership is", "paragraphs": ["plain text"] }], "body": "full plain text summary" }.'
-    }
+        'Return JSON: { "sections": [{ "title": "What this partnership is", "paragraphs": ["plain text"] }], "body": "full plain text summary" }.',
+    },
   ]);
 }
 
@@ -308,37 +305,37 @@ export function summaryUserPrompt(input: {
     input.extraction
       ? {
           tag: "extracted_fields",
-          content: promptQuotedText(JSON.stringify(input.extraction.data, null, 2))
+          content: promptQuotedText(JSON.stringify(input.extraction.data, null, 2)),
         }
       : null,
     input.risks
       ? {
           tag: "risk_flags",
-          content: promptQuotedText(JSON.stringify(input.risks, null, 2))
+          content: promptQuotedText(JSON.stringify(input.risks, null, 2)),
         }
       : null,
     input.baseSummary
       ? {
           tag: "current_summary",
-          content: promptQuotedText(input.baseSummary)
+          content: promptQuotedText(input.baseSummary),
         }
       : null,
     input.grounding
       ? {
           tag: "grounding",
-          content: promptQuotedText(JSON.stringify(input.grounding, null, 2))
+          content: promptQuotedText(JSON.stringify(input.grounding, null, 2)),
         }
       : null,
     {
       tag: "fallback_summary",
-      content: promptQuotedText(input.fallbackBody)
+      content: promptQuotedText(input.fallbackBody),
     },
     {
       tag: "task",
       content: input.styleInstruction
         ? `Type: ${input.targetType}. ${input.styleInstruction}`
-        : "Write the creator-facing summary from the extracted facts and risk flags above."
-    }
+        : "Write the creator-facing summary from the extracted facts and risk flags above.",
+    },
   ];
 
   return joinPromptSections(sections);
@@ -349,7 +346,7 @@ export function briefExtractionSystemPrompt() {
     {
       tag: "role",
       content:
-        "You extract campaign-brief fields from partnership documents. Strict: only capture what is explicitly stated."
+        "You extract campaign-brief fields from partnership documents. Strict: only capture what is explicitly stated.",
     },
     {
       tag: "rules",
@@ -357,14 +354,14 @@ export function briefExtractionSystemPrompt() {
         "Source types vary: formal briefs, pitch decks, storyboards, moodboards, creative feedback, and status updates are all valid sources.",
         "Return null or empty arrays for anything not found. Do not invent messaging, approvals, or audience details.",
         "Use doNotMention for prohibited claims, banned phrasing, or explicit avoid lists.",
-        "Ignore payment, invoicing, and legal clauses unless they directly shape the creator brief experience."
-      ])
+        "Ignore payment, invoicing, and legal clauses unless they directly shape the creator brief experience.",
+      ]),
     },
     {
       tag: "output_contract",
       content:
-        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention }. Null or [] for missing fields."
-    }
+        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention }. Null or [] for missing fields.",
+    },
   ]);
 }
 
@@ -373,7 +370,7 @@ export function briefGenerationSystemPrompt() {
     {
       tag: "role",
       content:
-        "You write polished, actionable campaign briefs for creators from partnership context."
+        "You write polished, actionable campaign briefs for creators from partnership context.",
     },
     {
       tag: "rules",
@@ -381,18 +378,18 @@ export function briefGenerationSystemPrompt() {
         "Use provided context only. Do not invent terms, dates, or requirements.",
         "Preserve risks, deliverables, timing, rights, and approval constraints when present.",
         "Pre-fill from briefData when available, improve clarity and organization.",
-        "Each section: id, title, content required. items is optional."
-      ])
+        "Each section: id, title, content required. items is optional.",
+      ]),
     },
     {
       tag: "section_ids",
-      content: promptBullets(BRIEF_SECTION_IDS.map((id) => `"${id}"`))
+      content: promptBullets(BRIEF_SECTION_IDS.map((id) => `"${id}"`)),
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON: { "sections": [{ "id": "campaign-overview", "title": "...", "content": "...", "items": ["..."] }] }.'
-    }
+        'Return JSON: { "sections": [{ "id": "campaign-overview", "title": "...", "content": "...", "items": ["..."] }] }.',
+    },
   ]);
 }
 
@@ -401,7 +398,7 @@ export function clauseConsolidationSystemPrompt() {
     {
       tag: "role",
       content:
-        "You consolidate repeated creator partnership contract clauses after Google Document AI extraction. You are not an extractor. You rewrite only the provided extracted snippets into concise, faithful summaries."
+        "You consolidate repeated creator partnership contract clauses after structured extraction. You are not an extractor. You rewrite only the provided extracted snippets into concise, faithful summaries.",
     },
     {
       tag: "rules",
@@ -412,14 +409,14 @@ export function clauseConsolidationSystemPrompt() {
         "Keep important conditions, durations, territories, exceptions, quantities, and party obligations.",
         "Return null for a field when there are no snippets for that field.",
         "Keep deliverables summary concise. Do not replace structured deliverable quantities when they are already clear.",
-        "Write in plain text only. No markdown bullets, no numbered lists, no headings."
-      ])
+        "Write in plain text only. No markdown bullets, no numbered lists, no headings.",
+      ]),
     },
     {
       tag: "output_contract",
       content:
-        'Return JSON: { "usageRights": "...", "exclusivity": "...", "deliverablesSummary": "...", "termination": "...", "notes": "..." }.'
-    }
+        'Return JSON: { "usageRights": "...", "exclusivity": "...", "deliverablesSummary": "...", "termination": "...", "notes": "..." }.',
+    },
   ]);
 }
 
@@ -429,33 +426,33 @@ export function clauseConsolidationUserPrompt(input: ClauseConsolidationInput) {
       tag: "context",
       content: promptBullets([
         `Today: ${isoDateContext()}`,
-        "Source: Google Document AI custom extractor entities",
-        "Task: summarize repeated occurrences for downstream deal terms"
-      ])
+        "Source: extracted clause snippets",
+        "Task: summarize repeated occurrences for downstream deal terms",
+      ]),
     },
     {
       tag: "fallback_values",
-      content: promptQuotedText(JSON.stringify(input.fallback, null, 2))
+      content: promptQuotedText(JSON.stringify(input.fallback, null, 2)),
     },
     {
       tag: "usage_rights_snippets",
-      content: promptQuotedText(JSON.stringify(input.usageRights, null, 2))
+      content: promptQuotedText(JSON.stringify(input.usageRights, null, 2)),
     },
     {
       tag: "exclusivity_snippets",
-      content: promptQuotedText(JSON.stringify(input.exclusivity, null, 2))
+      content: promptQuotedText(JSON.stringify(input.exclusivity, null, 2)),
     },
     {
       tag: "deliverables_snippets",
-      content: promptQuotedText(JSON.stringify(input.deliverables, null, 2))
+      content: promptQuotedText(JSON.stringify(input.deliverables, null, 2)),
     },
     {
       tag: "termination_snippets",
-      content: promptQuotedText(JSON.stringify(input.termination, null, 2))
+      content: promptQuotedText(JSON.stringify(input.termination, null, 2)),
     },
     {
       tag: "notes_snippets",
-      content: promptQuotedText(JSON.stringify(input.notes, null, 2))
-    }
+      content: promptQuotedText(JSON.stringify(input.notes, null, 2)),
+    },
   ]);
 }

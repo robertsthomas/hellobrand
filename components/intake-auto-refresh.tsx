@@ -19,6 +19,14 @@ function logClientRefresh(event: string, details: Record<string, unknown>) {
   console.info(`[client-intake-refresh] ${event}`, details);
 }
 
+function getIntakePollDelayMs() {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+    return 15000;
+  }
+
+  return 5000;
+}
+
 function isDocumentAiArtifact(artifact: DocumentArtifactRecord) {
   return artifact.kind === "raw_vendor_output" && Boolean(artifact.payload);
 }
@@ -177,7 +185,7 @@ export function IntakeAutoRefresh({
       if (disposed) return;
       await pollSession();
       if (!disposed) {
-        timeoutId = setTimeout(pollLoop, 3000);
+        timeoutId = setTimeout(pollLoop, getIntakePollDelayMs());
       }
     }
 

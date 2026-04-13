@@ -296,7 +296,7 @@ export function getAiModelConfig(): AiModelConfig {
 
   const models: AiModelInfo[] = AI_TASKS.map(({ key, envVar }) => {
     const taskModel = envVar ? process.env[envVar] : null;
-    const effectiveModel = globalModel ?? taskModel ?? TASK_PRIMARY_DEFAULTS[key] ?? "unknown";
+    const effectiveModel = taskModel ?? globalModel ?? TASK_PRIMARY_DEFAULTS[key] ?? "unknown";
 
     const taskFallbackKey = envVar;
     const fallbacks = [
@@ -309,7 +309,7 @@ export function getAiModelConfig(): AiModelConfig {
       task: key,
       primary: effectiveModel,
       fallbacks,
-      envVar: globalModel ? null : envVar,
+      envVar: taskModel ? envVar : globalModel ? null : envVar,
       routeVersion: ROUTE_VERSIONS[key] ?? "unknown"
     };
   });

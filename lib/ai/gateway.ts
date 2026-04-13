@@ -358,7 +358,7 @@ function taskEnvPrimary(taskKey: AiTaskKey) {
   const taskSpecificVar = getTaskSpecificEnvVar(taskKey);
   const taskModel = taskSpecificVar ? process.env[taskSpecificVar] : null;
 
-  return globalModel || taskModel || null;
+  return taskModel || globalModel || null;
 }
 
 function getTaskSpecificEnvVar(taskKey: AiTaskKey): string | null {

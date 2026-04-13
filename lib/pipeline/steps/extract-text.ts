@@ -17,33 +17,24 @@ export async function runExtractTextStep(documentId: string, runId: string) {
       fileName: document.fileName,
       sourceType: document.sourceType,
       mimeType: document.mimeType,
-      runId
+      runId,
     });
 
     await getRepository().updateDocument(document.id, {
       processingStatus: "processing",
-      errorMessage: null
+      errorMessage: null,
     });
 
     const extractionSource =
       document.sourceType === "pasted_text"
         ? {
             rawText: document.rawText ?? "",
-            normalizedText: normalizeDocumentText(document.rawText ?? "")
+            normalizedText: normalizeDocumentText(document.rawText ?? ""),
           }
         : await extractDocumentText(
             await readStoredBytes(document.storagePath),
             document.mimeType,
-            document.fileName,
-            {
-              preferDocumentAi: true,
-              requireDocumentAi: true,
-              rollout: {
-                dealId: document.dealId,
-                documentId: document.id,
-                userId: document.userId
-              }
-            }
+            document.fileName
           );
 
     await assertCurrentRun(document.id, runId);
@@ -52,7 +43,7 @@ export async function runExtractTextStep(documentId: string, runId: string) {
       processingStatus: "processing",
       rawText: extractionSource.rawText,
       normalizedText: extractionSource.normalizedText,
-      errorMessage: null
+      errorMessage: null,
     });
 
     await saveArtifact({
@@ -64,8 +55,8 @@ export async function runExtractTextStep(documentId: string, runId: string) {
       payload: {
         rawText: extractionSource.rawText,
         normalizedText: extractionSource.normalizedText,
-        debug: extractionSource._debug ?? null
-      }
+        debug: extractionSource._debug ?? null,
+      },
     });
 
     await saveObservabilityArtifact({
@@ -80,8 +71,8 @@ export async function runExtractTextStep(documentId: string, runId: string) {
         fileSizeBytes: extractionSource._debug?.fileSizeBytes ?? null,
         extractedChars: extractionSource._debug?.extractedChars ?? null,
         pageCount: extractionSource._debug?.pageCount ?? null,
-        estimatedCostUsd: extractionSource._debug?.estimatedCostUsd ?? 0
-      }
+        estimatedCostUsd: extractionSource._debug?.estimatedCostUsd ?? 0,
+      },
     });
 
     if (extractionSource._vendor) {
@@ -91,7 +82,7 @@ export async function runExtractTextStep(documentId: string, runId: string) {
         step: "extract_text",
         kind: "raw_vendor_output",
         processor: extractionSource._vendor.processor,
-        payload: extractionSource._vendor.payload
+        payload: extractionSource._vendor.payload,
       });
     }
 

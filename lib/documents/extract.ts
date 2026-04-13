@@ -4,10 +4,6 @@ import path from "node:path";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
-import {
-  estimateDocumentAiCostUsd,
-  isDocumentAiParsingEnabled,
-} from "@/lib/document-pipeline-rollout";
 import { getRuntimePath } from "@/lib/runtime-path";
 import { slugify } from "@/lib/utils";
 
@@ -198,17 +194,9 @@ export type ExtractionResult = {
   };
 };
 
-export type ExtractDocumentTextOptions = {
-  preferDocumentAi?: boolean;
-  requireDocumentAi?: boolean;
-  rollout?: {
-    dealId?: string | null;
-    documentId?: string | null;
-    userId?: string | null;
-  };
-};
+export type ExtractDocumentTextOptions = {};
 
-async function extractTextWithDocumentAi(
+async function extractTextWithAzureDocumentIntelligence(
   buffer: Buffer,
   mimeType: string,
   fileName: string
@@ -224,76 +212,35 @@ async function extractTextWithDocumentAi(
     return null;
   }
 
-  const { hasDocumentAiProcessor, processDocumentWithDocumentAi } = await import(
-    "@/lib/document-ai"
-  );
+  const { analyzeDocumentWithAzureDocumentIntelligence, hasAzureDocumentIntelligence } =
+    await import("@/lib/azure-document-intelligence");
 
-  const processors: Array<"layout" | "ocr"> = [];
-
-  if (
-    hasDocumentAiProcessor("layout") &&
-    (mimeType === "application/pdf" ||
-      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      lowerFileName.endsWith(".pdf") ||
-      lowerFileName.endsWith(".docx"))
-  ) {
-    processors.push("layout");
-  }
-
-  if (
-    hasDocumentAiProcessor("ocr") &&
-    (mimeType === "application/pdf" || lowerFileName.endsWith(".pdf"))
-  ) {
-    processors.push("ocr");
-  }
-
-  if (processors.length === 0) {
+  if (!hasAzureDocumentIntelligence()) {
     return null;
   }
 
-  const failures: string[] = [];
+  const startedAt = Date.now();
+  const response = await analyzeDocumentWithAzureDocumentIntelligence({
+    bytes: buffer,
+    mimeType,
+  });
 
-  for (const processor of processors) {
-    const startedAt = Date.now();
-
-    try {
-      const response = await processDocumentWithDocumentAi({
-        processor,
-        bytes: buffer,
-        mimeType,
-        imagelessMode: true,
-        fieldMaskPaths: ["text"],
-      });
-
-      if (!response.fullText.trim()) {
-        failures.push(`${processor} returned empty text`);
-        continue;
-      }
-
-      return {
-        rawText: response.fullText,
-        normalizedText: normalizeDocumentText(response.fullText),
-        _debug: {
-          parser: `document-ai:${processor}`,
-          durationMs: Date.now() - startedAt,
-          fileSizeBytes: buffer.length,
-          extractedChars: response.fullText.length,
-          pageCount: response.pageCount,
-          estimatedCostUsd: estimateDocumentAiCostUsd(processor, response.pageCount),
-        },
-        _vendor: {
-          processor,
-          payload: response.rawResponse,
-        },
-      };
-    } catch (error) {
-      failures.push(
-        `${processor} failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  throw new UnreadableDocumentError(failures.join(" | "));
+  return {
+    rawText: response.fullText,
+    normalizedText: normalizeDocumentText(response.fullText),
+    _debug: {
+      parser: `azure-document-intelligence:${response.modelId}`,
+      durationMs: Date.now() - startedAt,
+      fileSizeBytes: buffer.length,
+      extractedChars: response.fullText.length,
+      pageCount: response.pageCount,
+      estimatedCostUsd: null,
+    },
+    _vendor: {
+      processor: response.modelId,
+      payload: response.rawResponse,
+    },
+  };
 }
 
 export async function extractDocumentText(
@@ -314,39 +261,13 @@ export async function extractDocumentText(
     return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
   }
 
-  if (options?.preferDocumentAi) {
-    const canUseDocumentAi = isDocumentAiParsingEnabled({
-      dealId: options.rollout?.dealId,
-      documentId: options.rollout?.documentId,
-      userId: options.rollout?.userId,
-      fileName,
-    });
-
-    if (!canUseDocumentAi) {
-      failures.push("Document AI parsing is not enabled for this document.");
-      if (options.requireDocumentAi) {
-        throw new UnreadableDocumentError(failures.join(" | "));
-      }
+  try {
+    const azureResult = await extractTextWithAzureDocumentIntelligence(buffer, mimeType, fileName);
+    if (azureResult) {
+      return azureResult;
     }
-
-    try {
-      if (canUseDocumentAi) {
-        const result = await extractTextWithDocumentAi(buffer, mimeType, fileName);
-        if (result) {
-          return result;
-        }
-
-        failures.push("Document AI has no configured text processor for this document.");
-      }
-    } catch (documentAiError) {
-      failures.push(
-        documentAiError instanceof Error ? documentAiError.message : String(documentAiError)
-      );
-    }
-
-    if (options.requireDocumentAi && !canUseDocumentAi) {
-      throw new UnreadableDocumentError(failures.join(" | "));
-    }
+  } catch (azureError) {
+    failures.push(azureError instanceof Error ? azureError.message : String(azureError));
   }
 
   if (mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {

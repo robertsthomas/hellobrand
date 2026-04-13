@@ -19,8 +19,8 @@ describe("document pipeline observability", () => {
           failedAt: null,
           failureMessage: null,
           createdAt: "2026-04-09T12:00:00.000Z",
-          updatedAt: "2026-04-09T12:00:30.000Z"
-        }
+          updatedAt: "2026-04-09T12:00:30.000Z",
+        },
       ],
       documentArtifacts: [
         {
@@ -29,13 +29,13 @@ describe("document pipeline observability", () => {
           runId,
           step: "extract_text",
           kind: "observability",
-          processor: "document-ai:layout",
+          processor: "pdfjs-dist",
           payload: {
             event: "extract_text_metrics",
-            estimatedCostUsd: 0.05,
-            pageCount: 5
+            estimatedCostUsd: 0,
+            pageCount: 5,
           },
-          createdAt: "2026-04-09T12:00:02.000Z"
+          createdAt: "2026-04-09T12:00:02.000Z",
         },
         {
           id: "artifact-2",
@@ -43,14 +43,14 @@ describe("document pipeline observability", () => {
           runId,
           step: "extract_fields",
           kind: "observability",
-          processor: "contract",
+          processor: "fallback-merge",
           payload: {
             event: "extract_fields_metrics",
-            estimatedCostUsd: 0.15,
-            pageCount: 5,
-            usedFallback: false
+            estimatedCostUsd: 0,
+            pageCount: null,
+            usedFallback: true,
           },
-          createdAt: "2026-04-09T12:00:10.000Z"
+          createdAt: "2026-04-09T12:00:10.000Z",
         },
         {
           id: "artifact-3",
@@ -58,11 +58,11 @@ describe("document pipeline observability", () => {
           runId,
           step: "extract_fields",
           kind: "normalized_extraction",
-          processor: "document_ai:contract_custom_extractor",
+          processor: "fallback-merge",
           payload: {
-            confidence: 0.88
+            confidence: 0.88,
           },
-          createdAt: "2026-04-09T12:00:11.000Z"
+          createdAt: "2026-04-09T12:00:11.000Z",
         },
         {
           id: "artifact-4",
@@ -74,10 +74,10 @@ describe("document pipeline observability", () => {
           payload: {
             event: "step_result",
             durationMs: 1200,
-            failed: false
+            failed: false,
           },
-          createdAt: "2026-04-09T12:00:03.000Z"
-        }
+          createdAt: "2026-04-09T12:00:03.000Z",
+        },
       ],
       documentReviewItems: [
         {
@@ -95,7 +95,7 @@ describe("document pipeline observability", () => {
           sectionId: null,
           artifactId: null,
           createdAt: "2026-04-09T12:00:12.000Z",
-          updatedAt: "2026-04-09T12:00:12.000Z"
+          updatedAt: "2026-04-09T12:00:12.000Z",
         },
         {
           id: "review-2",
@@ -112,23 +112,23 @@ describe("document pipeline observability", () => {
           sectionId: null,
           artifactId: null,
           createdAt: "2026-04-09T12:00:12.000Z",
-          updatedAt: "2026-04-09T12:00:12.000Z"
-        }
-      ]
+          updatedAt: "2026-04-09T12:00:12.000Z",
+        },
+      ],
     } satisfies Pick<DealAggregate, "documentRuns" | "documentArtifacts" | "documentReviewItems">;
 
     const summary = summarizeDocumentRunObservability({
       aggregate,
-      runId
+      runId,
     });
 
     expect(summary).not.toBeNull();
-    expect(summary?.estimatedCostUsd).toBe(0.2);
-    expect(summary?.pagesProcessed).toBe(10);
+    expect(summary?.estimatedCostUsd).toBe(0);
+    expect(summary?.pagesProcessed).toBe(5);
     expect(summary?.extractionConfidence).toBe(0.88);
     expect(summary?.openReviewItems).toBe(2);
-    expect(summary?.fallbackCount).toBe(0);
-    expect(summary?.processorsUsed).toEqual(["document-ai:layout", "contract", "document_ai:contract_custom_extractor"]);
+    expect(summary?.fallbackCount).toBe(1);
+    expect(summary?.processorsUsed).toEqual(["pdfjs-dist", "fallback-merge"]);
     expect(summary?.stages.extract_text?.durationMs).toBe(1200);
   });
 });

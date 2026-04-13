@@ -66,6 +66,14 @@ function getStageState(
   return "pending" as const;
 }
 
+function getIntakeReviewPollDelayMs() {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+    return 15000;
+  }
+
+  return 5000;
+}
+
 function StageStatusRow({
   label,
   state
@@ -152,7 +160,7 @@ export function IntakeReviewLiveStatus({
       }
 
       if (!disposed) {
-        timeoutId = setTimeout(poll, 3000);
+        timeoutId = setTimeout(poll, getIntakeReviewPollDelayMs());
       }
     }
 

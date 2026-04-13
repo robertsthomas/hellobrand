@@ -56,21 +56,12 @@ doppler secrets upload .env --project hellobrand --config dev
    - `OPENROUTER_MODEL_SUMMARY` for creator-facing summaries
    - optional `*_FALLBACKS` secrets for per-task failover
    If the task-specific model is unset, it falls back to `OPENROUTER_MODEL`. If no provider is configured, the fallback parser is used.
-7. Optional for Google Document AI-backed parsing and extraction, set:
-   - `GOOGLE_CLOUD_PROJECT_ID`
-   - `GOOGLE_CLOUD_PROJECT_NUMBER`
-   - `DOCUMENT_AI_LOCATION`
-   - `DOCUMENT_AI_CONTRACT_PROCESSOR_ID`
-   - `DOCUMENT_AI_BRIEF_PROCESSOR_ID`
-   - `DOCUMENT_AI_INVOICE_PROCESSOR_ID`
-   - `DOCUMENT_AI_LAYOUT_PROCESSOR_ID`
-   - `DOCUMENT_AI_OCR_PROCESSOR_ID`
-   - optional rollout controls:
-     - `DOCUMENT_PIPELINE_V2_FORCE_LEGACY`
-     - `DOCUMENT_PIPELINE_V2_ALLOWED_KINDS`
-     - `DOCUMENT_PIPELINE_V2_COHORT_PERCENT`
-     - `DOCUMENT_PIPELINE_V2_ALLOWED_USER_IDS`
-   Authentication can come from either local ADC (`gcloud auth application-default login`) or a Doppler secret named `GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON`.
+7. Optional for Azure Document Intelligence-backed text extraction, set:
+   - `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`
+   - `AZURE_DOCUMENT_INTELLIGENCE_API_KEY`
+   - optional `AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID` (defaults to `prebuilt-layout`)
+   - optional `AZURE_DOCUMENT_INTELLIGENCE_API_VERSION` (defaults to `2024-11-30`)
+   When configured, HelloBrand uses Azure for PDF and DOCX text/layout extraction before falling back to local parsers.
 8. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
 9. For Stripe-backed billing flows, set:
    - `STRIPE_SECRET_KEY`
@@ -115,46 +106,9 @@ pnpm run start:prd
 - Uploaded files use Supabase Storage when configured, otherwise local `.runtime/uploads`.
 - The app enqueues document processing. With Inngest credentials it uses the worker route under `/api/inngest`; without them it falls back to local fire-and-forget execution.
 - The extraction pipeline uses local parsers first: `pdfjs-dist` for PDFs, `mammoth` for DOCX, plain text decoding for TXT, and `pdf-parse` only as a secondary PDF fallback.
-- The downstream analysis pipeline remains section-based: extract text -> classify -> split sections -> section extraction -> merge -> risk analysis -> summary.
+- The downstream analysis pipeline remains section-based: extract text -> classify -> split sections -> structured term extraction -> merge -> risk analysis -> summary.
 - Billing entitlements resolve from Prisma/Postgres. Stripe drives checkout, subscriptions, invoices, and the customer portal.
 - When `DATABASE_URL` is unset, the app falls back to the local file-backed seed store. The Playwright tier matrix uses this mode together with `HELLOBRAND_DEV_PLAN` and the non-production E2E auth cookie.
-
-## Document AI notes for HelloBrand
-
-These are the important Google Document AI rules and product decisions for this repo.
-
-- Keep all HelloBrand Document AI processors in the same region. The current setup is `us`, and `DOCUMENT_AI_LOCATION` must match the processor region.
-- Use processor IDs, not processor version IDs, in app config. Google expects production callers to hit the processor and let the processor's default version control rollout.
-- Current intended processor routing is:
-  - invoices -> `DOCUMENT_AI_INVOICE_PROCESSOR_ID`
-  - contracts / influencer agreements -> `DOCUMENT_AI_CONTRACT_PROCESSOR_ID`
-  - briefs / decks -> `DOCUMENT_AI_BRIEF_PROCESSOR_ID`
-  - layout-first parsing fallback -> `DOCUMENT_AI_LAYOUT_PROCESSOR_ID`
-  - OCR fallback -> `DOCUMENT_AI_OCR_PROCESSOR_ID`
-- The app must continue normalizing Document AI output into HelloBrand's internal extraction schema. Do not let raw vendor entities write directly into canonical deal terms.
-- Invoice Parser is the best fit for invoices and should stay the primary invoice extraction path.
-- Layout Parser is the best general parsing fallback for PDFs, HTML, DOCX, PPTX, XLSX, and similar files. OCR is still useful when layout parsing returns weak text or when the source is image-heavy.
-- Custom extractors are required for contracts and briefs. If a custom extractor has no entity schema defined, Google rejects requests with `INVALID_ARGUMENT` and a field violation on `entity_types`.
-- Custom extractor field names are effectively permanent. Choose descriptive snake_case names the first time and keep them aligned with the app mappers.
-- For HelloBrand, keep custom extractor schemas tight. Start with coarse, high-value fields and let app code handle downstream normalization and merge logic.
-- Label all occurrences of an entity in training documents, even if the field is logically single-value. Inconsistent labeling lowers quality quickly.
-- Do not manually "fix" OCR text during annotation. If OCR is wrong in the document, label the detected text rather than inventing a corrected value.
-- Brief and contract processors should be trained and evaluated separately. They have different layouts, different signal density, and different review requirements.
-- Review-item UX is expected for weak extractions. Briefs and decks are less structurally consistent than invoices, so `review_needed` is a normal outcome, not necessarily a processor failure.
-- Supported file types and synchronous page limits vary by processor. Treat larger or more complex uploads carefully and prefer layout/OCR ingestion before assuming a custom extractor can handle every source file directly.
-
-### Document AI operational checklist
-
-- After changing any processor schema or training data in Google Cloud, rerun the local verification scripts before relying on the new behavior:
-  - `doppler run -- pnpm exec tsx scripts/verify-document-ai.ts`
-  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-invoice.ts`
-  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-contract.ts`
-  - `doppler run -- pnpm exec tsx scripts/verify-document-ai-brief.ts`
-- Keep representative local fixtures in `example-docs/` for smoke tests. That folder is intentionally gitignored.
-- If local auth is used, Application Default Credentials must be configured with:
-  - `gcloud auth application-default login`
-  - `gcloud auth application-default set-quota-project hellobrand-490702`
-- Rollout controls are documented in [docs/document-pipeline-rollout.md](/Users/thomasroberts/Desktop/projects/hellobrand/docs/document-pipeline-rollout.md). Use those env vars to limit v2 by document kind, stable cohort percentage, or an internal user allowlist before broad cutover.
 
 ## API surface
 

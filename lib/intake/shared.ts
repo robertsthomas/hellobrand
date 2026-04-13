@@ -228,7 +228,7 @@ export function campaignDateWindowFromTimelineItems(timelineItems: IntakeTimelin
 const JOB_STAGE_MAP: Record<JobType, IntakeProcessingSnapshot["currentStage"]> = {
   extract_text: "extracting",
   classify_document: "extracting",
-  section_document: "extracting",
+  section_document: "structuring",
   extract_fields: "structuring",
   merge_results: "structuring",
   analyze_risks: "risk_review",

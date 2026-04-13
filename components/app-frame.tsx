@@ -277,6 +277,7 @@ export function AppFrame({
       <div key={item.href}>
         <Link
           href={item.href}
+          prefetch={false}
           data-guide={guideId}
           onClick={options?.onClick}
           className={cn(
@@ -297,6 +298,7 @@ export function AppFrame({
         {active && sidebarSubItem?.parentHref === item.href ? (
           <Link
             href={sidebarSubItem.href}
+            prefetch={false}
             onClick={options?.onClick}
             className="ml-9 mt-1 flex h-9 items-center border-l border-black/10 pl-3 text-[13px] font-medium text-foreground dark:border-white/10"
           >
@@ -358,7 +360,7 @@ export function AppFrame({
       <div className="flex h-full min-h-0 overflow-hidden dark:bg-[#0f1115]">
         <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
           <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-            <Link href="/app" className="group flex items-center gap-3">
+            <Link href="/app" prefetch={false} className="group flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
                 <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
               </div>
@@ -414,6 +416,7 @@ export function AppFrame({
             <div className="space-y-3">
               <PostHogActionLink
                 href="/app/intake/new"
+                prefetch={false}
                 eventName="workspace_entry_cta_clicked"
                 payload={{ source: "sidebar_desktop" }}
                 data-guide="sidebar-new-workspace"
@@ -450,7 +453,7 @@ export function AppFrame({
                 <SheetDescription>App navigation and account actions.</SheetDescription>
               </SheetHeader>
               <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-                <Link href="/app" className="group flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
+                <Link href="/app" prefetch={false} className="group flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
                   <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
                     <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
                   </div>
@@ -525,6 +528,7 @@ export function AppFrame({
                 <div className="space-y-3">
                   <PostHogActionLink
                     href="/app/intake/new"
+                    prefetch={false}
                     eventName="workspace_entry_cta_clicked"
                     payload={{ source: "sidebar_mobile" }}
                     data-guide="sidebar-new-workspace"
