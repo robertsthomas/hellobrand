@@ -2,7 +2,7 @@ import { gmailScopes, getGooglePubSubTopic, getGoogleRedirectUri } from "@/lib/e
 import type {
   ProviderSendAttachmentInput,
   ProviderSendMessageResult,
-  ProviderThreadPayload
+  ProviderThreadPayload,
 } from "@/lib/email/providers/types";
 import type { EmailParticipant } from "@/lib/types";
 
@@ -73,9 +73,7 @@ async function mapWithConcurrency<TInput, TOutput>(
   }
 
   await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () =>
-      runWorker()
-    )
+    Array.from({ length: Math.max(1, Math.min(concurrency, values.length)) }, () => runWorker())
   );
 
   return results;
@@ -91,13 +89,13 @@ function parseAddressHeader(value: string | null | undefined): EmailParticipant 
   if (match) {
     return {
       name: match[1]?.trim().replace(/^"|"$|^'|'$/g, "") || null,
-      email: match[2].trim().toLowerCase()
+      email: match[2].trim().toLowerCase(),
     };
   }
 
   return {
     name: null,
-    email: trimmed.replace(/^"|"$|^'|'$/g, "").toLowerCase()
+    email: trimmed.replace(/^"|"$|^'|'$/g, "").toLowerCase(),
   };
 }
 
@@ -112,8 +110,13 @@ function parseAddressList(value: string | null | undefined) {
     .filter((entry): entry is EmailParticipant => Boolean(entry?.email));
 }
 
-function headerValue(headers: Array<{ name?: string; value?: string }> | undefined, target: string) {
-  return headers?.find((header) => header.name?.toLowerCase() === target.toLowerCase())?.value ?? null;
+function headerValue(
+  headers: Array<{ name?: string; value?: string }> | undefined,
+  target: string
+) {
+  return (
+    headers?.find((header) => header.name?.toLowerCase() === target.toLowerCase())?.value ?? null
+  );
 }
 
 function decodeGmailBody(data: string | null | undefined) {
@@ -148,7 +151,16 @@ function formatAddressList(participants: EmailParticipant[]) {
 
 function collectBodyParts(
   payload: GmailPayloadPart | null | undefined,
-  output: { textBody: string | null; htmlBody: string | null; attachments: Array<{ providerAttachmentId: string; filename: string; mimeType: string; sizeBytes: number }> }
+  output: {
+    textBody: string | null;
+    htmlBody: string | null;
+    attachments: Array<{
+      providerAttachmentId: string;
+      filename: string;
+      mimeType: string;
+      sizeBytes: number;
+    }>;
+  }
 ) {
   if (!payload) {
     return;
@@ -163,7 +175,7 @@ function collectBodyParts(
       providerAttachmentId: body.attachmentId,
       filename: fileName,
       mimeType: payload.mimeType ?? "application/octet-stream",
-      sizeBytes: Number(body.size ?? 0)
+      sizeBytes: Number(body.size ?? 0),
     });
   }
 
@@ -188,7 +200,8 @@ function stripHtml(html: string | null) {
     return null;
   }
 
-  return html.replace(/<style[\s\S]*?<\/style>/gi, " ")
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
@@ -212,7 +225,7 @@ function uniqueParticipants(entries: Array<EmailParticipant | null | undefined>)
     seen.add(email);
     participants.push({
       name: entry.name?.trim() || null,
-      email
+      email,
     });
   }
 
@@ -221,24 +234,27 @@ function uniqueParticipants(entries: Array<EmailParticipant | null | undefined>)
 
 function inferContractRelated(subject: string, bodies: string[]) {
   const corpus = `${subject}\n${bodies.join("\n")}`.toLowerCase();
-  return ["contract", "agreement", "usage rights", "net ", "invoice", "payment", "deliverable", "campaign"].some((term) =>
-    corpus.includes(term)
-  );
+  return [
+    "contract",
+    "agreement",
+    "usage rights",
+    "net ",
+    "invoice",
+    "payment",
+    "deliverable",
+    "campaign",
+  ].some((term) => corpus.includes(term));
 }
 
-async function gmailRequest<T>(
-  path: string,
-  accessToken: string,
-  init?: RequestInit
-): Promise<T> {
+async function gmailRequest<T>(path: string, accessToken: string, init?: RequestInit): Promise<T> {
   for (let attempt = 0; attempt < GMAIL_REQUEST_RETRY_LIMIT; attempt += 1) {
     const response = await fetch(`${GMAIL_API_BASE}${path}`, {
       ...init,
       headers: {
         authorization: `Bearer ${accessToken}`,
         "content-type": "application/json",
-        ...(init?.headers ?? {})
-      }
+        ...(init?.headers ?? {}),
+      },
     });
 
     if (response.ok) {
@@ -257,8 +273,7 @@ async function gmailRequest<T>(
     }
 
     const backoffMs =
-      error.retryAfterMs ??
-      Math.min(1000 * 2 ** attempt, 8000) + Math.floor(Math.random() * 250);
+      error.retryAfterMs ?? Math.min(1000 * 2 ** attempt, 8000) + Math.floor(Math.random() * 250);
     await sleep(backoffMs);
   }
 
@@ -274,7 +289,7 @@ export function buildGoogleAuthUrl(state: string) {
     include_granted_scopes: "true",
     prompt: "consent",
     scope: gmailScopes.join(" "),
-    state
+    state,
   });
 
   return `${GOOGLE_AUTH_BASE}?${params.toString()}`;
@@ -284,15 +299,15 @@ export async function exchangeGoogleCode(code: string) {
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: {
-      "content-type": "application/x-www-form-urlencoded"
+      "content-type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
       code,
       client_id: process.env.GOOGLE_CLIENT_ID ?? "",
       client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
       redirect_uri: getGoogleRedirectUri(),
-      grant_type: "authorization_code"
-    })
+      grant_type: "authorization_code",
+    }),
   });
 
   if (!response.ok) {
@@ -311,14 +326,14 @@ export async function refreshGoogleAccessToken(refreshToken: string) {
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: {
-      "content-type": "application/x-www-form-urlencoded"
+      "content-type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID ?? "",
       client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
       refresh_token: refreshToken,
-      grant_type: "refresh_token"
-    })
+      grant_type: "refresh_token",
+    }),
   });
 
   if (!response.ok) {
@@ -344,7 +359,7 @@ export async function getGoogleProfile(accessToken: string) {
     providerAccountId: profile.emailAddress.toLowerCase(),
     emailAddress: profile.emailAddress.toLowerCase(),
     displayName: profile.emailAddress.split("@")[0] ?? profile.emailAddress,
-    historyId: profile.historyId
+    historyId: profile.historyId,
   };
 }
 
@@ -380,7 +395,7 @@ function mapGmailThread(
           filename: string;
           mimeType: string;
           sizeBytes: number;
-        }>
+        }>,
       };
       collectBodyParts(message.payload, bodyOutput);
       const sentAt = message.internalDate
@@ -404,7 +419,7 @@ function mapGmailThread(
             ? ("outbound" as const)
             : ("inbound" as const),
         hasAttachments: bodyOutput.attachments.length > 0,
-        attachments: bodyOutput.attachments
+        attachments: bodyOutput.attachments,
       };
     })
     .sort((left, right) => (left.receivedAt ?? "").localeCompare(right.receivedAt ?? ""));
@@ -419,19 +434,20 @@ function mapGmailThread(
     subject: lastMessage?.subject ?? "(no subject)",
     snippet: payload.snippet ?? lastMessage?.textBody?.slice(0, 280) ?? null,
     participants,
-    lastMessageAt:
-      lastMessage?.receivedAt ??
-      lastMessage?.sentAt ??
-      new Date().toISOString(),
+    lastMessageAt: lastMessage?.receivedAt ?? lastMessage?.sentAt ?? new Date().toISOString(),
     isContractRelated: inferContractRelated(
       lastMessage?.subject ?? "",
       messages.map((message) => message.textBody ?? stripHtml(message.htmlBody) ?? "")
     ),
-    messages
+    messages,
   };
 }
 
-export async function listRecentGmailThreads(accessToken: string, emailAddress: string, maxResults = 20) {
+export async function listRecentGmailThreads(
+  accessToken: string,
+  emailAddress: string,
+  maxResults = 20
+) {
   const list = await gmailRequest<{ threads?: Array<{ id: string }> }>(
     `/threads?labelIds=INBOX&maxResults=${maxResults}`,
     accessToken
@@ -445,22 +461,19 @@ export async function fetchGmailThreadsByIds(
   emailAddress: string,
   threadIds: string[]
 ) {
-  const threads = await mapWithConcurrency(
-    threadIds,
-    GMAIL_THREAD_FETCH_CONCURRENCY,
-    (threadId) =>
-      gmailRequest<{
+  const threads = await mapWithConcurrency(threadIds, GMAIL_THREAD_FETCH_CONCURRENCY, (threadId) =>
+    gmailRequest<{
+      id: string;
+      snippet?: string;
+      messages?: Array<{
         id: string;
-        snippet?: string;
-        messages?: Array<{
-          id: string;
-          threadId: string;
-          internalDate?: string;
-          payload?: GmailPayloadPart & {
-            headers?: Array<{ name?: string; value?: string }>;
-          };
-        }>;
-      }>(`/threads/${threadId}?format=full`, accessToken)
+        threadId: string;
+        internalDate?: string;
+        payload?: GmailPayloadPart & {
+          headers?: Array<{ name?: string; value?: string }>;
+        };
+      }>;
+    }>(`/threads/${threadId}?format=full`, accessToken)
   );
 
   return threads.map((thread) => mapGmailThread(thread, emailAddress));
@@ -481,7 +494,7 @@ export async function fetchGmailAttachment(
 
   return {
     bytes: Buffer.from((payload.data ?? "").replace(/-/g, "+").replace(/_/g, "/"), "base64"),
-    sizeBytes: Number(payload.size ?? 0)
+    sizeBytes: Number(payload.size ?? 0),
   };
 }
 
@@ -517,7 +530,7 @@ export async function sendGmailThreadReply(
     'Content-Type: text/plain; charset="UTF-8"',
     "",
     input.body,
-    ""
+    "",
   ].filter((value): value is string => value !== null);
 
   for (const attachment of input.attachments ?? []) {
@@ -541,8 +554,8 @@ export async function sendGmailThreadReply(
     method: "POST",
     body: JSON.stringify({
       raw: encodeBase64Url(parts.join("\r\n")),
-      threadId: input.threadId
-    })
+      threadId: input.threadId,
+    }),
   });
 
   return {
@@ -551,37 +564,47 @@ export async function sendGmailThreadReply(
     providerThreadId: payload.threadId ?? input.threadId,
     to: input.to,
     cc: input.cc ?? [],
-    bcc: input.bcc ?? []
+    bcc: input.bcc ?? [],
   };
 }
 
 export async function listGmailHistoryThreadIds(accessToken: string, startHistoryId: string) {
   const payload = await gmailRequest<{
     history?: Array<{
-      messagesAdded?: Array<{ message?: { threadId?: string } }>;
-      messages?: Array<{ threadId?: string }>;
+      messagesAdded?: Array<{ message?: { threadId?: string; labelIds?: string[] } }>;
+      messages?: Array<{ threadId?: string; labelIds?: string[] }>;
     }>;
     historyId?: string;
-  }>(`/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded`, accessToken);
+  }>(
+    `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelIds=INBOX`,
+    accessToken
+  );
 
+  const INBOX_LABEL = "inbox";
   const threadIds = new Set<string>();
   for (const history of payload.history ?? []) {
     for (const entry of history.messagesAdded ?? []) {
       if (entry.message?.threadId) {
-        threadIds.add(entry.message.threadId);
+        const labels = (entry.message.labelIds ?? []).map((l) => l.toLowerCase());
+        if (labels.includes(INBOX_LABEL)) {
+          threadIds.add(entry.message.threadId);
+        }
       }
     }
 
     for (const entry of history.messages ?? []) {
       if (entry.threadId) {
-        threadIds.add(entry.threadId);
+        const labels = (entry.labelIds ?? []).map((l) => l.toLowerCase());
+        if (labels.includes(INBOX_LABEL)) {
+          threadIds.add(entry.threadId);
+        }
       }
     }
   }
 
   return {
     threadIds: [...threadIds],
-    historyId: payload.historyId ?? startHistoryId
+    historyId: payload.historyId ?? startHistoryId,
   };
 }
 
@@ -592,16 +615,12 @@ export async function registerGmailWatch(accessToken: string) {
     return null;
   }
 
-  return gmailRequest<{ historyId: string; expiration?: string }>(
-    "/watch",
-    accessToken,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        topicName,
-        labelIds: ["INBOX"],
-        labelFilterBehavior: "INCLUDE"
-      })
-    }
-  );
+  return gmailRequest<{ historyId: string; expiration?: string }>("/watch", accessToken, {
+    method: "POST",
+    body: JSON.stringify({
+      topicName,
+      labelIds: ["INBOX"],
+      labelFilterBehavior: "INCLUDE",
+    }),
+  });
 }

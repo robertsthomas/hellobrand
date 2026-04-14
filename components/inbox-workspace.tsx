@@ -16,14 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
-import {
-  Inbox,
-  Info,
-  MailSearch,
-  Plus,
-  X,
-  XCircle,
-} from "lucide-react";
+import { Inbox, Info, MailSearch, Plus, X, XCircle } from "lucide-react";
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { InboxFilterDialog } from "@/components/inbox-filter-dialog";
@@ -44,7 +37,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { normalizeInboxSort, sortInboxThreadItems, type InboxSortOption } from "@/lib/email/inbox-sort";
+import {
+  normalizeInboxSort,
+  sortInboxThreadItems,
+  type InboxSortOption,
+} from "@/lib/email/inbox-sort";
 import { buildReplySuggestionThreadVersion } from "@/lib/email/reply-suggestion-version";
 import type {
   DealRecord,
@@ -93,7 +90,7 @@ export function InboxWorkspace({
   profile,
   invoiceAttachmentsByDealId,
   autoAttachInvoice,
-  selectedFilters
+  selectedFilters,
 }: {
   threads: EmailThreadListItem[];
   selectedThread: EmailThreadDetail | null;
@@ -157,6 +154,7 @@ export function InboxWorkspace({
   const [isInvoiceAttached, setIsInvoiceAttached] = useState(false);
   const aiSuggestionCacheRef = useRef(aiSuggestionCache);
   const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
+  const manualAddSyncedRef = useRef(false);
   const {
     candidateGroups,
     cancelDiscovery,
@@ -170,10 +168,10 @@ export function InboxWorkspace({
     primaryCandidateId,
     reviewCandidates,
     selectedCandidateIds,
-    toggleCandidate
+    toggleCandidate,
   } = useInboxCandidateDiscovery({
     onErrorMessage: setErrorMessage,
-    onRefresh: () => router.refresh()
+    onRefresh: () => router.refresh(),
   });
   const {
     activeThreadId,
@@ -181,11 +179,11 @@ export function InboxWorkspace({
     loadThread: loadSelectedThread,
     prefetchThread,
     selectedThread,
-    selectedThreadId
+    selectedThreadId,
   } = useInboxThreadSelection({
     initialSelectedThread,
     onErrorMessage: setErrorMessage,
-    threads
+    threads,
   });
   const linkedDealIds = useMemo(
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
@@ -216,7 +214,7 @@ export function InboxWorkspace({
     summarizeThread,
     summary,
     threadPreviewStates,
-    updateWorkflowState
+    updateWorkflowState,
   } = useInboxThreadDetailState({
     initialSelectedThread,
     initialThreadPreviewStates,
@@ -224,7 +222,7 @@ export function InboxWorkspace({
     onErrorMessage: setErrorMessage,
     onRefresh: () => router.refresh(),
     selectedThread,
-    selectedThreadId
+    selectedThreadId,
   });
   const {
     draft,
@@ -255,11 +253,11 @@ export function InboxWorkspace({
     usePromptForDraft: runPromptForDraft,
     cancelDraftReply,
     clearDraftComposer,
-    refineGeneratedDraft
+    refineGeneratedDraft,
   } = useInboxReplyComposer({
     selectedDealId,
     selectedThread,
-    setErrorMessage
+    setErrorMessage,
   });
 
   useEffect(() => {
@@ -281,7 +279,7 @@ export function InboxWorkspace({
     isFilterDialogOpen,
     selectedFilters.dealId,
     selectedFilters.provider,
-    selectedFilters.workflowState
+    selectedFilters.workflowState,
   ]);
 
   useEffect(() => {
@@ -361,10 +359,7 @@ export function InboxWorkspace({
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
-      if (
-        actionMenuRef.current &&
-        !actionMenuRef.current.contains(event.target as Node)
-      ) {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
         setIsActionMenuOpen(false);
       }
     }
@@ -401,15 +396,12 @@ export function InboxWorkspace({
   const activeFilterCount = [
     selectedFilters.provider,
     selectedFilters.dealId,
-    selectedFilters.workflowState
+    selectedFilters.workflowState,
   ].filter(Boolean).length;
   const selectedThreadDeals = useMemo(() => {
     const byId = new Map(deals.map((deal) => [deal.id, deal]));
     return selectedThread
-      ? [
-          selectedThread.primaryLink,
-          ...selectedThread.referenceLinks
-        ]
+      ? [selectedThread.primaryLink, ...selectedThread.referenceLinks]
           .filter((link): link is NonNullable<typeof selectedThread.primaryLink> => Boolean(link))
           .map((link) => byId.get(link.dealId))
           .filter((entry): entry is DealRecord => Boolean(entry))
@@ -438,16 +430,15 @@ export function InboxWorkspace({
     return null;
   }, [invoiceAttachmentsByDealId, selectedDealId, selectedThread]);
   const selectedThreadSuggestionVersion = useMemo(
-    () =>
-      selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null,
+    () => (selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null),
     [
       selectedThread?.thread.updatedAt,
       selectedThread?.thread.lastMessageAt,
-      selectedThread?.thread.messageCount
+      selectedThread?.thread.messageCount,
     ]
   );
   const selectedThreadPreviewState = selectedThread
-    ? threadPreviewStates[selectedThread.thread.id] ?? null
+    ? (threadPreviewStates[selectedThread.thread.id] ?? null)
     : null;
   const selectedThreadUpdates = useMemo<PreviewUpdateEntry[]>(() => {
     if (!selectedThread) {
@@ -481,7 +472,7 @@ export function InboxWorkspace({
         id: `event:${event.id}`,
         titles: [event.title],
         body,
-        updatedAt: event.updatedAt
+        updatedAt: event.updatedAt,
       });
     }
 
@@ -489,7 +480,7 @@ export function InboxWorkspace({
       id: event.id,
       title: combineEventUpdateTitles(event.titles),
       body: event.body,
-      updatedAt: event.updatedAt
+      updatedAt: event.updatedAt,
     }));
 
     const termUpdates = selectedThread.termSuggestions.map((suggestion) => ({
@@ -498,7 +489,7 @@ export function InboxWorkspace({
       body: suggestion.summary,
       updatedAt: suggestion.updatedAt,
       href: `/app/p/${suggestion.dealId}?tab=terms`,
-      ctaLabel: "Review terms"
+      ctaLabel: "Review terms",
     }));
 
     return [...eventUpdates, ...termUpdates].sort((left, right) =>
@@ -521,8 +512,7 @@ export function InboxWorkspace({
     latestPreviewUpdateAt,
     selectedThreadPreviewState?.previewUpdatesClearedAt
   );
-  const shouldShowPreviewUpdates =
-    selectedThreadUpdates.length > 0 && !arePreviewUpdatesCleared;
+  const shouldShowPreviewUpdates = selectedThreadUpdates.length > 0 && !arePreviewUpdatesCleared;
   const hasUnseenActionItems = hasUnseenPreviewSection(
     latestActionItemAt,
     selectedThreadPreviewState?.actionItemsSeenAt
@@ -536,7 +526,8 @@ export function InboxWorkspace({
     [replySignatureMissingFields]
   );
   const canAttachInvoice =
-    Boolean(selectedThreadInvoiceAttachment) && selectedThreadInvoiceAttachment?.status !== "voided";
+    Boolean(selectedThreadInvoiceAttachment) &&
+    selectedThreadInvoiceAttachment?.status !== "voided";
   const hasThreadSummary = Boolean(summary?.trim()) && !isLegacyThreadSummary(summary);
 
   useEffect(() => {
@@ -570,19 +561,19 @@ export function InboxWorkspace({
       const response = await fetch(`/api/email/threads/${selectedThread.thread.id}/send`, {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
         body: JSON.stringify({
           dealId: isInvoiceAttached
-            ? ((selectedThreadInvoiceAttachment?.dealId ?? selectedDealId) || null)
-            : (selectedDealId || null),
+            ? (selectedThreadInvoiceAttachment?.dealId ?? selectedDealId) || null
+            : selectedDealId || null,
           subject: replySubject,
           body: replyBody,
           attachmentDocumentIds:
             isInvoiceAttached && selectedThreadInvoiceAttachment
               ? [selectedThreadInvoiceAttachment.documentId]
-              : []
-        })
+              : [],
+        }),
       });
 
       const payload = await response.json();
@@ -607,7 +598,7 @@ export function InboxWorkspace({
     router,
     selectedDealId,
     selectedThread,
-    selectedThreadInvoiceAttachment
+    selectedThreadInvoiceAttachment,
   ]);
 
   const markDraftReady = useCallback(async () => {
@@ -635,11 +626,11 @@ export function InboxWorkspace({
       const response = await fetch(`/api/email/threads/${selectedThread.thread.id}/notes`, {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          body: noteBody.trim()
-        })
+          body: noteBody.trim(),
+        }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -667,11 +658,11 @@ export function InboxWorkspace({
         const response = await fetch(`/api/email/attachments/${attachmentId}/import`, {
           method: "POST",
           headers: {
-            "content-type": "application/json"
+            "content-type": "application/json",
           },
           body: JSON.stringify({
-            dealId: selectedThread.primaryLink.dealId
-          })
+            dealId: selectedThread.primaryLink.dealId,
+          }),
         });
         const payload = await response.json();
         if (!response.ok) {
@@ -679,9 +670,7 @@ export function InboxWorkspace({
         }
         router.refresh();
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not import attachment."
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Could not import attachment.");
       } finally {
         setImportingAttachmentId(null);
       }
@@ -710,7 +699,7 @@ export function InboxWorkspace({
       suggestionRequestVersionsRef.current[thread.id] = version;
       setLoadingSuggestionThreadIds((current) => ({
         ...current,
-        [thread.id]: true
+        [thread.id]: true,
       }));
 
       try {
@@ -731,8 +720,8 @@ export function InboxWorkspace({
             ...current,
             [thread.id]: {
               version,
-              suggestions: payload.suggestions as DraftPromptSuggestion[]
-            }
+              suggestions: payload.suggestions as DraftPromptSuggestion[],
+            },
           };
         });
         setThreadCopilotInsightCache((current) => ({
@@ -743,8 +732,8 @@ export function InboxWorkspace({
               : [],
             documents: Array.isArray(payload.documentSuggestions)
               ? (payload.documentSuggestions as DocumentSuggestion[])
-              : []
-          }
+              : [],
+          },
         }));
       } catch {
         // Keep fallback suggestions when prefetch fails.
@@ -804,7 +793,7 @@ export function InboxWorkspace({
     selectedThread?.thread.id,
     selectedThread?.thread.updatedAt,
     selectedThread?.thread.lastMessageAt,
-    selectedThread?.thread.messageCount
+    selectedThread?.thread.messageCount,
   ]);
 
   useEffect(() => {
@@ -832,14 +821,14 @@ export function InboxWorkspace({
     if (!selectedThread) {
       return {
         risks: [] as RiskSuggestion[],
-        documents: [] as DocumentSuggestion[]
+        documents: [] as DocumentSuggestion[],
       };
     }
 
     return (
       threadCopilotInsightCache[selectedThread.thread.id] ?? {
         risks: [],
-        documents: []
+        documents: [],
       }
     );
   }, [selectedThread, threadCopilotInsightCache]);
@@ -865,6 +854,20 @@ export function InboxWorkspace({
       setIsManualAddLoading(true);
       setErrorMessage(null);
       try {
+        if (!manualAddSyncedRef.current) {
+          manualAddSyncedRef.current = true;
+          try {
+            const syncRes = await fetch("/api/email/sync?force=1", { method: "POST" });
+            if (!syncRes.ok) {
+              const syncPayload = await syncRes.json().catch(() => null);
+              const syncMsg = syncPayload?.error ?? "Could not sync latest emails.";
+              setErrorMessage(typeof syncMsg === "string" ? syncMsg : String(syncMsg));
+            }
+          } catch (_syncError) {
+            setErrorMessage("Could not sync latest emails. Please try again.");
+          }
+        }
+
         const params = new URLSearchParams();
         const trimmed = nextQuery.trim();
         if (trimmed) {
@@ -886,9 +889,7 @@ export function InboxWorkspace({
           current.filter((threadId) => nextThreads.some((thread) => thread.thread.id === threadId))
         );
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Could not load inbox threads."
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Could not load inbox threads.");
       } finally {
         setIsManualAddLoading(false);
       }
@@ -901,18 +902,19 @@ export function InboxWorkspace({
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      void fetchManualAddThreads(manualAddQuery);
-    }, manualAddQuery.trim() ? 250 : 0);
+    const timeoutId = window.setTimeout(
+      () => {
+        void fetchManualAddThreads(manualAddQuery);
+      },
+      manualAddQuery.trim() ? 250 : 0
+    );
 
     return () => window.clearTimeout(timeoutId);
   }, [fetchManualAddThreads, isManualAddModalOpen, manualAddQuery]);
 
   const toggleManualAddThread = useCallback((threadId: string) => {
     setManualAddSelectedThreadIds((current) =>
-      current.includes(threadId)
-        ? current.filter((id) => id !== threadId)
-        : [...current, threadId]
+      current.includes(threadId) ? current.filter((id) => id !== threadId) : [...current, threadId]
     );
   }, []);
 
@@ -956,12 +958,12 @@ export function InboxWorkspace({
           const response = await fetch(`/api/email/threads/${threadId}/link`, {
             method: "POST",
             headers: {
-              "content-type": "application/json"
+              "content-type": "application/json",
             },
             body: JSON.stringify({
               dealId: manualAddDealId,
-              role: thread?.primaryLink ? "reference" : "primary"
-            })
+              role: thread?.primaryLink ? "reference" : "primary",
+            }),
           });
 
           const payload = await response.json().catch(() => ({}));
@@ -980,9 +982,7 @@ export function InboxWorkspace({
         router.refresh();
       }
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not link email threads."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not link email threads.");
     } finally {
       setIsManualAddSubmitting(false);
     }
@@ -1001,9 +1001,9 @@ export function InboxWorkspace({
       const createResponse = await fetch("/api/p", {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
-        body: JSON.stringify(inferWorkspaceDraftFromThread(seedThread))
+        body: JSON.stringify(inferWorkspaceDraftFromThread(seedThread)),
       });
       const createPayload = await createResponse.json().catch(() => ({}));
 
@@ -1023,12 +1023,12 @@ export function InboxWorkspace({
           const response = await fetch(`/api/email/threads/${threadId}/link`, {
             method: "POST",
             headers: {
-              "content-type": "application/json"
+              "content-type": "application/json",
             },
             body: JSON.stringify({
               dealId: nextDealId,
-              role: thread?.primaryLink ? "reference" : "primary"
-            })
+              role: thread?.primaryLink ? "reference" : "primary",
+            }),
           });
 
           const payload = await response.json().catch(() => ({}));
@@ -1048,9 +1048,7 @@ export function InboxWorkspace({
         router.refresh();
       }
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not create workspace."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not create workspace.");
     } finally {
       setIsManualAddCreatingWorkspace(false);
     }
@@ -1066,19 +1064,29 @@ export function InboxWorkspace({
     }
 
     return [
-      { id: "fallback-0", label: "Ask for more details on deliverables", prompt: "Ask the brand to clarify the deliverables, timeline, or creative direction." },
-      { id: "fallback-1", label: "Push back on the terms politely", prompt: "Politely push back on terms that feel unfavorable. Suggest alternatives." },
-      { id: "fallback-2", label: "Confirm availability and interest", prompt: "Write a brief reply confirming availability and interest without overcommitting." },
+      {
+        id: "fallback-0",
+        label: "Ask for more details on deliverables",
+        prompt: "Ask the brand to clarify the deliverables, timeline, or creative direction.",
+      },
+      {
+        id: "fallback-1",
+        label: "Push back on the terms politely",
+        prompt: "Politely push back on terms that feel unfavorable. Suggest alternatives.",
+      },
+      {
+        id: "fallback-2",
+        label: "Confirm availability and interest",
+        prompt: "Write a brief reply confirming availability and interest without overcommitting.",
+      },
     ].slice(0, 3);
   }, [currentAiSuggestions]);
-  function buildInboxUrl(
-    next: Partial<typeof selectedFilters> & { thread?: string } = {}
-  ) {
+  function buildInboxUrl(next: Partial<typeof selectedFilters> & { thread?: string } = {}) {
     const params = new URLSearchParams();
     const values = {
       ...selectedFilters,
       q: query.trim(),
-      ...next
+      ...next,
     };
 
     for (const [key, value] of Object.entries(values)) {
@@ -1094,9 +1102,7 @@ export function InboxWorkspace({
     return `/app/inbox${params.size > 0 ? `?${params.toString()}` : ""}`;
   }
 
-  function applyFilters(
-    next: Partial<typeof selectedFilters> & { thread?: string } = {}
-  ) {
+  function applyFilters(next: Partial<typeof selectedFilters> & { thread?: string } = {}) {
     router.push(buildInboxUrl({ ...next, thread: next.thread ?? selectedThreadId }));
   }
 
@@ -1106,7 +1112,7 @@ export function InboxWorkspace({
       provider: draftProviderFilter,
       dealId: draftDealFilter,
       workflowState: draftWorkflowFilter,
-      thread: ""
+      thread: "",
     });
   }
 
@@ -1120,7 +1126,7 @@ export function InboxWorkspace({
     setIsSortDialogOpen(false);
     applyFilters({
       sort: draftSort,
-      thread: ""
+      thread: "",
     });
   }
 
@@ -1147,17 +1153,16 @@ export function InboxWorkspace({
           </p>
           <div className="mt-12 flex flex-col items-center text-center">
             <Inbox className="h-10 w-10 text-muted-foreground/40" />
-            <p className="mt-4 text-sm font-medium text-foreground">
-              No workspaces yet
-            </p>
+            <p className="mt-4 text-sm font-medium text-foreground">No workspaces yet</p>
             <p className="mt-1.5 max-w-xs text-sm text-muted-foreground">
-              Create a workspace first, then connect your email to start matching threads to your deals.
+              Create a workspace first, then connect your email to start matching threads to your
+              deals.
             </p>
             <Link
               href="/app/intake/new"
               onClick={() =>
                 captureAppEvent(posthog, "workspace_entry_cta_clicked", {
-                  source: "inbox_empty_state"
+                  source: "inbox_empty_state",
                 })
               }
               className="mt-5 inline-flex h-10 items-center gap-2 bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
@@ -1189,10 +1194,7 @@ export function InboxWorkspace({
                 </div>
                 {hasConnectedAccounts && hasLinkedThreads ? (
                   <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-                    <AppTooltip
-                      content="Find emails"
-                      sideOffset={8}
-                    >
+                    <AppTooltip content="Find emails" sideOffset={8}>
                       <button
                         type="button"
                         onClick={() => void discoverCandidates()}
@@ -1236,7 +1238,8 @@ export function InboxWorkspace({
                   Build your deal inbox
                 </h2>
                 <p className="mt-4 text-[14px] leading-7 text-muted-foreground">
-                  Search connected inboxes, review likely matches, and keep this inbox focused on linked deal conversations.
+                  Search connected inboxes, review likely matches, and keep this inbox focused on
+                  linked deal conversations.
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -1271,7 +1274,7 @@ export function InboxWorkspace({
                       href="/app/settings"
                       onClick={() =>
                         captureAppEvent(posthog, "inbox_connect_email_clicked", {
-                          source: "inbox_empty_state"
+                          source: "inbox_empty_state",
                         })
                       }
                       className="inline-flex h-12 items-center border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20"
@@ -1301,7 +1304,9 @@ export function InboxWorkspace({
               />
 
               {!selectedThread ? (
-                <section className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white xl:mr-28 dark:border-white/10 dark:bg-white/[0.03] ${!mobileDetailOpen ? "hidden xl:flex" : ""}`}>
+                <section
+                  className={`flex min-h-0 flex-col overflow-hidden border border-black/8 bg-white xl:mr-28 dark:border-white/10 dark:bg-white/[0.03] ${!mobileDetailOpen ? "hidden xl:flex" : ""}`}
+                >
                   <div className="px-6 py-10 text-[13px] text-muted-foreground">
                     <button
                       type="button"
@@ -1331,7 +1336,11 @@ export function InboxWorkspace({
                     onOpenNotes={() => setIsNotesDialogOpen(true)}
                     onOpenLinkModal={() => setLinkModalOpen(true)}
                     isUpdatingWorkflow={isUpdatingWorkflow}
-                    onUpdateWorkflowState={(state) => void updateWorkflowState(state as import("@/lib/types").EmailThreadWorkflowState)}
+                    onUpdateWorkflowState={(state) =>
+                      void updateWorkflowState(
+                        state as import("@/lib/types").EmailThreadWorkflowState
+                      )
+                    }
                     arePreviewUpdatesOpen={arePreviewUpdatesOpen}
                     onPreviewUpdatesOpenChange={handlePreviewUpdatesOpenChange}
                     shouldShowPreviewUpdates={shouldShowPreviewUpdates}
@@ -1414,9 +1423,7 @@ export function InboxWorkspace({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>AI Summary</DialogTitle>
-            <DialogDescription>
-              Thread summary for this partnership conversation.
-            </DialogDescription>
+            <DialogDescription>Thread summary for this partnership conversation.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             <p className="whitespace-pre-wrap text-[13px] leading-7 text-foreground">
@@ -1431,9 +1438,7 @@ export function InboxWorkspace({
           <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden border border-black/8 bg-white shadow-2xl">
             <div className="flex items-center justify-between gap-4 border-b border-black/8 px-6 py-4">
               <div>
-                <h3 className="text-base font-semibold text-foreground">
-                  Deal matches found
-                </h3>
+                <h3 className="text-base font-semibold text-foreground">Deal matches found</h3>
                 <p className="mt-1 text-[13px] text-muted-foreground">
                   Select threads to link to your partnerships.
                 </p>
@@ -1484,7 +1489,10 @@ export function InboxWorkspace({
                             const isPrimary = primaryCandidateId === match.candidate.id;
 
                             return (
-                              <div key={match.candidate.id} className="flex items-start gap-3 px-4 py-3">
+                              <div
+                                key={match.candidate.id}
+                                className="flex items-start gap-3 px-4 py-3"
+                              >
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -1501,7 +1509,8 @@ export function InboxWorkspace({
                                     </span>
                                   </div>
                                   <p className="mt-1 text-xs text-muted-foreground">
-                                    {providerLabel(match.account.provider)} · {match.account.emailAddress}
+                                    {providerLabel(match.account.provider)} ·{" "}
+                                    {match.account.emailAddress}
                                   </p>
                                   {match.thread.snippet ? (
                                     <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-muted-foreground/70">
@@ -1563,7 +1572,9 @@ export function InboxWorkspace({
                 disabled={selectedCandidateIds.length === 0 || isReviewingCandidates}
                 className="h-9 bg-primary px-4 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
               >
-                {isReviewingCandidates ? "Linking..." : `Link ${selectedCandidateIds.length > 0 ? selectedCandidateIds.length : ""} selected`}
+                {isReviewingCandidates
+                  ? "Linking..."
+                  : `Link ${selectedCandidateIds.length > 0 ? selectedCandidateIds.length : ""} selected`}
               </button>
             </div>
           </div>
@@ -1599,9 +1610,7 @@ export function InboxWorkspace({
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-foreground" />
-                <p className="text-[14px] font-medium text-foreground">
-                  Fetching recent emails...
-                </p>
+                <p className="text-[14px] font-medium text-foreground">Fetching recent emails...</p>
               </div>
               <button
                 type="button"
@@ -1617,16 +1626,14 @@ export function InboxWorkspace({
       ) : null}
 
       {selectedThread && isLinkModalOpen ? (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-sm border border-black/8 bg-white p-5 shadow-2xl dark:border-white/10 dark:bg-[#161a20]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
                   Link partnership
                 </p>
-                <h3 className="mt-2 text-xl font-semibold text-foreground">
-                  Pick a workspace
-                </h3>
+                <h3 className="mt-2 text-xl font-semibold text-foreground">Pick a workspace</h3>
               </div>
               <button
                 type="button"
@@ -1727,6 +1734,7 @@ export function InboxWorkspace({
             setManualAddQuery("");
             setManualAddSelectedThreadIds([]);
             setManualAddThreads([]);
+            manualAddSyncedRef.current = false;
           }
         }}
       >
@@ -1734,7 +1742,8 @@ export function InboxWorkspace({
           <DialogHeader className="gap-3 border-b border-black/8 px-6 py-5 pr-12">
             <DialogTitle>Add threads manually</DialogTitle>
             <DialogDescription>
-              Browse the latest 20 synced emails by default. Search scans up to the first 1000 synced emails and lets you link the threads you want to a workspace.
+              Browse the latest 20 synced emails by default. Search scans up to the first 1000
+              synced emails and lets you link the threads you want to a workspace.
             </DialogDescription>
           </DialogHeader>
 
@@ -1778,9 +1787,7 @@ export function InboxWorkspace({
 
               <div className="max-h-[440px] min-h-[320px] overflow-y-auto">
                 {isManualAddLoading ? (
-                  <div className="px-4 py-8 text-sm text-muted-foreground">
-                    Loading emails...
-                  </div>
+                  <div className="px-4 py-8 text-sm text-muted-foreground">Loading emails...</div>
                 ) : manualAddThreads.length === 0 ? (
                   <div className="px-4 py-8 text-sm text-muted-foreground">
                     No synced emails match this search.
@@ -1788,8 +1795,7 @@ export function InboxWorkspace({
                 ) : (
                   manualAddThreads.map((item) => {
                     const alreadyLinkedToSelectedDeal = Boolean(
-                      manualAddDealId &&
-                        item.links.some((link) => link.dealId === manualAddDealId)
+                      manualAddDealId && item.links.some((link) => link.dealId === manualAddDealId)
                     );
 
                     return (
@@ -1808,7 +1814,9 @@ export function InboxWorkspace({
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <p className="truncate text-[13px] font-semibold text-foreground">
-                                {item.thread.participants[0]?.name?.trim() || item.thread.participants[0]?.email || "Unknown"}
+                                {item.thread.participants[0]?.name?.trim() ||
+                                  item.thread.participants[0]?.email ||
+                                  "Unknown"}
                               </p>
                               <p className="truncate text-[12px] text-foreground/90">
                                 {item.thread.subject}
@@ -1847,7 +1855,8 @@ export function InboxWorkspace({
             <div className="flex flex-col gap-4 border-t border-black/8 pt-4 md:flex-row md:items-end md:justify-between">
               <div className="space-y-1">
                 <p className="text-[12px] text-muted-foreground">
-                  {manualAddSelectedThreadIds.length} thread{manualAddSelectedThreadIds.length === 1 ? "" : "s"} selected
+                  {manualAddSelectedThreadIds.length} thread
+                  {manualAddSelectedThreadIds.length === 1 ? "" : "s"} selected
                 </p>
                 {selectedManualThreads.length > 0 ? (
                   <p className="text-[12px] text-muted-foreground">
@@ -1866,7 +1875,11 @@ export function InboxWorkspace({
                 <button
                   type="button"
                   onClick={() => void createWorkspaceFromSelectedThreads()}
-                  disabled={selectedManualThreads.length === 0 || isManualAddSubmitting || isManualAddCreatingWorkspace}
+                  disabled={
+                    selectedManualThreads.length === 0 ||
+                    isManualAddSubmitting ||
+                    isManualAddCreatingWorkspace
+                  }
                   className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[8.75rem] md:w-auto`}
                 >
                   {isManualAddCreatingWorkspace ? "Creating..." : "Create workspace"}

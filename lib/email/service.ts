@@ -8,26 +8,13 @@ import type {
   EmailLinkRole,
   EmailThreadDraftRecord,
   EmailThreadWorkflowState,
-  Viewer
+  Viewer,
 } from "@/lib/types";
-import {
-  checkCrossDealConflicts
-} from "@/lib/email/conflict-bridge";
-import {
-  detectPromiseDiscrepancies
-} from "@/lib/email/smart-inbox";
-import {
-  fetchGmailAttachment,
-  sendGmailThreadReply
-} from "@/lib/email/providers/gmail";
-import {
-  fetchOutlookAttachment,
-  sendOutlookThreadReply
-} from "@/lib/email/providers/outlook";
-import {
-  fetchYahooAttachment,
-  sendYahooThreadReply
-} from "@/lib/email/providers/yahoo";
+import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
+import { detectPromiseDiscrepancies } from "@/lib/email/smart-inbox";
+import { fetchGmailAttachment, sendGmailThreadReply } from "@/lib/email/providers/gmail";
+import { fetchOutlookAttachment, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
+import { fetchYahooAttachment, sendYahooThreadReply } from "@/lib/email/providers/yahoo";
 import { getRepository } from "@/lib/repository";
 import {
   createEmailThreadNoteForUser,
@@ -49,7 +36,7 @@ import {
   saveOutboundEmailMessage,
   unlinkEmailThreadFromDeal,
   updateEmailCandidateMatchStatus,
-  updateEmailThreadWorkflowForUser
+  updateEmailThreadWorkflowForUser,
 } from "@/lib/email/repository";
 import {
   assertEmailConnectionsAccess,
@@ -64,11 +51,14 @@ import {
   primaryThreadLink,
   processLinkedThreadUpdates,
   refreshEmailDealSuggestionsForViewer,
-  textBodyToHtml
+  textBodyToHtml,
 } from "@/lib/email/service-shared";
 export type { IncrementalEmailSyncRequest } from "./service-sync";
 
-export { coalesceIncrementalEmailSyncRequests, getIncrementalEmailSyncBatchConfig } from "./service-sync";
+export {
+  coalesceIncrementalEmailSyncRequests,
+  getIncrementalEmailSyncBatchConfig,
+} from "./service-sync";
 
 export async function runIncrementalEmailSync(
   ...args: Parameters<typeof import("./service-sync").runIncrementalEmailSync>
@@ -97,7 +87,9 @@ export async function createGoogleConnectUrlForViewer(
 }
 
 export async function createGoogleConnectUrlForViewerWithReturnBaseUrl(
-  ...args: Parameters<typeof import("./service-connect").createGoogleConnectUrlForViewerWithReturnBaseUrl>
+  ...args: Parameters<
+    typeof import("./service-connect").createGoogleConnectUrlForViewerWithReturnBaseUrl
+  >
 ) {
   const module = await import("./service-connect");
   return module.createGoogleConnectUrlForViewerWithReturnBaseUrl(...args);
@@ -111,7 +103,9 @@ export async function createOutlookConnectUrlForViewer(
 }
 
 export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
-  ...args: Parameters<typeof import("./service-connect").createOutlookConnectUrlForViewerWithReturnBaseUrl>
+  ...args: Parameters<
+    typeof import("./service-connect").createOutlookConnectUrlForViewerWithReturnBaseUrl
+  >
 ) {
   const module = await import("./service-connect");
   return module.createOutlookConnectUrlForViewerWithReturnBaseUrl(...args);
@@ -125,7 +119,9 @@ export async function createYahooConnectUrlForViewer(
 }
 
 export async function createYahooConnectUrlForViewerWithReturnBaseUrl(
-  ...args: Parameters<typeof import("./service-connect").createYahooConnectUrlForViewerWithReturnBaseUrl>
+  ...args: Parameters<
+    typeof import("./service-connect").createYahooConnectUrlForViewerWithReturnBaseUrl
+  >
 ) {
   const module = await import("./service-connect");
   return module.createYahooConnectUrlForViewerWithReturnBaseUrl(...args);
@@ -302,7 +298,7 @@ export async function sendEmailThreadReplyForViewer(
         bytes:
           document.sourceType === "pasted_text"
             ? Buffer.from(document.normalizedText ?? document.rawText ?? "", "utf8")
-            : await readStoredBytes(document.storagePath)
+            : await readStoredBytes(document.storagePath),
       };
     })
   );
@@ -324,8 +320,8 @@ export async function sendEmailThreadReplyForViewer(
           attachments: attachmentDocuments.map(({ document, bytes }) => ({
             filename: document.fileName,
             mimeType: document.mimeType,
-            bytes
-          }))
+            bytes,
+          })),
         })
       : account.provider === "outlook"
         ? await sendOutlookThreadReply(accessToken, {
@@ -344,8 +340,8 @@ export async function sendEmailThreadReplyForViewer(
             attachments: attachmentDocuments.map(({ document, bytes }) => ({
               filename: document.fileName,
               mimeType: document.mimeType,
-              bytes
-            }))
+              bytes,
+            })),
           })
         : await sendYahooThreadReply(account.emailAddress, accessToken, {
             threadId: detail.thread.providerThreadId,
@@ -362,8 +358,8 @@ export async function sendEmailThreadReplyForViewer(
             attachments: attachmentDocuments.map(({ document, bytes }) => ({
               filename: document.fileName,
               mimeType: document.mimeType,
-              bytes
-            }))
+              bytes,
+            })),
           });
 
   const sentAt = new Date().toISOString();
@@ -374,7 +370,7 @@ export async function sendEmailThreadReplyForViewer(
     internetMessageId: sendResult.internetMessageId,
     from: {
       name: account.displayName ?? viewer.displayName,
-      email: account.emailAddress
+      email: account.emailAddress,
     },
     to: sendResult.to,
     cc: sendResult.cc,
@@ -388,11 +384,14 @@ export async function sendEmailThreadReplyForViewer(
       filename: document.fileName,
       mimeType: document.mimeType,
       sizeBytes: bytes.length,
-      storageKey: document.storagePath
-    }))
+      storageKey: document.storagePath,
+    })),
   });
 
-  if (linkedDealId && attachmentDocuments.some(({ document }) => document.documentKind === "invoice")) {
+  if (
+    linkedDealId &&
+    attachmentDocuments.some(({ document }) => document.documentKind === "invoice")
+  ) {
     const { markInvoiceSentForViewer } = await import("@/lib/invoices");
     await markInvoiceSentForViewer(viewer, linkedDealId, {
       threadId: detail.thread.id,
@@ -400,7 +399,7 @@ export async function sendEmailThreadReplyForViewer(
       accountId: account.id,
       provider: account.provider,
       toEmail: sendResult.to[0]?.email ?? to[0]?.email ?? null,
-      subject: normalizedSubject
+      subject: normalizedSubject,
     });
   }
 
@@ -408,12 +407,12 @@ export async function sendEmailThreadReplyForViewer(
   await updateEmailThreadWorkflowForUser({
     userId: viewer.id,
     threadId: detail.thread.id,
-    workflowState: "waiting_on_them"
+    workflowState: "waiting_on_them",
   });
 
   return {
     threadId: detail.thread.id,
-    messageId: savedMessage?.id ?? null
+    messageId: savedMessage?.id ?? null,
   };
 }
 
@@ -434,7 +433,7 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
       filename: attachment.filename,
       mimeType: attachment.mimeType || "application/octet-stream",
       sizeBytes: attachment.sizeBytes || bytes.length,
-      bytes
+      bytes,
     };
   }
 
@@ -482,7 +481,7 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
     filename: attachment.filename,
     mimeType: attachment.mimeType || "application/octet-stream",
     sizeBytes: payload.sizeBytes || attachment.sizeBytes,
-    bytes: payload.bytes
+    bytes: payload.bytes,
   };
 }
 
@@ -508,7 +507,7 @@ export async function saveEmailThreadDraftForViewer(
     subject: input.subject.trim(),
     body: input.body.trim(),
     status: input.status,
-    source: input.source
+    source: input.source,
   });
 }
 
@@ -526,7 +525,7 @@ export async function createEmailThreadNoteForViewer(
   return createEmailThreadNoteForUser({
     userId: viewer.id,
     threadId,
-    body: body.trim()
+    body: body.trim(),
   });
 }
 
@@ -539,7 +538,7 @@ export async function updateEmailThreadWorkflowForViewer(
   return updateEmailThreadWorkflowForUser({
     userId: viewer.id,
     threadId,
-    workflowState
+    workflowState,
   });
 }
 
@@ -569,7 +568,7 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     fileName: attachment.filename,
     bytes: attachmentBytes,
     contentType: attachment.mimeType || "application/octet-stream",
-    folder: dealId
+    folder: dealId,
   });
 
   const document = await getRepository().createDocument({
@@ -589,7 +588,7 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     errorMessage: null,
     processingRunId: null,
     processingRunStateJson: null,
-    processingStartedAt: null
+    processingStartedAt: null,
   });
 
   const { enqueueDocumentProcessing } = await import("@/lib/deals");
@@ -623,7 +622,11 @@ export async function linkThreadToDealForViewer(
   return link;
 }
 
-export async function unlinkThreadFromDealForViewer(viewer: Viewer, threadId: string, dealId: string) {
+export async function unlinkThreadFromDealForViewer(
+  viewer: Viewer,
+  threadId: string,
+  dealId: string
+) {
   await assertPremiumInboxAccess(viewer);
   const unlinked = await unlinkEmailThreadFromDeal(viewer.id, threadId, dealId);
   if (unlinked) {
@@ -636,6 +639,42 @@ export async function listDealEmailCandidatesForViewer(viewer: Viewer) {
   await assertPremiumInboxAccess(viewer);
   const matches = await listEmailCandidateMatchesForUser(viewer.id, "suggested");
   return groupCandidateMatches(matches);
+}
+
+export async function syncConnectedInboxAccountsForViewer(
+  viewer: Viewer,
+  options?: { force?: boolean }
+) {
+  await assertPremiumInboxAccess(viewer);
+  const accounts = await listConnectedEmailAccounts(viewer.id);
+
+  const results = await Promise.allSettled(
+    accounts.map(async (account) => {
+      if (!options?.force) {
+        const syncState = await getEmailSyncState(account.id);
+        if (isRecentIso(syncState?.lastSuccessfulSyncAt, EMAIL_DISCOVERY_SYNC_COOLDOWN_MS)) {
+          return { accountId: account.id, status: "skipped" as const };
+        }
+      }
+
+      const syncModule = await import("./service-sync");
+      await syncModule.syncEmailAccount(account.id, {
+        mode: "incremental",
+        recentLimit: EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT,
+      });
+      return { accountId: account.id, status: "synced" as const };
+    })
+  );
+
+  type SyncResult = { accountId: string; status: "skipped" | "synced" };
+  const synced = results.filter(
+    (r): r is PromiseFulfilledResult<SyncResult> => r.status === "fulfilled"
+  );
+
+  return {
+    accountsProcessed: synced.length,
+    accountsSkipped: synced.filter((r) => r.value.status === "skipped").length,
+  };
 }
 
 export async function discoverDealEmailCandidatesForViewer(viewer: Viewer) {
@@ -652,7 +691,7 @@ export async function discoverDealEmailCandidatesForViewer(viewer: Viewer) {
       const syncModule = await import("./service-sync");
       return syncModule.syncEmailAccount(account.id, {
         mode: "incremental",
-        recentLimit: EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT
+        recentLimit: EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT,
       });
     })
   );
@@ -678,8 +717,8 @@ export async function reviewDealEmailCandidatesForViewer(
     ...new Set([
       ...(input.confirmIds ?? []),
       ...(input.referenceIds ?? []),
-      ...(input.primaryCandidateId ? [input.primaryCandidateId] : [])
-    ])
+      ...(input.primaryCandidateId ? [input.primaryCandidateId] : []),
+    ]),
   ];
   const candidates = (
     await Promise.all(
@@ -699,7 +738,7 @@ export async function reviewDealEmailCandidatesForViewer(
       (candidate) => candidate.id === input.primaryCandidateId
     )
       ? input.primaryCandidateId
-      : threadCandidates[0]?.id ?? null;
+      : (threadCandidates[0]?.id ?? null);
 
     for (const candidate of threadCandidates) {
       const role: EmailLinkRole =
@@ -735,7 +774,7 @@ export async function reviewDealEmailCandidatesForViewer(
 
   return {
     confirmed,
-    rejected
+    rejected,
   };
 }
 
