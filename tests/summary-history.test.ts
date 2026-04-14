@@ -5,7 +5,7 @@ import * as llmModule from "@/lib/analysis/llm";
 import {
   getCurrentWorkspaceSummary,
   getLatestSummaryByType,
-  normalizeSummaryRecord
+  normalizeSummaryRecord,
 } from "@/lib/summaries";
 import { createSeedStore } from "@/lib/repository/seed";
 import type { DealAggregate } from "@/lib/types";
@@ -22,7 +22,6 @@ function createAggregate(): DealAggregate {
     paymentRecord: null,
     invoiceRecord: null,
     riskFlags: seed.riskFlags,
-    emailDrafts: seed.emailDrafts,
     jobs: seed.jobs,
     documentSections: seed.documentSections,
     documentRuns: seed.documentRuns,
@@ -33,7 +32,7 @@ function createAggregate(): DealAggregate {
     extractionEvidence: seed.extractionEvidence,
     summaries: seed.summaries,
     currentSummary: seed.summaries[0],
-    intakeSession: null
+    intakeSession: null,
   };
 }
 
@@ -49,7 +48,7 @@ describe("summary history", () => {
       documentId: "doc-1",
       body: "Legacy summary",
       version: "v1",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     });
 
     expect(summary.summaryType).toBe("legal");
@@ -65,15 +64,15 @@ describe("summary history", () => {
       body: "Legal summary",
       version: "v1",
       createdAt: "2026-03-26T00:00:00.000Z",
-      isCurrent: true
+      isCurrent: true,
     });
     const intake = normalizeSummaryRecord({
       id: "summary-intake",
       dealId: "deal-1",
       documentId: null,
-      body: "{\"brandName\":\"Brand\"}",
+      body: '{"brandName":"Brand"}',
       version: "intake-normalized:v1",
-      createdAt: "2026-03-26T01:00:00.000Z"
+      createdAt: "2026-03-26T01:00:00.000Z",
     });
 
     expect(getCurrentWorkspaceSummary([intake, legal])?.id).toBe("summary-legal");
@@ -90,7 +89,7 @@ describe("summary history", () => {
       source: "analysis",
       parentSummaryId: null,
       isCurrent: true,
-      createdAt: "2026-03-26T02:00:00.000Z"
+      createdAt: "2026-03-26T02:00:00.000Z",
     });
     const olderPlain = normalizeSummaryRecord({
       id: "summary-plain-old",
@@ -102,7 +101,7 @@ describe("summary history", () => {
       source: "simplification",
       parentSummaryId: "summary-legal-old",
       isCurrent: false,
-      createdAt: "2026-03-25T02:00:00.000Z"
+      createdAt: "2026-03-25T02:00:00.000Z",
     });
     const newerPlain = normalizeSummaryRecord({
       id: "summary-plain-new",
@@ -114,12 +113,12 @@ describe("summary history", () => {
       source: "simplification",
       parentSummaryId: "summary-legal-new",
       isCurrent: false,
-      createdAt: "2026-03-26T03:00:00.000Z"
+      createdAt: "2026-03-26T03:00:00.000Z",
     });
 
-    expect(getLatestSummaryByType([olderPlain, newerPlain, currentLegal], "plain_language")?.id).toBe(
-      "summary-plain-new"
-    );
+    expect(
+      getLatestSummaryByType([olderPlain, newerPlain, currentLegal], "plain_language")?.id
+    ).toBe("summary-plain-new");
   });
 
   test("builds a fallback simplified summary that keeps canonical sections", async () => {
@@ -127,7 +126,7 @@ describe("summary history", () => {
     const result = await buildGeneratedSummaryVariant({
       aggregate,
       baseSummary: aggregate.summaries[0],
-      targetType: "plain_language"
+      targetType: "plain_language",
     });
 
     expect(result.summaryType).toBe("plain_language");
@@ -145,14 +144,13 @@ describe("summary history", () => {
     const result = await buildGeneratedSummaryVariant({
       aggregate,
       baseSummary: aggregate.summaries[0],
-      targetType: "plain_language"
+      targetType: "plain_language",
     });
 
     expect(result.summaryType).toBe("plain_language");
     expect(result.source).toBe("simplification");
     expect(result.version).toBe("fallback:plain_language");
     expect(validateSummaryVariantBody(aggregate, result.body)).toBeNull();
-
   });
 
   test("blocks simplified summaries that lose the payment amount", () => {

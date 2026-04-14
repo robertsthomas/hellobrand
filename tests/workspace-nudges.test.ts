@@ -16,13 +16,21 @@ function createAggregate(overrides?: {
   const deal = {
     ...seed.deals[0],
     status: (overrides?.status as DealAggregate["deal"]["status"]) ?? "negotiating",
-    confirmedAt: overrides?.confirmedAt !== undefined ? overrides.confirmedAt : new Date().toISOString()
+    confirmedAt:
+      overrides?.confirmedAt !== undefined ? overrides.confirmedAt : new Date().toISOString(),
   };
   const terms = {
     ...seed.dealTerms[0],
-    paymentAmount: overrides?.paymentAmount !== undefined ? overrides.paymentAmount : seed.dealTerms[0].paymentAmount,
-    deliverables: overrides?.deliverables !== undefined ? overrides.deliverables as never : seed.dealTerms[0].deliverables,
-    usageRights: overrides?.usageRights !== undefined ? overrides.usageRights : seed.dealTerms[0].usageRights
+    paymentAmount:
+      overrides?.paymentAmount !== undefined
+        ? overrides.paymentAmount
+        : seed.dealTerms[0].paymentAmount,
+    deliverables:
+      overrides?.deliverables !== undefined
+        ? (overrides.deliverables as never)
+        : seed.dealTerms[0].deliverables,
+    usageRights:
+      overrides?.usageRights !== undefined ? overrides.usageRights : seed.dealTerms[0].usageRights,
   };
 
   return {
@@ -34,7 +42,6 @@ function createAggregate(overrides?: {
     paymentRecord: null,
     invoiceRecord: null,
     riskFlags: [],
-    emailDrafts: [],
     jobs: [],
     documentSections: [],
     documentRuns: [],
@@ -45,7 +52,7 @@ function createAggregate(overrides?: {
     extractionEvidence: [],
     summaries: [],
     currentSummary: null,
-    intakeSession: null
+    intakeSession: null,
   };
 }
 
@@ -54,7 +61,7 @@ describe("buildWorkspaceNudgeSeed", () => {
     const seed = buildWorkspaceNudgeSeed({
       dealId: "deal-1",
       campaignName: "Spring Drop",
-      eventType: "workspace.missing_payment"
+      eventType: "workspace.missing_payment",
     });
 
     expect(seed.eventType).toBe("workspace.missing_payment");
@@ -69,7 +76,7 @@ describe("buildWorkspaceNudgeSeed", () => {
     const seed = buildWorkspaceNudgeSeed({
       dealId: "deal-2",
       campaignName: "Summer Campaign",
-      eventType: "workspace.missing_deliverables"
+      eventType: "workspace.missing_deliverables",
     });
 
     expect(seed.eventType).toBe("workspace.missing_deliverables");
@@ -81,7 +88,7 @@ describe("buildWorkspaceNudgeSeed", () => {
     const seed = buildWorkspaceNudgeSeed({
       dealId: "deal-3",
       campaignName: "Fall Promo",
-      eventType: "workspace.missing_usage_rights"
+      eventType: "workspace.missing_usage_rights",
     });
 
     expect(seed.eventType).toBe("workspace.missing_usage_rights");
@@ -95,7 +102,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: 2000,
       deliverables: [{ id: "d1", title: "Reel", dueDate: null, channel: null, quantity: 1 }],
-      usageRights: "Organic only"
+      usageRights: "Organic only",
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -106,7 +113,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: null,
       deliverables: [{ id: "d1", title: "Reel", dueDate: null, channel: null, quantity: 1 }],
-      usageRights: "Organic only"
+      usageRights: "Organic only",
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -118,7 +125,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: 2000,
       deliverables: [],
-      usageRights: "Organic only"
+      usageRights: "Organic only",
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -130,7 +137,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: 2000,
       deliverables: [{ id: "d1", title: "Reel", dueDate: null, channel: null, quantity: 1 }],
-      usageRights: null
+      usageRights: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -142,7 +149,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: null,
       deliverables: [],
-      usageRights: null
+      usageRights: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -157,7 +164,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
   test("skips archived deals", () => {
     const aggregate = createAggregate({
       status: "archived",
-      paymentAmount: null
+      paymentAmount: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -167,7 +174,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
   test("skips completed deals", () => {
     const aggregate = createAggregate({
       status: "completed",
-      paymentAmount: null
+      paymentAmount: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -177,7 +184,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
   test("skips paid deals", () => {
     const aggregate = createAggregate({
       status: "paid",
-      paymentAmount: null
+      paymentAmount: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -187,7 +194,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
   test("skips unconfirmed deals", () => {
     const aggregate = createAggregate({
       confirmedAt: null,
-      paymentAmount: null
+      paymentAmount: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);
@@ -198,7 +205,7 @@ describe("computeWorkspaceNudgeSeeds", () => {
     const aggregate = createAggregate({
       paymentAmount: null,
       deliverables: [],
-      usageRights: null
+      usageRights: null,
     });
 
     const seeds = computeWorkspaceNudgeSeeds([aggregate]);

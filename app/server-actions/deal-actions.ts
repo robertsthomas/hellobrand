@@ -11,7 +11,6 @@ export {
   saveTermsAction,
   saveDealNotesAction,
   confirmTermsReviewAction,
-  generateDraftAction,
 } from "./deal-workspace-actions";
 export {
   activateSummaryVariantAction,

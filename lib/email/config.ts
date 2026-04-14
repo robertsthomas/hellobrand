@@ -9,11 +9,7 @@ function normalizeBaseUrl(value: string | undefined) {
 export function getAllowedEmailAppBaseUrls() {
   return Array.from(
     new Set(
-      [
-        process.env.NEXT_PUBLIC_APP_URL,
-        process.env.INTEGRATIONS_APP_URL,
-        "http://localhost:3011"
-      ]
+      [process.env.NEXT_PUBLIC_APP_URL, process.env.INTEGRATIONS_APP_URL, "http://localhost:3011"]
         .map((value) => normalizeBaseUrl(value))
         .filter(Boolean)
     )
@@ -34,10 +30,7 @@ export function getAppBaseUrl() {
 }
 
 export function getIntegrationBaseUrl() {
-  return normalizeBaseUrl(
-    process.env.INTEGRATIONS_APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL
-  );
+  return normalizeBaseUrl(process.env.INTEGRATIONS_APP_URL || process.env.NEXT_PUBLIC_APP_URL);
 }
 
 export function getGoogleRedirectUri() {
@@ -75,9 +68,7 @@ export function hasProviderConfig(provider: EmailProvider) {
   }
 
   if (provider === "outlook") {
-    return Boolean(
-      process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
-    );
+    return Boolean(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET);
   }
 
   if (provider === "yahoo") {
@@ -91,7 +82,7 @@ export const gmailScopes = [
   "openid",
   "email",
   "profile",
-  "https://www.googleapis.com/auth/gmail.readonly"
+  "https://www.googleapis.com/auth/gmail.readonly",
 ];
 
 export const outlookScopes = [
@@ -100,29 +91,13 @@ export const outlookScopes = [
   "email",
   "offline_access",
   "User.Read",
-  "Mail.Read"
+  "Mail.Read",
 ];
 
-export const yahooScopes = [
-  "openid",
-  "profile",
-  "email",
-  "mail-r",
-  "mail-w"
-];
+export const yahooScopes = ["openid", "profile", "email", "mail-r", "mail-w"];
 
 export function getEmailSummaryModel() {
   return (
-    process.env.OPENROUTER_MODEL_EMAIL ||
-    process.env.OPENROUTER_MODEL ||
-    "google/gemini-2.5-flash"
-  );
-}
-
-export function getEmailDraftModel() {
-  return (
-    process.env.OPENROUTER_MODEL_EMAIL ||
-    process.env.OPENROUTER_MODEL ||
-    "google/gemini-2.5-flash"
+    process.env.OPENROUTER_MODEL_EMAIL || process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash"
   );
 }

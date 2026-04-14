@@ -1,20 +1,5 @@
 // Inbox sync, linked thread, and email collaboration records.
 
-model EmailDraft {
-  id        String   @id @default(uuid())
-  dealId    String
-  intent    String
-  subject   String
-  body      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
-
-  @@unique([dealId, intent])
-  @@index([dealId])
-}
-
 model ConnectedEmailAccount {
   id                    String    @id @default(uuid())
   userId                String

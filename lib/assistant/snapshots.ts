@@ -4,7 +4,7 @@ import type {
   AssistantContextSnapshotRecord,
   AssistantScope,
   DealAggregate,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 
 import { assistantDealTabs, assistantRouteTargets } from "@/lib/assistant/app-manual";
@@ -41,7 +41,9 @@ function dealSnapshotSummary(aggregate: DealAggregate, comparisonSet: DealAggreg
       aggregate.riskFlags.length > 0
         ? `${aggregate.riskFlags.length} risk flag(s)`
         : "No active risk flags",
-      conflicts.length > 0 ? `${conflicts.length} cross-partnership conflict warning(s)` : "No cross-partnership conflicts"
+      conflicts.length > 0
+        ? `${conflicts.length} cross-partnership conflict warning(s)`
+        : "No cross-partnership conflicts",
     ].join(" | "),
     payload: {
       deal: {
@@ -54,22 +56,21 @@ function dealSnapshotSummary(aggregate: DealAggregate, comparisonSet: DealAggreg
         summary:
           aggregate.currentSummary?.body ??
           aggregate.deal.summary ??
-          "No current summary available."
+          "No current summary available.",
       },
       terms: aggregate.terms,
       paymentRecord: aggregate.paymentRecord,
       riskFlags: aggregate.riskFlags,
-      emailDrafts: aggregate.emailDrafts,
       conflicts,
       evidence: aggregate.extractionEvidence,
       documents: aggregate.documents.map((document) => ({
         id: document.id,
         fileName: document.fileName,
         documentKind: document.documentKind,
-        updatedAt: document.updatedAt
+        updatedAt: document.updatedAt,
       })),
-      tabs: assistantDealTabs
-    }
+      tabs: assistantDealTabs,
+    },
   };
 }
 
@@ -89,7 +90,7 @@ function userSnapshotSummary(aggregates: DealAggregate[]) {
       currency: aggregate.terms?.currency ?? null,
       riskCount: aggregate.riskFlags.length,
       highRiskCount: aggregate.riskFlags.filter((flag) => flag.severity === "high").length,
-      conflictCount: conflicts.length
+      conflictCount: conflicts.length,
     };
   });
 
@@ -97,12 +98,12 @@ function userSnapshotSummary(aggregates: DealAggregate[]) {
     summary: [
       `${portfolio.length} active workspace(s)`,
       `${portfolio.reduce((count, partnership) => count + partnership.riskCount, 0)} total risk flag(s)`,
-      `${portfolio.filter((deal) => deal.paymentStatus === "late").length} late payment partnership workspace(s)`
+      `${portfolio.filter((deal) => deal.paymentStatus === "late").length} late payment partnership workspace(s)`,
     ].join(" | "),
     payload: {
       portfolio,
-      routes: assistantRouteTargets
-    }
+      routes: assistantRouteTargets,
+    },
   };
 }
 
@@ -133,7 +134,7 @@ export async function refreshAssistantSnapshotsForViewer(
       key: assistantSnapshotKey("user"),
       version: ASSISTANT_SNAPSHOT_VERSION,
       summary: userSnapshot.summary,
-      payload: userSnapshot.payload
+      payload: userSnapshot.payload,
     });
 
     if (options?.dealId) {
@@ -147,7 +148,7 @@ export async function refreshAssistantSnapshotsForViewer(
           key: assistantSnapshotKey("deal", target.deal.id),
           version: ASSISTANT_SNAPSHOT_VERSION,
           summary: dealSnapshot.summary,
-          payload: dealSnapshot.payload
+          payload: dealSnapshot.payload,
         });
       }
     }

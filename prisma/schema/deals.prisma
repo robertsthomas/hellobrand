@@ -35,7 +35,7 @@ model Deal {
   documents                  Document[]
   terms                      DealTerms?
   riskFlags                  RiskFlag[]
-  emailDrafts                EmailDraft[]
+
   assistantThreads           AssistantThread[]
   assistantSnapshots         AssistantContextSnapshot[]
   jobs                       Job[]

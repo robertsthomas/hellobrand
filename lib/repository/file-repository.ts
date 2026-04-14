@@ -4,13 +4,13 @@ import {
   buildAggregate,
   ensureStore,
   saveStore,
-  sortNewestFirst
+  sortNewestFirst,
 } from "@/lib/repository/file-store";
 import {
   getLatestSummaryByType,
   getWorkspaceSummaries,
   normalizeSummaryInput,
-  normalizeSummaryRecord
+  normalizeSummaryRecord,
 } from "@/lib/summaries";
 import { deleteStoredBytes } from "@/lib/storage";
 import type {
@@ -27,8 +27,6 @@ import type {
   DocumentRunRecord,
   DocumentRecord,
   DocumentSectionRecord,
-  DraftIntent,
-  EmailDraftRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord,
   IntakeBatchGroupRecord,
@@ -40,7 +38,7 @@ import type {
   RiskFlagRecord,
   SummaryRecord,
   SummaryRecordInput,
-  SummaryType
+  SummaryType,
 } from "@/lib/types";
 
 export class FileRepository {
@@ -52,9 +50,7 @@ export class FileRepository {
 
   async getDealAggregate(userId: string, dealId: string) {
     const store = await ensureStore();
-    const deal = store.deals.find(
-      (entry) => entry.id === dealId && entry.userId === userId
-    );
+    const deal = store.deals.find((entry) => entry.id === dealId && entry.userId === userId);
 
     if (!deal) {
       return null;
@@ -108,7 +104,7 @@ export class FileRepository {
       updatedAt: now,
       analyzedAt: null,
       confirmedAt: options?.confirmedAt ?? now,
-      statusBeforeArchive: null
+      statusBeforeArchive: null,
     };
 
     store.deals.unshift(deal);
@@ -118,9 +114,7 @@ export class FileRepository {
 
   async updateDeal(userId: string, dealId: string, patch: Partial<DealRecord>) {
     const store = await ensureStore();
-    const index = store.deals.findIndex(
-      (entry) => entry.id === dealId && entry.userId === userId
-    );
+    const index = store.deals.findIndex((entry) => entry.id === dealId && entry.userId === userId);
 
     if (index === -1) {
       return null;
@@ -129,7 +123,7 @@ export class FileRepository {
     const next = {
       ...store.deals[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     store.deals[index] = next;
@@ -152,7 +146,6 @@ export class FileRepository {
     store.documents = store.documents.filter((entry) => entry.dealId !== dealId);
     store.dealTerms = store.dealTerms.filter((entry) => entry.dealId !== dealId);
     store.riskFlags = store.riskFlags.filter((entry) => entry.dealId !== dealId);
-    store.emailDrafts = store.emailDrafts.filter((entry) => entry.dealId !== dealId);
     store.dealEmailLinks = store.dealEmailLinks.filter((entry) => entry.dealId !== dealId);
     store.emailCandidateMatches = store.emailCandidateMatches.filter(
       (entry) => entry.dealId !== dealId
@@ -189,16 +182,13 @@ export class FileRepository {
       (entry) => !documentIds.includes(entry.documentId)
     );
     store.documentArtifacts = store.documentArtifacts.filter(
-      (entry) =>
-        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
+      (entry) => !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
     );
     store.documentFieldEvidence = store.documentFieldEvidence.filter(
-      (entry) =>
-        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
+      (entry) => !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
     );
     store.documentReviewItems = store.documentReviewItems.filter(
-      (entry) =>
-        !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
+      (entry) => !documentIds.includes(entry.documentId) && !deletedRunIds.includes(entry.runId)
     );
     store.extractionResults = store.extractionResults.filter(
       (entry) => !documentIds.includes(entry.documentId)
@@ -212,16 +202,14 @@ export class FileRepository {
     return true;
   }
 
-  async createDocument(
-    document: Omit<DocumentRecord, "id" | "createdAt" | "updatedAt">
-  ) {
+  async createDocument(document: Omit<DocumentRecord, "id" | "createdAt" | "updatedAt">) {
     const store = await ensureStore();
     const now = new Date().toISOString();
     const next: DocumentRecord = {
       ...document,
       id: randomUUID(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     store.documents.unshift(next);
@@ -240,7 +228,7 @@ export class FileRepository {
     store.documents[index] = {
       ...store.documents[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await saveStore(store);
@@ -249,17 +237,14 @@ export class FileRepository {
 
   async listInvoiceRecords(userId: string) {
     const store = await ensureStore();
-    return sortNewestFirst(
-      store.invoiceRecords.filter((record) => record.userId === userId)
-    );
+    return sortNewestFirst(store.invoiceRecords.filter((record) => record.userId === userId));
   }
 
   async getInvoiceRecord(userId: string, dealId: string) {
     const store = await ensureStore();
     return (
-      store.invoiceRecords.find(
-        (record) => record.userId === userId && record.dealId === dealId
-      ) ?? null
+      store.invoiceRecords.find((record) => record.userId === userId && record.dealId === dealId) ??
+      null
     );
   }
 
@@ -294,7 +279,7 @@ export class FileRepository {
       userId,
       createdAt: index >= 0 ? store.invoiceRecords[index]!.createdAt : now,
       updatedAt: now,
-      ...patch
+      ...patch,
     };
 
     if (index >= 0) {
@@ -318,7 +303,7 @@ export class FileRepository {
       userId,
       dealId,
       createdAt: new Date().toISOString(),
-      ...patch
+      ...patch,
     };
 
     store.invoiceDeliveryRecords.unshift(next);
@@ -346,7 +331,9 @@ export class FileRepository {
   async upsertInvoiceReminderTouchpoints(
     userId: string,
     dealId: string,
-    touchpoints: Array<Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">>
+    touchpoints: Array<
+      Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+    >
   ) {
     const store = await ensureStore();
     const now = new Date().toISOString();
@@ -361,7 +348,7 @@ export class FileRepository {
         userId,
         createdAt: index >= 0 ? store.invoiceReminderTouchpoints[index]!.createdAt : now,
         updatedAt: now,
-        ...touchpoint
+        ...touchpoint,
       };
 
       if (index >= 0) {
@@ -393,7 +380,7 @@ export class FileRepository {
     const next = {
       ...store.invoiceReminderTouchpoints[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     store.invoiceReminderTouchpoints[index] = next;
@@ -415,7 +402,7 @@ export class FileRepository {
         ...section,
         id: randomUUID(),
         documentId,
-        createdAt: now
+        createdAt: now,
       }))
     );
     await saveStore(store);
@@ -435,7 +422,7 @@ export class FileRepository {
     const next: DocumentRunRecord = {
       ...run,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     store.documentRuns.unshift(next);
@@ -457,7 +444,7 @@ export class FileRepository {
     store.documentRuns[index] = {
       ...store.documentRuns[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await saveStore(store);
@@ -474,14 +461,12 @@ export class FileRepository {
     return sortNewestFirst(store.documentRuns.filter((entry) => entry.documentId === documentId));
   }
 
-  async createDocumentArtifact(
-    artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">
-  ) {
+  async createDocumentArtifact(artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">) {
     const store = await ensureStore();
     const next: DocumentArtifactRecord = {
       ...artifact,
       id: randomUUID(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     store.documentArtifacts.unshift(next);
@@ -493,7 +478,8 @@ export class FileRepository {
     const store = await ensureStore();
     return sortNewestFirst(
       store.documentArtifacts.filter(
-        (entry) => entry.documentId === documentId && (!options?.runId || entry.runId === options.runId)
+        (entry) =>
+          entry.documentId === documentId && (!options?.runId || entry.runId === options.runId)
       )
     );
   }
@@ -514,7 +500,7 @@ export class FileRepository {
         id: randomUUID(),
         documentId,
         runId,
-        createdAt: now
+        createdAt: now,
       }))
     );
     await saveStore(store);
@@ -543,7 +529,10 @@ export class FileRepository {
   async replaceDocumentReviewItems(
     documentId: string,
     runId: string,
-    items: Omit<DocumentReviewItemRecord, "id" | "documentId" | "runId" | "createdAt" | "updatedAt">[]
+    items: Omit<
+      DocumentReviewItemRecord,
+      "id" | "documentId" | "runId" | "createdAt" | "updatedAt"
+    >[]
   ) {
     const store = await ensureStore();
     const now = new Date().toISOString();
@@ -557,7 +546,7 @@ export class FileRepository {
         documentId,
         runId,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       }))
     );
     await saveStore(store);
@@ -589,15 +578,13 @@ export class FileRepository {
   ) {
     const store = await ensureStore();
     const now = new Date().toISOString();
-    const index = store.extractionResults.findIndex(
-      (entry) => entry.documentId === documentId
-    );
+    const index = store.extractionResults.findIndex((entry) => entry.documentId === documentId);
 
     const next: ExtractionResultRecord = {
       ...result,
       id: index === -1 ? randomUUID() : store.extractionResults[index].id,
       documentId,
-      createdAt: index === -1 ? now : store.extractionResults[index].createdAt
+      createdAt: index === -1 ? now : store.extractionResults[index].createdAt,
     };
 
     if (index === -1) {
@@ -617,10 +604,7 @@ export class FileRepository {
 
   async replaceExtractionEvidence(
     documentId: string,
-    evidence: Omit<
-      ExtractionEvidenceRecord,
-      "id" | "documentId" | "createdAt"
-    >[]
+    evidence: Omit<ExtractionEvidenceRecord, "id" | "documentId" | "createdAt">[]
   ) {
     const store = await ensureStore();
     const now = new Date().toISOString();
@@ -632,7 +616,7 @@ export class FileRepository {
         ...entry,
         id: randomUUID(),
         documentId,
-        createdAt: now
+        createdAt: now,
       }))
     );
     await saveStore(store);
@@ -644,11 +628,7 @@ export class FileRepository {
     return store.extractionEvidence.filter((entry) => entry.documentId === documentId);
   }
 
-  async saveSummary(
-    dealId: string,
-    documentId: string | null,
-    summary: SummaryRecordInput
-  ) {
+  async saveSummary(dealId: string, documentId: string | null, summary: SummaryRecordInput) {
     const store = await ensureStore();
     const now = new Date().toISOString();
     const normalized = normalizeSummaryInput(summary);
@@ -671,7 +651,7 @@ export class FileRepository {
       id: randomUUID(),
       dealId,
       documentId,
-      createdAt: now
+      createdAt: now,
     };
 
     store.summaries.unshift(next);
@@ -707,7 +687,7 @@ export class FileRepository {
 
       return {
         ...summary,
-        isCurrent: false
+        isCurrent: false,
       };
     });
 
@@ -726,7 +706,7 @@ export class FileRepository {
       ...job,
       id: randomUUID(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     store.jobs.unshift(next);
@@ -745,7 +725,7 @@ export class FileRepository {
     store.jobs[index] = {
       ...store.jobs[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await saveStore(store);
@@ -765,7 +745,7 @@ export class FileRepository {
       id: index === -1 ? randomUUID() : store.dealTerms[index].id,
       dealId,
       createdAt: index === -1 ? now : store.dealTerms[index].createdAt,
-      updatedAt: now
+      updatedAt: now,
     };
 
     if (index === -1) {
@@ -785,7 +765,7 @@ export class FileRepository {
     store.dealTerms[index] = {
       ...store.dealTerms[index],
       pendingExtraction: (data as DealTermsRecord["pendingExtraction"]) ?? null,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     await saveStore(store);
   }
@@ -805,7 +785,7 @@ export class FileRepository {
         ...flag,
         id: randomUUID(),
         dealId,
-        createdAt: now
+        createdAt: now,
       }))
     );
     await saveStore(store);
@@ -817,38 +797,6 @@ export class FileRepository {
     return store.riskFlags.filter(
       (flag) => flag.dealId === dealId && flag.sourceDocumentId === documentId
     );
-  }
-
-  async saveEmailDraft(
-    dealId: string,
-    intent: DraftIntent,
-    payload: Pick<EmailDraftRecord, "subject" | "body">
-  ) {
-    const store = await ensureStore();
-    const now = new Date().toISOString();
-    const existingIndex = store.emailDrafts.findIndex(
-      (entry) => entry.dealId === dealId && entry.intent === intent
-    );
-
-    const next: EmailDraftRecord = {
-      id: existingIndex === -1 ? randomUUID() : store.emailDrafts[existingIndex].id,
-      dealId,
-      intent,
-      subject: payload.subject,
-      body: payload.body,
-      createdAt:
-        existingIndex === -1 ? now : store.emailDrafts[existingIndex].createdAt,
-      updatedAt: now
-    };
-
-    if (existingIndex === -1) {
-      store.emailDrafts.unshift(next);
-    } else {
-      store.emailDrafts[existingIndex] = next;
-    }
-
-    await saveStore(store);
-    return next;
   }
 
   async listAssistantThreads(
@@ -878,9 +826,8 @@ export class FileRepository {
   async getAssistantThread(userId: string, threadId: string) {
     const store = await ensureStore();
     return (
-      store.assistantThreads.find(
-        (thread) => thread.id === threadId && thread.userId === userId
-      ) ?? null
+      store.assistantThreads.find((thread) => thread.id === threadId && thread.userId === userId) ??
+      null
     );
   }
 
@@ -898,7 +845,7 @@ export class FileRepository {
       title: input.title,
       summary: input.summary ?? null,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
 
     store.assistantThreads.unshift(thread);
@@ -923,7 +870,7 @@ export class FileRepository {
     store.assistantThreads[index] = {
       ...store.assistantThreads[index],
       ...patch,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     await saveStore(store);
@@ -941,7 +888,9 @@ export class FileRepository {
     }
 
     store.assistantThreads = store.assistantThreads.filter((thread) => thread.id !== threadId);
-    store.assistantMessages = store.assistantMessages.filter((message) => message.threadId !== threadId);
+    store.assistantMessages = store.assistantMessages.filter(
+      (message) => message.threadId !== threadId
+    );
     await saveStore(store);
     return true;
   }
@@ -986,9 +935,8 @@ export class FileRepository {
       role: input.role,
       content: input.content,
       parts: input.parts,
-      createdAt:
-        existingIndex === -1 ? now : store.assistantMessages[existingIndex].createdAt,
-      updatedAt: now
+      createdAt: existingIndex === -1 ? now : store.assistantMessages[existingIndex].createdAt,
+      updatedAt: now,
     };
 
     if (existingIndex === -1) {
@@ -1003,7 +951,7 @@ export class FileRepository {
       summary:
         input.role === "assistant" && input.content.trim().length > 0
           ? input.content.slice(0, 280)
-          : store.assistantThreads[threadIndex].summary
+          : store.assistantThreads[threadIndex].summary,
     };
 
     await saveStore(store);
@@ -1033,10 +981,7 @@ export class FileRepository {
     );
 
     const next: AssistantContextSnapshotRecord = {
-      id:
-        existingIndex === -1
-          ? randomUUID()
-          : store.assistantContextSnapshots[existingIndex].id,
+      id: existingIndex === -1 ? randomUUID() : store.assistantContextSnapshots[existingIndex].id,
       userId,
       dealId: input.dealId ?? null,
       scope: input.scope,
@@ -1045,10 +990,8 @@ export class FileRepository {
       summary: input.summary,
       payload: input.payload,
       createdAt:
-        existingIndex === -1
-          ? now
-          : store.assistantContextSnapshots[existingIndex].createdAt,
-      updatedAt: now
+        existingIndex === -1 ? now : store.assistantContextSnapshots[existingIndex].createdAt,
+      updatedAt: now,
     };
 
     if (existingIndex === -1) {
@@ -1080,8 +1023,8 @@ export class FileRepository {
         confidence: group.confidence,
         documentIds: group.documentIds,
         status: "pending" as const,
-        createdAt: now
-      }))
+        createdAt: now,
+      })),
     };
     for (const g of batch.groups) {
       g.batchId = batch.id;
@@ -1095,7 +1038,9 @@ export class FileRepository {
 
   async updateBatchGroup(
     _groupId: string,
-    _patch: Partial<Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">>
+    _patch: Partial<
+      Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">
+    >
   ): Promise<IntakeBatchGroupRecord> {
     throw new Error("Batch operations require a database.");
   }

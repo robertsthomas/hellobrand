@@ -264,13 +264,3 @@ export type DraftIntent =
   | "request-contract-revisions"
   | "confirm-deliverables"
   | "confirm-revised-brief";
-
-export interface EmailDraftRecord {
-  id: string;
-  dealId: string;
-  intent: DraftIntent;
-  subject: string;
-  body: string;
-  createdAt: string;
-  updatedAt: string;
-}

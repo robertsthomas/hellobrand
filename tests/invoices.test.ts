@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildInvoiceDraftNotes,
   buildInvoiceLineItems,
-  computeInvoiceReminderAnchorDate
+  computeInvoiceReminderAnchorDate,
 } from "@/lib/invoices";
 import type { DealAggregate, DealRecord, DealTermsRecord, DocumentRecord } from "@/lib/types";
 
@@ -23,7 +23,7 @@ function makeDeal(): DealRecord {
     updatedAt: "2026-03-01T00:00:00.000Z",
     analyzedAt: null,
     confirmedAt: "2026-03-01T00:00:00.000Z",
-    statusBeforeArchive: null
+    statusBeforeArchive: null,
   };
 }
 
@@ -71,7 +71,7 @@ function makeTerms(): DealTermsRecord {
     briefData: null,
     pendingExtraction: null,
     createdAt: "2026-03-01T00:00:00.000Z",
-    updatedAt: "2026-03-01T00:00:00.000Z"
+    updatedAt: "2026-03-01T00:00:00.000Z",
   };
 }
 
@@ -96,7 +96,7 @@ function makeAggregate(terms: DealTermsRecord): DealAggregate {
     processingRunStateJson: null,
     processingStartedAt: null,
     createdAt: "2026-03-01T00:00:00.000Z",
-    updatedAt: "2026-03-01T00:00:00.000Z"
+    updatedAt: "2026-03-01T00:00:00.000Z",
   };
 
   return {
@@ -108,7 +108,6 @@ function makeAggregate(terms: DealTermsRecord): DealAggregate {
     paymentRecord: null,
     invoiceRecord: null,
     riskFlags: [],
-    emailDrafts: [],
     jobs: [],
     documentSections: [],
     documentRuns: [],
@@ -119,7 +118,7 @@ function makeAggregate(terms: DealTermsRecord): DealAggregate {
     extractionEvidence: [],
     summaries: [],
     currentSummary: null,
-    intakeSession: null
+    intakeSession: null,
   };
 }
 
@@ -137,7 +136,7 @@ describe("buildInvoiceLineItems", () => {
           channel: "TikTok",
           quantity: 2,
           status: "pending",
-          description: null
+          description: null,
         },
         {
           id: "d2",
@@ -146,9 +145,9 @@ describe("buildInvoiceLineItems", () => {
           channel: "Instagram",
           quantity: 1,
           status: "pending",
-          description: null
-        }
-      ]
+          description: null,
+        },
+      ],
     });
 
     expect(lineItems).toHaveLength(2);
@@ -156,7 +155,7 @@ describe("buildInvoiceLineItems", () => {
       title: "TikTok videos",
       quantity: 2,
       unitRate: 1000,
-      amount: 2000
+      amount: 2000,
     });
     expect(lineItems[0]?.description).toContain("Due Mar 30, 2026");
     expect(lineItems[0]?.description).toContain("Includes 1 revision round");
@@ -164,7 +163,7 @@ describe("buildInvoiceLineItems", () => {
       title: "Instagram story",
       quantity: 1,
       unitRate: 1000,
-      amount: 1000
+      amount: 1000,
     });
   });
 
@@ -173,7 +172,7 @@ describe("buildInvoiceLineItems", () => {
       amount: 1800,
       fallbackTitle: "Spring Drop",
       paymentStructure: "Flat fee",
-      deliverables: []
+      deliverables: [],
     });
 
     expect(lineItems).toEqual([
@@ -182,8 +181,8 @@ describe("buildInvoiceLineItems", () => {
         description: "Flat fee",
         quantity: 1,
         unitRate: 1800,
-        amount: 1800
-      })
+        amount: 1800,
+      }),
     ]);
   });
 });
@@ -199,7 +198,7 @@ describe("buildInvoiceDraftNotes", () => {
           channel: "TikTok",
           quantity: 2,
           status: "pending",
-          description: null
+          description: null,
         },
         {
           id: "d2",
@@ -208,13 +207,13 @@ describe("buildInvoiceDraftNotes", () => {
           channel: "Instagram",
           quantity: 1,
           status: "pending",
-          description: null
-        }
+          description: null,
+        },
       ],
       paymentTerms: "Net 30",
       paymentTrigger: "After final live links",
       paymentStructure: "50% on signature, 50% on completion",
-      revisionRounds: 1
+      revisionRounds: 1,
     });
 
     expect(notes).toContain("Services rendered: 2 TikTok videos, Instagram Reel.");
@@ -228,7 +227,7 @@ describe("buildInvoiceDraftNotes", () => {
     const notes = buildInvoiceDraftNotes({
       existingNotes: "Use vendor portal reference PO-123.",
       deliverables: [],
-      paymentTerms: "Net 30"
+      paymentTerms: "Net 30",
     });
 
     expect(notes).toBe("Use vendor portal reference PO-123.");
@@ -246,7 +245,7 @@ describe("computeInvoiceReminderAnchorDate", () => {
         channel: "Instagram",
         quantity: 1,
         status: "pending",
-        description: null
+        description: null,
       },
       {
         id: "d2",
@@ -255,13 +254,11 @@ describe("computeInvoiceReminderAnchorDate", () => {
         channel: "Instagram",
         quantity: 1,
         status: "pending",
-        description: null
-      }
+        description: null,
+      },
     ];
 
-    expect(computeInvoiceReminderAnchorDate(makeAggregate(terms))).toBe(
-      "2026-03-31T04:00:00.000Z"
-    );
+    expect(computeInvoiceReminderAnchorDate(makeAggregate(terms))).toBe("2026-03-31T04:00:00.000Z");
   });
 
   it("falls back to the campaign end date when no deliverable dates exist", () => {
@@ -269,11 +266,9 @@ describe("computeInvoiceReminderAnchorDate", () => {
     terms.campaignDateWindow = {
       startDate: "2026-03-20T00:00:00.000Z",
       endDate: "2026-04-05T00:00:00.000Z",
-      postingWindow: "Mar 20 - Apr 5"
+      postingWindow: "Mar 20 - Apr 5",
     };
 
-    expect(computeInvoiceReminderAnchorDate(makeAggregate(terms))).toBe(
-      "2026-04-05T04:00:00.000Z"
-    );
+    expect(computeInvoiceReminderAnchorDate(makeAggregate(terms))).toBe("2026-04-05T04:00:00.000Z");
   });
 });

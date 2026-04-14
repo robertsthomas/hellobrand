@@ -5,7 +5,6 @@ export { saveDealMetaAction } from "@/app/server-actions/deal-actions";
 export { saveTermsAction } from "@/app/server-actions/deal-actions";
 export { confirmTermsReviewAction } from "@/app/server-actions/deal-actions";
 export { saveDealNotesAction } from "@/app/server-actions/deal-actions";
-export { generateDraftAction } from "@/app/server-actions/deal-actions";
 export { activateSummaryVariantAction } from "@/app/server-actions/deal-actions";
 export { restoreSummaryVersionAction } from "@/app/server-actions/deal-actions";
 export { deleteWorkspaceAction } from "@/app/server-actions/deal-actions";

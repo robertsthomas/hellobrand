@@ -4,13 +4,7 @@
  */
 
 import { normalizeDealCategory } from "@/lib/conflict-intelligence";
-import type {
-  DealRecord,
-  DealTermsRecord,
-  DraftIntent,
-  EmailDraftRecord,
-  RiskFlagRecord
-} from "@/lib/types";
+import type { DealRecord, DealTermsRecord, RiskFlagRecord } from "@/lib/types";
 
 import { iso, toStringArray } from "./prisma-shared";
 
@@ -37,7 +31,7 @@ export function toDealRecord(deal: {
     createdAt: iso(deal.createdAt) ?? new Date().toISOString(),
     updatedAt: iso(deal.updatedAt) ?? new Date().toISOString(),
     analyzedAt: iso(deal.analyzedAt),
-    confirmedAt: iso(deal.confirmedAt)
+    confirmedAt: iso(deal.confirmedAt),
   } as DealRecord;
 }
 
@@ -112,7 +106,7 @@ export function toDealTermsRecord(terms: {
         ? (terms.pendingExtraction as DealTermsRecord["pendingExtraction"])
         : null,
     createdAt: iso(terms.createdAt) ?? new Date().toISOString(),
-    updatedAt: iso(terms.updatedAt) ?? new Date().toISOString()
+    updatedAt: iso(terms.updatedAt) ?? new Date().toISOString(),
   };
 }
 
@@ -137,23 +131,6 @@ export function toRiskFlagRecord(flag: {
     evidence: toStringArray(flag.evidence),
     sourceType: (flag.sourceType as RiskFlagRecord["sourceType"]) ?? null,
     sourceMessageId: flag.sourceMessageId ?? null,
-    createdAt: iso(flag.createdAt) ?? new Date().toISOString()
-  };
-}
-
-export function toEmailDraftRecord(draft: {
-  id: string;
-  dealId: string;
-  intent: string;
-  subject: string;
-  body: string;
-  createdAt: Date;
-  updatedAt: Date;
-}): EmailDraftRecord {
-  return {
-    ...draft,
-    intent: draft.intent as DraftIntent,
-    createdAt: iso(draft.createdAt) ?? new Date().toISOString(),
-    updatedAt: iso(draft.updatedAt) ?? new Date().toISOString()
+    createdAt: iso(flag.createdAt) ?? new Date().toISOString(),
   };
 }

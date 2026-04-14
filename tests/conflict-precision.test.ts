@@ -27,7 +27,7 @@ function makeDealAggregate(
       brandName: overrides.brandName ?? seed.deals[0].brandName,
       campaignName: overrides.campaignName ?? seed.deals[0].campaignName,
       confirmedAt: overrides.confirmedAt !== undefined ? overrides.confirmedAt : now,
-      status: (overrides.status as DealAggregate["deal"]["status"]) ?? "negotiating"
+      status: (overrides.status as DealAggregate["deal"]["status"]) ?? "negotiating",
     },
     latestDocument: seed.documents[0],
     documents: seed.documents,
@@ -35,12 +35,11 @@ function makeDealAggregate(
       ...seed.dealTerms[0],
       id: `terms-${id}`,
       dealId: id,
-      ...(overrides.terms ?? {})
+      ...(overrides.terms ?? {}),
     } as DealTermsRecord,
     conflictResults: [],
     paymentRecord: null,
     riskFlags: [],
-    emailDrafts: [],
     jobs: [],
     documentSections: [],
     documentRuns: [],
@@ -51,7 +50,7 @@ function makeDealAggregate(
     extractionEvidence: [],
     summaries: [],
     currentSummary: null,
-    intakeSession: null
+    intakeSession: null,
   };
 }
 
@@ -60,12 +59,12 @@ describe("cross-deal conflict precision", () => {
     const oreo = makeDealAggregate({
       id: "deal-oreo",
       brandName: "Oreo",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
     const goldfish = makeDealAggregate({
       id: "deal-goldfish",
       brandName: "Goldfish",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
 
     const conflicts = buildConflictResults(oreo, [oreo, goldfish]);
@@ -81,8 +80,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "fitness_wellness",
         restrictedCategories: [],
-        competitorCategories: []
-      }
+        competitorCategories: [],
+      },
     });
     const beauty = makeDealAggregate({
       id: "deal-beauty",
@@ -90,8 +89,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "beauty_personal_care",
         restrictedCategories: [],
-        competitorCategories: []
-      }
+        competitorCategories: [],
+      },
     });
 
     const conflicts = buildConflictResults(fitness, [fitness, beauty]);
@@ -110,9 +109,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-10T00:00:00.000Z",
           endDate: "2026-04-10T00:00:00.000Z",
-          postingWindow: "2026-04-10"
-        }
-      }
+          postingWindow: "2026-04-10",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -125,9 +124,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-12T00:00:00.000Z",
           endDate: "2026-04-12T00:00:00.000Z",
-          postingWindow: "2026-04-12"
-        }
-      }
+          postingWindow: "2026-04-12",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -148,9 +147,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-10T00:00:00.000Z",
           endDate: "2026-04-10T00:00:00.000Z",
-          postingWindow: "2026-04-10"
-        }
-      }
+          postingWindow: "2026-04-10",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -163,9 +162,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-14T00:00:00.000Z",
           endDate: "2026-04-14T00:00:00.000Z",
-          postingWindow: "2026-04-14"
-        }
-      }
+          postingWindow: "2026-04-14",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -184,9 +183,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-10T00:00:00.000Z",
           endDate: "2026-04-15T00:00:00.000Z",
-          postingWindow: "2026-04-10 to 2026-04-15"
-        }
-      }
+          postingWindow: "2026-04-10 to 2026-04-15",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -199,9 +198,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-12T00:00:00.000Z",
           endDate: "2026-04-18T00:00:00.000Z",
-          postingWindow: "2026-04-12 to 2026-04-18"
-        }
-      }
+          postingWindow: "2026-04-12 to 2026-04-18",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -217,8 +216,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "food_beverage",
         restrictedCategories: ["Food & beverage"],
-        competitorCategories: ["Food & beverage"]
-      }
+        competitorCategories: ["Food & beverage"],
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -226,8 +225,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "food_beverage",
         restrictedCategories: ["Food & beverage"],
-        competitorCategories: ["Food & beverage"]
-      }
+        competitorCategories: ["Food & beverage"],
+      },
     });
 
     const conflictsFromA = buildConflictResults(dealA, [dealA, dealB]);
@@ -245,8 +244,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "food_beverage",
         restrictedCategories: ["Food & beverage"],
-        competitorCategories: ["Food & beverage"]
-      }
+        competitorCategories: ["Food & beverage"],
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -254,8 +253,8 @@ describe("cross-deal conflict precision", () => {
       terms: {
         brandCategory: "food_beverage",
         restrictedCategories: [],
-        competitorCategories: []
-      }
+        competitorCategories: [],
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -275,9 +274,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-01T00:00:00.000Z",
           endDate: "2026-04-30T00:00:00.000Z",
-          postingWindow: "2026-04-01 to 2026-04-30"
-        }
-      }
+          postingWindow: "2026-04-01 to 2026-04-30",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -289,9 +288,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-15T00:00:00.000Z",
           endDate: "2026-05-15T00:00:00.000Z",
-          postingWindow: "2026-04-15 to 2026-05-15"
-        }
-      }
+          postingWindow: "2026-04-15 to 2026-05-15",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -311,9 +310,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-03-01T00:00:00.000Z",
           endDate: "2026-03-15T00:00:00.000Z",
-          postingWindow: "2026-03-01 to 2026-03-15"
-        }
-      }
+          postingWindow: "2026-03-01 to 2026-03-15",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -325,9 +324,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-05-01T00:00:00.000Z",
           endDate: "2026-05-31T00:00:00.000Z",
-          postingWindow: "2026-05-01 to 2026-05-31"
-        }
-      }
+          postingWindow: "2026-05-01 to 2026-05-31",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -345,9 +344,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-01T00:00:00.000Z",
           endDate: "2026-04-30T00:00:00.000Z",
-          postingWindow: "2026-04-01 to 2026-04-30"
-        }
-      }
+          postingWindow: "2026-04-01 to 2026-04-30",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -359,9 +358,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-10T00:00:00.000Z",
           endDate: "2026-05-10T00:00:00.000Z",
-          postingWindow: "2026-04-10 to 2026-05-10"
-        }
-      }
+          postingWindow: "2026-04-10 to 2026-05-10",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);
@@ -380,9 +379,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-06-01T00:00:00.000Z",
           endDate: "2026-06-05T00:00:00.000Z",
-          postingWindow: "2026-06-01 to 2026-06-05"
-        }
-      }
+          postingWindow: "2026-06-01 to 2026-06-05",
+        },
+      },
     });
     const finance = makeDealAggregate({
       id: "deal-finance",
@@ -395,9 +394,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-09-01T00:00:00.000Z",
           endDate: "2026-09-15T00:00:00.000Z",
-          postingWindow: "2026-09-01 to 2026-09-15"
-        }
-      }
+          postingWindow: "2026-09-01 to 2026-09-15",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(entertainment, [entertainment, finance]);
@@ -408,13 +407,13 @@ describe("cross-deal conflict precision", () => {
     const active = makeDealAggregate({
       id: "deal-active",
       brandName: "Oreo",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
     const completed = makeDealAggregate({
       id: "deal-completed",
       brandName: "Goldfish",
       status: "completed",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
 
     const conflicts = buildConflictResults(active, [active, completed]);
@@ -425,13 +424,13 @@ describe("cross-deal conflict precision", () => {
     const active = makeDealAggregate({
       id: "deal-active",
       brandName: "Oreo",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
     const unconfirmed = makeDealAggregate({
       id: "deal-unconfirmed",
       brandName: "Goldfish",
       confirmedAt: null,
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
 
     const conflicts = buildConflictResults(active, [active, unconfirmed]);
@@ -442,12 +441,12 @@ describe("cross-deal conflict precision", () => {
     const lunchables = makeDealAggregate({
       id: "deal-lunchables",
       brandName: "Lunchables",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
     const otherFood = makeDealAggregate({
       id: "deal-food",
       brandName: "Goldfish",
-      terms: { brandCategory: "food_beverage" }
+      terms: { brandCategory: "food_beverage" },
     });
 
     const conflicts = buildConflictResults(lunchables, [lunchables, otherFood]);
@@ -468,9 +467,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-01T00:00:00.000Z",
           endDate: "2026-04-30T00:00:00.000Z",
-          postingWindow: "2026-04-01 to 2026-04-30"
-        }
-      }
+          postingWindow: "2026-04-01 to 2026-04-30",
+        },
+      },
     });
     const dealB = makeDealAggregate({
       id: "deal-b",
@@ -484,9 +483,9 @@ describe("cross-deal conflict precision", () => {
         campaignDateWindow: {
           startDate: "2026-04-15T00:00:00.000Z",
           endDate: "2026-05-15T00:00:00.000Z",
-          postingWindow: "2026-04-15 to 2026-05-15"
-        }
-      }
+          postingWindow: "2026-04-15 to 2026-05-15",
+        },
+      },
     });
 
     const conflicts = buildConflictResults(dealA, [dealA, dealB]);

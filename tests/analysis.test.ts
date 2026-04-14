@@ -9,7 +9,7 @@ import {
   classifyDocumentHeuristically,
   fallbackAnalyzeDocument,
   fallbackAnalyzeContract,
-  splitIntoSections
+  splitIntoSections,
 } from "@/lib/analysis/fallback";
 import { buildConflictResults } from "@/lib/conflict-intelligence";
 import { mergeTerms } from "@/lib/deals";
@@ -74,9 +74,7 @@ USD $5,000.00
     expect(result.terms.paymentAmount).toBe(2000);
     expect(result.terms.paymentTerms).toBe("Net 45");
     expect(result.terms.deliverables.length).toBeGreaterThan(0);
-    expect(result.riskFlags.some((flag) => flag.category === "usage_rights")).toBe(
-      true
-    );
+    expect(result.riskFlags.some((flag) => flag.category === "usage_rights")).toBe(true);
   });
 
   test("tracks conflicts when sections disagree on scalar terms", () => {
@@ -90,7 +88,7 @@ Brand shall pay Creator $3,000 on Net 45 terms.
 
     const result = fallbackAnalyzeDocument(conflictingFixture, {
       fileName: "conflicting-contract.txt",
-      documentKindHint: "contract"
+      documentKindHint: "contract",
     });
 
     expect(result.extraction.conflicts).toContain("paymentAmount");
@@ -107,19 +105,15 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
 
     const result = fallbackAnalyzeDocument(fixture, {
       fileName: "split-payment-contract.txt",
-      documentKindHint: "contract"
+      documentKindHint: "contract",
     });
 
     expect(result.extraction.data.paymentAmount).toBe(7200);
     expect(result.extraction.data.currency).toBe("USD");
     expect(result.extraction.data.netTermsDays).toBe(30);
     expect(result.extraction.data.paymentTerms).toBe("Net 30");
-    expect(result.extraction.data.paymentStructure).toBe(
-      "50% on signature, 50% on completion"
-    );
-    expect(result.extraction.data.paymentTrigger).toBe(
-      "On signature and after final live links"
-    );
+    expect(result.extraction.data.paymentStructure).toBe("50% on signature, 50% on completion");
+    expect(result.extraction.data.paymentTrigger).toBe("On signature and after final live links");
   });
 
   test("mergeTerms preserves earlier extracted usage and exclusivity fields when a later brief omits them", () => {
@@ -135,7 +129,8 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       netTermsDays: 30,
       paymentTrigger: "On signature and after final live links",
       deliverables: [],
-      usageRights: "Organic usage (Perpetual unless revoked for breach), Paid usage (See deal type), Whitelisting (Only if expressly authorized)",
+      usageRights:
+        "Organic usage (Perpetual unless revoked for breach), Paid usage (See deal type), Whitelisting (Only if expressly authorized)",
       usageRightsOrganicAllowed: true,
       usageRightsPaidAllowed: true,
       whitelistingAllowed: true,
@@ -162,7 +157,7 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       notes: null,
       manuallyEditedFields: [],
       briefData: null,
-      pendingExtraction: null
+      pendingExtraction: null,
     };
 
     const laterBriefPatch = {
@@ -187,7 +182,7 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       exclusivityDuration: null,
       exclusivityRestrictions: null,
       notes:
-        "Target audience: Startup operators, PMs, founders, 25-45. Primary CTA: Book a demo through the custom link."
+        "Target audience: Startup operators, PMs, founders, 25-45. Primary CTA: Book a demo through the custom link.",
     };
 
     const merged = mergeTerms(base, laterBriefPatch);
@@ -220,7 +215,6 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       conflictResults: [],
       paymentRecord: null,
       riskFlags: seed.riskFlags,
-      emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
       documentRuns: seed.documentRuns,
@@ -231,7 +225,7 @@ Brand shall pay Creator $7,200 USD, payable 50% on signature and 50% net-30 afte
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
       currentSummary: seed.summaries[0],
-      intakeSession: null
+      intakeSession: null,
     };
 
     const draft = generateEmailDraft(aggregate, "request-faster-payment");
@@ -248,7 +242,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
 
     const result = fallbackAnalyzeDocument(fixture, {
       fileName: "lunchables-email.txt",
-      documentKindHint: "email_thread"
+      documentKindHint: "email_thread",
     });
 
     expect(result.extraction.data.brandCategory).toBe("food_beverage");
@@ -266,7 +260,6 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       conflictResults: [],
       paymentRecord: null,
       riskFlags: seed.riskFlags,
-      emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
       documentRuns: seed.documentRuns,
@@ -277,7 +270,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
       currentSummary: seed.summaries[0],
-      intakeSession: null
+      intakeSession: null,
     };
     const second: DealAggregate = {
       ...first,
@@ -286,7 +279,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
         id: "deal-2",
         brandName: "Lunchables",
         campaignName: "Snack Week",
-        confirmedAt: new Date().toISOString()
+        confirmedAt: new Date().toISOString(),
       },
       terms: {
         ...first.terms!,
@@ -296,8 +289,8 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
         campaignName: "Snack Week",
         brandCategory: "food_beverage",
         restrictedCategories: ["Food & beverage"],
-        competitorCategories: ["Food & beverage"]
-      }
+        competitorCategories: ["Food & beverage"],
+      },
     };
 
     const conflicts = buildConflictResults(second, [first, second]);
@@ -314,7 +307,6 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       conflictResults: [],
       paymentRecord: null,
       riskFlags: seed.riskFlags,
-      emailDrafts: seed.emailDrafts,
       jobs: seed.jobs,
       documentSections: seed.documentSections,
       documentRuns: seed.documentRuns,
@@ -325,7 +317,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
       extractionEvidence: seed.extractionEvidence,
       summaries: seed.summaries,
       currentSummary: seed.summaries[0],
-      intakeSession: null
+      intakeSession: null,
     };
     const second: DealAggregate = {
       ...first,
@@ -334,7 +326,7 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
         id: "deal-3",
         brandName: "Netflix",
         campaignName: "Show Launch",
-        confirmedAt: new Date().toISOString()
+        confirmedAt: new Date().toISOString(),
       },
       terms: {
         ...first.terms!,
@@ -348,9 +340,9 @@ All sponsored posts must include #ad and follow FTC endorsement guidance.
         campaignDateWindow: {
           startDate: "2026-05-10T00:00:00.000Z",
           endDate: "2026-05-12T00:00:00.000Z",
-          postingWindow: "2026-05-10 to 2026-05-12"
-        }
-      }
+          postingWindow: "2026-05-10 to 2026-05-12",
+        },
+      },
     };
 
     const conflicts = buildConflictResults(second, [first, second]);
@@ -369,7 +361,7 @@ Brand may terminate immediately without notice.
 `,
       {
         fileName: "rights-contract.txt",
-        documentKindHint: "contract"
+        documentKindHint: "contract",
       }
     );
 

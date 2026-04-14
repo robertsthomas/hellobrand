@@ -7,16 +7,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { getRuntimeDir, getRuntimePath } from "@/lib/runtime-path";
 import { createSeedStore } from "@/lib/repository/seed";
-import {
-  getCurrentWorkspaceSummary,
-  normalizeSummaryRecord
-} from "@/lib/summaries";
-import type {
-  AppStore,
-  DealAggregate,
-  DealRecord,
-  DocumentRecord
-} from "@/lib/types";
+import { getCurrentWorkspaceSummary, normalizeSummaryRecord } from "@/lib/summaries";
+import type { AppStore, DealAggregate, DealRecord, DocumentRecord } from "@/lib/types";
 
 const runtimeDir = getRuntimeDir();
 const dataFile = getRuntimePath("app-store.json");
@@ -54,7 +46,7 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
                   : "not_invoiced",
       legalDisclaimer:
         deal.legalDisclaimer ||
-        "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice."
+        "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice.",
     })),
     documents: (store.documents ?? []).map((document) => {
       const legacyDocument = document as DocumentRecord & {
@@ -72,7 +64,7 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
         errorMessage: document.errorMessage ?? legacyDocument.failureReason ?? null,
         processingRunId: document.processingRunId ?? null,
         processingRunStateJson: document.processingRunStateJson ?? null,
-        processingStartedAt: document.processingStartedAt ?? null
+        processingStartedAt: document.processingStartedAt ?? null,
       };
     }),
     dealTerms: (store.dealTerms ?? []).map((terms) => ({
@@ -109,16 +101,15 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
       deliverables: (terms.deliverables ?? []).map((deliverable) => ({
         ...deliverable,
         status: deliverable.status ?? "pending",
-        description: deliverable.description ?? null
-      }))
+        description: deliverable.description ?? null,
+      })),
     })),
     riskFlags: (store.riskFlags ?? []).map((flag) => ({
       ...flag,
       suggestedAction: flag.suggestedAction ?? null,
       evidence: flag.evidence ?? [],
-      sourceDocumentId: flag.sourceDocumentId ?? null
+      sourceDocumentId: flag.sourceDocumentId ?? null,
     })),
-    emailDrafts: store.emailDrafts ?? [],
     emailAccounts: store.emailAccounts ?? [],
     emailThreads: store.emailThreads ?? [],
     emailMessages: store.emailMessages ?? [],
@@ -144,13 +135,13 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
       lastSentThreadId: record.lastSentThreadId ?? null,
       lastSentMessageId: record.lastSentMessageId ?? null,
       lastSentAccountId: record.lastSentAccountId ?? null,
-      lastSentToEmail: record.lastSentToEmail ?? null
+      lastSentToEmail: record.lastSentToEmail ?? null,
     })),
     invoiceDeliveryRecords: store.invoiceDeliveryRecords ?? [],
     invoiceReminderTouchpoints: store.invoiceReminderTouchpoints ?? [],
     jobs: (store.jobs ?? []).map((job) => ({
       ...job,
-      type: job.type ?? "generate_summary"
+      type: job.type ?? "generate_summary",
     })),
     documentSections: store.documentSections ?? [],
     documentRuns: store.documentRuns ?? [],
@@ -159,7 +150,7 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
     documentReviewItems: store.documentReviewItems ?? [],
     extractionResults: store.extractionResults ?? [],
     extractionEvidence: store.extractionEvidence ?? [],
-    summaries: (store.summaries ?? []).map((summary) => normalizeSummaryRecord(summary))
+    summaries: (store.summaries ?? []).map((summary) => normalizeSummaryRecord(summary)),
   };
 }
 
@@ -184,9 +175,7 @@ export async function saveStore(store: AppStore) {
 
 export function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(items: T[]) {
   return [...items].sort((left, right) =>
-    (right.updatedAt ?? right.createdAt ?? "").localeCompare(
-      left.updatedAt ?? left.createdAt ?? ""
-    )
+    (right.updatedAt ?? right.createdAt ?? "").localeCompare(left.updatedAt ?? left.createdAt ?? "")
   );
 }
 
@@ -208,7 +197,6 @@ export function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate
     paymentRecord: null,
     invoiceRecord: store.invoiceRecords.find((record) => record.dealId === deal.id) ?? null,
     riskFlags: sortNewestFirst(store.riskFlags.filter((flag) => flag.dealId === deal.id)),
-    emailDrafts: sortNewestFirst(store.emailDrafts.filter((draft) => draft.dealId === deal.id)),
     jobs: sortNewestFirst(store.jobs.filter((job) => job.dealId === deal.id)),
     documentSections: store.documentSections.filter((section) =>
       documents.some((document) => document.id === section.documentId)
@@ -245,6 +233,6 @@ export function buildAggregate(store: AppStore, deal: DealRecord): DealAggregate
     ),
     summaries,
     currentSummary: getCurrentWorkspaceSummary(summaries),
-    intakeSession: null
+    intakeSession: null,
   };
 }

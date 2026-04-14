@@ -12,7 +12,7 @@ import {
   getLatestSummaryByType as getLatestSummaryByTypeFromHistory,
   getWorkspaceSummaries,
   normalizeSummaryInput,
-  normalizeSummaryRecord
+  normalizeSummaryRecord,
 } from "@/lib/summaries";
 import { deleteStoredBytes } from "@/lib/storage";
 import type {
@@ -28,8 +28,6 @@ import type {
   DocumentRunRecord,
   DocumentRecord,
   DocumentSectionRecord,
-  DraftIntent,
-  EmailDraftRecord,
   ExtractionEvidenceRecord,
   ExtractionResultRecord,
   IntakeBatchGroupRecord,
@@ -44,26 +42,25 @@ import type {
   RiskFlagRecord,
   SummaryRecord,
   SummaryRecordInput,
-  SummaryType
+  SummaryType,
 } from "@/lib/types";
 import {
   toAssistantContextSnapshotRecord,
   toAssistantMessageRecord,
   toAssistantThreadRecord,
   toBatchGroupRecord,
-  toBatchRecord
+  toBatchRecord,
 } from "@/lib/repository/mappers/prisma-assistant";
 import {
   toInvoiceDeliveryRecord,
   toInvoiceRecord,
   toInvoiceReminderTouchpointRecord,
-  toPaymentRecord
+  toPaymentRecord,
 } from "@/lib/repository/mappers/prisma-billing";
 import {
   toDealRecord,
   toDealTermsRecord,
-  toEmailDraftRecord,
-  toRiskFlagRecord
+  toRiskFlagRecord,
 } from "@/lib/repository/mappers/prisma-deals";
 import {
   toDocumentArtifactRecord,
@@ -75,16 +72,14 @@ import {
   toExtractionResultRecord,
   toJobRecord,
   toSectionRecord,
-  toSummaryRecord
+  toSummaryRecord,
 } from "@/lib/repository/mappers/prisma-documents";
 import { toIntakeSessionRecord } from "@/lib/repository/mappers/prisma-intake";
 import { iso, toJsonValue, toNullableJsonValue } from "@/lib/repository/mappers/prisma-shared";
 
 function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(items: T[]) {
   return [...items].sort((left, right) =>
-    (right.updatedAt ?? right.createdAt ?? "").localeCompare(
-      left.updatedAt ?? left.createdAt ?? ""
-    )
+    (right.updatedAt ?? right.createdAt ?? "").localeCompare(left.updatedAt ?? left.createdAt ?? "")
   );
 }
 
@@ -93,9 +88,9 @@ export class PrismaRepository {
     const deals = await prisma.deal.findMany({
       where: {
         userId,
-        confirmedAt: { not: null }
+        confirmedAt: { not: null },
       },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
     });
 
     return deals.map(toDealRecord);
@@ -105,18 +100,17 @@ export class PrismaRepository {
     const deal = await prisma.deal.findFirst({
       where: {
         id: dealId,
-        userId
+        userId,
       },
       include: {
         documents: { orderBy: { updatedAt: "desc" } },
         terms: true,
         paymentRecord: true,
         riskFlags: { orderBy: { createdAt: "desc" } },
-        emailDrafts: { orderBy: { updatedAt: "desc" } },
         jobs: { orderBy: { updatedAt: "desc" } },
         summaries: { orderBy: { createdAt: "desc" } },
-        intakeSession: true
-      }
+        intakeSession: true,
+      },
     });
 
     if (!deal) {
@@ -141,44 +135,44 @@ export class PrismaRepository {
         documentFieldEvidence,
         documentReviewItems,
         extractionResults,
-        extractionEvidence
+        extractionEvidence,
       ] = await prisma.$transaction([
         prisma.documentSection.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: [{ chunkIndex: "asc" }]
+          orderBy: [{ chunkIndex: "asc" }],
         }),
         prisma.documentRun.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
+          orderBy: { createdAt: "desc" },
         }),
         prisma.documentArtifact.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
+          orderBy: { createdAt: "desc" },
         }),
         prisma.documentFieldEvidence.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
+          orderBy: { createdAt: "desc" },
         }),
         prisma.documentReviewItem.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
+          orderBy: { createdAt: "desc" },
         }),
         prisma.extractionResult.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
+          orderBy: { createdAt: "desc" },
         }),
         prisma.extractionEvidence.findMany({
           where: { documentId: { in: documentIds } },
-          orderBy: { createdAt: "desc" }
-        })
+          orderBy: { createdAt: "desc" },
+        }),
       ]);
     }
 
     const invoiceRecord = await prisma.invoiceRecord.findFirst({
       where: {
         dealId,
-        userId
-      }
+        userId,
+      },
     });
 
     const documents = deal.documents.map(toDocumentRecord);
@@ -193,7 +187,6 @@ export class PrismaRepository {
       paymentRecord: deal.paymentRecord ? toPaymentRecord(deal.paymentRecord) : null,
       invoiceRecord: invoiceRecord ? toInvoiceRecord(invoiceRecord) : null,
       riskFlags: deal.riskFlags.map(toRiskFlagRecord),
-      emailDrafts: deal.emailDrafts.map(toEmailDraftRecord),
       jobs: deal.jobs.map(toJobRecord),
       documentSections: sections.map(toSectionRecord),
       documentRuns: documentRuns.map(toDocumentRunRecord),
@@ -204,7 +197,7 @@ export class PrismaRepository {
       extractionEvidence: extractionEvidence.map(toEvidenceRecord),
       summaries,
       currentSummary: getCurrentWorkspaceSummary(summaries),
-      intakeSession: deal.intakeSession ? toIntakeSessionRecord(deal.intakeSession) : null
+      intakeSession: deal.intakeSession ? toIntakeSessionRecord(deal.intakeSession) : null,
     };
   }
 
@@ -220,7 +213,7 @@ export class PrismaRepository {
   async listDocuments(userId: string, dealId: string) {
     const deal = await prisma.deal.findFirst({
       where: { id: dealId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!deal) {
@@ -229,7 +222,7 @@ export class PrismaRepository {
 
     const documents = await prisma.document.findMany({
       where: { dealId },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
     });
 
     return documents.map(toDocumentRecord);
@@ -256,8 +249,8 @@ export class PrismaRepository {
             ? new Date()
             : options.confirmedAt
               ? new Date(options.confirmedAt)
-              : null
-      }
+              : null,
+      },
     });
 
     return toDealRecord(deal);
@@ -266,7 +259,7 @@ export class PrismaRepository {
   async updateDeal(userId: string, dealId: string, patch: Partial<DealRecord>) {
     const existing = await prisma.deal.findFirst({
       where: { id: dealId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!existing) {
@@ -298,20 +291,20 @@ export class PrismaRepository {
           ? new Date(patch.confirmedAt)
           : patch.confirmedAt === null
             ? null
-            : undefined
-      }
+            : undefined,
+      },
     });
 
     if (patch.paymentStatus) {
       await prisma.paymentRecord.upsert({
         where: { dealId },
         update: {
-          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus
+          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus,
         },
         create: {
           dealId,
-          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus
-        }
+          status: patch.paymentStatus === "invoiced" ? "not_invoiced" : patch.paymentStatus,
+        },
       });
     }
 
@@ -325,10 +318,10 @@ export class PrismaRepository {
         id: true,
         documents: {
           select: {
-            storagePath: true
-          }
-        }
-      }
+            storagePath: true,
+          },
+        },
+      },
     });
 
     if (!existing) {
@@ -339,26 +332,26 @@ export class PrismaRepository {
       where: { claimedDealId: dealId },
       select: {
         id: true,
-        storagePath: true
-      }
+        storagePath: true,
+      },
     });
 
     await prisma.$transaction(async (tx) => {
       await tx.appNotification.deleteMany({
         where: {
           userId,
-          dealId
-        }
+          dealId,
+        },
       });
 
       await tx.anonymousAnalysisSession.deleteMany({
         where: {
-          claimedDealId: dealId
-        }
+          claimedDealId: dealId,
+        },
       });
 
       await tx.deal.delete({
-        where: { id: dealId }
+        where: { id: dealId },
       });
     });
 
@@ -367,7 +360,7 @@ export class PrismaRepository {
         ...existing.documents.map((document) => document.storagePath),
         ...anonymousSessions
           .map((session) => session.storagePath)
-          .filter((storagePath): storagePath is string => Boolean(storagePath))
+          .filter((storagePath): storagePath is string => Boolean(storagePath)),
       ].map((storagePath) => deleteStoredBytes(storagePath))
     );
 
@@ -395,8 +388,8 @@ export class PrismaRepository {
         processingRunStateJson: toNullableJsonValue(document.processingRunStateJson),
         processingStartedAt: document.processingStartedAt
           ? new Date(document.processingStartedAt)
-          : null
-      }
+          : null,
+      },
     });
 
     return toDocumentRecord(next);
@@ -405,7 +398,7 @@ export class PrismaRepository {
   async listInvoiceRecords(userId: string) {
     const records = await prisma.invoiceRecord.findMany({
       where: { userId },
-      orderBy: [{ updatedAt: "desc" }]
+      orderBy: [{ updatedAt: "desc" }],
     });
 
     return records.map(toInvoiceRecord);
@@ -413,7 +406,7 @@ export class PrismaRepository {
 
   async getInvoiceRecord(userId: string, dealId: string) {
     const record = await prisma.invoiceRecord.findFirst({
-      where: { userId, dealId }
+      where: { userId, dealId },
     });
 
     return record ? toInvoiceRecord(record) : null;
@@ -422,7 +415,7 @@ export class PrismaRepository {
   async listInvoiceDeliveryRecords(userId: string, dealId: string) {
     const records = await prisma.invoiceDeliveryRecord.findMany({
       where: { userId, dealId },
-      orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }]
+      orderBy: [{ sentAt: "desc" }, { createdAt: "desc" }],
     });
 
     return records.map(toInvoiceDeliveryRecord);
@@ -454,7 +447,7 @@ export class PrismaRepository {
         lastSentThreadId: patch.lastSentThreadId,
         lastSentMessageId: patch.lastSentMessageId,
         lastSentAccountId: patch.lastSentAccountId,
-        lastSentToEmail: patch.lastSentToEmail
+        lastSentToEmail: patch.lastSentToEmail,
       },
       create: {
         dealId,
@@ -477,8 +470,8 @@ export class PrismaRepository {
         lastSentThreadId: patch.lastSentThreadId,
         lastSentMessageId: patch.lastSentMessageId,
         lastSentAccountId: patch.lastSentAccountId,
-        lastSentToEmail: patch.lastSentToEmail
-      }
+        lastSentToEmail: patch.lastSentToEmail,
+      },
     });
 
     return toInvoiceRecord(record);
@@ -486,7 +479,7 @@ export class PrismaRepository {
 
   async deleteInvoiceRecord(userId: string, dealId: string) {
     await prisma.invoiceRecord.deleteMany({
-      where: { userId, dealId }
+      where: { userId, dealId },
     });
   }
 
@@ -508,8 +501,8 @@ export class PrismaRepository {
         subject: patch.subject,
         status: patch.status,
         errorMessage: patch.errorMessage,
-        sentAt: new Date(patch.sentAt)
-      }
+        sentAt: new Date(patch.sentAt),
+      },
     });
 
     return toInvoiceDeliveryRecord(record);
@@ -519,9 +512,9 @@ export class PrismaRepository {
     const rows = await prisma.invoiceReminderTouchpoint.findMany({
       where: {
         userId,
-        ...(options?.dealId ? { dealId: options.dealId } : {})
+        ...(options?.dealId ? { dealId: options.dealId } : {}),
       },
-      orderBy: [{ sendOn: "asc" }]
+      orderBy: [{ sendOn: "asc" }],
     });
 
     return rows.map(toInvoiceReminderTouchpointRecord);
@@ -530,7 +523,9 @@ export class PrismaRepository {
   async upsertInvoiceReminderTouchpoints(
     userId: string,
     dealId: string,
-    touchpoints: Array<Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">>
+    touchpoints: Array<
+      Omit<InvoiceReminderTouchpointRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">
+    >
   ) {
     const saved = await prisma.$transaction(
       touchpoints.map((touchpoint) =>
@@ -538,14 +533,14 @@ export class PrismaRepository {
           where: {
             dealId_offsetDays: {
               dealId,
-              offsetDays: touchpoint.offsetDays
-            }
+              offsetDays: touchpoint.offsetDays,
+            },
           },
           update: {
             anchorDate: new Date(touchpoint.anchorDate),
             sendOn: new Date(touchpoint.sendOn),
             status: touchpoint.status,
-            notificationId: touchpoint.notificationId
+            notificationId: touchpoint.notificationId,
           },
           create: {
             dealId,
@@ -554,8 +549,8 @@ export class PrismaRepository {
             offsetDays: touchpoint.offsetDays,
             sendOn: new Date(touchpoint.sendOn),
             status: touchpoint.status,
-            notificationId: touchpoint.notificationId
-          }
+            notificationId: touchpoint.notificationId,
+          },
         })
       )
     );
@@ -576,8 +571,8 @@ export class PrismaRepository {
         offsetDays: patch.offsetDays,
         sendOn: patch.sendOn ? new Date(patch.sendOn) : undefined,
         status: patch.status,
-        notificationId: patch.notificationId
-      }
+        notificationId: patch.notificationId,
+      },
     });
 
     return toInvoiceReminderTouchpointRecord(row);
@@ -606,8 +601,8 @@ export class PrismaRepository {
               ? undefined
               : patch.processingStartedAt
                 ? new Date(patch.processingStartedAt)
-                : null
-        }
+                : null,
+        },
       });
 
       return toDocumentRecord(next);
@@ -628,14 +623,14 @@ export class PrismaRepository {
           title: section.title,
           content: section.content,
           chunkIndex: section.chunkIndex,
-          pageRange: section.pageRange
-        }))
+          pageRange: section.pageRange,
+        })),
       });
     }
 
     const saved = await prisma.documentSection.findMany({
       where: { documentId },
-      orderBy: { chunkIndex: "asc" }
+      orderBy: { chunkIndex: "asc" },
     });
 
     return saved.map(toSectionRecord);
@@ -644,15 +639,13 @@ export class PrismaRepository {
   async listDocumentSections(documentId: string) {
     const sections = await prisma.documentSection.findMany({
       where: { documentId },
-      orderBy: { chunkIndex: "asc" }
+      orderBy: { chunkIndex: "asc" },
     });
 
     return sections.map(toSectionRecord);
   }
 
-  async createDocumentRun(
-    run: Omit<DocumentRunRecord, "createdAt" | "updatedAt">
-  ) {
+  async createDocumentRun(run: Omit<DocumentRunRecord, "createdAt" | "updatedAt">) {
     const saved = await prisma.documentRun.create({
       data: {
         id: run.id,
@@ -662,8 +655,8 @@ export class PrismaRepository {
         startedAt: run.startedAt ? new Date(run.startedAt) : null,
         completedAt: run.completedAt ? new Date(run.completedAt) : null,
         failedAt: run.failedAt ? new Date(run.failedAt) : null,
-        failureMessage: run.failureMessage
-      }
+        failureMessage: run.failureMessage,
+      },
     });
 
     return toDocumentRunRecord(saved);
@@ -698,9 +691,8 @@ export class PrismaRepository {
               : patch.failedAt
                 ? new Date(patch.failedAt)
                 : null,
-          failureMessage:
-            patch.failureMessage === undefined ? undefined : patch.failureMessage
-        }
+          failureMessage: patch.failureMessage === undefined ? undefined : patch.failureMessage,
+        },
       });
 
       return toDocumentRunRecord(saved);
@@ -717,15 +709,13 @@ export class PrismaRepository {
   async listDocumentRuns(documentId: string) {
     const runs = await prisma.documentRun.findMany({
       where: { documentId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return runs.map(toDocumentRunRecord);
   }
 
-  async createDocumentArtifact(
-    artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">
-  ) {
+  async createDocumentArtifact(artifact: Omit<DocumentArtifactRecord, "id" | "createdAt">) {
     const saved = await prisma.documentArtifact.create({
       data: {
         documentId: artifact.documentId,
@@ -733,23 +723,20 @@ export class PrismaRepository {
         step: artifact.step,
         kind: artifact.kind,
         processor: artifact.processor,
-        payload: toNullableJsonValue(artifact.payload)
-      }
+        payload: toNullableJsonValue(artifact.payload),
+      },
     });
 
     return toDocumentArtifactRecord(saved);
   }
 
-  async listDocumentArtifacts(
-    documentId: string,
-    options?: { runId?: string }
-  ) {
+  async listDocumentArtifacts(documentId: string, options?: { runId?: string }) {
     const artifacts = await prisma.documentArtifact.findMany({
       where: {
         documentId,
-        runId: options?.runId
+        runId: options?.runId,
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return artifacts.map(toDocumentArtifactRecord);
@@ -761,7 +748,7 @@ export class PrismaRepository {
     evidence: Omit<DocumentFieldEvidenceRecord, "id" | "documentId" | "runId" | "createdAt">[]
   ) {
     await prisma.documentFieldEvidence.deleteMany({
-      where: { documentId, runId }
+      where: { documentId, runId },
     });
 
     if (evidence.length > 0) {
@@ -774,14 +761,14 @@ export class PrismaRepository {
           sourceType: entry.sourceType,
           sectionId: entry.sectionId,
           artifactId: entry.artifactId,
-          confidence: entry.confidence
-        }))
+          confidence: entry.confidence,
+        })),
       });
     }
 
     const saved = await prisma.documentFieldEvidence.findMany({
       where: { documentId, runId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return saved.map(toDocumentFieldEvidenceRecord);
@@ -795,9 +782,9 @@ export class PrismaRepository {
       where: {
         documentId,
         runId: options?.runId,
-        fieldPath: options?.fieldPath
+        fieldPath: options?.fieldPath,
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return evidence.map(toDocumentFieldEvidenceRecord);
@@ -806,10 +793,13 @@ export class PrismaRepository {
   async replaceDocumentReviewItems(
     documentId: string,
     runId: string,
-    items: Omit<DocumentReviewItemRecord, "id" | "documentId" | "runId" | "createdAt" | "updatedAt">[]
+    items: Omit<
+      DocumentReviewItemRecord,
+      "id" | "documentId" | "runId" | "createdAt" | "updatedAt"
+    >[]
   ) {
     await prisma.documentReviewItem.deleteMany({
-      where: { documentId, runId }
+      where: { documentId, runId },
     });
 
     if (items.length > 0) {
@@ -826,14 +816,14 @@ export class PrismaRepository {
           suggestedValue: toNullableJsonValue(entry.suggestedValue),
           currentValue: toNullableJsonValue(entry.currentValue),
           sectionId: entry.sectionId,
-          artifactId: entry.artifactId
-        }))
+          artifactId: entry.artifactId,
+        })),
       });
     }
 
     const saved = await prisma.documentReviewItem.findMany({
       where: { documentId, runId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return saved.map(toDocumentReviewItemRecord);
@@ -847,9 +837,9 @@ export class PrismaRepository {
       where: {
         documentId,
         runId: options?.runId,
-        status: options?.status
+        status: options?.status,
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return items.map(toDocumentReviewItemRecord);
@@ -866,7 +856,7 @@ export class PrismaRepository {
         model: result.model,
         data: toJsonValue(result.data),
         confidence: result.confidence,
-        conflicts: toJsonValue(result.conflicts)
+        conflicts: toJsonValue(result.conflicts),
       },
       create: {
         documentId,
@@ -874,8 +864,8 @@ export class PrismaRepository {
         model: result.model,
         data: toJsonValue(result.data),
         confidence: result.confidence,
-        conflicts: toJsonValue(result.conflicts)
-      }
+        conflicts: toJsonValue(result.conflicts),
+      },
     });
 
     return toExtractionResultRecord(saved);
@@ -883,7 +873,7 @@ export class PrismaRepository {
 
   async getExtractionResult(documentId: string) {
     const result = await prisma.extractionResult.findUnique({
-      where: { documentId }
+      where: { documentId },
     });
 
     return result ? toExtractionResultRecord(result) : null;
@@ -901,14 +891,14 @@ export class PrismaRepository {
           fieldPath: entry.fieldPath,
           snippet: entry.snippet,
           sectionId: entry.sectionId,
-          confidence: entry.confidence
-        }))
+          confidence: entry.confidence,
+        })),
       });
     }
 
     const saved = await prisma.extractionEvidence.findMany({
       where: { documentId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return saved.map(toEvidenceRecord);
@@ -917,28 +907,24 @@ export class PrismaRepository {
   async listExtractionEvidence(documentId: string) {
     const evidence = await prisma.extractionEvidence.findMany({
       where: { documentId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return evidence.map(toEvidenceRecord);
   }
 
-  async saveSummary(
-    dealId: string,
-    documentId: string | null,
-    summary: SummaryRecordInput
-  ) {
+  async saveSummary(dealId: string, documentId: string | null, summary: SummaryRecordInput) {
     const normalized = normalizeSummaryInput(summary);
     const saved = await prisma.$transaction(async (tx) => {
       if (normalized.isCurrent) {
         await tx.summary.updateMany({
           where: {
             dealId,
-            summaryType: { not: null }
+            summaryType: { not: null },
           },
           data: {
-            isCurrent: false
-          }
+            isCurrent: false,
+          },
         });
       }
 
@@ -951,8 +937,8 @@ export class PrismaRepository {
           summaryType: normalized.summaryType ?? undefined,
           source: normalized.source ?? undefined,
           parentSummaryId: normalized.parentSummaryId ?? null,
-          isCurrent: normalized.isCurrent ?? false
-        }
+          isCurrent: normalized.isCurrent ?? false,
+        },
       });
     });
 
@@ -962,11 +948,11 @@ export class PrismaRepository {
   async listSummaryHistory(dealId: string) {
     const summaries = await prisma.summary.findMany({
       where: {
-        dealId
+        dealId,
       },
       orderBy: {
-        createdAt: "desc"
-      }
+        createdAt: "desc",
+      },
     });
 
     return getWorkspaceSummaries(summaries.map(toSummaryRecord));
@@ -983,8 +969,8 @@ export class PrismaRepository {
         where: {
           id: summaryId,
           dealId,
-          summaryType: { not: null }
-        }
+          summaryType: { not: null },
+        },
       });
 
       if (!existing) {
@@ -994,20 +980,20 @@ export class PrismaRepository {
       await tx.summary.updateMany({
         where: {
           dealId,
-          summaryType: { not: null }
+          summaryType: { not: null },
         },
         data: {
-          isCurrent: false
-        }
+          isCurrent: false,
+        },
       });
 
       return tx.summary.update({
         where: {
-          id: summaryId
+          id: summaryId,
         },
         data: {
-          isCurrent: true
-        }
+          isCurrent: true,
+        },
       });
     });
 
@@ -1022,8 +1008,8 @@ export class PrismaRepository {
         type: job.type,
         status: job.status,
         attemptCount: job.attemptCount,
-        failureReason: job.failureReason
-      }
+        failureReason: job.failureReason,
+      },
     });
 
     return toJobRecord(saved);
@@ -1037,8 +1023,8 @@ export class PrismaRepository {
           type: patch.type,
           status: patch.status,
           attemptCount: patch.attemptCount,
-          failureReason: patch.failureReason
-        }
+          failureReason: patch.failureReason,
+        },
       });
 
       return toJobRecord(saved);
@@ -1060,20 +1046,20 @@ export class PrismaRepository {
       disclosureObligations: toJsonValue(patch.disclosureObligations),
       manuallyEditedFields: toJsonValue(patch.manuallyEditedFields),
       briefData: toNullableJsonValue(patch.briefData),
-      pendingExtraction: toNullableJsonValue(patch.pendingExtraction)
+      pendingExtraction: toNullableJsonValue(patch.pendingExtraction),
     };
 
     const saved = await prisma.dealTerms.upsert({
       where: { dealId },
       update: {
         ...patch,
-        ...jsonPatch
+        ...jsonPatch,
       },
       create: {
         dealId,
         ...patch,
-        ...jsonPatch
-      }
+        ...jsonPatch,
+      },
     });
 
     return toDealTermsRecord(saved);
@@ -1082,7 +1068,7 @@ export class PrismaRepository {
   async savePendingExtraction(dealId: string, data: unknown) {
     await prisma.dealTerms.update({
       where: { dealId },
-      data: { pendingExtraction: toNullableJsonValue(data) }
+      data: { pendingExtraction: toNullableJsonValue(data) },
     });
   }
 
@@ -1094,8 +1080,8 @@ export class PrismaRepository {
     await prisma.riskFlag.deleteMany({
       where: {
         dealId,
-        sourceDocumentId: documentId
-      }
+        sourceDocumentId: documentId,
+      },
     });
 
     if (flags.length > 0) {
@@ -1108,14 +1094,14 @@ export class PrismaRepository {
           severity: flag.severity,
           suggestedAction: flag.suggestedAction,
           evidence: flag.evidence,
-          sourceDocumentId: flag.sourceDocumentId
-        }))
+          sourceDocumentId: flag.sourceDocumentId,
+        })),
       });
     }
 
     const saved = await prisma.riskFlag.findMany({
       where: { dealId },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return saved.map(toRiskFlagRecord);
@@ -1125,39 +1111,12 @@ export class PrismaRepository {
     const flags = await prisma.riskFlag.findMany({
       where: {
         dealId,
-        sourceDocumentId: documentId
+        sourceDocumentId: documentId,
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: { createdAt: "desc" },
     });
 
     return flags.map(toRiskFlagRecord);
-  }
-
-  async saveEmailDraft(
-    dealId: string,
-    intent: DraftIntent,
-    payload: Pick<EmailDraftRecord, "subject" | "body">
-  ) {
-    const saved = await prisma.emailDraft.upsert({
-      where: {
-        dealId_intent: {
-          dealId,
-          intent
-        }
-      },
-      update: {
-        subject: payload.subject,
-        body: payload.body
-      },
-      create: {
-        dealId,
-        intent,
-        subject: payload.subject,
-        body: payload.body
-      }
-    });
-
-    return toEmailDraftRecord(saved);
   }
 
   async listAssistantThreads(
@@ -1168,9 +1127,9 @@ export class PrismaRepository {
       where: {
         userId,
         scope: options?.scope,
-        dealId: options?.dealId === undefined ? undefined : options.dealId
+        dealId: options?.dealId === undefined ? undefined : options.dealId,
       },
-      orderBy: { updatedAt: "desc" }
+      orderBy: { updatedAt: "desc" },
     });
 
     return threads.map(toAssistantThreadRecord);
@@ -1178,7 +1137,7 @@ export class PrismaRepository {
 
   async getAssistantThread(userId: string, threadId: string) {
     const thread = await prisma.assistantThread.findFirst({
-      where: { id: threadId, userId }
+      where: { id: threadId, userId },
     });
 
     return thread ? toAssistantThreadRecord(thread) : null;
@@ -1194,8 +1153,8 @@ export class PrismaRepository {
         dealId: input.dealId ?? null,
         scope: input.scope,
         title: input.title,
-        summary: input.summary ?? null
-      }
+        summary: input.summary ?? null,
+      },
     });
 
     return toAssistantThreadRecord(thread);
@@ -1208,7 +1167,7 @@ export class PrismaRepository {
   ) {
     const existing = await prisma.assistantThread.findFirst({
       where: { id: threadId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!existing) {
@@ -1219,8 +1178,8 @@ export class PrismaRepository {
       where: { id: threadId },
       data: {
         title: patch.title,
-        summary: patch.summary
-      }
+        summary: patch.summary,
+      },
     });
 
     return toAssistantThreadRecord(thread);
@@ -1229,7 +1188,7 @@ export class PrismaRepository {
   async deleteAssistantThread(userId: string, threadId: string) {
     const existing = await prisma.assistantThread.findFirst({
       where: { id: threadId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!existing) {
@@ -1237,7 +1196,7 @@ export class PrismaRepository {
     }
 
     await prisma.assistantThread.delete({
-      where: { id: threadId }
+      where: { id: threadId },
     });
 
     return true;
@@ -1246,7 +1205,7 @@ export class PrismaRepository {
   async listAssistantMessages(userId: string, threadId: string) {
     const thread = await prisma.assistantThread.findFirst({
       where: { id: threadId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!thread) {
@@ -1255,7 +1214,7 @@ export class PrismaRepository {
 
     const messages = await prisma.assistantMessage.findMany({
       where: { threadId },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     return messages.map(toAssistantMessageRecord);
@@ -1268,7 +1227,7 @@ export class PrismaRepository {
   ) {
     const thread = await prisma.assistantThread.findFirst({
       where: { id: threadId, userId },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (!thread) {
@@ -1280,23 +1239,23 @@ export class PrismaRepository {
       update: {
         role: input.role,
         content: input.content,
-        parts: toJsonValue(input.parts)
+        parts: toJsonValue(input.parts),
       },
       create: {
         id: input.id,
         threadId,
         role: input.role,
         content: input.content,
-        parts: toJsonValue(input.parts)
-      }
+        parts: toJsonValue(input.parts),
+      },
     });
 
     if (input.role === "assistant" && input.content.trim().length > 0) {
       await prisma.assistantThread.update({
         where: { id: threadId },
         data: {
-          summary: input.content.slice(0, 280)
-        }
+          summary: input.content.slice(0, 280),
+        },
       });
     }
 
@@ -1305,7 +1264,7 @@ export class PrismaRepository {
 
   async getAssistantContextSnapshot(userId: string, key: string) {
     const snapshot = await prisma.assistantContextSnapshot.findFirst({
-      where: { userId, key }
+      where: { userId, key },
     });
 
     return snapshot ? toAssistantContextSnapshotRecord(snapshot) : null;
@@ -1322,15 +1281,15 @@ export class PrismaRepository {
       where: {
         userId_key: {
           userId,
-          key: input.key
-        }
+          key: input.key,
+        },
       },
       update: {
         dealId: input.dealId ?? null,
         scope: input.scope,
         version: input.version,
         summary: input.summary,
-        payload: toJsonValue(input.payload)
+        payload: toJsonValue(input.payload),
       },
       create: {
         userId,
@@ -1339,8 +1298,8 @@ export class PrismaRepository {
         key: input.key,
         version: input.version,
         summary: input.summary,
-        payload: toJsonValue(input.payload)
-      }
+        payload: toJsonValue(input.payload),
+      },
     });
 
     return toAssistantContextSnapshotRecord(snapshot);
@@ -1359,11 +1318,11 @@ export class PrismaRepository {
             label: group.label,
             confidence: group.confidence,
             documentIds: group.documentIds,
-            status: "pending"
-          }))
-        }
+            status: "pending",
+          })),
+        },
       },
-      include: { groups: true }
+      include: { groups: true },
     });
 
     return toBatchRecord(batch, batch.groups);
@@ -1372,7 +1331,7 @@ export class PrismaRepository {
   async getBatch(userId: string, batchId: string): Promise<IntakeBatchRecord | null> {
     const batch = await prisma.intakeBatch.findFirst({
       where: { id: batchId, userId },
-      include: { groups: { orderBy: { createdAt: "asc" } } }
+      include: { groups: { orderBy: { createdAt: "asc" } } },
     });
 
     if (!batch) return null;
@@ -1381,7 +1340,9 @@ export class PrismaRepository {
 
   async updateBatchGroup(
     groupId: string,
-    patch: Partial<Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">>
+    patch: Partial<
+      Pick<IntakeBatchGroupRecord, "label" | "status" | "intakeSessionId" | "documentIds">
+    >
   ) {
     const saved = await prisma.intakeBatchGroup.update({
       where: { id: groupId },
@@ -1389,8 +1350,8 @@ export class PrismaRepository {
         label: patch.label,
         status: patch.status,
         intakeSessionId: patch.intakeSessionId,
-        documentIds: patch.documentIds
-      }
+        documentIds: patch.documentIds,
+      },
     });
 
     return toBatchGroupRecord(saved);
@@ -1399,7 +1360,7 @@ export class PrismaRepository {
   async updateBatchStatus(batchId: string, status: string) {
     await prisma.intakeBatch.update({
       where: { id: batchId },
-      data: { status }
+      data: { status },
     });
   }
 }

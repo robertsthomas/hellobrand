@@ -1,9 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  buildNormalizedIntakeRecord,
-  INTAKE_NORMALIZED_VERSION
-} from "@/lib/intake-normalization";
+import { buildNormalizedIntakeRecord, INTAKE_NORMALIZED_VERSION } from "@/lib/intake-normalization";
 import { createSeedStore } from "@/lib/repository/seed";
 import type { DealAggregate } from "@/lib/types";
 
@@ -18,7 +15,6 @@ function createAggregate(): DealAggregate {
     conflictResults: [],
     paymentRecord: null,
     riskFlags: seed.riskFlags,
-    emailDrafts: seed.emailDrafts,
     jobs: seed.jobs,
     documentSections: seed.documentSections,
     documentRuns: seed.documentRuns,
@@ -29,7 +25,7 @@ function createAggregate(): DealAggregate {
     extractionEvidence: seed.extractionEvidence,
     summaries: seed.summaries,
     currentSummary: seed.summaries[0],
-    intakeSession: null
+    intakeSession: null,
   };
 }
 
@@ -54,8 +50,8 @@ describe("intake normalization", () => {
           Client Name Mondelez
           Brand Name (if any) Oreo Cakesters
           Agreed to and accepted by: $3200 Three Thousand Two Hundred USD
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
@@ -64,20 +60,20 @@ describe("intake normalization", () => {
       agencyName: "Name",
       campaignName: "Client NameMondelez",
       paymentAmount: 320,
-      deliverables: []
+      deliverables: [],
     };
     aggregate.extractionEvidence = [
       {
         ...aggregate.extractionEvidence[0],
         fieldPath: "brandName",
-        snippet: "Brand Name (if any) Oreo Cakesters"
+        snippet: "Brand Name (if any) Oreo Cakesters",
       },
       {
         ...aggregate.extractionEvidence[0],
         id: "payment-evidence",
         fieldPath: "paymentAmount",
-        snippet: "Agreed to and accepted by: $3200 Three Thousand Two Hundred USD"
-      }
+        snippet: "Agreed to and accepted by: $3200 Three Thousand Two Hundred USD",
+      },
     ];
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -121,8 +117,8 @@ describe("intake normalization", () => {
           Aki Technologies
           amber.logan@inmar.com
           312-555-0101
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
@@ -131,7 +127,7 @@ describe("intake normalization", () => {
       agencyName: null,
       campaignName: null,
       paymentAmount: null,
-      deliverables: []
+      deliverables: [],
     };
     aggregate.extractionEvidence = [];
 
@@ -150,7 +146,7 @@ describe("intake normalization", () => {
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Amazon Kids ## Stories with Alexa",
-      campaignName: "Amazon Kids ## Stories with Alexa"
+      campaignName: "Amazon Kids ## Stories with Alexa",
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -177,15 +173,15 @@ describe("intake normalization", () => {
           Amazon Kids Influencer Brief
           Stories with Alexa
           Overview: We’re partnering with creators like you to highlight the exciting features of Alexa+ on kids Echo devices.
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Workspace",
       agencyName: "Agency or management company",
-      campaignName: "Stories with Alexa"
+      campaignName: "Stories with Alexa",
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -213,22 +209,22 @@ describe("intake normalization", () => {
           Influencer Brief
           NimbusPM
           Overview: Create content for the NimbusPM summer push.
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Influencer",
       agencyName: null,
-      campaignName: null
+      campaignName: null,
     };
     aggregate.extractionEvidence = [
       {
         ...aggregate.extractionEvidence[0],
         fieldPath: "brandName",
-        snippet: "Influencer"
-      }
+        snippet: "Influencer",
+      },
     ];
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -256,7 +252,7 @@ describe("intake normalization", () => {
           NimbusPM
           Summer Push
           Overview: Create content for the NimbusPM summer push.
-        `
+        `,
       },
       {
         ...aggregate.documents[1],
@@ -271,28 +267,28 @@ describe("intake normalization", () => {
           Brand Usage Rights
           Campaign Overview
           The brand receives 90 days paid and organic usage.
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[1];
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Usage",
       agencyName: null,
-      campaignName: "Overview"
+      campaignName: "Overview",
     };
     aggregate.extractionEvidence = [
       {
         ...aggregate.extractionEvidence[0],
         fieldPath: "brandName",
-        snippet: "Usage"
+        snippet: "Usage",
       },
       {
         ...aggregate.extractionEvidence[0],
         id: "campaign-evidence",
         fieldPath: "campaignName",
-        snippet: "Overview"
-      }
+        snippet: "Overview",
+      },
     ];
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -319,15 +315,15 @@ describe("intake normalization", () => {
           Stories with Alexa
           If for any reason you are unsure of the device name, please reach out to the campaign manager for clarity.
           Children under 13 can be shown interacting with the device so long as the marketing is clear that (1) the device is in Amazon Kids+ on Alexa mode when the child is interacting with it, and (2) the children depicted are no younger than 3.
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Amazon Kids",
       agencyName: null,
-      campaignName: "Stories with Alexa"
+      campaignName: "Stories with Alexa",
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -361,15 +357,15 @@ describe("intake normalization", () => {
           Campaign Manager
           Partnerships Team
           team@nimbuspm.com
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "NimbusPM",
       agencyName: null,
-      campaignName: "Campaign"
+      campaignName: "Campaign",
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -398,15 +394,15 @@ describe("intake normalization", () => {
           Campaign Manager, Partnerships Lead, Agent
           thomas@example.com
           909-743-1880
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.summaries = [];
 
     const normalized = buildNormalizedIntakeRecord(aggregate, {
       excludedPrimaryContactEmails: ["thomas@example.com"],
-      excludedPrimaryContactNames: ["Thomas Roberts"]
+      excludedPrimaryContactNames: ["Thomas Roberts"],
     });
 
     expect(normalized?.primaryContact.name).toBeNull();
@@ -435,8 +431,8 @@ describe("intake normalization", () => {
         brandContactTitle: "Partnerships Manager",
         brandContactEmail: "jordan@lunchables.com",
         brandContactPhone: "312-555-0199",
-        sourceDocumentIds: ["brief-document"]
-      }
+        sourceDocumentIds: ["brief-document"],
+      },
     };
     aggregate.summaries = [
       {
@@ -449,15 +445,15 @@ describe("intake normalization", () => {
             name: "Thomas Roberts",
             title: "Creator",
             email: "thomas@example.com",
-            phone: "909-743-1880"
-          }
-        })
-      }
+            phone: "909-743-1880",
+          },
+        }),
+      },
     ];
 
     const normalized = buildNormalizedIntakeRecord(aggregate, {
       excludedPrimaryContactEmails: ["thomas@example.com"],
-      excludedPrimaryContactNames: ["Thomas Roberts"]
+      excludedPrimaryContactNames: ["Thomas Roberts"],
     });
 
     expect(normalized?.primaryContact.organizationType).toBe("brand");
@@ -484,8 +480,8 @@ describe("intake normalization", () => {
         toneAndStyle: null,
         doNotMention: [],
         brandContactEmail: "jordan@lunchables.com",
-        sourceDocumentIds: ["brief-document"]
-      }
+        sourceDocumentIds: ["brief-document"],
+      },
     };
     aggregate.summaries = [
       {
@@ -498,10 +494,10 @@ describe("intake normalization", () => {
             name: null,
             title: null,
             email: null,
-            phone: null
-          }
-        })
-      }
+            phone: null,
+          },
+        }),
+      },
     ];
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -515,7 +511,7 @@ describe("intake normalization", () => {
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Lunchables",
-      agencyName: null
+      agencyName: null,
     };
     aggregate.documents = [
       {
@@ -543,14 +539,14 @@ describe("intake normalization", () => {
           Jordan Ellis
           Partnerships Manager
           jordan@lunchables.com
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
 
     const normalized = buildNormalizedIntakeRecord(aggregate, {
       excludedPrimaryContactEmails: ["thomas@example.com"],
-      excludedPrimaryContactNames: ["Thomas Roberts"]
+      excludedPrimaryContactNames: ["Thomas Roberts"],
     });
 
     expect(normalized?.primaryContact.organizationType).toBe("brand");
@@ -565,7 +561,7 @@ describe("intake normalization", () => {
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Pampers",
-      agencyName: "Aki Technologies"
+      agencyName: "Aki Technologies",
     };
     aggregate.documents = [
       {
@@ -589,8 +585,8 @@ describe("intake normalization", () => {
           Aki Technologies
           amber.logan@inmar.com
           312-555-0101
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
 
@@ -608,7 +604,7 @@ describe("intake normalization", () => {
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "Lunchables",
-      agencyName: null
+      agencyName: null,
     };
     aggregate.documents = [
       {
@@ -626,14 +622,14 @@ describe("intake normalization", () => {
           Thomas Roberts
           thomas@example.com
           909-743-1880
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
 
     const normalized = buildNormalizedIntakeRecord(aggregate, {
       excludedPrimaryContactEmails: ["thomas@example.com"],
-      excludedPrimaryContactNames: ["Thomas Roberts"]
+      excludedPrimaryContactNames: ["Thomas Roberts"],
     });
 
     expect(normalized?.primaryContact.name).toBeNull();
@@ -647,7 +643,7 @@ describe("intake normalization", () => {
     aggregate.terms = {
       ...aggregate.terms!,
       brandName: "NimbusPM",
-      campaignName: "Campaign"
+      campaignName: "Campaign",
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -681,13 +677,13 @@ describe("intake normalization", () => {
           Campaign Live date: 07/08
           Video & caption drafts due for review by 6/18
           Video Idea/Outline Due 48 hrs after accepting campaign
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
     aggregate.terms = {
       ...aggregate.terms!,
-      deliverables: []
+      deliverables: [],
     };
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -696,12 +692,12 @@ describe("intake normalization", () => {
     expect(normalized?.timelineItems.map((item) => item.label)).toEqual([
       "Outline due",
       "Draft due",
-      "Go live"
+      "Go live",
     ]);
     expect(normalized?.timelineItems.map((item) => item.date)).toEqual([
       "48 hrs after",
       "6/18",
-      "07/08"
+      "07/08",
     ]);
   });
 
@@ -727,8 +723,8 @@ describe("intake normalization", () => {
           90 days paid and organic usage with additional organic usage on
           Usage Platforms TikTok (Paid and organic) Meta and YT shorts (Organic)
           Document Ref: HYTE8-UHE7G-BAWAO-PDRF4
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
 
@@ -773,8 +769,8 @@ describe("intake normalization", () => {
           Analyst Notes
           • Strongest retention typically came from direct problem-solution intros.
           • Assets with visible product demo outperformed talking-head-only variants.
-        `
-      }
+        `,
+      },
     ];
     aggregate.latestDocument = aggregate.documents[0];
 

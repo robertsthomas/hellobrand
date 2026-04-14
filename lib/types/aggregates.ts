@@ -3,20 +3,19 @@
  * Keep single-domain records in their own modules and compose them here.
  */
 
-import type { AssistantContextSnapshotRecord, AssistantMessageRecord, AssistantThreadRecord } from "./assistant";
+import type {
+  AssistantContextSnapshotRecord,
+  AssistantMessageRecord,
+  AssistantThreadRecord,
+} from "./assistant";
 import type {
   InvoiceDeliveryRecord,
   InvoiceRecord,
   InvoiceReminderTouchpointRecord,
-  PaymentRecord
+  PaymentRecord,
 } from "./billing";
 import type { Viewer } from "./common";
-import type {
-  DealRecord,
-  DealTermsRecord,
-  EmailDraftRecord,
-  RiskFlagRecord
-} from "./deals";
+import type { DealRecord, DealTermsRecord, RiskFlagRecord } from "./deals";
 import type {
   BrandContactRecord,
   ConnectedEmailAccountRecord,
@@ -27,7 +26,7 @@ import type {
   EmailDealTermSuggestionRecord,
   EmailMessageRecord,
   EmailSyncStateRecord,
-  EmailThreadRecord
+  EmailThreadRecord,
 } from "./email";
 import type { IntakeSessionRecord } from "./intake";
 import type {
@@ -40,7 +39,7 @@ import type {
   ExtractionEvidenceRecord,
   ExtractionResultRecord,
   JobRecord,
-  SummaryRecord
+  SummaryRecord,
 } from "./documents";
 
 export interface DealAggregate {
@@ -52,7 +51,6 @@ export interface DealAggregate {
   paymentRecord: PaymentRecord | null;
   invoiceRecord?: InvoiceRecord | null;
   riskFlags: RiskFlagRecord[];
-  emailDrafts: EmailDraftRecord[];
   jobs: JobRecord[];
   documentSections: DocumentSectionRecord[];
   documentRuns: DocumentRunRecord[];
@@ -72,7 +70,6 @@ export interface AppStore {
   documents: DocumentRecord[];
   dealTerms: DealTermsRecord[];
   riskFlags: RiskFlagRecord[];
-  emailDrafts: EmailDraftRecord[];
   emailAccounts: ConnectedEmailAccountRecord[];
   emailThreads: EmailThreadRecord[];
   emailMessages: EmailMessageRecord[];

@@ -34,11 +34,6 @@ export {
 } from "./deals/terms";
 
 export {
-  generateDraftForViewer,
-  ensureDraftsForDeal,
-} from "./deals/drafts";
-
-export {
   applyPendingChangesForViewer,
   dismissPendingChangesForViewer,
 } from "./deals/pending-changes";

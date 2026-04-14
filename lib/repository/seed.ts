@@ -22,7 +22,7 @@ function createSeedTerms(now: string): DealTermsRecord {
         channel: "Instagram",
         quantity: 1,
         status: "pending",
-        description: "30-second product feature reel"
+        description: "30-second product feature reel",
       },
       {
         id: "deliverable-2",
@@ -31,8 +31,8 @@ function createSeedTerms(now: string): DealTermsRecord {
         channel: "Instagram",
         quantity: 2,
         status: "pending",
-        description: "Story support frames with swipe-up"
-      }
+        description: "Story support frames with swipe-up",
+      },
     ],
     usageRights: "Organic reposting plus 6 months of paid social usage.",
     usageRightsOrganicAllowed: true,
@@ -52,15 +52,15 @@ function createSeedTerms(now: string): DealTermsRecord {
     campaignDateWindow: {
       startDate: "2026-03-30T00:00:00.000Z",
       endDate: "2026-03-31T00:00:00.000Z",
-      postingWindow: "2026-03-30 to 2026-03-31"
+      postingWindow: "2026-03-30 to 2026-03-31",
     },
     disclosureObligations: [
       {
         id: "disclosure-1",
         title: "Disclosure required",
         detail: "Use a paid partnership label or #ad when posting sponsored content.",
-        source: "Sponsored social content must include clear disclosure."
-      }
+        source: "Sponsored social content must include clear disclosure.",
+      },
     ],
     revisions: "One round of revisions.",
     revisionRounds: 1,
@@ -74,7 +74,7 @@ function createSeedTerms(now: string): DealTermsRecord {
     briefData: null,
     pendingExtraction: null,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   };
 }
 
@@ -88,8 +88,8 @@ export function createSeedStore(): AppStore {
         id: "demo-user",
         email: "demo@hellobrand.app",
         displayName: "Demo Creator",
-        mode: "demo"
-      }
+        mode: "demo",
+      },
     ],
     deals: [
       {
@@ -109,8 +109,8 @@ export function createSeedStore(): AppStore {
         updatedAt: now,
         analyzedAt: now,
         confirmedAt: now,
-        statusBeforeArchive: null
-      }
+        statusBeforeArchive: null,
+      },
     ],
     documents: [
       {
@@ -135,8 +135,8 @@ export function createSeedStore(): AppStore {
         processingRunStateJson: null,
         processingStartedAt: null,
         createdAt: now,
-        updatedAt: now
-      }
+        updatedAt: now,
+      },
     ],
     dealTerms: [terms],
     riskFlags: [
@@ -150,7 +150,7 @@ export function createSeedStore(): AppStore {
         suggestedAction: "Ask whether payment can be moved to Net 15 or Net 30.",
         evidence: ["Brand shall pay Creator $2,000 net 45 after invoice."],
         sourceDocumentId: "demo-document",
-        createdAt: now
+        createdAt: now,
       },
       {
         id: "risk-2",
@@ -163,20 +163,8 @@ export function createSeedStore(): AppStore {
         suggestedAction: "Limit paid usage term or request added compensation for ads.",
         evidence: ["Brand receives 6 months paid social usage."],
         sourceDocumentId: "demo-document",
-        createdAt: now
-      }
-    ],
-    emailDrafts: [
-      {
-        id: "draft-1",
-        dealId: "demo-deal",
-        intent: "request-faster-payment",
-        subject: "Payment Terms Clarification",
-        body:
-          "Hi Nimbus team,\n\nThanks again for sending the agreement. I noticed the current payment terms are Net 45. Would you be open to revising them to Net 15 so the payment timing aligns with the campaign timeline?\n\nAppreciate it,\nDemo Creator",
         createdAt: now,
-        updatedAt: now
-      }
+      },
     ],
     emailAccounts: [],
     emailThreads: [],
@@ -204,8 +192,8 @@ export function createSeedStore(): AppStore {
         attemptCount: 1,
         createdAt: now,
         updatedAt: now,
-        failureReason: null
-      }
+        failureReason: null,
+      },
     ],
     documentSections: [
       {
@@ -215,7 +203,7 @@ export function createSeedStore(): AppStore {
         content: "Brand shall pay Creator $2,000 net 45 after invoice.",
         chunkIndex: 0,
         pageRange: "1",
-        createdAt: now
+        createdAt: now,
       },
       {
         id: "section-2",
@@ -224,8 +212,8 @@ export function createSeedStore(): AppStore {
         content: "1 Instagram Reel and 2 Story frames.",
         chunkIndex: 1,
         pageRange: "1",
-        createdAt: now
-      }
+        createdAt: now,
+      },
     ],
     documentRuns: [],
     documentArtifacts: [],
@@ -277,10 +265,10 @@ export function createSeedStore(): AppStore {
           governingLaw: terms.governingLaw,
           notes: terms.notes,
           manuallyEditedFields: terms.manuallyEditedFields,
-          briefData: terms.briefData
+          briefData: terms.briefData,
         },
-        createdAt: now
-      }
+        createdAt: now,
+      },
     ],
     extractionEvidence: [
       {
@@ -290,7 +278,7 @@ export function createSeedStore(): AppStore {
         snippet: "Brand shall pay Creator $2,000 net 45 after invoice.",
         sectionId: "section-1",
         confidence: 0.88,
-        createdAt: now
+        createdAt: now,
       },
       {
         id: "evidence-2",
@@ -299,23 +287,22 @@ export function createSeedStore(): AppStore {
         snippet: "Brand receives 6 months paid social usage.",
         sectionId: null,
         confidence: 0.81,
-        createdAt: now
-      }
+        createdAt: now,
+      },
     ],
     summaries: [
       {
         id: "summary-1",
         dealId: "demo-deal",
         documentId: "demo-document",
-        body:
-          "This deal appears to pay $2,000 for one Instagram Reel and two Story frames. Payment is Net 45 after invoice, and the brand receives six months of paid social usage with a 30-day footwear exclusivity period.",
+        body: "This deal appears to pay $2,000 for one Instagram Reel and two Story frames. Payment is Net 45 after invoice, and the brand receives six months of paid social usage with a 30-day footwear exclusivity period.",
         version: "v1",
         summaryType: "legal",
         source: "analysis",
         parentSummaryId: null,
         isCurrent: true,
-        createdAt: now
-      }
-    ]
+        createdAt: now,
+      },
+    ],
   };
 }

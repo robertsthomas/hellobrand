@@ -12,26 +12,19 @@ import { requireViewer } from "@/lib/auth";
 import {
   confirmTermsFieldForViewer,
   createDealForViewer as createDealFromDeals,
-  generateDraftForViewer as generateDraftFromDeals,
   reprocessDocumentForViewer as reprocessDocumentFromDeals,
   updateDealNotesForViewer as updateDealNotesFromDeals,
   updateDealForViewer as updateDealFromDeals,
   updateTermsForViewer as updateTermsFromDeals,
-  uploadDocumentsForViewer as uploadDocumentsFromDeals
+  uploadDocumentsForViewer as uploadDocumentsFromDeals,
 } from "@/lib/deals";
 import { startServerDebug } from "@/lib/server-debug";
 import { sanitizePlainTextInput } from "@/lib/utils";
-import {
-  createDealSchema,
-  dealTermsInputSchema,
-  draftIntentSchema,
-  updateDealSchema
-} from "@/lib/validation";
-import type { DraftIntent } from "@/lib/types";
+import { createDealSchema, dealTermsInputSchema, updateDealSchema } from "@/lib/validation";
 import {
   parseNullableBoolean,
   parseNullableNumber,
-  parseNullableString
+  parseNullableString,
 } from "@/app/action-helpers";
 
 import { invalidateDeals, invalidateDealWorkspace } from "./deal-shared";
@@ -41,7 +34,7 @@ export async function createDealAction(formData: FormData) {
   const input = createDealSchema.parse({
     brandName: String(formData.get("brandName") ?? "").trim(),
     campaignName: String(formData.get("campaignName") ?? "").trim(),
-    notes: parseNullableString(formData.get("notes"))
+    notes: parseNullableString(formData.get("notes")),
   });
 
   const deal = await createDealFromDeals(viewer, input);
@@ -52,7 +45,7 @@ export async function uploadDocumentsAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const debug = startServerDebug("action_upload_documents", {
     action: "uploadDocumentsAction",
-    dealId
+    dealId,
   });
 
   const viewer = await requireViewer();
@@ -63,17 +56,17 @@ export async function uploadDocumentsAction(formData: FormData) {
   try {
     await uploadDocumentsFromDeals(viewer, dealId, {
       files,
-      pastedText: parseNullableString(formData.get("pastedText"))
+      pastedText: parseNullableString(formData.get("pastedText")),
     });
     debug.complete({
       viewerId: viewer.id,
       fileCount: files.length,
-      pastedChars: parseNullableString(formData.get("pastedText"))?.length ?? 0
+      pastedChars: parseNullableString(formData.get("pastedText"))?.length ?? 0,
     });
   } catch (error) {
     debug.fail(error, {
       viewerId: viewer.id,
-      fileCount: files.length
+      fileCount: files.length,
     });
     throw error;
   }
@@ -98,7 +91,7 @@ export async function saveDealMetaAction(formData: FormData) {
   const input = updateDealSchema.parse({
     status: formData.get("status") || undefined,
     paymentStatus: formData.get("paymentStatus") || undefined,
-    countersignStatus: formData.get("countersignStatus") || undefined
+    countersignStatus: formData.get("countersignStatus") || undefined,
   });
 
   await updateDealFromDeals(viewer, dealId, input);
@@ -110,12 +103,8 @@ export async function saveTermsAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const deliverablesJson = String(formData.get("deliverablesJson") ?? "[]");
   const usageChannelsJson = String(formData.get("usageChannelsJson") ?? "[]");
-  const competitorCategoriesJson = String(
-    formData.get("competitorCategoriesJson") ?? "[]"
-  );
-  const restrictedCategoriesJson = String(
-    formData.get("restrictedCategoriesJson") ?? "[]"
-  );
+  const competitorCategoriesJson = String(formData.get("competitorCategoriesJson") ?? "[]");
+  const restrictedCategoriesJson = String(formData.get("restrictedCategoriesJson") ?? "[]");
 
   const input = dealTermsInputSchema.parse({
     brandName: parseNullableString(formData.get("brandName")),
@@ -130,12 +119,8 @@ export async function saveTermsAction(formData: FormData) {
     paymentTrigger: parseNullableString(formData.get("paymentTrigger")),
     deliverables: JSON.parse(deliverablesJson),
     usageRights: parseNullableString(formData.get("usageRights")),
-    usageRightsOrganicAllowed: parseNullableBoolean(
-      formData.get("usageRightsOrganicAllowed")
-    ),
-    usageRightsPaidAllowed: parseNullableBoolean(
-      formData.get("usageRightsPaidAllowed")
-    ),
+    usageRightsOrganicAllowed: parseNullableBoolean(formData.get("usageRightsOrganicAllowed")),
+    usageRightsPaidAllowed: parseNullableBoolean(formData.get("usageRightsPaidAllowed")),
     whitelistingAllowed: parseNullableBoolean(formData.get("whitelistingAllowed")),
     usageDuration: parseNullableString(formData.get("usageDuration")),
     usageTerritory: parseNullableString(formData.get("usageTerritory")),
@@ -144,9 +129,7 @@ export async function saveTermsAction(formData: FormData) {
     exclusivityApplies: parseNullableBoolean(formData.get("exclusivityApplies")),
     exclusivityCategory: parseNullableString(formData.get("exclusivityCategory")),
     exclusivityDuration: parseNullableString(formData.get("exclusivityDuration")),
-    exclusivityRestrictions: parseNullableString(
-      formData.get("exclusivityRestrictions")
-    ),
+    exclusivityRestrictions: parseNullableString(formData.get("exclusivityRestrictions")),
     brandCategory: normalizeDealCategory(parseNullableString(formData.get("brandCategory"))),
     competitorCategories: JSON.parse(competitorCategoriesJson),
     restrictedCategories: JSON.parse(restrictedCategoriesJson),
@@ -157,20 +140,18 @@ export async function saveTermsAction(formData: FormData) {
     termination: parseNullableString(formData.get("termination")),
     terminationAllowed: parseNullableBoolean(formData.get("terminationAllowed")),
     terminationNotice: parseNullableString(formData.get("terminationNotice")),
-    terminationConditions: parseNullableString(
-      formData.get("terminationConditions")
-    ),
+    terminationConditions: parseNullableString(formData.get("terminationConditions")),
     governingLaw: parseNullableString(formData.get("governingLaw")),
     notes: (() => {
       const rawNotes = parseNullableString(formData.get("notes"));
       const sanitizedNotes = sanitizePlainTextInput(rawNotes);
       return sanitizedNotes || null;
-    })()
+    })(),
   });
 
   await updateTermsFromDeals(viewer, dealId, {
     ...input,
-    brandCategory: normalizeDealCategory(input.brandCategory)
+    brandCategory: normalizeDealCategory(input.brandCategory),
   });
 
   invalidateDealWorkspace(viewer.id, dealId);
@@ -193,14 +174,4 @@ export async function confirmTermsReviewAction(formData: FormData) {
 
   await confirmTermsFieldForViewer(viewer, dealId, fieldPath);
   invalidateDealWorkspace(viewer.id, dealId);
-}
-
-export async function generateDraftAction(formData: FormData) {
-  const viewer = await requireViewer();
-  const dealId = String(formData.get("dealId") ?? "");
-  const intent = draftIntentSchema.parse(formData.get("intent")) as DraftIntent;
-
-  await generateDraftFromDeals(viewer, dealId, intent);
-  revalidatePath(`/app/p/${dealId}`);
-  invalidateDeals(viewer.id, dealId);
 }
