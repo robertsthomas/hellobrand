@@ -76,6 +76,15 @@ export function extractSectionSystemPrompt() {
         "netTermsDays: Numeric day count from 'Net 45', '45 days', 'due within 45 days'. If not stated, null.",
         "deliverables: Content requirements with channels and quantities. Map format specs (Reel, TikTok, Story) to deliverables with channels.",
         "disclosureObligations: FTC, platform-specific labeling requirements (e.g., #ad, verbal mentions).",
+        "briefData.campaignCode / jobNumber / referenceId: Campaign code, job number, ref ID, or internal identifiers when explicitly stated.",
+        "briefData.creatorHandle: The creator-facing account or handle to post from when explicitly stated.",
+        "briefData.agreementStartDate / agreementEndDate / executionTargetDate: Agreement term dates or signature/countersign target dates when explicitly labeled.",
+        "briefData.conceptDueDate / draftDueDate / contentDueDate / campaignLiveDate: Milestone dates for concept submission, first draft, final content delivery, and go-live when explicitly labeled.",
+        "briefData.campaignFlight / postingSchedule / postDuration / amplificationPeriod: Flight window, posting schedule, post-live duration, or paid amplification period when explicitly stated.",
+        "briefData.approvalRequirements / revisionRequirements / reportingRequirements: Approval turnaround, revision turnaround, and metrics/reporting obligations that shape creator workflow.",
+        "briefData.paymentSchedule / paymentRequirements / paymentNotes: Payment splits, timing, invoice/live-link/screenshot prerequisites, or operational payment instructions that matter to the creator.",
+        "briefData.deliverablesSummary / deliverablePlatforms / usageNotes / competitorRestrictions / campaignNotes / linksAndAssets / promoCode: Use these for creator-operational details, links, codes, or assets that matter but do not map cleanly to top-level terms.",
+        "briefData.requiredClaims: Required talking points, mandatory claims, exact hashtags, or must-say statements that the creator needs easy access to.",
         "briefData.brandContactName / Title / Email / Phone and briefData.agencyContactName / Title / Email / Phone: External points of contact ONLY. Extract only brand-side or agency-side contacts that are explicitly tied to approvals, campaign operations, signatures, or 'contact/questions' blocks.",
         "Never use creator, talent, or influencer contact details for any brandContact* or agencyContact* field. If the document only includes creator contact info, leave all contact fields null.",
         "Only return a phone number when it is clearly attached to the same external contact block as the chosen email/name/title. If unclear, return null for phone.",
@@ -180,6 +189,7 @@ export function extractSectionUserPrompt(
         "2. Is it a real value, not a placeholder or header?",
         "",
         "Fields to extract when stated: brandName, campaignName, paymentAmount, currency, paymentTerms, paymentStructure, paymentTrigger, netTermsDays, deliverables, usageRights, usageDuration, usageTerritory, usageChannels, exclusivity, exclusivityDuration, exclusivityCategory, disclosureObligations, revisions, termination, terminationNotice, governingLaw, notes.",
+        "For workflow details that do not belong to top-level legal/payment fields, place them under briefData. Important briefData fields here: campaignCode, jobNumber, referenceId, creatorHandle, agreementStartDate, agreementEndDate, executionTargetDate, conceptDueDate, draftDueDate, contentDueDate, campaignLiveDate, campaignFlight, postingSchedule, postDuration, amplificationPeriod, approvalRequirements, revisionRequirements, reportingRequirements, deliverablesSummary, deliverablePlatforms, requiredClaims, usageNotes, competitorRestrictions, paymentSchedule, paymentRequirements, paymentNotes, campaignNotes.",
         "For external contacts, place them under briefData using only these fields when explicitly supported: brandContactName, brandContactTitle, brandContactEmail, brandContactPhone, agencyContactName, agencyContactTitle, agencyContactEmail, agencyContactPhone.",
         "",
         "Return null for any field not explicitly stated.",
@@ -355,16 +365,20 @@ export function briefExtractionSystemPrompt() {
     {
       tag: "rules",
       content: promptNumbered([
-        "Source types vary: formal briefs, pitch decks, storyboards, moodboards, creative feedback, and status updates are all valid sources.",
+        "Source types vary: formal briefs, contracts, riders, term sheets, welcome kits, FAQ agreements, calendars, image one-pagers, pitch decks, storyboards, moodboards, creative feedback, and status updates are all valid sources.",
         "Return null or empty arrays for anything not found. Do not invent messaging, approvals, or audience details.",
         "Use doNotMention for prohibited claims, banned phrasing, or explicit avoid lists.",
-        "Ignore payment, invoicing, and legal clauses unless they directly shape the creator brief experience.",
+        "Use requiredClaims for mandatory talking points, hashtags, disclaimers, or statements the creator must include.",
+        "Use linksAndAssets for explicit URLs, asset folders, drive links, or reference links the creator is expected to use.",
+        "Keep creator-operational timeline data when stated: agreement dates, signature targets, concept due date, draft due date, content live date, campaign flight, post duration, amplification period, and reporting requirements.",
+        "Keep payment workflow data when stated if it affects operations: payment schedule, payment trigger dependencies, invoice/live-link/screenshot requirements, and payout prerequisites.",
+        "Ignore purely legal boilerplate unless it directly shapes the creator brief experience.",
       ]),
     },
     {
       tag: "output_contract",
       content:
-        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention, brandContactName, brandContactTitle, brandContactEmail, brandContactPhone, agencyContactName, agencyContactTitle, agencyContactEmail, agencyContactPhone }. Null or [] for missing fields.",
+        "Return JSON: { campaignOverview, campaignCode, jobNumber, referenceId, messagingPoints, talkingPoints, creativeConceptOverview, requiredClaims, brandGuidelines, approvalRequirements, revisionRequirements, targetAudience, toneAndStyle, deliverablesSummary, deliverablePlatforms, creatorHandle, postingSchedule, agreementStartDate, agreementEndDate, executionTargetDate, conceptDueDate, campaignLiveDate, campaignFlight, draftDueDate, contentDueDate, postDuration, amplificationPeriod, usageNotes, disclosureRequirements, competitorRestrictions, linksAndAssets, promoCode, paymentSchedule, paymentRequirements, paymentNotes, reportingRequirements, campaignNotes, doNotMention, brandContactName, brandContactTitle, brandContactEmail, brandContactPhone, agencyContactName, agencyContactTitle, agencyContactEmail, agencyContactPhone }. Null or [] for missing fields.",
     },
   ]);
 }

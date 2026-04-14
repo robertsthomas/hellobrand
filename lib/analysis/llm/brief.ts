@@ -61,13 +61,42 @@ export async function extractBriefWithLlm(
       briefExtractionResponseSchema,
       {
         campaignOverview: fallback.campaignOverview,
+        campaignCode: fallback.campaignCode,
+        jobNumber: fallback.jobNumber,
+        referenceId: fallback.referenceId,
         messagingPoints: fallback.messagingPoints,
         talkingPoints: fallback.talkingPoints,
         creativeConceptOverview: fallback.creativeConceptOverview,
+        requiredClaims: fallback.requiredClaims ?? [],
         brandGuidelines: fallback.brandGuidelines,
         approvalRequirements: fallback.approvalRequirements,
+        revisionRequirements: fallback.revisionRequirements,
         targetAudience: fallback.targetAudience,
         toneAndStyle: fallback.toneAndStyle,
+        deliverablesSummary: fallback.deliverablesSummary,
+        deliverablePlatforms: fallback.deliverablePlatforms ?? [],
+        creatorHandle: fallback.creatorHandle,
+        postingSchedule: fallback.postingSchedule,
+        agreementStartDate: fallback.agreementStartDate,
+        agreementEndDate: fallback.agreementEndDate,
+        executionTargetDate: fallback.executionTargetDate,
+        conceptDueDate: fallback.conceptDueDate,
+        campaignLiveDate: fallback.campaignLiveDate,
+        campaignFlight: fallback.campaignFlight,
+        draftDueDate: fallback.draftDueDate,
+        contentDueDate: fallback.contentDueDate,
+        postDuration: fallback.postDuration,
+        amplificationPeriod: fallback.amplificationPeriod,
+        usageNotes: fallback.usageNotes,
+        disclosureRequirements: fallback.disclosureRequirements ?? [],
+        competitorRestrictions: fallback.competitorRestrictions ?? [],
+        linksAndAssets: fallback.linksAndAssets ?? [],
+        promoCode: fallback.promoCode,
+        paymentNotes: fallback.paymentNotes,
+        paymentSchedule: fallback.paymentSchedule,
+        paymentRequirements: fallback.paymentRequirements,
+        reportingRequirements: fallback.reportingRequirements,
+        campaignNotes: fallback.campaignNotes,
         doNotMention: fallback.doNotMention,
         brandContactName: fallback.brandContactName,
         brandContactTitle: fallback.brandContactTitle,
@@ -86,6 +115,9 @@ export async function extractBriefWithLlm(
 
     return {
       campaignOverview: asString(payload.campaignOverview) ?? fallback.campaignOverview,
+      campaignCode: asString(payload.campaignCode) ?? fallback.campaignCode,
+      jobNumber: asString(payload.jobNumber) ?? fallback.jobNumber,
+      referenceId: asString(payload.referenceId) ?? fallback.referenceId,
       messagingPoints: asStringArray(payload.messagingPoints).length > 0
         ? asStringArray(payload.messagingPoints)
         : fallback.messagingPoints,
@@ -93,10 +125,46 @@ export async function extractBriefWithLlm(
         ? asStringArray(payload.talkingPoints)
         : fallback.talkingPoints,
       creativeConceptOverview: asString(payload.creativeConceptOverview) ?? fallback.creativeConceptOverview,
+      requiredClaims: asStringArray(payload.requiredClaims).length > 0
+        ? asStringArray(payload.requiredClaims)
+        : (fallback.requiredClaims ?? []),
       brandGuidelines: asString(payload.brandGuidelines) ?? fallback.brandGuidelines,
       approvalRequirements: asString(payload.approvalRequirements) ?? fallback.approvalRequirements,
+      revisionRequirements: asString(payload.revisionRequirements) ?? fallback.revisionRequirements,
       targetAudience: asString(payload.targetAudience) ?? fallback.targetAudience,
       toneAndStyle: asString(payload.toneAndStyle) ?? fallback.toneAndStyle,
+      deliverablesSummary: asString(payload.deliverablesSummary) ?? fallback.deliverablesSummary,
+      deliverablePlatforms: asStringArray(payload.deliverablePlatforms).length > 0
+        ? asStringArray(payload.deliverablePlatforms)
+        : (fallback.deliverablePlatforms ?? []),
+      creatorHandle: asString(payload.creatorHandle) ?? fallback.creatorHandle,
+      postingSchedule: asString(payload.postingSchedule) ?? fallback.postingSchedule,
+      agreementStartDate: asString(payload.agreementStartDate) ?? fallback.agreementStartDate,
+      agreementEndDate: asString(payload.agreementEndDate) ?? fallback.agreementEndDate,
+      executionTargetDate: asString(payload.executionTargetDate) ?? fallback.executionTargetDate,
+      conceptDueDate: asString(payload.conceptDueDate) ?? fallback.conceptDueDate,
+      campaignLiveDate: asString(payload.campaignLiveDate) ?? fallback.campaignLiveDate,
+      campaignFlight: asString(payload.campaignFlight) ?? fallback.campaignFlight,
+      draftDueDate: asString(payload.draftDueDate) ?? fallback.draftDueDate,
+      contentDueDate: asString(payload.contentDueDate) ?? fallback.contentDueDate,
+      postDuration: asString(payload.postDuration) ?? fallback.postDuration,
+      amplificationPeriod: asString(payload.amplificationPeriod) ?? fallback.amplificationPeriod,
+      usageNotes: asString(payload.usageNotes) ?? fallback.usageNotes,
+      disclosureRequirements: asStringArray(payload.disclosureRequirements).length > 0
+        ? asStringArray(payload.disclosureRequirements)
+        : (fallback.disclosureRequirements ?? []),
+      competitorRestrictions: asStringArray(payload.competitorRestrictions).length > 0
+        ? asStringArray(payload.competitorRestrictions)
+        : (fallback.competitorRestrictions ?? []),
+      linksAndAssets: asStringArray(payload.linksAndAssets).length > 0
+        ? asStringArray(payload.linksAndAssets)
+        : (fallback.linksAndAssets ?? []),
+      promoCode: asString(payload.promoCode) ?? fallback.promoCode,
+      paymentNotes: asString(payload.paymentNotes) ?? fallback.paymentNotes,
+      paymentSchedule: asString(payload.paymentSchedule) ?? fallback.paymentSchedule,
+      paymentRequirements: asString(payload.paymentRequirements) ?? fallback.paymentRequirements,
+      reportingRequirements: asString(payload.reportingRequirements) ?? fallback.reportingRequirements,
+      campaignNotes: asString(payload.campaignNotes) ?? fallback.campaignNotes,
       doNotMention: asStringArray(payload.doNotMention).length > 0
         ? asStringArray(payload.doNotMention)
         : fallback.doNotMention,

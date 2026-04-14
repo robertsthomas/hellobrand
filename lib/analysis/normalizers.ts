@@ -147,7 +147,7 @@ export function normalizeTerms(
   });
   const llmBrandName = sanitizePartyName(asString(input.brandName), "brand");
   const llmAgencyName = sanitizePartyName(asString(input.agencyName), "agency");
-  const normalizedBriefData = normalizeBriefContactData(
+  const normalizedBriefData = normalizeBriefData(
     input.briefData,
     {
       brandContactName: asString(input.brandContactName),
@@ -220,23 +220,76 @@ export function normalizeTerms(
 function emptyBriefData(): BriefData {
   return {
     campaignOverview: null,
+    campaignCode: null,
+    jobNumber: null,
+    referenceId: null,
     messagingPoints: [],
     talkingPoints: [],
     creativeConceptOverview: null,
+    requiredClaims: [],
     brandGuidelines: null,
     approvalRequirements: null,
+    revisionRequirements: null,
     targetAudience: null,
     toneAndStyle: null,
+    deliverablesSummary: null,
+    deliverablePlatforms: [],
+    creatorHandle: null,
+    postingSchedule: null,
+    agreementStartDate: null,
+    agreementEndDate: null,
+    executionTargetDate: null,
+    conceptDueDate: null,
+    campaignLiveDate: null,
+    campaignFlight: null,
+    draftDueDate: null,
+    contentDueDate: null,
+    postDuration: null,
+    amplificationPeriod: null,
+    usageNotes: null,
+    disclosureRequirements: [],
+    competitorRestrictions: [],
+    linksAndAssets: [],
+    promoCode: null,
+    paymentSchedule: null,
+    paymentRequirements: null,
+    paymentNotes: null,
+    reportingRequirements: null,
+    campaignNotes: null,
     doNotMention: [],
     sourceDocumentIds: []
   };
 }
 
-function normalizeBriefContactData(
+function normalizeBriefData(
   nestedValue: unknown,
   topLevelValue: Partial<
     Pick<
       BriefData,
+      | "campaignCode"
+      | "jobNumber"
+      | "referenceId"
+      | "approvalRequirements"
+      | "revisionRequirements"
+      | "deliverablesSummary"
+      | "creatorHandle"
+      | "postingSchedule"
+      | "agreementStartDate"
+      | "agreementEndDate"
+      | "executionTargetDate"
+      | "conceptDueDate"
+      | "campaignLiveDate"
+      | "campaignFlight"
+      | "draftDueDate"
+      | "contentDueDate"
+      | "postDuration"
+      | "amplificationPeriod"
+      | "usageNotes"
+      | "paymentSchedule"
+      | "paymentRequirements"
+      | "paymentNotes"
+      | "reportingRequirements"
+      | "campaignNotes"
       | "brandContactName"
       | "brandContactTitle"
       | "brandContactEmail"
@@ -254,29 +307,200 @@ function normalizeBriefContactData(
       ? (nestedValue as Record<string, unknown>)
       : null;
 
-  const patch = {
+  const patch: Partial<BriefData> = {
+    campaignOverview: asString(nested?.campaignOverview) ?? fallbackBriefData?.campaignOverview ?? null,
+    campaignCode:
+      asString(nested?.campaignCode) ?? topLevelValue.campaignCode ?? fallbackBriefData?.campaignCode ?? null,
+    jobNumber:
+      asString(nested?.jobNumber) ?? topLevelValue.jobNumber ?? fallbackBriefData?.jobNumber ?? null,
+    referenceId:
+      asString(nested?.referenceId) ?? topLevelValue.referenceId ?? fallbackBriefData?.referenceId ?? null,
+    campaignObjective: asString(nested?.campaignObjective) ?? fallbackBriefData?.campaignObjective ?? null,
+    messagingPoints: asStringArray(nested?.messagingPoints).length > 0
+      ? asStringArray(nested?.messagingPoints)
+      : (fallbackBriefData?.messagingPoints ?? []),
+    talkingPoints: asStringArray(nested?.talkingPoints).length > 0
+      ? asStringArray(nested?.talkingPoints)
+      : (fallbackBriefData?.talkingPoints ?? []),
+    creativeConceptOverview:
+      asString(nested?.creativeConceptOverview) ?? fallbackBriefData?.creativeConceptOverview ?? null,
+    requiredClaims: asStringArray(nested?.requiredClaims).length > 0
+      ? asStringArray(nested?.requiredClaims)
+      : (fallbackBriefData?.requiredClaims ?? []),
+    contentPillars: asStringArray(nested?.contentPillars).length > 0
+      ? asStringArray(nested?.contentPillars)
+      : (fallbackBriefData?.contentPillars ?? []),
+    requiredElements: asStringArray(nested?.requiredElements).length > 0
+      ? asStringArray(nested?.requiredElements)
+      : (fallbackBriefData?.requiredElements ?? []),
+    brandGuidelines: asString(nested?.brandGuidelines) ?? fallbackBriefData?.brandGuidelines ?? null,
+    approvalRequirements:
+      asString(nested?.approvalRequirements) ??
+      topLevelValue.approvalRequirements ??
+      fallbackBriefData?.approvalRequirements ??
+      null,
+    revisionRequirements:
+      asString(nested?.revisionRequirements) ??
+      topLevelValue.revisionRequirements ??
+      fallbackBriefData?.revisionRequirements ??
+      null,
+    targetAudience: asString(nested?.targetAudience) ?? fallbackBriefData?.targetAudience ?? null,
+    toneAndStyle: asString(nested?.toneAndStyle) ?? fallbackBriefData?.toneAndStyle ?? null,
+    visualDirection: asString(nested?.visualDirection) ?? fallbackBriefData?.visualDirection ?? null,
+    doNotMention: asStringArray(nested?.doNotMention).length > 0
+      ? asStringArray(nested?.doNotMention)
+      : (fallbackBriefData?.doNotMention ?? []),
+    productName: asString(nested?.productName) ?? fallbackBriefData?.productName ?? null,
+    productDescription: asString(nested?.productDescription) ?? fallbackBriefData?.productDescription ?? null,
+    deliverablesSummary:
+      asString(nested?.deliverablesSummary) ??
+      topLevelValue.deliverablesSummary ??
+      fallbackBriefData?.deliverablesSummary ??
+      null,
+    deliverablePlatforms: asStringArray(nested?.deliverablePlatforms).length > 0
+      ? asStringArray(nested?.deliverablePlatforms)
+      : (fallbackBriefData?.deliverablePlatforms ?? []),
+    creatorHandle:
+      asString(nested?.creatorHandle) ??
+      topLevelValue.creatorHandle ??
+      fallbackBriefData?.creatorHandle ??
+      null,
+    postingSchedule:
+      asString(nested?.postingSchedule) ??
+      topLevelValue.postingSchedule ??
+      fallbackBriefData?.postingSchedule ??
+      null,
+    agreementStartDate:
+      asString(nested?.agreementStartDate) ??
+      topLevelValue.agreementStartDate ??
+      fallbackBriefData?.agreementStartDate ??
+      null,
+    agreementEndDate:
+      asString(nested?.agreementEndDate) ??
+      topLevelValue.agreementEndDate ??
+      fallbackBriefData?.agreementEndDate ??
+      null,
+    executionTargetDate:
+      asString(nested?.executionTargetDate) ??
+      topLevelValue.executionTargetDate ??
+      fallbackBriefData?.executionTargetDate ??
+      null,
+    conceptDueDate:
+      asString(nested?.conceptDueDate) ??
+      topLevelValue.conceptDueDate ??
+      fallbackBriefData?.conceptDueDate ??
+      null,
+    campaignLiveDate:
+      asString(nested?.campaignLiveDate) ??
+      topLevelValue.campaignLiveDate ??
+      fallbackBriefData?.campaignLiveDate ??
+      null,
+    campaignFlight:
+      asString(nested?.campaignFlight) ??
+      topLevelValue.campaignFlight ??
+      fallbackBriefData?.campaignFlight ??
+      null,
+    draftDueDate:
+      asString(nested?.draftDueDate) ??
+      topLevelValue.draftDueDate ??
+      fallbackBriefData?.draftDueDate ??
+      null,
+    contentDueDate:
+      asString(nested?.contentDueDate) ??
+      topLevelValue.contentDueDate ??
+      fallbackBriefData?.contentDueDate ??
+      null,
+    postDuration:
+      asString(nested?.postDuration) ??
+      topLevelValue.postDuration ??
+      fallbackBriefData?.postDuration ??
+      null,
+    amplificationPeriod:
+      asString(nested?.amplificationPeriod) ??
+      topLevelValue.amplificationPeriod ??
+      fallbackBriefData?.amplificationPeriod ??
+      null,
+    usageNotes:
+      asString(nested?.usageNotes) ??
+      topLevelValue.usageNotes ??
+      fallbackBriefData?.usageNotes ??
+      null,
+    disclosureRequirements: asStringArray(nested?.disclosureRequirements).length > 0
+      ? asStringArray(nested?.disclosureRequirements)
+      : (fallbackBriefData?.disclosureRequirements ?? []),
+    competitorRestrictions: asStringArray(nested?.competitorRestrictions).length > 0
+      ? asStringArray(nested?.competitorRestrictions)
+      : (fallbackBriefData?.competitorRestrictions ?? []),
+    linksAndAssets: asStringArray(nested?.linksAndAssets).length > 0
+      ? asStringArray(nested?.linksAndAssets)
+      : (fallbackBriefData?.linksAndAssets ?? []),
+    promoCode: asString(nested?.promoCode) ?? fallbackBriefData?.promoCode ?? null,
+    paymentSchedule:
+      asString(nested?.paymentSchedule) ??
+      topLevelValue.paymentSchedule ??
+      fallbackBriefData?.paymentSchedule ??
+      null,
+    paymentRequirements:
+      asString(nested?.paymentRequirements) ??
+      topLevelValue.paymentRequirements ??
+      fallbackBriefData?.paymentRequirements ??
+      null,
+    paymentNotes:
+      asString(nested?.paymentNotes) ??
+      topLevelValue.paymentNotes ??
+      fallbackBriefData?.paymentNotes ??
+      null,
+    reportingRequirements:
+      asString(nested?.reportingRequirements) ??
+      topLevelValue.reportingRequirements ??
+      fallbackBriefData?.reportingRequirements ??
+      null,
+    campaignNotes:
+      asString(nested?.campaignNotes) ??
+      topLevelValue.campaignNotes ??
+      fallbackBriefData?.campaignNotes ??
+      null,
     brandContactName:
-      asString(nested?.brandContactName) ?? topLevelValue.brandContactName ?? null,
+      asString(nested?.brandContactName) ??
+      topLevelValue.brandContactName ??
+      fallbackBriefData?.brandContactName ??
+      null,
     brandContactTitle:
-      asString(nested?.brandContactTitle) ?? topLevelValue.brandContactTitle ?? null,
+      asString(nested?.brandContactTitle) ??
+      topLevelValue.brandContactTitle ??
+      fallbackBriefData?.brandContactTitle ??
+      null,
     brandContactEmail:
-      asString(nested?.brandContactEmail) ?? topLevelValue.brandContactEmail ?? null,
+      asString(nested?.brandContactEmail) ??
+      topLevelValue.brandContactEmail ??
+      fallbackBriefData?.brandContactEmail ??
+      null,
     brandContactPhone:
-      asString(nested?.brandContactPhone) ?? topLevelValue.brandContactPhone ?? null,
+      asString(nested?.brandContactPhone) ??
+      topLevelValue.brandContactPhone ??
+      fallbackBriefData?.brandContactPhone ??
+      null,
     agencyContactName:
-      asString(nested?.agencyContactName) ?? topLevelValue.agencyContactName ?? null,
+      asString(nested?.agencyContactName) ??
+      topLevelValue.agencyContactName ??
+      fallbackBriefData?.agencyContactName ??
+      null,
     agencyContactTitle:
-      asString(nested?.agencyContactTitle) ?? topLevelValue.agencyContactTitle ?? null,
+      asString(nested?.agencyContactTitle) ??
+      topLevelValue.agencyContactTitle ??
+      fallbackBriefData?.agencyContactTitle ??
+      null,
     agencyContactEmail:
-      asString(nested?.agencyContactEmail) ?? topLevelValue.agencyContactEmail ?? null,
+      asString(nested?.agencyContactEmail) ??
+      topLevelValue.agencyContactEmail ??
+      fallbackBriefData?.agencyContactEmail ??
+      null,
     agencyContactPhone:
-      asString(nested?.agencyContactPhone) ?? topLevelValue.agencyContactPhone ?? null
+      asString(nested?.agencyContactPhone) ??
+      topLevelValue.agencyContactPhone ??
+      fallbackBriefData?.agencyContactPhone ??
+      null
   };
-
-  const hasPatch = Object.values(patch).some((value) => value !== null);
-  if (!hasPatch) {
-    return fallbackBriefData;
-  }
 
   const base = fallbackBriefData ?? emptyBriefData();
   return {

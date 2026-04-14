@@ -80,12 +80,16 @@ export interface ConflictResult {
 
 export interface BriefData {
   campaignOverview: string | null;
+  campaignCode?: string | null;
+  jobNumber?: string | null;
+  referenceId?: string | null;
   campaignObjective?: string | null;
   messagingPoints: string[];
   talkingPoints: string[];
   creativeConceptOverview: string | null;
   contentPillars?: string[];
   requiredElements?: string[];
+  requiredClaims?: string[];
   brandGuidelines: string | null;
   approvalRequirements: string | null;
   revisionRequirements?: string | null;
@@ -97,16 +101,27 @@ export interface BriefData {
   productDescription?: string | null;
   deliverablesSummary?: string | null;
   deliverablePlatforms?: string[];
+  creatorHandle?: string | null;
   postingSchedule?: string | null;
+  agreementStartDate?: string | null;
+  agreementEndDate?: string | null;
+  executionTargetDate?: string | null;
+  conceptDueDate?: string | null;
   campaignLiveDate?: string | null;
+  campaignFlight?: string | null;
   draftDueDate?: string | null;
   contentDueDate?: string | null;
+  postDuration?: string | null;
+  amplificationPeriod?: string | null;
   usageNotes?: string | null;
   disclosureRequirements?: string[];
   competitorRestrictions?: string[];
   linksAndAssets?: string[];
   promoCode?: string | null;
+  paymentSchedule?: string | null;
+  paymentRequirements?: string | null;
   paymentNotes?: string | null;
+  reportingRequirements?: string | null;
   campaignNotes?: string | null;
   brandContactName?: string | null;
   brandContactTitle?: string | null;

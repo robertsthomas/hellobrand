@@ -6,7 +6,7 @@ import {
   joinPromptSections,
   promptBullets,
   promptNumbered,
-  promptQuotedText
+  promptQuotedText,
 } from "@/lib/ai/prompting";
 import { runStructuredOpenRouterTask } from "@/lib/ai/structured";
 import {
@@ -14,41 +14,55 @@ import {
   buildAiInputHash,
   finalizeAiStreamExecution,
   prepareAiStreamExecution,
-  runOpenRouterTask
+  runOpenRouterTask,
 } from "@/lib/ai/gateway";
 import { assistantProvider } from "@/lib/assistant/provider";
 import { buildEmailThreadVersion } from "@/lib/email/reply-suggestion-version";
+import {
+  buildThreadBrief,
+  modeSpecificDraftGuidance,
+  modeSpecificFallbackDraft,
+  modeSpecificSummaryGuidance,
+  modeSpecificSuggestions,
+  threadBriefForPrompt,
+} from "@/lib/email/thread-brief";
 import type {
   DealAggregate,
   EmailThreadDetail,
   EmailThreadNoteRecord,
   NegotiationStance,
   ProfileRecord,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 
 const emailDraftSchema = z.object({
   subject: z.string().trim().min(1),
-  body: z.string().trim().min(1)
+  body: z.string().trim().min(1),
 });
 
 const replySuggestionsSchema = z.object({
-  suggestions: z.array(
-    z.object({
-      label: z.string().trim().min(1),
-      prompt: z.string().trim().min(1)
-    })
-  ).max(3)
+  suggestions: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1),
+        prompt: z.string().trim().min(1),
+      })
+    )
+    .max(3),
 });
 
-const EMAIL_THREAD_SUMMARY_FORMAT_VERSION = "v2_short";
+const EMAIL_THREAD_SUMMARY_FORMAT_VERSION = "v3_brief";
 
-function emailThreadSummarySystemPrompt() {
+function emailThreadSummarySystemPrompt(modeGuidance: string) {
   return joinPromptSections([
     {
       tag: "role",
       content:
-        "You summarize creator inbox threads for brand partnership workflows. You are factual, concise, and grounded."
+        "You summarize creator inbox threads for brand partnership workflows. You are factual, concise, and grounded.",
+    },
+    {
+      tag: "conversation_context",
+      content: modeGuidance,
     },
     {
       tag: "rules",
@@ -57,6 +71,7 @@ function emailThreadSummarySystemPrompt() {
         "Call out asks, commitments, approvals, payment timing, usage rights, deadlines, and next steps when present.",
         "If the thread leaves a key deal fact unresolved, say it is not specified or still open instead of guessing.",
         "Prefer creator-native framing, such as what the creator needs to do, what the other side is asking for, and what is still unresolved.",
+        "Answer five things in order: what this thread is, what they want, what the creator last said, what is still unresolved, and what the recommended next move is.",
         "If an item is not explicit in the thread, omit it.",
         "Write plain text only.",
         "Keep the summary short and simple.",
@@ -65,40 +80,45 @@ function emailThreadSummarySystemPrompt() {
         "If you use bullets, use at most 3 bullets and keep each bullet to one short sentence.",
         "Do not use headings, sections, labels, or long checklists.",
         "Do not repeat the same fact in both prose and bullets.",
-        "Never use em dashes or en dashes. Replace them with commas."
-      ])
-    }
+        "Never use em dashes or en dashes. Replace them with commas.",
+      ]),
+    },
   ]);
 }
 
-function emailThreadSummaryUserPrompt(threadText: string) {
+function emailThreadSummaryUserPrompt(threadText: string, briefText: string) {
   return joinPromptSections([
     {
+      tag: "thread_brief",
+      content: briefText,
+    },
+    {
       tag: "thread",
-      content: promptQuotedText(threadText)
+      content: promptQuotedText(threadText),
     },
     {
       tag: "task",
       content:
-        "Based on the thread above, write a short creator-facing recap of the email. Keep it easy to skim, explain what happened, what they are asking for, and the most important next step. Aim for 4 to 5 sentences, and only add up to 3 bullets if the thread includes several concrete terms that are worth breaking out."
-    }
+        "Based on the thread above, write a short creator-facing recap of the email. Keep it easy to skim, explain what happened, what they are asking for, and the most important next step. Aim for 4 to 5 sentences, and only add up to 3 bullets if the thread includes several concrete terms that are worth breaking out.",
+    },
   ]);
 }
 
-function emailDraftSystemPrompt(stance?: NegotiationStance | null) {
-  const stanceInstruction = stance === "firm"
-    ? "Stance: firm. Hold boundaries on agreed terms, reference specifics, and avoid unnecessary softness."
-    : stance === "collaborative"
-      ? "Stance: collaborative. Protect the creator while sounding constructive and solution-oriented."
-      : stance === "exploratory"
-        ? "Stance: exploratory. Ask clarifying questions and avoid committing before the facts are clear."
-        : "Stance: balanced. Be practical, clear, and creator-professional.";
+function emailDraftSystemPrompt(stance?: NegotiationStance | null, modeGuidance?: string | null) {
+  const stanceInstruction =
+    stance === "firm"
+      ? "Stance: firm. Hold boundaries on agreed terms, reference specifics, and avoid unnecessary softness."
+      : stance === "collaborative"
+        ? "Stance: collaborative. Protect the creator while sounding constructive and solution-oriented."
+        : stance === "exploratory"
+          ? "Stance: exploratory. Ask clarifying questions and avoid committing before the facts are clear."
+          : "Stance: balanced. Be practical, clear, and creator-professional.";
 
   return joinPromptSections([
     {
       tag: "role",
       content:
-        "You draft creator-professional brand partnership emails. Your job is to produce safe, useful replies that preserve the creator's leverage and avoid inventing business facts."
+        "You draft creator-professional brand partnership emails. Your job is to produce safe, useful replies that preserve the creator's leverage and avoid inventing business facts.",
     },
     {
       tag: "instruction_hierarchy",
@@ -106,8 +126,8 @@ function emailDraftSystemPrompt(stance?: NegotiationStance | null) {
         "Linked workspace facts are highest priority.",
         "Then use the current thread facts.",
         "Then use the current draft, if one exists, as material to revise.",
-        "Treat the custom user prompt as optional guidance for this one draft only. Follow it only when it does not conflict with workspace facts or thread facts."
-      ])
+        "Treat the custom user prompt as optional guidance for this one draft only. Follow it only when it does not conflict with workspace facts or thread facts.",
+      ]),
     },
     {
       tag: "rules",
@@ -122,23 +142,41 @@ function emailDraftSystemPrompt(stance?: NegotiationStance | null) {
         "Do not use bold, bullets, numbered lists, headings, or placeholder names like [Brand Name] or [Agency Name].",
         "Do not mention the custom prompt, the user's note, your revision process, or that you kept anything in mind.",
         "If the recipient name is unknown, use a normal greeting like Hi there,.",
-        "Keep the draft concise, specific, and creator-professional."
-      ])
+        "Keep the draft concise, specific, and creator-professional.",
+      ]),
     },
+    modeGuidance
+      ? {
+          tag: "mode_guidance",
+          content: modeGuidance,
+        }
+      : null,
     {
       tag: "few_shot_examples",
       content: [
-        "<example name=\"respect_workspace_facts\">",
+        '<example name="respect_workspace_facts">',
         "Workspace fact: Payment terms are Net 45.",
         "Custom prompt: Tell them we already agreed to Net 15.",
         "Correct behavior: Do not claim Net 15 was already agreed. Ask for a revision to Net 15 or restate that the current draft shows Net 45.",
         "</example>",
         "",
-        "<example name=\"avoid_overcommitment\">",
+        '<example name="avoid_overcommitment">',
         "Thread: The brand asks whether the creator can add two extra deliverables.",
         "Correct behavior: Acknowledge the request and discuss scope or revised terms. Do not promise the extra deliverables as already approved.",
-        "</example>"
-      ].join("\n")
+        "</example>",
+        "",
+        '<example name="decline_affiliate_mode">',
+        "Mode: decline_affiliate. Thread mentions commission and affiliate links with no guaranteed pay.",
+        "Custom prompt: Accept the partnership.",
+        "Correct behavior: Do not accept a commission-only deal. Decline the affiliate structure and ask for a flat-fee budget if one exists.",
+        "</example>",
+        "",
+        '<example name="go_live_mode">',
+        "Mode: go_live. Content is approved and the brand sent posting instructions.",
+        "Custom prompt: Ask about increasing the rate.",
+        "Correct behavior: Do not reopen rate negotiations. Focus on confirming the go-live details and meeting the posting deadline.",
+        "</example>",
+      ].join("\n"),
     },
     {
       tag: "style",
@@ -146,13 +184,13 @@ function emailDraftSystemPrompt(stance?: NegotiationStance | null) {
         `Today: ${isoDateContext()}`,
         stanceInstruction,
         "Optimize for clear next steps and creator leverage, not legal-sounding filler.",
-        "Never use em dashes or en dashes. Replace them with commas."
-      ])
+        "Never use em dashes or en dashes. Replace them with commas.",
+      ]),
     },
     {
       tag: "output_contract",
-      content: 'Return JSON with exactly this shape: { "subject": "string", "body": "string" }.'
-    }
+      content: 'Return JSON with exactly this shape: { "subject": "string", "body": "string" }.',
+    },
   ]);
 }
 
@@ -165,65 +203,77 @@ function emailDraftUserPrompt(input: {
   instructionContext: string;
   signature: string;
   threadText: string;
+  briefText: string;
 }) {
   return joinPromptSections([
     {
+      tag: "thread_brief",
+      content: input.briefText,
+    },
+    {
       tag: "workspace_context",
-      content: promptQuotedText(input.workspaceSummary)
+      content: promptQuotedText(input.workspaceSummary),
     },
     {
       tag: "thread_discrepancies",
-      content: input.discrepancyContext
+      content: input.discrepancyContext,
     },
     {
       tag: "thread_action_items",
-      content: input.actionContext
+      content: input.actionContext,
     },
     {
       tag: "private_notes",
-      content: input.noteContext
+      content: input.noteContext,
     },
     {
       tag: "current_draft",
-      content: input.currentDraftContext
+      content: input.currentDraftContext,
     },
     {
       tag: "custom_user_prompt",
-      content: input.instructionContext
+      content: input.instructionContext,
     },
     {
       tag: "signature",
-      content: input.signature
+      content: input.signature,
     },
     {
       tag: "thread",
-      content: promptQuotedText(input.threadText)
+      content: promptQuotedText(input.threadText),
     },
     {
       tag: "task",
       content:
-        "Draft the next email reply for the creator using the hierarchy and rules above. Keep the output grounded in the workspace and thread."
-    }
+        "Draft the next email reply for the creator using the hierarchy and rules above. Keep the output grounded in the workspace and thread.",
+    },
   ]);
 }
 
-function replySuggestionsSystemPrompt() {
+function replySuggestionsSystemPrompt(modeGuidance: string) {
   return joinPromptSections([
     {
       tag: "role",
       content:
-        "You generate short, high-signal reply prompt suggestions for creators responding to brand partnership emails."
+        "You generate short, high-signal reply prompt suggestions for creators responding to brand partnership emails.",
+    },
+    {
+      tag: "conversation_context",
+      content: modeGuidance,
     },
     {
       tag: "rules",
       content: promptNumbered([
-        "Suggestions must be specific to the thread, not generic filler.",
-        "Each suggestion should represent a realistic creator move such as clarify scope, push back on terms, confirm timing, or ask a follow-up question.",
+        "Suggestions must be specific to the thread and its conversation mode, not generic filler.",
+        "Each suggestion should represent a realistic creator move appropriate for the current conversation phase.",
+        "For affiliate or gifted offers, suggest declining or requesting guaranteed pay, not enthusiastic acceptance.",
+        "For go-live threads, suggest operational moves like confirming timing or addressing posting requirements.",
+        "For low-signal or spam threads, suggest ignoring or a short decline, not an eager reply.",
         "Keep labels short and scannable.",
         "Keep prompts to one sentence each.",
         'Return JSON with this shape: { "suggestions": [{ "label": "...", "prompt": "..." }] }.',
-        "Never use em dashes or en dashes."
-      ])
+        "Never use em dashes or en dashes.",
+      ]),
     },
     {
       tag: "few_shot_examples",
@@ -234,25 +284,38 @@ function replySuggestionsSystemPrompt() {
         "</example>",
         "",
         "<example>",
-        "Bad suggestion: { \"label\": \"Respond politely\", \"prompt\": \"Write a nice reply.\" }",
+        "Thread theme: Affiliate offer with commission-only compensation, no guaranteed pay.",
+        'Good suggestion: { "label": "Decline and request flat-fee terms", "prompt": "Politely decline the commission arrangement and ask if they have a guaranteed flat-fee budget." }',
+        'Bad suggestion: { "label": "Accept the partnership", "prompt": "Express excitement about the affiliate program." }',
+        "Reason: Accepting commission-only deals without asking for guaranteed pay undermines creator leverage.",
+        "</example>",
+        "",
+        "<example>",
+        "Thread theme: Generic follow-up with no terms, no compensation, and no actionable ask.",
+        'Good suggestion: { "label": "Send a short decline", "prompt": "Write a brief, polite decline. Keep it to one or two sentences." }',
+        'Bad suggestion: { "label": "Respond politely", "prompt": "Write a nice reply." }',
         "Reason: Too generic and not useful.",
-        "</example>"
-      ].join("\n")
-    }
+        "</example>",
+      ].join("\n"),
+    },
   ]);
 }
 
-function replySuggestionsUserPrompt(threadText: string) {
+function replySuggestionsUserPrompt(threadText: string, briefText: string) {
   return joinPromptSections([
     {
+      tag: "thread_brief",
+      content: briefText,
+    },
+    {
       tag: "thread",
-      content: promptQuotedText(threadText)
+      content: promptQuotedText(threadText),
     },
     {
       tag: "task",
       content:
-        "Based on the thread above, return 3 distinct prompt suggestions for the creator's next reply."
-    }
+        "Based on the thread above and its conversation context, return 3 distinct prompt suggestions for the creator's next reply. Make each suggestion specific to the current conversation mode.",
+    },
   ]);
 }
 
@@ -267,15 +330,18 @@ function plainTextThread(thread: EmailThreadDetail) {
 }
 
 function fallbackSummary(thread: EmailThreadDetail) {
-  const participants = thread.thread.participants.map((participant) => participant.email).join(", ");
+  const participants = thread.thread.participants
+    .map((participant) => participant.email)
+    .join(", ");
   const latest = thread.messages[thread.messages.length - 1];
-  const latestBody = latest?.textBody?.trim() || latest?.htmlBody?.replace(/<[^>]+>/g, " ").trim() || "";
+  const latestBody =
+    latest?.textBody?.trim() || latest?.htmlBody?.replace(/<[^>]+>/g, " ").trim() || "";
 
   return [
     `Subject: ${thread.thread.subject}`,
     `Participants: ${participants || "Unknown"}`,
     `Last activity: ${thread.thread.lastMessageAt}`,
-    latestBody ? `Latest message: ${latestBody.slice(0, 500)}` : null
+    latestBody ? `Latest message: ${latestBody.slice(0, 500)}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -302,7 +368,9 @@ function workspaceContext(partnership: DealAggregate | null) {
   const extractionEvidence = partnership.extractionResults
     .slice(0, 6)
     .map((result) => {
-      const fields = Object.keys(result.data ?? {}).slice(0, 6).join(", ");
+      const fields = Object.keys(result.data ?? {})
+        .slice(0, 6)
+        .join(", ");
       return `- ${result.documentId}: ${fields || "structured extraction available"}`;
     })
     .join("\n");
@@ -340,34 +408,38 @@ function workspaceContext(partnership: DealAggregate | null) {
     documents || "- None",
     "",
     "Workspace extracted structure:",
-    extractionEvidence || "- None"
+    extractionEvidence || "- None",
   ].join("\n");
 }
 
 export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
   const fallback = fallbackSummary(thread);
   const threadText = plainTextThread(thread);
+  const brief = buildThreadBrief(thread, null);
+  const briefText = threadBriefForPrompt(brief);
+  const modeGuidance = modeSpecificSummaryGuidance(brief.mode);
   const cache = aiCachePolicy({
     taskKey: "email_summary",
     scopeKey: `email-thread:${EMAIL_THREAD_SUMMARY_FORMAT_VERSION}:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
     input: {
       threadId: thread.thread.id,
       formatVersion: EMAIL_THREAD_SUMMARY_FORMAT_VERSION,
-      threadText
-    }
+      threadText,
+      briefText,
+    },
   });
 
   const result = await runOpenRouterTask<string>({
     context: {
       featureKey: "premium_inbox",
-      taskKey: "email_summary"
+      taskKey: "email_summary",
     },
-    systemPrompt: emailThreadSummarySystemPrompt(),
-    userPrompt: emailThreadSummaryUserPrompt(threadText),
+    systemPrompt: emailThreadSummarySystemPrompt(modeGuidance),
+    userPrompt: emailThreadSummaryUserPrompt(threadText, briefText),
     temperature: 0.2,
     cache,
     parse: (content) => content.trim() || fallback,
-    serialize: (value) => value
+    serialize: (value) => value,
   });
 
   return result?.data ?? fallback;
@@ -378,8 +450,13 @@ function fallbackDraft(
   partnership: DealAggregate | null,
   profile: ProfileRecord,
   instructions?: string | null,
-  currentDraft?: { subject: string; body: string } | null
+  currentDraft?: { subject: string; body: string } | null,
+  brief?: ReturnType<typeof buildThreadBrief> | null
 ) {
+  if (brief) {
+    return modeSpecificFallbackDraft(thread, brief, profile, partnership, currentDraft);
+  }
+
   const signoff = profile.preferredSignature?.trim() || profile.displayName?.trim() || "Creator";
   const baseSubject = currentDraft?.subject?.trim();
   const baseBody = currentDraft?.body?.trim();
@@ -388,12 +465,14 @@ function fallbackDraft(
     : "Thanks for the note.";
 
   return {
-    subject: baseSubject || (thread.thread.subject.startsWith("Re:")
-      ? thread.thread.subject
-      : `Re: ${thread.thread.subject}`),
+    subject:
+      baseSubject ||
+      (thread.thread.subject.startsWith("Re:")
+        ? thread.thread.subject
+        : `Re: ${thread.thread.subject}`),
     body: baseBody
       ? baseBody
-      : `${intro}\n\nI reviewed the thread and I’m aligned on the next steps. If there are any updates on timing, deliverables, or contract details, send them over and I’ll keep things moving.\n\nBest,\n${signoff}`
+      : `${intro}\n\nI reviewed the thread and I'm aligned on the next steps. If there are any updates on timing, deliverables, or contract details, send them over and I'll keep things moving.\n\nBest,\n${signoff}`,
   };
 }
 
@@ -406,25 +485,41 @@ function buildEmailReplyDraftRequest(
   currentDraft?: { subject: string; body: string } | null,
   notes?: EmailThreadNoteRecord[]
 ) {
-  const fallback = fallbackDraft(thread, partnership, profile, instructions, currentDraft);
-  const discrepancyContext = thread.promiseDiscrepancies.length > 0
-    ? thread.promiseDiscrepancies.map((d) => `- ${d.field}: email says "${d.emailClaim}", contract says "${d.contractValue}"`).join("\n")
-    : "- None";
+  const brief = buildThreadBrief(thread, partnership);
+  const briefText = threadBriefForPrompt(brief);
+  const modeGuidance = modeSpecificDraftGuidance(brief.mode, brief);
+  const fallback = fallbackDraft(thread, partnership, profile, instructions, currentDraft, brief);
+  const discrepancyContext =
+    thread.promiseDiscrepancies.length > 0
+      ? thread.promiseDiscrepancies
+          .map(
+            (d) => `- ${d.field}: email says "${d.emailClaim}", contract says "${d.contractValue}"`
+          )
+          .join("\n")
+      : "- None";
 
-  const actionContext = thread.actionItems.length > 0
-    ? thread.actionItems.map((a) => `- ${a.action}${a.dueDate ? ` (due: ${a.dueDate})` : ""}`).join("\n")
-    : "- None";
-  const noteContext = notes && notes.length > 0
-    ? notes.slice(0, 10).map((note) => `- ${note.body}`).join("\n")
-    : "- None";
+  const actionContext =
+    thread.actionItems.length > 0
+      ? thread.actionItems
+          .map((a) => `- ${a.action}${a.dueDate ? ` (due: ${a.dueDate})` : ""}`)
+          .join("\n")
+      : "- None";
+  const noteContext =
+    notes && notes.length > 0
+      ? notes
+          .slice(0, 10)
+          .map((note) => `- ${note.body}`)
+          .join("\n")
+      : "- None";
 
-  const stanceInstruction = stance === "firm"
-    ? "firm"
-    : stance === "collaborative"
-      ? "collaborative"
-      : stance === "exploratory"
-        ? "exploratory"
-        : null;
+  const stanceInstruction =
+    stance === "firm"
+      ? "firm"
+      : stance === "collaborative"
+        ? "collaborative"
+        : stance === "exploratory"
+          ? "exploratory"
+          : null;
   const instructionContext = instructions?.trim() || "None";
   const currentDraftContext = currentDraft?.body?.trim()
     ? `Current draft subject: ${currentDraft.subject.trim()}\nCurrent draft body:\n${currentDraft.body.trim()}`
@@ -441,9 +536,10 @@ function buildEmailReplyDraftRequest(
         thread.thread.id,
         buildEmailThreadVersion(thread.thread),
         partnership?.deal.id ?? "no-deal",
-        partnership?.deal.updatedAt ?? "no-deal-version"
+        partnership?.deal.updatedAt ?? "no-deal-version",
       ].join(":"),
       input: {
+        briefText,
         discrepancyContext,
         actionContext,
         noteContext,
@@ -452,10 +548,10 @@ function buildEmailReplyDraftRequest(
         stance: stanceInstruction,
         workspaceContext: workspaceSummary,
         signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
-        threadText
-      }
+        threadText,
+      },
     }),
-    systemPrompt: emailDraftSystemPrompt(stance),
+    systemPrompt: emailDraftSystemPrompt(stance, modeGuidance),
     userPrompt: emailDraftUserPrompt({
       workspaceSummary,
       discrepancyContext,
@@ -464,9 +560,10 @@ function buildEmailReplyDraftRequest(
       currentDraftContext,
       instructionContext,
       signature: profile.preferredSignature ?? profile.displayName ?? "Creator",
-      threadText
+      threadText,
+      briefText,
     }),
-    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35
+    temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
   };
 }
 
@@ -474,8 +571,8 @@ function draftTextResponse(body: string) {
   return new Response(body, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-store"
-    }
+      "Cache-Control": "no-store",
+    },
   });
 }
 
@@ -514,7 +611,7 @@ export async function generateEmailReplyDraft(
   const result = await runStructuredOpenRouterTask({
     context: {
       featureKey: "premium_inbox",
-      taskKey: "email_draft"
+      taskKey: "email_draft",
     },
     systemPrompt: request.systemPrompt,
     userPrompt: request.userPrompt,
@@ -527,7 +624,7 @@ export async function generateEmailReplyDraft(
   const draft = result?.data ?? request.fallback;
   return {
     subject: normalizeEmailDraftText(draft.subject),
-    body: normalizeEmailDraftText(draft.body)
+    body: normalizeEmailDraftText(draft.body),
   };
 }
 
@@ -556,8 +653,8 @@ export async function streamEmailReplyDraft(input: {
     featureKey: "premium_inbox",
     metadata: {
       threadId: input.thread.thread.id,
-      stance: input.stance ?? null
-    }
+      stance: input.stance ?? null,
+    },
   });
 
   if (prepared.budgetDecision === "blocked") {
@@ -576,7 +673,7 @@ export async function streamEmailReplyDraft(input: {
     instructions: input.instructions ?? null,
     currentDraft: input.currentDraft ?? null,
     systemPrompt: request.systemPrompt,
-    userPrompt: request.userPrompt
+    userPrompt: request.userPrompt,
   });
 
   const result = streamText({
@@ -585,12 +682,12 @@ export async function streamEmailReplyDraft(input: {
       provider: {
         allow_fallbacks: prepared.fallbacks.length > 0,
         data_collection: "deny",
-        zdr: true
+        zdr: true,
       },
       cache_control: {
         type: "ephemeral",
-        ttl: "5m"
-      }
+        ttl: "5m",
+      },
     }),
     system: `${request.systemPrompt}\n\nReturn only the email body text. Do not include a subject line, JSON, markdown, bullets, or headings.`,
     prompt: request.userPrompt,
@@ -600,7 +697,7 @@ export async function streamEmailReplyDraft(input: {
       isEnabled: true,
       functionId: "email.generate-draft",
       recordInputs: true,
-      recordOutputs: true
+      recordOutputs: true,
     },
     onFinish: async ({ totalUsage, model }) => {
       await finalizeAiStreamExecution({
@@ -610,19 +707,19 @@ export async function streamEmailReplyDraft(input: {
           featureKey: "premium_inbox",
           metadata: {
             threadId: input.thread.thread.id,
-            stance: input.stance ?? null
-          }
+            stance: input.stance ?? null,
+          },
         },
         prepared,
         usage: {
           promptTokens: totalUsage.inputTokens ?? 0,
           completionTokens: totalUsage.outputTokens ?? 0,
-          totalTokens: totalUsage.totalTokens ?? 0
+          totalTokens: totalUsage.totalTokens ?? 0,
         },
         resolvedModel: model.modelId ?? prepared.requestedModel,
-        inputHash
+        inputHash,
       });
-    }
+    },
   });
 
   return result.toTextStreamResponse();
@@ -631,28 +728,32 @@ export async function streamEmailReplyDraft(input: {
 export async function generateReplySuggestions(
   thread: EmailThreadDetail
 ): Promise<{ id: string; label: string; prompt: string }[]> {
-  const fallback = fallbackSuggestions(thread);
+  const brief = buildThreadBrief(thread, null);
+  const briefText = threadBriefForPrompt(brief);
+  const fallback = modeSpecificSuggestions(brief.mode, brief);
   const threadText = plainTextThread(thread);
+  const modeGuidance = modeSpecificSummaryGuidance(brief.mode);
   const cache = aiCachePolicy({
     taskKey: "email_suggestions",
     scopeKey: `email-suggestions:${thread.thread.id}:${buildEmailThreadVersion(thread.thread)}`,
     input: {
       threadId: thread.thread.id,
-      threadText
-    }
+      briefText,
+      threadText,
+    },
   });
 
   const structuredFallback = {
-    suggestions: fallback.map(({ label, prompt }) => ({ label, prompt }))
+    suggestions: fallback.map(({ label, prompt }) => ({ label, prompt })),
   };
 
   const result = await runStructuredOpenRouterTask({
     context: {
       featureKey: "premium_inbox",
-      taskKey: "email_suggestions"
+      taskKey: "email_suggestions",
     },
-    systemPrompt: replySuggestionsSystemPrompt(),
-    userPrompt: replySuggestionsUserPrompt(threadText),
+    systemPrompt: replySuggestionsSystemPrompt(modeGuidance),
+    userPrompt: replySuggestionsUserPrompt(threadText, briefText),
     temperature: 0.4,
     schema: replySuggestionsSchema,
     fallback: structuredFallback,
@@ -663,32 +764,6 @@ export async function generateReplySuggestions(
   return items.slice(0, 3).map((entry, index) => ({
     id: `ai-${index}`,
     label: entry.label.trim(),
-    prompt: entry.prompt.trim()
+    prompt: entry.prompt.trim(),
   }));
-}
-
-function fallbackSuggestions(thread: EmailThreadDetail) {
-  const hasActionItems = thread.actionItems.length > 0;
-  const suggestions = [
-    {
-      id: "fallback-0",
-      label: hasActionItems
-        ? "Confirm the next steps they asked about"
-        : "Ask for more details on the deliverables",
-      prompt: hasActionItems
-        ? "Address the pending action items and confirm next steps."
-        : "Ask the brand to clarify the deliverables, timeline, or creative direction."
-    },
-    {
-      id: "fallback-1",
-      label: "Push back on the terms politely",
-      prompt: "Politely push back on terms that feel unfavorable. Suggest alternatives."
-    },
-    {
-      id: "fallback-2",
-      label: "Keep it short and confirm availability",
-      prompt: "Write a brief reply confirming availability and interest without overcommitting."
-    }
-  ];
-  return suggestions;
 }

@@ -465,6 +465,7 @@ export function TermsEditor({
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     partnership: true,
     payment: true,
+    workflow: true,
     deliverables: true,
     usage: true,
     exclusivity: true,
@@ -485,6 +486,34 @@ export function TermsEditor({
   }
 
   const catOpts = DEAL_CATEGORY_OPTIONS.map((c) => ({ value: c, label: dealCategoryLabel(c) ?? c }));
+  const briefTermDetails = terms?.briefData ?? null;
+  const hasWorkflowTerms = Boolean(
+    briefTermDetails?.campaignCode ||
+      briefTermDetails?.jobNumber ||
+      briefTermDetails?.referenceId ||
+      briefTermDetails?.creatorHandle ||
+      briefTermDetails?.agreementStartDate ||
+      briefTermDetails?.agreementEndDate ||
+      briefTermDetails?.executionTargetDate ||
+      briefTermDetails?.campaignFlight ||
+      briefTermDetails?.postingSchedule ||
+      briefTermDetails?.conceptDueDate ||
+      terms?.campaignDateWindow?.startDate ||
+      terms?.campaignDateWindow?.endDate ||
+      briefTermDetails?.draftDueDate ||
+      briefTermDetails?.contentDueDate ||
+      briefTermDetails?.campaignLiveDate ||
+      briefTermDetails?.postDuration ||
+      briefTermDetails?.amplificationPeriod ||
+      briefTermDetails?.approvalRequirements ||
+      briefTermDetails?.revisionRequirements ||
+      briefTermDetails?.reportingRequirements
+  );
+  const hasOperationalPaymentTerms = Boolean(
+    briefTermDetails?.paymentSchedule ||
+      briefTermDetails?.paymentRequirements ||
+      briefTermDetails?.paymentNotes
+  );
   const manuallyReviewedFields = useMemo(
     () => new Set(terms?.manuallyEditedFields ?? []),
     [terms?.manuallyEditedFields]
@@ -673,7 +702,40 @@ export function TermsEditor({
             editControl={<textarea className={`${FORM_TEXTAREA_CLASS} min-h-[4.5rem]`} name="paymentTrigger" defaultValue={fieldValue(terms?.paymentTrigger)} />}
           />
         </div>
-        <Signals fields={["paymentAmount", "paymentTerms"]} evidence={evidence} sections={sections} />
+        {hasOperationalPaymentTerms ? (
+          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-3">
+            <Field
+              label="Payment schedule"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentSchedule)} />}
+              editControl={null}
+            />
+            <Field
+              label="Payment requirements"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentRequirements)} />}
+              editControl={null}
+            />
+            <Field
+              label="Payment notes"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentNotes)} />}
+              editControl={null}
+            />
+          </div>
+        ) : null}
+        <Signals
+          fields={[
+            "paymentAmount",
+            "paymentTerms",
+            "paymentTrigger",
+            "briefData.paymentSchedule",
+            "briefData.paymentRequirements",
+            "briefData.paymentNotes"
+          ]}
+          evidence={evidence}
+          sections={sections}
+        />
         {!ed("payment") ? (
           <>
             {textHidden("paymentAmount", String(terms?.paymentAmount ?? ""))}
@@ -685,6 +747,177 @@ export function TermsEditor({
           </>
         ) : null}
       </Section>
+
+      {/* ───── Timeline & workflow ───── */}
+      {hasWorkflowTerms ? (
+        <Section
+          sectionKey="workflow"
+          title="Timeline and workflow"
+          description="Dates, submission milestones, and approval requirements pulled from the agreement."
+          open={isOpen("workflow")}
+          onToggleOpen={() => toggleOpen("workflow")}
+          editing={false}
+          showEditToggle={false}
+          onToggleEdit={() => undefined}
+        >
+          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+            <Field
+              label="Campaign code"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.campaignCode)} />}
+              editControl={null}
+            />
+            <Field
+              label="Job number"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.jobNumber)} />}
+              editControl={null}
+            />
+            <Field
+              label="Reference ID"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.referenceId)} />}
+              editControl={null}
+            />
+            <Field
+              label="Creator handle"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.creatorHandle)} />}
+              editControl={null}
+            />
+            <Field
+              label="Campaign flight"
+              editing={false}
+              readOnly={
+                <ReadOnlyValue
+                  value={
+                    fieldValue(briefTermDetails?.campaignFlight) ||
+                    fieldValue(terms?.campaignDateWindow?.postingWindow)
+                  }
+                />
+              }
+              editControl={null}
+            />
+            <Field
+              label="Campaign start"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(terms?.campaignDateWindow?.startDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Campaign end"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(terms?.campaignDateWindow?.endDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Agreement start"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.agreementStartDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Agreement end"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.agreementEndDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Execution target"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.executionTargetDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Concept due"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.conceptDueDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Draft due"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.draftDueDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Content due"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.contentDueDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Live date"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.campaignLiveDate)} />}
+              editControl={null}
+            />
+            <Field
+              label="Posting schedule"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.postingSchedule)} />}
+              editControl={null}
+            />
+            <Field
+              label="Post duration"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.postDuration)} />}
+              editControl={null}
+            />
+            <Field
+              label="Amplification period"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.amplificationPeriod)} />}
+              editControl={null}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-3">
+            <Field
+              label="Approval requirements"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.approvalRequirements)} />}
+              editControl={null}
+            />
+            <Field
+              label="Revision requirements"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.revisionRequirements)} />}
+              editControl={null}
+            />
+            <Field
+              label="Reporting requirements"
+              editing={false}
+              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.reportingRequirements)} />}
+              editControl={null}
+            />
+          </div>
+          <Signals
+            fields={[
+              "campaignDateWindow",
+              "briefData.campaignCode",
+              "briefData.jobNumber",
+              "briefData.referenceId",
+              "briefData.creatorHandle",
+              "briefData.agreementStartDate",
+              "briefData.agreementEndDate",
+              "briefData.executionTargetDate",
+              "briefData.campaignFlight",
+              "briefData.postingSchedule",
+              "briefData.conceptDueDate",
+              "briefData.draftDueDate",
+              "briefData.contentDueDate",
+              "briefData.campaignLiveDate",
+              "briefData.postDuration",
+              "briefData.amplificationPeriod",
+              "briefData.approvalRequirements",
+              "briefData.revisionRequirements",
+              "briefData.reportingRequirements"
+            ]}
+            evidence={evidence}
+            sections={sections}
+          />
+        </Section>
+      ) : null}
 
       {/* ───── Deliverables (always editable) ───── */}
       <Section
