@@ -68,7 +68,15 @@ export async function extractBriefWithLlm(
         approvalRequirements: fallback.approvalRequirements,
         targetAudience: fallback.targetAudience,
         toneAndStyle: fallback.toneAndStyle,
-        doNotMention: fallback.doNotMention
+        doNotMention: fallback.doNotMention,
+        brandContactName: fallback.brandContactName,
+        brandContactTitle: fallback.brandContactTitle,
+        brandContactEmail: fallback.brandContactEmail,
+        brandContactPhone: fallback.brandContactPhone,
+        agencyContactName: fallback.agencyContactName,
+        agencyContactTitle: fallback.agencyContactTitle,
+        agencyContactEmail: fallback.agencyContactEmail,
+        agencyContactPhone: fallback.agencyContactPhone
       },
       {
         documentKind: kind,
@@ -92,6 +100,14 @@ export async function extractBriefWithLlm(
       doNotMention: asStringArray(payload.doNotMention).length > 0
         ? asStringArray(payload.doNotMention)
         : fallback.doNotMention,
+      brandContactName: asString(payload.brandContactName) ?? fallback.brandContactName,
+      brandContactTitle: asString(payload.brandContactTitle) ?? fallback.brandContactTitle,
+      brandContactEmail: asString(payload.brandContactEmail) ?? fallback.brandContactEmail,
+      brandContactPhone: asString(payload.brandContactPhone) ?? fallback.brandContactPhone,
+      agencyContactName: asString(payload.agencyContactName) ?? fallback.agencyContactName,
+      agencyContactTitle: asString(payload.agencyContactTitle) ?? fallback.agencyContactTitle,
+      agencyContactEmail: asString(payload.agencyContactEmail) ?? fallback.agencyContactEmail,
+      agencyContactPhone: asString(payload.agencyContactPhone) ?? fallback.agencyContactPhone,
       sourceDocumentIds: fallback.sourceDocumentIds
     };
   } catch {

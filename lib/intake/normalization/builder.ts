@@ -218,11 +218,40 @@ function extractPhones(text: string) {
   );
 }
 
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "icloud.com",
+  "me.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "yahoo.com",
+  "aol.com"
+]);
+
+const CREATOR_CONTACT_CONTEXT_PATTERN =
+  /\b(creator|talent|influencer|pay creator|creator address|creator phone|creator email)\b/i;
+const PAYMENT_CONTACT_CONTEXT_PATTERN =
+  /\b(payment|invoice|billing|remit|wire|ach|w-9|tax|accounts payable)\b/i;
+const EXTERNAL_CONTACT_SIGNAL_PATTERN =
+  /\b(brand|agency|management|partnerships?|campaign|marketing|media|approval|approvals|questions|contact|manager|director|coordinator|executive|team)\b/i;
+
 function buildExcludedContactEmails(options: IntakeNormalizationOptions | undefined) {
   return new Set(
     (options?.excludedPrimaryContactEmails ?? [])
       .map((email) => normalizeEmail(email))
       .filter((email): email is string => Boolean(email))
+  );
+}
+
+function buildExcludedContactDomains(options: IntakeNormalizationOptions | undefined) {
+  return new Set(
+    (options?.excludedPrimaryContactEmails ?? [])
+      .map((email) => normalizeEmail(email)?.split("@")[1] ?? null)
+      .filter(
+        (domain): domain is string =>
+          typeof domain === "string" && !PUBLIC_EMAIL_DOMAINS.has(domain)
+      )
   );
 }
 
@@ -271,7 +300,7 @@ function sanitizeContactName(value: string | null | undefined) {
 
   const lower = normalized.toLowerCase();
   if (
-    /\b(manager|director|lead|specialist|executive|strategist|partnerships?|campaign|marketing|media|talent|agent|coordinator|producer|contact|email|phone|agency|brand|team)\b/.test(
+    /\b(manager|director|lead|specialist|executive|strategist|partnerships?|campaign|marketing|media|talent|agent|coordinator|producer|contact|email|phone|agency|brand|team|technologies|technology|company|studios|network|llc|inc|ltd)\b/.test(
       lower
     )
   ) {
@@ -333,12 +362,15 @@ function emptyPrimaryContact(agencyName: string | null, brandName: string | null
 function cleanContactCandidate(
   contact: IntakePrimaryContact,
   excludedEmails: Set<string>,
-  excludedNames: Set<string>
+  excludedNames: Set<string>,
+  excludedDomains: Set<string>
 ) {
-  if (
-    isExcludedContactEmail(contact.email, excludedEmails) ||
-    isExcludedContactName(contact.name, excludedNames)
-  ) {
+  const normalizedEmail = normalizeEmail(contact.email);
+  const emailDomain = normalizedEmail?.split("@")[1] ?? null;
+  if (isExcludedContactEmail(contact.email, excludedEmails) || isExcludedContactName(contact.name, excludedNames)) {
+    return null;
+  }
+  if (emailDomain && excludedDomains.has(emailDomain)) {
     return null;
   }
 
@@ -359,12 +391,189 @@ function cleanContactCandidate(
   } satisfies IntakePrimaryContact;
 }
 
+function normalizeOrganizationToken(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function inferOrganizationTypeFromSignals(input: {
+  email: string | null;
+  agencyName: string | null;
+  brandName: string | null;
+  windowLines: string[];
+}) {
+  const windowText = input.windowLines.join("\n").toLowerCase();
+  const emailDomainRoot =
+    normalizeEmail(input.email)?.split("@")[1]?.split(".")[0]?.replace(/[^a-z0-9]/g, "") ?? null;
+  const normalizedAgency = normalizeOrganizationToken(input.agencyName);
+  const normalizedBrand = normalizeOrganizationToken(input.brandName);
+
+  if (emailDomainRoot && normalizedAgency && emailDomainRoot.includes(normalizedAgency)) {
+    return "agency" as const;
+  }
+  if (emailDomainRoot && normalizedBrand && emailDomainRoot.includes(normalizedBrand)) {
+    return "brand" as const;
+  }
+  if (input.agencyName && windowText.includes(input.agencyName.toLowerCase())) {
+    return "agency" as const;
+  }
+  if (input.brandName && windowText.includes(input.brandName.toLowerCase())) {
+    return "brand" as const;
+  }
+  if (/\b(agency|management|talent management)\b/.test(windowText)) {
+    return "agency" as const;
+  }
+  if (/\b(brand|client)\b/.test(windowText)) {
+    return "brand" as const;
+  }
+
+  return input.agencyName ? "agency" : input.brandName ? "brand" : null;
+}
+
+function isRejectedExternalContactWindow(lines: string[]) {
+  const text = lines.join("\n");
+  if (CREATOR_CONTACT_CONTEXT_PATTERN.test(text)) {
+    return true;
+  }
+
+  return PAYMENT_CONTACT_CONTEXT_PATTERN.test(text) && !EXTERNAL_CONTACT_SIGNAL_PATTERN.test(text);
+}
+
+function nearestPhoneFromWindow(lines: string[], emailIndex: number) {
+  let best: { phone: string; distance: number } | null = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? "";
+    if (CREATOR_CONTACT_CONTEXT_PATTERN.test(line) || PAYMENT_CONTACT_CONTEXT_PATTERN.test(line)) {
+      continue;
+    }
+
+    const phone = extractPhones(line)[0] ?? null;
+    if (!phone) {
+      continue;
+    }
+
+    const distance = Math.abs(index - emailIndex);
+    if (distance > 2) {
+      continue;
+    }
+
+    if (!best || distance < best.distance) {
+      best = { phone, distance };
+    }
+  }
+
+  return best?.phone ?? null;
+}
+
+function buildPrimaryContactFromDocumentText(input: {
+  aggregate: DealAggregate;
+  agencyName: string | null;
+  brandName: string | null;
+  excludedEmails: Set<string>;
+  excludedNames: Set<string>;
+  excludedDomains: Set<string>;
+}) {
+  const documents = [...input.aggregate.documents].sort(
+    (left, right) => lineScore(right.documentKind) - lineScore(left.documentKind)
+  );
+
+  type ContactCandidate = IntakePrimaryContact & { score: number };
+  const candidates: ContactCandidate[] = [];
+
+  for (const document of documents) {
+    const text = document.normalizedText ?? document.rawText ?? "";
+    if (!text) {
+      continue;
+    }
+
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const emails = extractEmails(text).filter(
+      (email) =>
+        !isExcludedContactEmail(email, input.excludedEmails) &&
+        !input.excludedDomains.has(normalizeEmail(email)?.split("@")[1] ?? "")
+    );
+
+    for (const email of emails) {
+      const emailIndex = lines.findIndex((line) => line.includes(email));
+      if (emailIndex === -1) {
+        continue;
+      }
+
+      const windowStart = Math.max(0, emailIndex - 3);
+      const windowEnd = Math.min(lines.length, emailIndex + 4);
+      const windowLines = lines.slice(windowStart, windowEnd);
+      if (isRejectedExternalContactWindow(windowLines)) {
+        continue;
+      }
+
+      const localEmailIndex = emailIndex - windowStart;
+      const candidateName =
+        [...windowLines]
+          .slice(0, localEmailIndex + 1)
+          .reverse()
+          .map((line) => sanitizeContactName(line))
+          .find(
+            (line): line is string =>
+              Boolean(line) && !isExcludedContactName(line, input.excludedNames)
+          ) ?? null;
+      const candidateTitle =
+        windowLines
+          .map((line) => sanitizeContactTitle(line))
+          .find((line): line is string => Boolean(line)) ?? null;
+      const organizationType = inferOrganizationTypeFromSignals({
+        email,
+        agencyName: input.agencyName,
+        brandName: input.brandName,
+        windowLines
+      });
+      const candidate = cleanContactCandidate(
+        {
+          organizationType,
+          name: candidateName,
+          title: candidateTitle,
+          email,
+          phone: nearestPhoneFromWindow(windowLines, localEmailIndex)
+        },
+        input.excludedEmails,
+        input.excludedNames,
+        input.excludedDomains
+      );
+
+      if (!candidate) {
+        continue;
+      }
+
+      const score =
+        (candidate.email ? 4 : 0) +
+        (candidate.name ? 3 : 0) +
+        (candidate.title ? 2 : 0) +
+        (candidate.phone ? 1 : 0) +
+        (candidate.organizationType ? 2 : 0);
+      candidates.push({
+        ...candidate,
+        score
+      });
+    }
+  }
+
+  return candidates.sort((left, right) => right.score - left.score)[0] ?? null;
+}
+
 function contactFromBriefData(
   aggregate: DealAggregate,
   agencyName: string | null,
   brandName: string | null,
   excludedEmails: Set<string>,
-  excludedNames: Set<string>
+  excludedNames: Set<string>,
+  excludedDomains: Set<string>
 ) {
   const briefData = aggregate.terms?.briefData;
   if (!briefData) {
@@ -380,7 +589,8 @@ function contactFromBriefData(
       phone: briefData.agencyContactPhone ?? null
     },
     excludedEmails,
-    excludedNames
+    excludedNames,
+    excludedDomains
   );
   if (agencyContact) {
     return agencyContact;
@@ -395,7 +605,8 @@ function contactFromBriefData(
       phone: briefData.brandContactPhone ?? null
     },
     excludedEmails,
-    excludedNames
+    excludedNames,
+    excludedDomains
   );
   if (brandContact) {
     return brandContact;
@@ -415,7 +626,8 @@ function contactFromBriefData(
       phone: linkPhone
     },
     excludedEmails,
-    excludedNames
+    excludedNames,
+    excludedDomains
   );
 }
 
@@ -424,41 +636,89 @@ function contactFromExtractionEvidence(
   agencyName: string | null,
   brandName: string | null,
   excludedEmails: Set<string>,
-  excludedNames: Set<string>
+  excludedNames: Set<string>,
+  excludedDomains: Set<string>
 ) {
-  const emailSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
-    "primaryContact.email",
-    "briefData.agencyContactEmail",
-    "briefData.brandContactEmail"
-  ]);
-  const nameSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
-    "primaryContact.name",
-    "briefData.agencyContactName",
-    "briefData.brandContactName"
-  ]);
-  const titleSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
-    "primaryContact.title",
-    "briefData.agencyContactTitle",
-    "briefData.brandContactTitle"
-  ]);
-  const phoneSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
-    "primaryContact.phone",
-    "briefData.agencyContactPhone",
-    "briefData.brandContactPhone"
-  ]);
-  const email = extractEmails(emailSnippet ?? "")[0] ?? emailSnippet;
-  const phone = extractPhones(phoneSnippet ?? "")[0] ?? phoneSnippet;
+  const candidates = new Map<
+    string,
+    IntakePrimaryContact & { score: number }
+  >();
+
+  for (const entry of aggregate.extractionEvidence) {
+    let organizationType: IntakePrimaryContact["organizationType"] = null;
+    let field: "name" | "title" | "email" | "phone" | null = null;
+
+    if (entry.fieldPath.startsWith("briefData.agencyContact")) {
+      organizationType = "agency";
+    } else if (entry.fieldPath.startsWith("briefData.brandContact")) {
+      organizationType = "brand";
+    }
+
+    if (entry.fieldPath.endsWith("Name")) field = "name";
+    if (entry.fieldPath.endsWith("Title")) field = "title";
+    if (entry.fieldPath.endsWith("Email")) field = "email";
+    if (entry.fieldPath.endsWith("Phone")) field = "phone";
+
+    if (!organizationType || !field) {
+      continue;
+    }
+
+    const key = `${organizationType}:${entry.sectionId ?? entry.fieldPath}`;
+    const current =
+      candidates.get(key) ?? {
+        organizationType,
+        name: null,
+        title: null,
+        email: null,
+        phone: null,
+        score: 0
+      };
+    const nextValue =
+      field === "email"
+        ? extractEmails(entry.snippet)[0] ?? presentText(entry.snippet)
+        : field === "phone"
+          ? extractPhones(entry.snippet)[0] ?? presentText(entry.snippet)
+          : presentText(entry.snippet);
+
+    candidates.set(key, {
+      ...current,
+      [field]: nextValue,
+      score: current.score + 1
+    });
+  }
+
+  const bestCandidate = [...candidates.values()]
+    .map((candidate) =>
+      cleanContactCandidate(candidate, excludedEmails, excludedNames, excludedDomains)
+        ? {
+            ...candidate,
+            score:
+              candidate.score +
+              (candidate.email ? 4 : 0) +
+              (candidate.name ? 3 : 0) +
+              (candidate.title ? 2 : 0) +
+              (candidate.phone ? 1 : 0)
+          }
+        : null
+    )
+    .filter((candidate): candidate is IntakePrimaryContact & { score: number } => candidate !== null)
+    .sort((left, right) => right.score - left.score)[0];
+
+  if (!bestCandidate) {
+    return null;
+  }
 
   return cleanContactCandidate(
     {
-      organizationType: agencyName ? "agency" : brandName ? "brand" : null,
-      name: nameSnippet,
-      title: titleSnippet,
-      email,
-      phone
+      organizationType: bestCandidate.organizationType,
+      name: bestCandidate.name,
+      title: bestCandidate.title,
+      email: bestCandidate.email,
+      phone: bestCandidate.phone
     },
     excludedEmails,
-    excludedNames
+    excludedNames,
+    excludedDomains
   );
 }
 
@@ -469,6 +729,7 @@ function extractPrimaryContact(
   options?: IntakeNormalizationOptions
 ): IntakePrimaryContact {
   const excludedEmails = buildExcludedContactEmails(options);
+  const excludedDomains = buildExcludedContactDomains(options);
   const excludedNames = buildExcludedContactNames(options);
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.primaryContact;
   if (persisted) {
@@ -481,7 +742,8 @@ function extractPrimaryContact(
         phone: persisted.phone
       },
       excludedEmails,
-      excludedNames
+      excludedNames,
+      excludedDomains
     );
 
     if (persistedContact) {
@@ -493,85 +755,36 @@ function extractPrimaryContact(
   }
 
   const structuredContact =
-    contactFromBriefData(aggregate, agencyName, brandName, excludedEmails, excludedNames) ??
-    contactFromExtractionEvidence(aggregate, agencyName, brandName, excludedEmails, excludedNames);
+    contactFromBriefData(
+      aggregate,
+      agencyName,
+      brandName,
+      excludedEmails,
+      excludedNames,
+      excludedDomains
+    ) ??
+    contactFromExtractionEvidence(
+      aggregate,
+      agencyName,
+      brandName,
+      excludedEmails,
+      excludedNames,
+      excludedDomains
+    );
   if (structuredContact) {
     return structuredContact;
   }
 
-  const documents = [...aggregate.documents].sort(
-    (left, right) => lineScore(right.documentKind) - lineScore(left.documentKind)
-  );
-
-  for (const document of documents) {
-    const text = document.normalizedText ?? document.rawText ?? "";
-    if (!text) {
-      continue;
-    }
-
-    const emails = extractEmails(text);
-    const phones = extractPhones(text);
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const candidateEmails = emails.filter(
-      (email) => !isExcludedContactEmail(email, excludedEmails)
-    );
-    const excludedEmailIndexes = emails
-      .filter((email) => isExcludedContactEmail(email, excludedEmails))
-      .map((email) => lines.findIndex((line) => line.includes(email)))
-      .filter((index) => index !== -1);
-    const candidatePhones = phones.filter((phone) => {
-      const phoneIndex = lines.findIndex((line) => line.includes(phone));
-      if (phoneIndex === -1) {
-        return true;
-      }
-
-      return !excludedEmailIndexes.some((emailIndex) => Math.abs(emailIndex - phoneIndex) <= 4);
-    });
-    const emailIndex = candidateEmails.length
-      ? lines.findIndex((line) => line.includes(candidateEmails[0]))
-      : -1;
-    const phoneIndex = candidatePhones.length
-      ? lines.findIndex((line) => line.includes(candidatePhones[0]))
-      : -1;
-    const anchorIndex = emailIndex !== -1 ? emailIndex : phoneIndex;
-
-    if (
-      anchorIndex === -1 &&
-      (document.documentKind !== "email_thread" || excludedEmailIndexes.length > 0)
-    ) {
-      continue;
-    }
-
-    const windowStart =
-      anchorIndex === -1 ? Math.max(lines.length - 8, 0) : Math.max(0, anchorIndex - 4);
-    const windowEnd =
-      anchorIndex === -1 ? lines.length : Math.min(lines.length, anchorIndex + 4);
-    const windowLines = lines.slice(windowStart, windowEnd);
-    const nameLine =
-      [...windowLines]
-        .sort((left, right) => scoreContactLine(right) - scoreContactLine(left))
-        .map((line) => sanitizeContactName(line))
-        .find(
-          (line): line is string =>
-            Boolean(line) && !isExcludedContactName(line, excludedNames)
-        ) ?? null;
-    const titleLine =
-      windowLines
-        .map((line) => sanitizeContactTitle(line))
-        .find((line): line is string => Boolean(line)) ?? null;
-
-    if (candidateEmails[0] || candidatePhones[0] || nameLine) {
-      return {
-        organizationType: agencyName ? "agency" : brandName ? "brand" : null,
-        name: sanitizeContactName(nameLine),
-        title: sanitizeContactTitle(titleLine),
-        email: presentText(candidateEmails[0] ?? null),
-        phone: presentText(candidatePhones[0] ?? null)
-      };
-    }
+  const documentContact = buildPrimaryContactFromDocumentText({
+    aggregate,
+    agencyName,
+    brandName,
+    excludedEmails,
+    excludedNames,
+    excludedDomains
+  });
+  if (documentContact) {
+    return documentContact;
   }
 
   return emptyPrimaryContact(agencyName, brandName);

@@ -4,9 +4,7 @@ import { safeRevalidateTag } from "@/lib/safe-revalidate";
 import type { IntakeSessionRecord } from "@/lib/types";
 
 async function enqueuePendingDocumentsForDeal(dealId: string) {
-  const { enqueueDocumentProcessing, processDocumentById } = await import(
-    "@/lib/deals"
-  );
+  const { enqueueDocumentProcessing } = await import("@/lib/deals");
   const documents = await prisma.document.findMany({
     where: {
       dealId,
@@ -18,11 +16,7 @@ async function enqueuePendingDocumentsForDeal(dealId: string) {
   });
 
   for (const document of documents) {
-    const queue = await enqueueDocumentProcessing(document.id);
-
-    if (queue.mode === "local") {
-      void processDocumentById(document.id, queue.runId).catch(() => undefined);
-    }
+    await enqueueDocumentProcessing(document.id);
   }
 
   return documents.length;

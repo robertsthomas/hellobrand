@@ -47,25 +47,56 @@ export const documentProcessingFunction = inngest.createFunction(
 
     const pipeline = await import("@/lib/pipeline-steps");
 
-    await step.run("extract_text", () => pipeline.runExtractTextStep(documentId, runId));
-    await step.run("classify_document", () =>
-      pipeline.runClassifyDocumentStep(documentId, runId)
-    );
-    await step.run("section_document", () =>
-      pipeline.runSectionDocumentStep(documentId, runId)
-    );
-    await step.run("extract_fields", () =>
-      pipeline.runExtractFieldsStep(documentId, runId)
-    );
-    await step.run("merge_results", () =>
-      pipeline.runMergeResultsStep(documentId, runId)
-    );
-    await step.run("analyze_risks", () =>
-      pipeline.runAnalyzeRisksStep(documentId, runId)
-    );
-    await step.run("generate_summary", () =>
-      pipeline.runGenerateSummaryStep(documentId, runId)
-    );
+    await step.run("extract_text", async () => {
+      const stepResult = await pipeline.runExtractTextStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        parser: result?._debug?.parser ?? null,
+        extractedChars: result?.rawText?.length ?? 0,
+        pageCount: result?._debug?.pageCount ?? null
+      };
+    });
+    await step.run("classify_document", async () => {
+      const stepResult = await pipeline.runClassifyDocumentStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        documentKind: result?.documentKind ?? null,
+        confidence: result?.confidence ?? null
+      };
+    });
+    await step.run("section_document", async () => {
+      const stepResult = await pipeline.runSectionDocumentStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        sectionCount: Array.isArray(result) ? result.length : 0
+      };
+    });
+    await step.run("extract_fields", async () => {
+      const stepResult = await pipeline.runExtractFieldsStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        evidenceCount: Array.isArray(result?.evidence) ? result.evidence.length : 0,
+        confidence: result?.confidence ?? null
+      };
+    });
+    await step.run("merge_results", async () => {
+      await pipeline.runMergeResultsStep(documentId, runId);
+      return { ok: true };
+    });
+    await step.run("analyze_risks", async () => {
+      const stepResult = await pipeline.runAnalyzeRisksStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        riskCount: Array.isArray(result) ? result.length : 0
+      };
+    });
+    await step.run("generate_summary", async () => {
+      const stepResult = await pipeline.runGenerateSummaryStep(documentId, runId);
+      const result = stepResult.result;
+      return {
+        summaryVersion: result?.currentSummary?.version ?? null
+      };
+    });
 
     return { ok: true, documentId, runId };
   }

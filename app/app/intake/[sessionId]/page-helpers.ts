@@ -155,26 +155,24 @@ export function buildIntakeReviewPageViewModel(input: {
   const summaryCards = [
     {
       label: "Brand",
-      value: displayLabels.brandName ?? "Not detected yet",
-      loading: !normalized?.brandName
+      value: displayLabels.brandName ?? "",
+      loading: false
     },
     {
       label: "Primary contact",
       value:
         cleanDisplayText(normalized?.primaryContact?.name) ??
         cleanDisplayText(normalized?.primaryContact?.email) ??
-        "Not detected yet",
-      loading:
-        !normalized?.primaryContact?.name &&
-        !normalized?.primaryContact?.email
+        "",
+      loading: false
     },
     {
       label: "Payment",
       value:
         typeof normalized?.paymentAmount === "number"
           ? formatCurrency(normalized.paymentAmount, normalized.currency ?? "USD")
-          : "Not specified",
-      loading: typeof normalized?.paymentAmount !== "number"
+          : "",
+      loading: false
     },
     {
       label: "Deliverables",

@@ -19,7 +19,6 @@ export {
 
 export {
   enqueueDocumentProcessing,
-  processDocumentById,
   type DirectUploadFileRegistration,
   type RegisteredDirectDocumentUpload,
   registerDirectDocumentUploadsForViewer,

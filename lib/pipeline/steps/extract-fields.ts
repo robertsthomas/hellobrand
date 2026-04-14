@@ -39,6 +39,19 @@ import type {
   ExtractionPipelineResult,
 } from "@/lib/types";
 
+const SINGLE_PASS_LLM_EXTRACTION_MAX_CHARS = 12_000;
+
+function shouldUseSinglePassLlmExtraction(input: {
+  normalizedText: string;
+  sectionInputs: DocumentSectionInput[];
+}) {
+  if (input.sectionInputs.length <= 1) {
+    return true;
+  }
+
+  return input.normalizedText.length <= SINGLE_PASS_LLM_EXTRACTION_MAX_CHARS;
+}
+
 function isGenericCampaignName(value: string | null | undefined) {
   return sanitizeCampaignName(value) === null;
 }
@@ -114,17 +127,17 @@ async function applyLlmExtraction(input: {
     return input.extraction;
   }
 
-  const llmSections =
-    input.sectionInputs.length > 0
+  const fallbackSection = {
+    title: "General",
+    content: input.normalizedText,
+    chunkIndex: 0,
+    pageRange: null,
+  };
+  const llmSections = shouldUseSinglePassLlmExtraction(input)
+    ? [fallbackSection]
+    : input.sectionInputs.length > 0
       ? input.sectionInputs
-      : [
-          {
-            title: "General",
-            content: input.normalizedText,
-            chunkIndex: 0,
-            pageRange: null,
-          },
-        ];
+      : [fallbackSection];
 
   let extraction = input.extraction;
   for (const section of llmSections) {

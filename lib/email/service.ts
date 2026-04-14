@@ -592,11 +592,8 @@ export async function importEmailAttachmentToWorkspaceForViewer(
     processingStartedAt: null
   });
 
-  const { enqueueDocumentProcessing, processDocumentById } = await import("@/lib/deals");
-  const queue = await enqueueDocumentProcessing(document.id);
-  if (queue.mode === "local") {
-    void processDocumentById(document.id, queue.runId).catch(() => undefined);
-  }
+  const { enqueueDocumentProcessing } = await import("@/lib/deals");
+  await enqueueDocumentProcessing(document.id);
 
   return document;
 }

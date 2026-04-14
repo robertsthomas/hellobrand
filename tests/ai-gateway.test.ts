@@ -111,7 +111,7 @@ describe("ai gateway", () => {
     expect(prepared.budgetDecision).toBe("normal");
   });
 
-  it("does not let the global model override the email draft route", async () => {
+  it("lets the global model override the email draft route", async () => {
     testEnv.OPENROUTER_MODEL = "openai/gpt-5-mini";
 
     const prepared = await prepareAiStreamExecution({
@@ -119,7 +119,7 @@ describe("ai gateway", () => {
       featureKey: "premium_inbox"
     });
 
-    expect(prepared.requestedModel).toBe("google/gemini-2.5-flash");
+    expect(prepared.requestedModel).toBe("openai/gpt-5-mini");
   });
 
   it("blocks requests above the hard cap", async () => {

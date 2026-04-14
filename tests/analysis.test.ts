@@ -37,6 +37,37 @@ describe("contract analysis", () => {
     expect(sections[0]?.title).toBeTruthy();
   });
 
+  test("merges tiny adjacent blocks into fewer extraction sections", () => {
+    const tinyBlockFixture = `
+STRICTLY CONFIDENTIAL
+
+Creator Agreement
+
+General Campaign Information
+
+Creator Name:
+
+Jahnesha Standley
+
+Brand:
+
+Lunchables
+
+Campaign Name:
+
+KHC - Lunchables Core CLP 2026
+
+Fee:
+
+USD $5,000.00
+`;
+
+    const sections = splitIntoSections(tinyBlockFixture, "contract");
+
+    expect(sections.length).toBeLessThan(6);
+    expect(sections.every((section) => section.content.trim().length >= 20)).toBe(true);
+  });
+
   test("extracts core creator terms from fallback parser", () => {
     const result = fallbackAnalyzeContract(fixture);
 

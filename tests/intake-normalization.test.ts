@@ -510,6 +510,138 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.email).toBe("jordan@lunchables.com");
   });
 
+  test("does not attach a creator phone to a brand contact block", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Lunchables",
+      agencyName: null
+    };
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "lunchables-contract.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Creator:
+          Thomas Roberts
+          thomas@example.com
+          909-743-1880
+
+          Brand Contact:
+          Jordan Ellis
+          Partnerships Manager
+          jordan@lunchables.com
+        `,
+        rawText: `
+          Creator:
+          Thomas Roberts
+          thomas@example.com
+          909-743-1880
+
+          Brand Contact:
+          Jordan Ellis
+          Partnerships Manager
+          jordan@lunchables.com
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate, {
+      excludedPrimaryContactEmails: ["thomas@example.com"],
+      excludedPrimaryContactNames: ["Thomas Roberts"]
+    });
+
+    expect(normalized?.primaryContact.organizationType).toBe("brand");
+    expect(normalized?.primaryContact.name).toBe("Jordan Ellis");
+    expect(normalized?.primaryContact.title).toBe("Partnerships Manager");
+    expect(normalized?.primaryContact.email).toBe("jordan@lunchables.com");
+    expect(normalized?.primaryContact.phone).toBeNull();
+  });
+
+  test("extracts an agency signature block as one coherent contact", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Pampers",
+      agencyName: "Aki Technologies"
+    };
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "pampers-signature-block.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          For campaign approvals and production questions:
+
+          Amber Logan
+          Campaign Activation Manager, Media
+          Aki Technologies
+          amber.logan@inmar.com
+          312-555-0101
+        `,
+        rawText: `
+          For campaign approvals and production questions:
+
+          Amber Logan
+          Campaign Activation Manager, Media
+          Aki Technologies
+          amber.logan@inmar.com
+          312-555-0101
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.primaryContact.organizationType).toBe("agency");
+    expect(normalized?.primaryContact.name).toBe("Amber Logan");
+    expect(normalized?.primaryContact.title).toBe("Campaign Activation Manager, Media");
+    expect(normalized?.primaryContact.email).toBe("amber.logan@inmar.com");
+    expect(normalized?.primaryContact.phone).toBe("312-555-0101");
+  });
+
+  test("keeps primary contact blank when only creator contact details are present", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Lunchables",
+      agencyName: null
+    };
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "creator-only-contract.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          Creator:
+          Thomas Roberts
+          thomas@example.com
+          909-743-1880
+        `,
+        rawText: `
+          Creator:
+          Thomas Roberts
+          thomas@example.com
+          909-743-1880
+        `
+      }
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate, {
+      excludedPrimaryContactEmails: ["thomas@example.com"],
+      excludedPrimaryContactNames: ["Thomas Roberts"]
+    });
+
+    expect(normalized?.primaryContact.name).toBeNull();
+    expect(normalized?.primaryContact.title).toBeNull();
+    expect(normalized?.primaryContact.email).toBeNull();
+    expect(normalized?.primaryContact.phone).toBeNull();
+  });
+
   test("does not use a generic campaign label as the contract title", () => {
     const aggregate = createAggregate();
     aggregate.terms = {

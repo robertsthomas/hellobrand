@@ -76,6 +76,9 @@ export function extractSectionSystemPrompt() {
         "netTermsDays: Numeric day count from 'Net 45', '45 days', 'due within 45 days'. If not stated, null.",
         "deliverables: Content requirements with channels and quantities. Map format specs (Reel, TikTok, Story) to deliverables with channels.",
         "disclosureObligations: FTC, platform-specific labeling requirements (e.g., #ad, verbal mentions).",
+        "briefData.brandContactName / Title / Email / Phone and briefData.agencyContactName / Title / Email / Phone: External points of contact ONLY. Extract only brand-side or agency-side contacts that are explicitly tied to approvals, campaign operations, signatures, or 'contact/questions' blocks.",
+        "Never use creator, talent, or influencer contact details for any brandContact* or agencyContact* field. If the document only includes creator contact info, leave all contact fields null.",
+        "Only return a phone number when it is clearly attached to the same external contact block as the chosen email/name/title. If unclear, return null for phone.",
       ].join("\n"),
     },
     {
@@ -177,6 +180,7 @@ export function extractSectionUserPrompt(
         "2. Is it a real value, not a placeholder or header?",
         "",
         "Fields to extract when stated: brandName, campaignName, paymentAmount, currency, paymentTerms, paymentStructure, paymentTrigger, netTermsDays, deliverables, usageRights, usageDuration, usageTerritory, usageChannels, exclusivity, exclusivityDuration, exclusivityCategory, disclosureObligations, revisions, termination, terminationNotice, governingLaw, notes.",
+        "For external contacts, place them under briefData using only these fields when explicitly supported: brandContactName, brandContactTitle, brandContactEmail, brandContactPhone, agencyContactName, agencyContactTitle, agencyContactEmail, agencyContactPhone.",
         "",
         "Return null for any field not explicitly stated.",
       ].join("\n"),
@@ -360,7 +364,7 @@ export function briefExtractionSystemPrompt() {
     {
       tag: "output_contract",
       content:
-        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention }. Null or [] for missing fields.",
+        "Return JSON: { campaignOverview, messagingPoints, talkingPoints, creativeConceptOverview, brandGuidelines, approvalRequirements, targetAudience, toneAndStyle, doNotMention, brandContactName, brandContactTitle, brandContactEmail, brandContactPhone, agencyContactName, agencyContactTitle, agencyContactEmail, agencyContactPhone }. Null or [] for missing fields.",
     },
   ]);
 }

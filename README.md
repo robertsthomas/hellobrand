@@ -55,7 +55,7 @@ doppler secrets upload .env --project hellobrand --config dev
    - `OPENROUTER_MODEL_RISKS` for risk analysis
    - `OPENROUTER_MODEL_SUMMARY` for creator-facing summaries
    - optional `*_FALLBACKS` secrets for per-task failover
-   If the task-specific model is unset, it falls back to `OPENROUTER_MODEL`. If no provider is configured, the fallback parser is used.
+   `OPENROUTER_MODEL` overrides the task-specific model secrets when set. If it is unset, the app falls back to the task-specific model for that route. If no provider is configured, the fallback parser is used.
 7. Optional for Azure Document Intelligence-backed text extraction, set:
    - `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`
    - `AZURE_DOCUMENT_INTELLIGENCE_API_KEY`

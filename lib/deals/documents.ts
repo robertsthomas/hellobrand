@@ -84,39 +84,46 @@ export async function enqueueDocumentProcessing(documentId: string) {
   const startedRun = await startDocumentProcessingRun(documentId);
   const eventKey = process.env.INNGEST_EVENT_KEY;
 
-  if (eventKey) {
-    try {
-      const { inngest } = await import("@/lib/inngest/client");
-      await inngest.send({
-        name: "document/process.requested",
-        data: { documentId, runId: startedRun.runId }
-      });
-      logDocumentPipeline("info", "queue_enqueued", {
-        documentId,
-        runId: startedRun.runId,
-        mode: "inngest"
-      });
-      return { mode: "inngest" as const, runId: startedRun.runId };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to enqueue Inngest event.";
-      logDocumentPipeline("error", "inngest_enqueue_failed", {
-        documentId,
-        runId: startedRun.runId,
-        error: message
-      });
-    }
+  if (!eventKey) {
+    const message = "Inngest document processing is required but INNGEST_EVENT_KEY is not configured.";
+    await failDocumentProcessingRun({
+      documentId,
+      runId: startedRun.runId,
+      message
+    });
+    throw new Error(message);
   }
 
-  logDocumentPipeline("info", "queue_enqueued", {
-    documentId,
-    runId: startedRun.runId,
-    mode: "local"
-  });
-  return { mode: "local" as const, runId: startedRun.runId };
+  try {
+    const { inngest } = await import("@/lib/inngest/client");
+    await inngest.send({
+      name: "document/process.requested",
+      data: { documentId, runId: startedRun.runId }
+    });
+    logDocumentPipeline("info", "queue_enqueued", {
+      documentId,
+      runId: startedRun.runId,
+      mode: "inngest"
+    });
+    return { mode: "inngest" as const, runId: startedRun.runId };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to enqueue Inngest event.";
+    logDocumentPipeline("error", "inngest_enqueue_failed", {
+      documentId,
+      runId: startedRun.runId,
+      error: message
+    });
+    await failDocumentProcessingRun({
+      documentId,
+      runId: startedRun.runId,
+      message
+    });
+    throw new Error(message);
+  }
 }
 
-export async function processDocumentById(documentId: string, runId?: string) {
+async function processDocumentById(documentId: string, runId?: string) {
   const repository = getRepository();
   const document = await repository.getDocument(documentId);
 
@@ -315,12 +322,7 @@ export async function completeDirectDocumentUploadsForViewer(
 
   if (input.startProcessing !== false) {
     for (const documentId of input.succeededDocumentIds) {
-      const queue = await enqueueDocumentProcessing(documentId);
-      if (queue.mode === "local") {
-        void processDocumentById(documentId, queue.runId).catch(async () => {
-          await getRepository().getDealAggregate(viewer.id, dealId);
-        });
-      }
+      await enqueueDocumentProcessing(documentId);
     }
   }
 
@@ -417,13 +419,7 @@ export async function uploadDocumentsForViewer(
 
   if (input.startProcessing !== false) {
     for (const document of createdDocuments) {
-      const queue = await enqueueDocumentProcessing(document.id);
-
-      if (queue.mode === "local") {
-        void processDocumentById(document.id, queue.runId).catch(async () => {
-          await getRepository().getDealAggregate(viewer.id, dealId);
-        });
-      }
+      await enqueueDocumentProcessing(document.id);
     }
   }
 
@@ -450,10 +446,7 @@ export async function reprocessDocumentForViewer(
     throw new Error("Document not found.");
   }
 
-  const queue = await enqueueDocumentProcessing(document.id);
-  if (queue.mode === "local") {
-    await processDocumentById(document.id, queue.runId);
-  }
+  await enqueueDocumentProcessing(document.id);
 
   return getRepository().getDealAggregate(viewer.id, document.dealId);
 }

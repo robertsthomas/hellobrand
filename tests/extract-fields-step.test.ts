@@ -25,6 +25,64 @@ afterEach(() => {
 });
 
 describe("buildStructuredExtractionForDocument", () => {
+  test("uses a single LLM extraction pass for small multi-section documents", async () => {
+    hasLlmKeyMock.mockReturnValue(true);
+    extractBriefWithLlmMock.mockResolvedValue(null);
+    extractSectionWithLlmMock.mockImplementation(async (section, _kind, fallback) => ({
+      ...fallback,
+      model: "llm:test-extract",
+      evidence: [
+        ...fallback.evidence,
+        {
+          fieldPath: "brandName",
+          snippet: section.content,
+          sectionKey: `section:${section.chunkIndex}`,
+          confidence: 0.9,
+        },
+      ],
+    }));
+
+    const normalizedText = [
+      "Creator Agreement",
+      "",
+      "Brand: Lunchables",
+      "",
+      "Campaign: Spring Launch",
+      "",
+      "Fee: $5,000",
+    ].join("\n");
+
+    await buildStructuredExtractionForDocument({
+      documentId: "doc-contract-2",
+      fileName: "lunchables-contract.pdf",
+      normalizedText,
+      documentKind: "contract",
+      sectionInputs: [
+        {
+          title: "General",
+          content: "Creator Agreement",
+          chunkIndex: 0,
+          pageRange: "1",
+        },
+        {
+          title: "Compensation",
+          content: "Fee: $5,000",
+          chunkIndex: 1,
+          pageRange: "1",
+        },
+      ],
+      preferredCreatorName: "Roberts Casa",
+    });
+
+    expect(extractSectionWithLlmMock).toHaveBeenCalledTimes(1);
+    expect(extractSectionWithLlmMock.mock.calls[0]?.[0]).toMatchObject({
+      title: "General",
+      content: normalizedText,
+      chunkIndex: 0,
+      pageRange: null,
+    });
+  });
+
   test("layers LLM extraction over the extracted document text for contract fields", async () => {
     hasLlmKeyMock.mockReturnValue(true);
     extractBriefWithLlmMock.mockResolvedValue(null);

@@ -5,6 +5,7 @@ import { mergeConflictIntelligence, normalizeDealCategory } from "@/lib/conflict
 import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { normalizeEvidenceSnippet } from "@/lib/utils";
 import type {
+  BriefData,
   CampaignDateWindow,
   DealTermsRecord,
   DisclosureObligation,
@@ -146,6 +147,20 @@ export function normalizeTerms(
   });
   const llmBrandName = sanitizePartyName(asString(input.brandName), "brand");
   const llmAgencyName = sanitizePartyName(asString(input.agencyName), "agency");
+  const normalizedBriefData = normalizeBriefContactData(
+    input.briefData,
+    {
+      brandContactName: asString(input.brandContactName),
+      brandContactTitle: asString(input.brandContactTitle),
+      brandContactEmail: asString(input.brandContactEmail),
+      brandContactPhone: asString(input.brandContactPhone),
+      agencyContactName: asString(input.agencyContactName),
+      agencyContactTitle: asString(input.agencyContactTitle),
+      agencyContactEmail: asString(input.agencyContactEmail),
+      agencyContactPhone: asString(input.agencyContactPhone)
+    },
+    fallbackData.briefData
+  );
 
   return {
     ...fallbackData,
@@ -197,7 +212,77 @@ export function normalizeTerms(
     terminationConditions:
       asString(input.terminationConditions) ?? fallbackData.terminationConditions,
     governingLaw: asString(input.governingLaw) ?? fallbackData.governingLaw,
-    notes: asString(input.notes) ?? fallbackData.notes
+    notes: asString(input.notes) ?? fallbackData.notes,
+    briefData: normalizedBriefData
+  };
+}
+
+function emptyBriefData(): BriefData {
+  return {
+    campaignOverview: null,
+    messagingPoints: [],
+    talkingPoints: [],
+    creativeConceptOverview: null,
+    brandGuidelines: null,
+    approvalRequirements: null,
+    targetAudience: null,
+    toneAndStyle: null,
+    doNotMention: [],
+    sourceDocumentIds: []
+  };
+}
+
+function normalizeBriefContactData(
+  nestedValue: unknown,
+  topLevelValue: Partial<
+    Pick<
+      BriefData,
+      | "brandContactName"
+      | "brandContactTitle"
+      | "brandContactEmail"
+      | "brandContactPhone"
+      | "agencyContactName"
+      | "agencyContactTitle"
+      | "agencyContactEmail"
+      | "agencyContactPhone"
+    >
+  >,
+  fallbackBriefData: BriefData | null
+) {
+  const nested =
+    nestedValue && typeof nestedValue === "object"
+      ? (nestedValue as Record<string, unknown>)
+      : null;
+
+  const patch = {
+    brandContactName:
+      asString(nested?.brandContactName) ?? topLevelValue.brandContactName ?? null,
+    brandContactTitle:
+      asString(nested?.brandContactTitle) ?? topLevelValue.brandContactTitle ?? null,
+    brandContactEmail:
+      asString(nested?.brandContactEmail) ?? topLevelValue.brandContactEmail ?? null,
+    brandContactPhone:
+      asString(nested?.brandContactPhone) ?? topLevelValue.brandContactPhone ?? null,
+    agencyContactName:
+      asString(nested?.agencyContactName) ?? topLevelValue.agencyContactName ?? null,
+    agencyContactTitle:
+      asString(nested?.agencyContactTitle) ?? topLevelValue.agencyContactTitle ?? null,
+    agencyContactEmail:
+      asString(nested?.agencyContactEmail) ?? topLevelValue.agencyContactEmail ?? null,
+    agencyContactPhone:
+      asString(nested?.agencyContactPhone) ?? topLevelValue.agencyContactPhone ?? null
+  };
+
+  const hasPatch = Object.values(patch).some((value) => value !== null);
+  if (!hasPatch) {
+    return fallbackBriefData;
+  }
+
+  const base = fallbackBriefData ?? emptyBriefData();
+  return {
+    ...base,
+    ...patch,
+    sourceDocumentIds: base.sourceDocumentIds ?? []
   };
 }
 

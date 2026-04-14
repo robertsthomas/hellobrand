@@ -70,7 +70,15 @@ export const briefExtractionResponseSchema = z.object({
   approvalRequirements: z.string().nullable().optional(),
   targetAudience: z.string().nullable().optional(),
   toneAndStyle: z.string().nullable().optional(),
-  doNotMention: z.array(z.string().trim().min(1)).default([])
+  doNotMention: z.array(z.string().trim().min(1)).default([]),
+  brandContactName: z.string().nullable().optional(),
+  brandContactTitle: z.string().nullable().optional(),
+  brandContactEmail: z.string().nullable().optional(),
+  brandContactPhone: z.string().nullable().optional(),
+  agencyContactName: z.string().nullable().optional(),
+  agencyContactTitle: z.string().nullable().optional(),
+  agencyContactEmail: z.string().nullable().optional(),
+  agencyContactPhone: z.string().nullable().optional()
 });
 
 export const generatedBriefResponseSchema = z.object({
@@ -196,8 +204,8 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
 
   const sharedFallbacks = parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS);
   const requestedPrimary =
-    taskSpecificModel(task) ||
     process.env.OPENROUTER_MODEL ||
+    taskSpecificModel(task) ||
     defaultRoutes[task].primary;
   const primary = requestedPrimary;
   const fallbacks = [
