@@ -46,11 +46,3 @@ export interface AnonymousAnalysisSessionRecord {
   createdAt: string;
   updatedAt: string;
 }
-
-export interface AnonymousUploadLedgerRecord {
-  id: string;
-  visitorId: string;
-  ipHash: string;
-  fileHash: string;
-  createdAt: string;
-}

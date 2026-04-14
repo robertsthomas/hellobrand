@@ -65,18 +65,6 @@ model AnonymousAnalysisSession {
   @@index([ipHash, createdAt])
 }
 
-model AnonymousUploadLedger {
-  id        String   @id @default(uuid())
-  visitorId String
-  ipHash    String
-  fileHash  String
-  createdAt DateTime @default(now())
-
-  @@index([visitorId, createdAt])
-  @@index([ipHash, createdAt])
-  @@index([visitorId, fileHash, createdAt])
-}
-
 model FeedbackSubmission {
   id                         String    @id @default(uuid())
   userId                     String

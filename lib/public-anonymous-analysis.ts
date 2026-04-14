@@ -14,25 +14,21 @@ import { getProfileForViewer } from "@/lib/profile";
 import { prisma } from "@/lib/prisma";
 import {
   getUnsupportedPublicUploadDocumentMessage,
-  isAllowedPublicUploadDocumentKind
+  isAllowedPublicUploadDocumentKind,
 } from "@/lib/public-upload-document-kind";
-import {
-  ANONYMOUS_UPLOAD_WINDOW_MS
-} from "@/lib/public-upload-guards";
+import { ANONYMOUS_UPLOAD_WINDOW_MS } from "@/lib/public-upload-guards";
 import { getRepository } from "@/lib/repository";
 import { getRuntimePath } from "@/lib/runtime-path";
 import { deleteStoredBytes, readStoredBytes, storeUploadedBytes } from "@/lib/storage";
 import type {
   AnonymousAnalysisSessionRecord,
   AnonymousDealBreakdown,
-  AnonymousUploadLedgerRecord,
   DocumentAnalysisResult,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 
 const ANONYMOUS_SESSION_TTL_MS = 1000 * 60 * 60 * 24;
 const SESSION_FILE_STORE_NAME = "anonymous-analysis-sessions.json";
-const LEDGER_FILE_STORE_NAME = "anonymous-upload-ledger.json";
 const CLAIM_IN_PROGRESS_PREFIX = "__claiming__:";
 const MAINTENANCE_INTERVAL_MS = 1000 * 60 * 5;
 
@@ -77,14 +73,6 @@ type AnonymousAnalysisSessionRow = {
   updatedAt: Date;
 };
 
-type AnonymousUploadLedgerRow = {
-  id: string;
-  visitorId: string;
-  ipHash: string;
-  fileHash: string;
-  createdAt: Date;
-};
-
 function isClaimInProgressValue(value: string | null | undefined) {
   return typeof value === "string" && value.startsWith(CLAIM_IN_PROGRESS_PREFIX);
 }
@@ -94,25 +82,17 @@ function createClaimInProgressValue() {
 }
 
 function getAnonymousSessionDelegate() {
-  return (prisma as typeof prisma & {
-    anonymousAnalysisSession?: {
-      create: (args: unknown) => Promise<AnonymousAnalysisSessionRow>;
-      findUnique: (args: unknown) => Promise<AnonymousAnalysisSessionRow | null>;
-      findMany: (args: unknown) => Promise<AnonymousAnalysisSessionRow[]>;
-      update: (args: unknown) => Promise<AnonymousAnalysisSessionRow>;
-      deleteMany: (args: unknown) => Promise<{ count: number }>;
-    };
-  }).anonymousAnalysisSession;
-}
-
-function getAnonymousUploadLedgerDelegate() {
-  return (prisma as typeof prisma & {
-    anonymousUploadLedger?: {
-      create: (args: unknown) => Promise<AnonymousUploadLedgerRow>;
-      count: (args: unknown) => Promise<number>;
-      deleteMany: (args: unknown) => Promise<{ count: number }>;
-    };
-  }).anonymousUploadLedger;
+  return (
+    prisma as typeof prisma & {
+      anonymousAnalysisSession?: {
+        create: (args: unknown) => Promise<AnonymousAnalysisSessionRow>;
+        findUnique: (args: unknown) => Promise<AnonymousAnalysisSessionRow | null>;
+        findMany: (args: unknown) => Promise<AnonymousAnalysisSessionRow[]>;
+        update: (args: unknown) => Promise<AnonymousAnalysisSessionRow>;
+        deleteMany: (args: unknown) => Promise<{ count: number }>;
+      };
+    }
+  ).anonymousAnalysisSession;
 }
 
 async function readStore<T>(fileName: string) {
@@ -161,7 +141,7 @@ function toSessionRecord(row: AnonymousAnalysisSessionRow): AnonymousAnalysisSes
     claimedAt: iso(row.claimedAt),
     expiresAt: row.expiresAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString()
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -191,7 +171,7 @@ function buildPaymentSummary(analysis: DocumentAnalysisResult) {
       new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: terms.currency ?? "USD",
-        maximumFractionDigits: 2
+        maximumFractionDigits: 2,
       }).format(terms.paymentAmount)
     );
   }
@@ -227,7 +207,7 @@ export function buildAnonymousDealBreakdown(input: {
     deliverables: Array.isArray(terms.deliverables)
       ? terms.deliverables.map((item, index) => ({
           ...item,
-          id: item.id || `deliverable-${index + 1}`
+          id: item.id || `deliverable-${index + 1}`,
         }))
       : [],
     riskFlags: input.analysis.riskFlags.map((flag, index) => ({
@@ -235,10 +215,10 @@ export function buildAnonymousDealBreakdown(input: {
       title: stripInlineMarkdown(flag.title),
       detail: stripInlineMarkdown(flag.detail),
       severity: flag.severity,
-      suggestedAction: flag.suggestedAction
+      suggestedAction: flag.suggestedAction,
     })),
     documentKind: input.analysis.classification.documentKind,
-    sourceFileName: input.fileName
+    sourceFileName: input.fileName,
   };
 }
 
@@ -262,8 +242,8 @@ export async function createAnonymousAnalysisSession(input: AnonymousSessionInpu
         normalizedText: input.normalizedText,
         analysisJson: input.analysis,
         breakdownJson: input.breakdown,
-        expiresAt
-      }
+        expiresAt,
+      },
     });
 
     return toSessionRecord(created);
@@ -289,7 +269,7 @@ export async function createAnonymousAnalysisSession(input: AnonymousSessionInpu
     claimedAt: null,
     expiresAt: expiresAt.toISOString(),
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
   };
 
   const existing = await readStore<AnonymousAnalysisSessionRecord>(SESSION_FILE_STORE_NAME);
@@ -305,8 +285,8 @@ async function cleanupExpiredStoredSessions() {
     const expired = await delegate.findMany({
       where: {
         expiresAt: { lt: new Date(now) },
-        claimedAt: null
-      }
+        claimedAt: null,
+      },
     });
 
     await Promise.all(
@@ -319,8 +299,8 @@ async function cleanupExpiredStoredSessions() {
     await delegate.deleteMany({
       where: {
         expiresAt: { lt: new Date(now) },
-        claimedAt: null
-      }
+        claimedAt: null,
+      },
     });
 
     return;
@@ -344,43 +324,17 @@ async function cleanupExpiredStoredSessions() {
   await writeStore(SESSION_FILE_STORE_NAME, activeEntries);
 }
 
-async function cleanupOldAnonymousUploadLedgerEntries() {
-  const cutoff = new Date(Date.now() - ANONYMOUS_UPLOAD_WINDOW_MS);
-  const delegate = getAnonymousUploadLedgerDelegate();
-
-  if (delegate) {
-    await delegate.deleteMany({
-      where: {
-        createdAt: { lt: cutoff }
-      }
-    });
-    return;
-  }
-
-  const entries = await readStore<AnonymousUploadLedgerRecord>(LEDGER_FILE_STORE_NAME);
-  const activeEntries = entries.filter(
-    (entry) => new Date(entry.createdAt).getTime() >= cutoff.getTime()
-  );
-  await writeStore(LEDGER_FILE_STORE_NAME, activeEntries);
-}
-
 function scheduleAnonymousStorageMaintenance() {
   const now = Date.now();
 
-  if (
-    maintenancePromise ||
-    now - lastMaintenanceStartedAt < MAINTENANCE_INTERVAL_MS
-  ) {
+  if (maintenancePromise || now - lastMaintenanceStartedAt < MAINTENANCE_INTERVAL_MS) {
     return;
   }
 
   lastMaintenanceStartedAt = now;
   maintenancePromise = (async () => {
     try {
-      await Promise.all([
-        cleanupExpiredStoredSessions(),
-        cleanupOldAnonymousUploadLedgerEntries()
-      ]);
+      await cleanupExpiredStoredSessions();
     } finally {
       maintenancePromise = null;
     }
@@ -395,7 +349,7 @@ export async function getAnonymousAnalysisSessionByToken(token: string) {
 
   if (delegate) {
     const row = await delegate.findUnique({
-      where: { token }
+      where: { token },
     });
 
     return row ? toSessionRecord(row) : null;
@@ -418,12 +372,12 @@ export async function findReusableAnonymousAnalysisSession(input: {
         visitorId: input.visitorId,
         fileHash: input.fileHash,
         claimedAt: null,
-        expiresAt: { gte: new Date() }
+        expiresAt: { gte: new Date() },
       },
       orderBy: {
-        createdAt: "desc"
+        createdAt: "desc",
       },
-      take: 1
+      take: 1,
     });
 
     return row ? toSessionRecord(row) : null;
@@ -449,66 +403,36 @@ export async function countRecentAnonymousUploadAttempts(input: {
 }) {
   scheduleAnonymousStorageMaintenance();
   const since = new Date(Date.now() - ANONYMOUS_UPLOAD_WINDOW_MS);
-  const delegate = getAnonymousUploadLedgerDelegate();
+  const delegate = getAnonymousSessionDelegate();
 
   if (delegate) {
     const [visitorCount, ipCount] = await Promise.all([
       delegate.count({
         where: {
           visitorId: input.visitorId,
-          createdAt: { gte: since }
-        }
+          createdAt: { gte: since },
+        },
       }),
       delegate.count({
         where: {
           ipHash: input.ipHash,
-          createdAt: { gte: since }
-        }
-      })
+          createdAt: { gte: since },
+        },
+      }),
     ]);
 
     return { visitorCount, ipCount };
   }
 
-  const entries = await readStore<AnonymousUploadLedgerRecord>(LEDGER_FILE_STORE_NAME);
+  const entries = await readStore<AnonymousAnalysisSessionRecord>(SESSION_FILE_STORE_NAME);
   const activeEntries = entries.filter(
     (entry) => new Date(entry.createdAt).getTime() >= since.getTime()
   );
 
   return {
     visitorCount: activeEntries.filter((entry) => entry.visitorId === input.visitorId).length,
-    ipCount: activeEntries.filter((entry) => entry.ipHash === input.ipHash).length
+    ipCount: activeEntries.filter((entry) => entry.ipHash === input.ipHash).length,
   };
-}
-
-export async function recordAnonymousUploadAttempt(input: {
-  visitorId: string;
-  ipHash: string;
-  fileHash: string;
-}) {
-  const delegate = getAnonymousUploadLedgerDelegate();
-
-  if (delegate) {
-    await delegate.create({
-      data: {
-        visitorId: input.visitorId,
-        ipHash: input.ipHash,
-        fileHash: input.fileHash
-      }
-    });
-    return;
-  }
-
-  const entries = await readStore<AnonymousUploadLedgerRecord>(LEDGER_FILE_STORE_NAME);
-  const record: AnonymousUploadLedgerRecord = {
-    id: randomUUID(),
-    visitorId: input.visitorId,
-    ipHash: input.ipHash,
-    fileHash: input.fileHash,
-    createdAt: new Date().toISOString()
-  };
-
-  await writeStore(LEDGER_FILE_STORE_NAME, [...entries, record]);
 }
 
 export async function updateStoredSession(
@@ -529,8 +453,8 @@ export async function updateStoredSession(
             ? undefined
             : patch.claimedAt
               ? new Date(patch.claimedAt)
-              : null
-      }
+              : null,
+      },
     });
 
     return toSessionRecord(updated);
@@ -542,7 +466,7 @@ export async function updateStoredSession(
       ? {
           ...entry,
           ...patch,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         }
       : entry
   );
@@ -557,18 +481,20 @@ async function tryAcquireAnonymousClaimLock(viewer: Viewer, token: string) {
   const claimTimestamp = new Date().toISOString();
 
   if (delegate) {
-    const updated = await (delegate as typeof delegate & {
-      updateMany: (args: unknown) => Promise<{ count: number }>;
-    }).updateMany({
+    const updated = await (
+      delegate as typeof delegate & {
+        updateMany: (args: unknown) => Promise<{ count: number }>;
+      }
+    ).updateMany({
       where: {
         token,
-        claimedDealId: null
+        claimedDealId: null,
       },
       data: {
         claimedByUserId: viewer.id,
         claimedDealId: claimingValue,
-        claimedAt: new Date(claimTimestamp)
-      }
+        claimedAt: new Date(claimTimestamp),
+      },
     });
 
     if (updated.count === 0) {
@@ -576,7 +502,7 @@ async function tryAcquireAnonymousClaimLock(viewer: Viewer, token: string) {
     }
 
     const locked = await delegate.findUnique({
-      where: { token }
+      where: { token },
     });
 
     return locked ? toSessionRecord(locked) : null;
@@ -595,7 +521,7 @@ async function tryAcquireAnonymousClaimLock(viewer: Viewer, token: string) {
       claimedByUserId: viewer.id,
       claimedDealId: claimingValue,
       claimedAt: claimTimestamp,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
     return lockedEntry;
@@ -618,34 +544,29 @@ export async function analyzeAnonymousUpload(input: {
   fileHash: string;
 }) {
   const extracted = await extractDocumentText(input.bytes, input.mimeType, input.fileName);
-  const classification = classifyDocumentHeuristically(
-    extracted.normalizedText,
-    input.fileName
-  );
+  const classification = classifyDocumentHeuristically(extracted.normalizedText, input.fileName);
   const isSupportedAnonymousDocument = isAllowedPublicUploadDocumentKind(
     classification.documentKind
   );
 
   if (!isSupportedAnonymousDocument) {
-    throw new Error(
-      getUnsupportedPublicUploadDocumentMessage(classification.documentKind)
-    );
+    throw new Error(getUnsupportedPublicUploadDocumentMessage(classification.documentKind));
   }
 
   const analysis = await analyzeDocument(extracted.normalizedText, {
     fileName: input.fileName,
-    documentKindHint: classification.documentKind
+    documentKindHint: classification.documentKind,
   });
   const breakdown = buildAnonymousDealBreakdown({
     fileName: input.fileName,
-    analysis
+    analysis,
   });
 
   const stored = await storeUploadedBytes({
     fileName: input.fileName,
     bytes: input.bytes,
     contentType: input.mimeType || "application/octet-stream",
-    folder: "anonymous-analysis"
+    folder: "anonymous-analysis",
   });
 
   const session = await createAnonymousAnalysisSession({
@@ -659,13 +580,13 @@ export async function analyzeAnonymousUpload(input: {
     rawText: extracted.rawText,
     normalizedText: extracted.normalizedText,
     analysis,
-    breakdown
+    breakdown,
   });
 
   return {
     token: session.token,
     breakdown: session.breakdown,
-    expiresAt: session.expiresAt
+    expiresAt: session.expiresAt,
   };
 }
 
@@ -689,7 +610,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       return {
         dealId: session.claimedDealId,
         href: `/app/p/${session.claimedDealId}`,
-        alreadyClaimed: true
+        alreadyClaimed: true,
       };
     }
 
@@ -714,7 +635,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
         return {
           dealId: latestSession.claimedDealId,
           href: `/app/p/${latestSession.claimedDealId}`,
-          alreadyClaimed: true
+          alreadyClaimed: true,
         };
       }
 
@@ -731,8 +652,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
     const deal = await createDealForViewer(viewer, {
       brandName: lockedSession.breakdown.brandName ?? "Untitled brand",
       campaignName:
-        lockedSession.breakdown.contractTitle ??
-        deriveTitleFromFileName(lockedSession.fileName)
+        lockedSession.breakdown.contractTitle ?? deriveTitleFromFileName(lockedSession.fileName),
     });
 
     let documentStoragePath = lockedSession.storagePath;
@@ -744,7 +664,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
         fileName: lockedSession.fileName,
         bytes,
         contentType: lockedSession.mimeType,
-        folder: deal.id
+        folder: deal.id,
       });
       documentStoragePath = stored.storagePath;
     }
@@ -766,7 +686,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       errorMessage: null,
       processingRunId: null,
       processingRunStateJson: null,
-      processingStartedAt: null
+      processingStartedAt: null,
     });
 
     const savedSections = await repository.replaceDocumentSections(
@@ -775,7 +695,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
         title: section.title,
         content: section.content,
         chunkIndex: section.chunkIndex,
-        pageRange: section.pageRange
+        pageRange: section.pageRange,
       }))
     );
 
@@ -784,7 +704,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       model: lockedSession.analysis.extraction.model,
       confidence: lockedSession.analysis.extraction.confidence,
       data: lockedSession.analysis.extraction.data,
-      conflicts: lockedSession.analysis.extraction.conflicts
+      conflicts: lockedSession.analysis.extraction.conflicts,
     });
 
     await repository.replaceExtractionEvidence(
@@ -795,7 +715,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
         sectionId:
           savedSections.find((section) => `section:${section.chunkIndex}` === entry.sectionKey)
             ?.id ?? null,
-        confidence: entry.confidence
+        confidence: entry.confidence,
       }))
     );
 
@@ -804,7 +724,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       document.id,
       lockedSession.analysis.riskFlags.map((flag) => ({
         ...flag,
-        sourceDocumentId: document.id
+        sourceDocumentId: document.id,
       }))
     );
 
@@ -814,9 +734,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
     const nextTerms = {
       ...extractionData,
       brandName:
-        cleanText(extractionData.brandName) ??
-        lockedSession.breakdown.brandName ??
-        deal.brandName,
+        cleanText(extractionData.brandName) ?? lockedSession.breakdown.brandName ?? deal.brandName,
       campaignName:
         cleanText(extractionData.campaignName) ??
         lockedSession.breakdown.contractTitle ??
@@ -826,7 +744,7 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
         profile?.creatorLegalName ??
         profile?.displayName ??
         viewer.displayName,
-      pendingExtraction: null
+      pendingExtraction: null,
     };
 
     await repository.upsertTerms(deal.id, nextTerms);
@@ -837,14 +755,14 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
       campaignName: nextTerms.campaignName ?? deal.campaignName,
       summary: lockedSession.breakdown.contractSummary,
       analyzedAt: new Date().toISOString(),
-      confirmedAt: deal.confirmedAt ?? new Date().toISOString()
+      confirmedAt: deal.confirmedAt ?? new Date().toISOString(),
     });
 
     await updateStoredSession(token, {
       storagePath: null,
       claimedByUserId: viewer.id,
       claimedDealId: deal.id,
-      claimedAt: new Date().toISOString()
+      claimedAt: new Date().toISOString(),
     });
 
     if (lockedSession.storagePath) {
@@ -854,13 +772,13 @@ export async function claimAnonymousAnalysisSession(viewer: Viewer, token: strin
     return {
       dealId: deal.id,
       href: `/app/p/${deal.id}`,
-      alreadyClaimed: false
+      alreadyClaimed: false,
     };
   } catch (error) {
     await updateStoredSession(token, {
       claimedByUserId: null,
       claimedDealId: null,
-      claimedAt: null
+      claimedAt: null,
     }).catch(() => undefined);
 
     throw error;

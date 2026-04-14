@@ -9,7 +9,6 @@ import {
   analyzeAnonymousUpload,
   countRecentAnonymousUploadAttempts,
   findReusableAnonymousAnalysisSession,
-  recordAnonymousUploadAttempt
 } from "@/lib/public-anonymous-analysis";
 import { logPublicFunnelEvent } from "@/lib/public-funnel-events";
 import {
@@ -20,7 +19,7 @@ import {
   getAnonymousUploadSignUpHref,
   hashBuffer,
   resolveAnonymousVisitorIdentity,
-  validateAnonymousUploadFile
+  validateAnonymousUploadFile,
 } from "@/lib/public-upload-guards";
 import { captureHandledError } from "@/lib/monitoring/sentry";
 
@@ -39,7 +38,7 @@ function attachVisitorCookie(
     maxAge: ANONYMOUS_VISITOR_COOKIE_MAX_AGE_SECONDS,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    path: "/"
+    path: "/",
   });
 
   return response;
@@ -50,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   await logPublicFunnelEvent("anonymous_upload_started", {
     path: "/api/public/intake/upload",
-    visitorId: identity.visitorId
+    visitorId: identity.visitorId,
   });
 
   try {
@@ -68,7 +67,7 @@ export async function POST(request: NextRequest) {
     const fileHash = hashBuffer(bytes);
     const reusable = await findReusableAnonymousAnalysisSession({
       visitorId: identity.visitorId,
-      fileHash
+      fileHash,
     });
 
     if (reusable) {
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         mimeType: file.type || "application/octet-stream",
         expiresAt: reusable.expiresAt,
-        reused: true
+        reused: true,
       });
 
       return attachVisitorCookie(
@@ -84,7 +83,7 @@ export async function POST(request: NextRequest) {
           {
             analysisToken: reusable.token,
             breakdown: reusable.breakdown,
-            expiresAt: reusable.expiresAt
+            expiresAt: reusable.expiresAt,
           },
           { status: 200 }
         ),
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     const counts = await countRecentAnonymousUploadAttempts({
       visitorId: identity.visitorId,
-      ipHash: identity.ipHash
+      ipHash: identity.ipHash,
     });
 
     if (
@@ -107,7 +106,7 @@ export async function POST(request: NextRequest) {
         message,
         code: ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE,
         visitorCount: counts.visitorCount,
-        ipCount: counts.ipCount
+        ipCount: counts.ipCount,
       });
 
       return attachVisitorCookie(
@@ -115,7 +114,7 @@ export async function POST(request: NextRequest) {
           {
             error: message,
             code: ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE,
-            redirectTo: getAnonymousUploadSignUpHref()
+            redirectTo: getAnonymousUploadSignUpHref(),
           },
           { status: 429 }
         ),
@@ -129,20 +128,14 @@ export async function POST(request: NextRequest) {
       bytes,
       visitorId: identity.visitorId,
       ipHash: identity.ipHash,
-      fileHash
-    });
-
-    await recordAnonymousUploadAttempt({
-      visitorId: identity.visitorId,
-      ipHash: identity.ipHash,
-      fileHash
+      fileHash,
     });
 
     await logPublicFunnelEvent("anonymous_upload_succeeded", {
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
       expiresAt: result.expiresAt,
-      reused: false
+      reused: false,
     });
 
     return attachVisitorCookie(
@@ -150,15 +143,14 @@ export async function POST(request: NextRequest) {
         {
           analysisToken: result.token,
           breakdown: result.breakdown,
-          expiresAt: result.expiresAt
+          expiresAt: result.expiresAt,
         },
         { status: 201 }
       ),
       identity
     );
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not analyze that document.";
+    const message = error instanceof Error ? error.message : "Could not analyze that document.";
     const isUserInputError =
       message.startsWith("Please ") ||
       message.includes("smaller than") ||
@@ -172,21 +164,18 @@ export async function POST(request: NextRequest) {
         status,
         captureExpected: true,
         tags: {
-          visitor: "anonymous"
+          visitor: "anonymous",
         },
         extras: {
-          visitorId: identity.visitorId
-        }
+          visitorId: identity.visitorId,
+        },
       });
     }
 
     await logPublicFunnelEvent("anonymous_upload_failed", {
-      message
+      message,
     });
 
-    return attachVisitorCookie(
-      fail(message, status),
-      identity
-    );
+    return attachVisitorCookie(fail(message, status), identity);
   }
 }
