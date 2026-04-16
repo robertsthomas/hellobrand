@@ -13,8 +13,6 @@ import {
 const originalEnv = {
   STRIPE_PRICE_BASIC_MONTHLY: process.env.STRIPE_PRICE_BASIC_MONTHLY,
   STRIPE_PRICE_BASIC_YEARLY: process.env.STRIPE_PRICE_BASIC_YEARLY,
-  STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY,
-  STRIPE_PRICE_STANDARD_YEARLY: process.env.STRIPE_PRICE_STANDARD_YEARLY,
   STRIPE_PRICE_PREMIUM_MONTHLY: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
   STRIPE_PRICE_PREMIUM_YEARLY: process.env.STRIPE_PRICE_PREMIUM_YEARLY
 };
@@ -32,11 +30,14 @@ afterEach(() => {
 describe("billing rules", () => {
   test("recommends the next tier from the current plan", () => {
     expect(recommendedUpgradeForCurrentPlan(null)).toEqual({
-      tier: PlanTier.standard,
-      label: "Start with Standard for the full solo-creator workflow."
+      tier: PlanTier.basic,
+      label: "Start with Basic for the full creator workflow."
     });
-    expect(recommendedUpgradeForCurrentPlan(PlanTier.basic).tier).toBe(PlanTier.standard);
-    expect(recommendedUpgradeForCurrentPlan(PlanTier.standard).tier).toBe(PlanTier.premium);
+    expect(recommendedUpgradeForCurrentPlan(PlanTier.free)).toEqual({
+      tier: PlanTier.basic,
+      label: "Upgrade to Basic for more workspaces, briefs, analytics, and invoicing."
+    });
+    expect(recommendedUpgradeForCurrentPlan(PlanTier.basic).tier).toBe(PlanTier.premium);
     expect(recommendedUpgradeForCurrentPlan(PlanTier.premium)).toEqual({
       tier: null,
       label: null
@@ -50,17 +51,12 @@ describe("billing rules", () => {
         PlanTier.premium
       )
     ).toBe(true);
-    expect(hasUsedTrialForPlan([{ planTier: PlanTier.basic }], PlanTier.standard)).toBe(
-      false
-    );
+    expect(hasUsedTrialForPlan([{ planTier: PlanTier.basic }], PlanTier.free)).toBe(false);
   });
 
   test("returns default trial durations for fresh plan starts", () => {
+    expect(getTrialOffer(null, PlanTier.free)).toBeNull();
     expect(getTrialOffer(null, PlanTier.basic)).toEqual({
-      days: 14,
-      source: "new_plan_trial"
-    });
-    expect(getTrialOffer(null, PlanTier.standard)).toEqual({
       days: 14,
       source: "new_plan_trial"
     });
@@ -70,25 +66,11 @@ describe("billing rules", () => {
     });
   });
 
-  test("returns premium upsell trials for active paid basic and standard accounts", () => {
+  test("returns premium upsell trials for active basic accounts", () => {
     expect(
       getTrialOffer(
         {
           currentPlanTier: PlanTier.basic,
-          currentSubscriptionStatus: BillingSubscriptionStatus.active,
-          trialLedgers: []
-        },
-        PlanTier.premium
-      )
-    ).toEqual({
-      days: 14,
-      source: "premium_paid_upsell"
-    });
-
-    expect(
-      getTrialOffer(
-        {
-          currentPlanTier: PlanTier.standard,
           currentSubscriptionStatus: BillingSubscriptionStatus.active,
           trialLedgers: []
         },
@@ -104,7 +86,7 @@ describe("billing rules", () => {
     expect(
       getTrialOffer(
         {
-          currentPlanTier: PlanTier.standard,
+          currentPlanTier: PlanTier.basic,
           currentSubscriptionStatus: BillingSubscriptionStatus.active,
           trialLedgers: [{ planTier: PlanTier.premium }]
         },
@@ -133,23 +115,21 @@ describe("billing plan availability", () => {
   test("reads monthly and yearly Stripe price availability from env", () => {
     process.env.STRIPE_PRICE_BASIC_MONTHLY = "price_basic_month";
     delete process.env.STRIPE_PRICE_BASIC_YEARLY;
-    process.env.STRIPE_PRICE_STANDARD_MONTHLY = "price_standard_month";
-    process.env.STRIPE_PRICE_STANDARD_YEARLY = "price_standard_year";
     process.env.STRIPE_PRICE_PREMIUM_MONTHLY = "price_premium_month";
     delete process.env.STRIPE_PRICE_PREMIUM_YEARLY;
 
     const plans = buildPlanAvailability();
+    const free = plans.find((plan) => plan.tier === PlanTier.free);
     const basic = plans.find((plan) => plan.tier === PlanTier.basic);
-    const standard = plans.find((plan) => plan.tier === PlanTier.standard);
     const premium = plans.find((plan) => plan.tier === PlanTier.premium);
+
+    expect(free?.monthlyAvailable).toBe(true);
+    expect(free?.yearlyAvailable).toBe(false);
+    expect(free?.trialLabel).toBe("Free forever");
 
     expect(basic?.monthlyAvailable).toBe(true);
     expect(basic?.yearlyAvailable).toBe(false);
     expect(basic?.trialLabel).toBe("14-day trial");
-
-    expect(standard?.monthlyAvailable).toBe(true);
-    expect(standard?.yearlyAvailable).toBe(true);
-    expect(standard?.trialLabel).toBe("14-day trial");
 
     expect(premium?.monthlyAvailable).toBe(true);
     expect(premium?.yearlyAvailable).toBe(false);

@@ -9,8 +9,8 @@ import type { TierName } from "./runtime";
 
 export function getTierName(projectName: string): TierName {
   if (
+    projectName !== "free" &&
     projectName !== "basic" &&
-    projectName !== "standard" &&
     projectName !== "premium"
   ) {
     throw new Error(`Unknown tier project: ${projectName}`);

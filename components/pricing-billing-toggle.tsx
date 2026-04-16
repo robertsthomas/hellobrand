@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { PlanTier } from "@prisma/client";
 import { Check } from "lucide-react";
 
 type PlanData = {
+  tier: PlanTier;
   name: string;
   persona: string;
   monthlyPriceLabel: string;
@@ -60,7 +62,7 @@ export function PricingBillingToggle({ plans }: { plans: PlanData[] }) {
           const priceLabel =
             isAnnual && plan.yearlyAvailable ? plan.annualPriceLabel : plan.monthlyPriceLabel;
           const priceNum = priceLabel.replace(/[^0-9]/g, "");
-          const period = isAnnual && plan.yearlyAvailable ? "/yr" : "/mo";
+          const period = plan.tier === PlanTier.free ? "" : isAnnual && plan.yearlyAvailable ? "/yr" : "/mo";
           const showSavings = isAnnual && plan.yearlyAvailable;
 
           return (
@@ -129,7 +131,7 @@ export function PricingBillingToggle({ plans }: { plans: PlanData[] }) {
                     : "bg-ocean text-white dark:bg-sand dark:text-[#18201d]"
                 }`}
               >
-                Start {plan.trialLabel}
+                {plan.tier === PlanTier.free ? "Get started" : `Start ${plan.trialLabel}`}
               </a>
             </article>
           );

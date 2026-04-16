@@ -240,7 +240,7 @@ const pageContextRegistry: Record<string, AssistantPageContext> = {
       "View feature entitlements by tier"
     ],
     dataHints: [
-      "Shows current tier (Basic, Standard, Premium) and feature access",
+      "Shows current tier (Free, Basic, Premium) and feature access",
       "Premium inbox and brief generation are tier-gated features",
       "Billing insights may show creator earnings vs subscription cost"
     ]

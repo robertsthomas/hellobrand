@@ -41,6 +41,7 @@ export function statusBadgeLabel(options: {
     return "Payment issue";
   if (options.currentSubscriptionStatus === "paused") return "Paused";
   if (options.currentSubscriptionStatus === "canceled") return "Canceled";
+  if (options.currentPlanTier === PlanTier.free) return "Free plan";
   return options.currentPlanTier ? "Plan selected" : "No plan yet";
 }
 
@@ -50,6 +51,8 @@ export function billingIntro(options: {
 }) {
   if (options.currentSubscriptionStatus === "trialing" && options.currentPlanTier)
     return `You are currently trying the ${humanizeToken(options.currentPlanTier)} plan.`;
+  if (options.currentPlanTier === PlanTier.free)
+    return "You are on the free plan. Upgrade when you need more workspaces, briefs, analytics, or inbox intelligence.";
   if (options.currentPlanTier) return "Manage your plan, payment method, and renewal details.";
   return "Choose the plan that fits how you manage brand partnerships.";
 }
@@ -78,7 +81,6 @@ export function buildBillingPageViewModel(input: {
     usageCards: [
       { key: "active_workspaces", label: "Workspaces" },
       { key: "assistant_messages_monthly", label: "Assistant" },
-      { key: "deal_drafts_monthly", label: "AI drafts" },
       { key: "brief_generations_monthly", label: "Briefs" }
     ] satisfies Array<{ key: UsageLimitKey; label: string }>
   };

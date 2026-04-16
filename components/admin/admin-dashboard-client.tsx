@@ -125,8 +125,8 @@ function UserDetailModal({
   const [editor, setEditor] = useState<UserEditorState>(toEditorState(user));
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [planForm, setPlanForm] = useState({ tier: "premium", status: "active" });
-  const [trialForm, setTrialForm] = useState({ tier: "premium", days: "14" });
+  const [planForm, setPlanForm] = useState({ tier: "free", status: "active" });
+  const [trialForm, setTrialForm] = useState({ tier: "basic", days: "14" });
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -322,8 +322,8 @@ function UserDetailModal({
                       value={planForm.tier}
                       onChange={(e) => setPlanForm((s) => ({ ...s, tier: e.target.value }))}
                     >
+                      <option value="free">Free</option>
                       <option value="basic">Basic</option>
-                      <option value="standard">Standard</option>
                       <option value="premium">Premium</option>
                     </select>
                     <select
@@ -362,7 +362,6 @@ function UserDetailModal({
                       onChange={(e) => setTrialForm((s) => ({ ...s, tier: e.target.value }))}
                     >
                       <option value="basic">Basic</option>
-                      <option value="standard">Standard</option>
                       <option value="premium">Premium</option>
                     </select>
                     <Input

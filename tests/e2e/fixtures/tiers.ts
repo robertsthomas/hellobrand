@@ -2,12 +2,12 @@ import type { TierName } from "../runtime";
 
 export const PRICING_PLAN_CONTRACT = [
   {
-    name: "Basic",
-    caption: "For creators getting started with active contract understanding and light operations",
+    name: "Free",
+    caption: "For creators validating value on one real brand partnership",
   },
   {
-    name: "Standard",
-    caption: "For active solo creators managing multiple brand partnerships",
+    name: "Basic",
+    caption: "For creators managing active brand work without needing a synced inbox yet",
   },
   {
     name: "Premium",
@@ -20,7 +20,7 @@ export const TIER_SURFACE_CONTRACT: Record<
   TierName,
   {
     currentPlanHeading: string;
-    recommendedUpgrade: "Standard" | "Premium" | null;
+    recommendedUpgrade: "Basic" | "Premium" | null;
     analytics: "locked" | "full";
     inbox: "locked" | "full";
     settings: "locked" | "full";
@@ -28,17 +28,17 @@ export const TIER_SURFACE_CONTRACT: Record<
     emailsTab: "locked" | "full";
   }
 > = {
-  basic: {
-    currentPlanHeading: "Basic plan",
-    recommendedUpgrade: "Standard",
-    analytics: "full",
+  free: {
+    currentPlanHeading: "Free plan",
+    recommendedUpgrade: "Basic",
+    analytics: "locked",
     inbox: "locked",
     settings: "locked",
     briefTab: "locked",
     emailsTab: "locked",
   },
-  standard: {
-    currentPlanHeading: "Standard plan",
+  basic: {
+    currentPlanHeading: "Basic plan",
     recommendedUpgrade: "Premium",
     analytics: "full",
     inbox: "locked",

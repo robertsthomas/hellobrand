@@ -7,8 +7,8 @@ import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config
 export const ANONYMOUS_VISITOR_COOKIE_NAME = "hb_anon_visitor";
 export const ANONYMOUS_VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 export const ANONYMOUS_UPLOAD_WINDOW_MS = 1000 * 60 * 60 * 24 * 30;
-export const ANONYMOUS_UPLOAD_MAX_COUNT = 3;
-export const ANONYMOUS_UPLOAD_REDIRECT_PATH = "/app/intake/new";
+export const ANONYMOUS_UPLOAD_MAX_COUNT = 1;
+export const ANONYMOUS_UPLOAD_REDIRECT_PATH = "/upload/claim";
 export const ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE = "ANONYMOUS_UPLOAD_LIMIT_REACHED";
 
 const SUPPORTED_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".txt"]);

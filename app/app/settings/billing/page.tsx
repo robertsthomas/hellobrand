@@ -154,7 +154,7 @@ export default async function BillingSettingsPage({
                 <span className="text-muted-foreground">Trial</span>
                 <InfoTooltip
                   label="Trial policy"
-                  content="Basic and Standard include 14-day trials. Premium includes a 7-day trial."
+                  content="Free is available without billing. Basic includes a 14-day trial. Premium includes a 7-day trial."
                   className="h-4 w-4"
                 />
               </div>
@@ -396,6 +396,7 @@ export default async function BillingSettingsPage({
         <div className="grid gap-4 lg:grid-cols-3">
           {overview.planCatalog.map((plan) => {
             const isCurrentPlan = overview.currentPlanTier === plan.tier;
+            const isFreePlan = plan.tier === PlanTier.free;
             const disablePlanActions =
               !overview.billingReady ||
               !overview.stripeConfigured ||
@@ -426,7 +427,11 @@ export default async function BillingSettingsPage({
                 </div>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {plan.yearlyAvailable ? plan.annualEquivalentLabel : "Monthly billing only"}
+                  {isFreePlan
+                    ? "Free forever"
+                    : plan.yearlyAvailable
+                      ? plan.annualEquivalentLabel
+                      : "Monthly billing only"}
                 </p>
 
                 <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{plan.summary}</p>
@@ -434,7 +439,7 @@ export default async function BillingSettingsPage({
                 <ul className="mt-4 flex-1 space-y-2 border-t border-black/[0.06] pt-4">
                   {plan.features.map((feature, index) => {
                     const isHighlighted =
-                      (plan.tier === PlanTier.standard || plan.tier === PlanTier.premium) &&
+                      (plan.tier === PlanTier.basic || plan.tier === PlanTier.premium) &&
                       !(index === 0 && feature.startsWith("Everything in "));
 
                     return (
@@ -456,25 +461,31 @@ export default async function BillingSettingsPage({
                 </ul>
 
                 <div className="mt-5 grid gap-2 border-t border-black/[0.06] pt-4">
-                  <form action={startCheckoutAction}>
-                    <input type="hidden" name="planTier" value={plan.tier} />
-                    <input type="hidden" name="interval" value={BillingInterval.month} />
-                    <PostHogSubmitButton
-                      eventName="billing_checkout_started"
-                      payload={{
-                        source: "billing_plan_grid",
-                        targetTier: plan.tier,
-                        interval: BillingInterval.month,
-                      }}
-                      pendingLabel="Redirecting…"
-                      disabled={disablePlanActions || !plan.monthlyAvailable}
-                      className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {isCurrentPlan ? "Current plan" : "Start monthly"}
-                    </PostHogSubmitButton>
-                  </form>
+                  {isFreePlan ? (
+                    <div className="w-full rounded-lg border border-black/10 bg-white px-4 py-2.5 text-center text-sm font-medium text-muted-foreground">
+                      {isCurrentPlan ? "Current plan" : "Included with every account"}
+                    </div>
+                  ) : (
+                    <form action={startCheckoutAction}>
+                      <input type="hidden" name="planTier" value={plan.tier} />
+                      <input type="hidden" name="interval" value={BillingInterval.month} />
+                      <PostHogSubmitButton
+                        eventName="billing_checkout_started"
+                        payload={{
+                          source: "billing_plan_grid",
+                          targetTier: plan.tier,
+                          interval: BillingInterval.month,
+                        }}
+                        pendingLabel="Redirecting…"
+                        disabled={disablePlanActions || !plan.monthlyAvailable}
+                        className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isCurrentPlan ? "Current plan" : "Start monthly"}
+                      </PostHogSubmitButton>
+                    </form>
+                  )}
 
-                  {plan.yearlyAvailable && (
+                  {!isFreePlan && plan.yearlyAvailable && (
                     <form action={startCheckoutAction}>
                       <input type="hidden" name="planTier" value={plan.tier} />
                       <input type="hidden" name="interval" value={BillingInterval.year} />

@@ -6,16 +6,16 @@ export const E2E_BASE_URL = `http://127.0.0.1:${E2E_PORT}`;
 
 export const E2E_PROJECTS = [
   {
+    tier: "free",
+    port: E2E_PORT,
+    baseURL: E2E_BASE_URL,
+    storageState: path.join(process.cwd(), "tests/e2e/.auth/free.json")
+  },
+  {
     tier: "basic",
     port: E2E_PORT,
     baseURL: E2E_BASE_URL,
     storageState: path.join(process.cwd(), "tests/e2e/.auth/basic.json")
-  },
-  {
-    tier: "standard",
-    port: E2E_PORT,
-    baseURL: E2E_BASE_URL,
-    storageState: path.join(process.cwd(), "tests/e2e/.auth/standard.json")
   },
   {
     tier: "premium",

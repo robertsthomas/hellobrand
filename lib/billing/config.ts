@@ -8,7 +8,11 @@ function isNonProduction() {
 }
 
 function isValidPlanTier(value: string | undefined | null): value is PlanTier {
-  return value === PlanTier.basic || value === PlanTier.standard || value === PlanTier.premium;
+  return value === PlanTier.free || value === PlanTier.basic || value === PlanTier.premium;
+}
+
+function isPaidPlanTier(planTier: PlanTier): planTier is "basic" | "premium" {
+  return planTier === "basic" || planTier === "premium";
 }
 
 function isValidBillingInterval(
@@ -111,6 +115,10 @@ export function stripePriceEnvName(planTier: PlanTier, interval: BillingInterval
 }
 
 export function getStripePriceId(planTier: PlanTier, interval: BillingInterval) {
+  if (!isPaidPlanTier(planTier)) {
+    throw new Error("Free tier does not have a Stripe price.");
+  }
+
   const envName = stripePriceEnvName(planTier, interval);
   const value = process.env[envName]?.trim();
   if (!value) {
@@ -121,6 +129,10 @@ export function getStripePriceId(planTier: PlanTier, interval: BillingInterval) 
 }
 
 export function hasStripePriceId(planTier: PlanTier, interval: BillingInterval) {
+  if (!isPaidPlanTier(planTier)) {
+    return false;
+  }
+
   return Boolean(process.env[stripePriceEnvName(planTier, interval)]?.trim());
 }
 

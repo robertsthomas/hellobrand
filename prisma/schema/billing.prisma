@@ -1,8 +1,8 @@
 // Billing plan, subscription, invoice, and payment tracking records.
 
 enum PlanTier {
+  free
   basic
-  standard
   premium
 }
 

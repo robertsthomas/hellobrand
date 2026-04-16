@@ -616,7 +616,7 @@ export async function deleteUserDeal(userId: string, dealId: string) {
 
 export async function updateUserPlan(
   userId: string,
-  planTier: "basic" | "standard" | "premium",
+  planTier: "free" | "basic" | "premium",
   subscriptionStatus: string
 ) {
   await prisma.billingAccount.upsert({
@@ -638,7 +638,7 @@ export async function updateUserPlan(
 
 export async function grantUserTrial(
   userId: string,
-  planTier: "basic" | "standard" | "premium",
+  planTier: "basic" | "premium",
   durationDays: number
 ) {
   const startsAt = new Date();

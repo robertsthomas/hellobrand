@@ -28,12 +28,12 @@ const actionSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("update_plan"),
-    planTier: z.enum(["basic", "standard", "premium"]),
+    planTier: z.enum(["free", "basic", "premium"]),
     subscriptionStatus: z.enum(["active", "trialing", "canceled", "paused"])
   }),
   z.object({
     action: z.literal("grant_trial"),
-    planTier: z.enum(["basic", "standard", "premium"]),
+    planTier: z.enum(["basic", "premium"]),
     durationDays: z.number().int().min(1).max(365)
   })
 ]);

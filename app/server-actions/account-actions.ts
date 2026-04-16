@@ -80,21 +80,21 @@ export async function startCheckoutAction(formData: FormData) {
   const viewer = await requireViewer();
   const planTier = String(formData.get("planTier") ?? "");
   const interval = String(formData.get("interval") ?? "");
-  const validPlanTiers = [PlanTier.basic, PlanTier.standard, PlanTier.premium];
-  const validIntervals = [BillingInterval.month, BillingInterval.year];
+  const validPlanTiers = [PlanTier.basic, PlanTier.premium] as const;
+  const validIntervals = [BillingInterval.month, BillingInterval.year] as const;
 
-  if (!validPlanTiers.includes(planTier as PlanTier)) {
+  if (!validPlanTiers.includes(planTier as (typeof validPlanTiers)[number])) {
     redirect("/app/settings/billing?billing_error=Invalid%20plan%20selection.");
   }
 
-  if (!validIntervals.includes(interval as BillingInterval)) {
+  if (!validIntervals.includes(interval as (typeof validIntervals)[number])) {
     redirect("/app/settings/billing?billing_error=Invalid%20billing%20interval.");
   }
 
   try {
     const result = await createCheckoutSessionForViewer(viewer, {
-      planTier: planTier as PlanTier,
-      interval: interval as BillingInterval
+      planTier: planTier as (typeof validPlanTiers)[number],
+      interval: interval as (typeof validIntervals)[number]
     });
     redirect(result.url);
   } catch (error) {

@@ -68,89 +68,89 @@ export type BillingOverview = {
 
 const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
   {
-    tier: PlanTier.basic,
-    name: "Basic",
-    persona: "Just starting out",
-    monthlyPriceUsd: 19,
-    annualPriceUsd: 180,
-    monthlyPriceLabel: "$19/mo",
-    annualPriceLabel: "$180/yr",
-    annualEquivalentLabel: "$15/mo billed annually",
-    annualSavingsLabel: "Save $48/yr",
-    summary: "Core partnership intelligence for lighter creator workflows.",
-    caption: "For creators getting started with active contract understanding and light operations",
+    tier: PlanTier.free,
+    name: "Free",
+    persona: "Trying one real deal",
+    monthlyPriceUsd: 0,
+    annualPriceUsd: 0,
+    monthlyPriceLabel: "$0/mo",
+    annualPriceLabel: "$0/yr",
+    annualEquivalentLabel: "Free forever",
+    annualSavingsLabel: "",
+    summary: "Try HelloBrand on one active partnership before you decide to pay.",
+    caption: "For creators validating value on one real brand partnership",
     features: [
-      "3 active workspaces",
+      "1 active workspace",
       "AI extraction, summary, and risk review",
-      "Basic deliverables and payment tracking",
-      "AI assistant with capped usage",
-      "Revenue tracking and basic analytics",
+      "10 AI assistant messages / month",
+      "No generated campaign briefs",
+      "No analytics or inbox sync",
     ],
     marketingFeatures: [
-      "3 active partnership workspaces",
-      "25 AI assistant messages / month",
-      "10 AI draft generations / month",
+      "1 active partnership workspace",
+      "10 AI assistant messages / month",
       "Document upload and paste intake",
       "AI extraction, summary, and risk review",
       "Editable partnership terms",
-      "Basic deliverables and payments tracking",
-      "Revenue tracking and basic analytics",
       "Search and notifications",
     ],
   },
   {
-    tier: PlanTier.standard,
-    name: "Standard",
-    persona: "Active creator",
-    monthlyPriceUsd: 49,
-    annualPriceUsd: 468,
-    monthlyPriceLabel: "$49/mo",
-    annualPriceLabel: "$468/yr",
-    annualEquivalentLabel: "$39/mo billed annually",
-    annualSavingsLabel: "Save $120/yr",
-    summary: "The full solo-creator workflow with deeper AI and workspace operations.",
-    caption: "For active solo creators managing multiple brand partnerships",
+    tier: PlanTier.basic,
+    name: "Basic",
+    persona: "Running creator ops",
+    monthlyPriceUsd: 29,
+    annualPriceUsd: 288,
+    monthlyPriceLabel: "$29/mo",
+    annualPriceLabel: "$288/yr",
+    annualEquivalentLabel: "$24/mo billed annually",
+    annualSavingsLabel: "Save $60/yr",
+    summary: "The full paid creator workflow with generous limits for growing businesses.",
+    caption: "For creators managing active brand work without needing a synced inbox yet",
     popular: true,
     features: [
-      "Everything in Basic",
-      "Unlimited active workspaces",
-      "Full AI drafting and brief generation",
-      "Revenue analytics and conflict intelligence",
+      "8 active workspaces",
+      "AI extraction, summary, and risk review",
+      "Campaign brief generation",
+      "Invoices, payment tracking, and analytics",
+      "250 AI assistant messages / month",
     ],
     marketingFeatures: [
-      "Everything in Basic",
-      "Unlimited active partnership workspaces",
+      "8 active partnership workspaces",
       "250 AI assistant messages / month",
-      "100 AI draft generations / month",
-      "30 AI campaign brief generations / month",
-      "Negotiation and follow-up drafting",
+      "20 AI campaign brief generations / month",
+      "Document upload and paste intake",
+      "AI extraction, summary, and risk review",
+      "Editable partnership terms",
+      "Full deliverables, invoicing, and payments workflow",
+      "Revenue tracking and partnership analytics",
       "Cross-partnership conflict detection",
-      "Full document diff review",
-      "Full deliverables, approvals, and payment workflow",
+      "Search and notifications",
     ],
   },
   {
     tier: PlanTier.premium,
     name: "Premium",
-    persona: "Power creator & managers",
-    monthlyPriceUsd: 99,
-    annualPriceUsd: 948,
-    monthlyPriceLabel: "$99/mo",
-    annualPriceLabel: "$948/yr",
-    annualEquivalentLabel: "$79/mo billed annually",
-    annualSavingsLabel: "Save $240/yr",
+    persona: "Operating at scale",
+    monthlyPriceUsd: 79,
+    annualPriceUsd: 768,
+    monthlyPriceLabel: "$79/mo",
+    annualPriceLabel: "$768/yr",
+    annualEquivalentLabel: "$64/mo billed annually",
+    annualSavingsLabel: "Save $180/yr",
     summary: "Connected inbox, advanced intelligence, and premium operations.",
     caption:
       "For power creators, managers, or creator businesses that want HelloBrand as an operational system",
     features: [
-      "Everything in Standard",
+      "Everything in Basic",
       "Synced inbox and thread intelligence",
       "Email action items and discrepancy tracking",
       "Advanced analytics and reporting",
     ],
     marketingFeatures: [
-      "Everything in Standard",
-      "Unlimited AI assistant, drafts, and briefs",
+      "Everything in Basic",
+      "Unlimited active partnership workspaces",
+      "Unlimited AI assistant and briefs",
       "Gmail / Outlook synced inbox",
       "Smart inbox matching and communication intelligence",
       "Action-item extraction from email",
@@ -163,6 +163,10 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
 ];
 
 function formatTrialLabel(tier: PlanTier) {
+  if (tier === PlanTier.free) {
+    return "Free forever";
+  }
+
   return tier === PlanTier.premium ? "7-day trial" : "14-day trial";
 }
 
@@ -173,8 +177,10 @@ export function getPlanCatalogFeatures(tier: PlanTier): string[] {
 export function buildPlanAvailability() {
   return BILLING_PLAN_CATALOG.map((plan) => ({
     ...plan,
-    monthlyAvailable: hasStripePriceId(plan.tier, BillingInterval.month),
-    yearlyAvailable: hasStripePriceId(plan.tier, BillingInterval.year),
+    monthlyAvailable:
+      plan.tier === PlanTier.free || hasStripePriceId(plan.tier, BillingInterval.month),
+    yearlyAvailable:
+      plan.tier !== PlanTier.free && hasStripePriceId(plan.tier, BillingInterval.year),
     trialLabel: formatTrialLabel(plan.tier),
   }));
 }
@@ -184,8 +190,11 @@ export async function buildMarketingPlanAvailability(): Promise<MarketingPlanAva
   return plans.map((plan) => ({
     ...plan,
     displayMonthlyPriceLabel: plan.monthlyPriceLabel,
-    displayAnnualEquivalentLabel: plan.yearlyAvailable
-      ? plan.annualEquivalentLabel
-      : "Monthly billing only right now",
+    displayAnnualEquivalentLabel:
+      plan.tier === PlanTier.free
+        ? "Free forever"
+        : plan.yearlyAvailable
+          ? plan.annualEquivalentLabel
+          : "Monthly billing only right now",
   }));
 }

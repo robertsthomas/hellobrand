@@ -31,6 +31,11 @@
       "sourceType": "github",
       "computedHash": "4793ac377b2bc1a5831d9634ce882373350cc5d097fd631d192155266204ceb8"
     },
+    "copywriting": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "2e83eda2221e97166172a0798e9b0379e34080595e107e2fc0cf580e9b3bbf7b"
+    },
     "critique": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",
@@ -45,6 +50,11 @@
       "source": "vercel/flags",
       "sourceType": "github",
       "computedHash": "a9fbc5cdeb0d891ddfaf0674f779aa7107c43011e6301f806a7a836a83c7002d"
+    },
+    "i18n-localization": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "ea5d6d0faa9fabd6a8a3165dca69dac9ab7c622dc130bdce3f1dfa88e02ba948"
     },
     "layout": {
       "source": "pbakaus/impeccable",
@@ -75,6 +85,11 @@
       "source": "coreyhaines31/marketingskills",
       "sourceType": "github",
       "computedHash": "4312095789cc328883428b1f9bd61549ca44b376aeda8d62bb977efad017e594"
+    },
+    "product-marketing-context": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "21dd05f970ba54406d7405f92240853f809d0fed09ef6ca2a9204abcdd21548a"
     },
     "prompt-engineering-patterns": {
       "source": "wshobson/agents",

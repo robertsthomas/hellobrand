@@ -187,10 +187,13 @@ async function ensureBillingAccount(viewer: Viewer) {
   });
 
   if (existing) {
-    if (existing.billingEmail !== viewer.email) {
+    if (existing.billingEmail !== viewer.email || existing.currentPlanTier === null) {
       return prisma.billingAccount.update({
         where: { id: existing.id },
-        data: { billingEmail: viewer.email }
+        data: {
+          billingEmail: viewer.email,
+          ...(existing.currentPlanTier === null ? { currentPlanTier: PlanTier.free } : {})
+        }
       });
     }
 
@@ -200,7 +203,8 @@ async function ensureBillingAccount(viewer: Viewer) {
   return prisma.billingAccount.create({
     data: {
       userId: viewer.id,
-      billingEmail: viewer.email
+      billingEmail: viewer.email,
+      currentPlanTier: PlanTier.free
     }
   });
 }
@@ -240,7 +244,8 @@ async function ensureBillingAccountForStripeCustomer(
       userId: clerkUserId,
       provider: BillingProvider.stripe,
       stripeCustomerId: customerId,
-      billingEmail: resolvedCustomer.email ?? null
+      billingEmail: resolvedCustomer.email ?? null,
+      currentPlanTier: PlanTier.free
     }
   });
 }
@@ -292,7 +297,7 @@ async function buildFileBackedBillingOverview(): Promise<BillingOverview> {
         ).toISOString()
       : null;
   const recommendedUpgrade = recommendedUpgradeForCurrentPlan(
-    overridePlanTier ?? PlanTier.basic
+    overridePlanTier ?? PlanTier.free
   );
   const insights = computeBillingInsights({
     currentPlanTier: effectivePlanTier,
@@ -450,8 +455,8 @@ export async function getBillingOverviewForViewer(
       cancelAtPeriodEnd: false,
       planCatalog,
       hasActiveSubscription: false,
-      recommendedUpgradeTier: PlanTier.standard,
-      recommendedUpgradeLabel: "Start with Standard for the full solo-creator workflow.",
+      recommendedUpgradeTier: PlanTier.basic,
+      recommendedUpgradeLabel: "Start with Basic for the full creator workflow.",
       insights: computeBillingInsights({
         currentPlanTier: null,
         currentPlanInterval: null,
@@ -963,7 +968,7 @@ export async function reconcileStripeCheckoutSession(
         billingAccountId: billingAccount.id,
         provider: BillingProvider.stripe,
         planTier:
-          coercePlanTier(session.metadata?.requestedPlanTier) ?? PlanTier.basic,
+          coercePlanTier(session.metadata?.requestedPlanTier) ?? PlanTier.free,
         interval:
           coerceBillingInterval(session.metadata?.requestedInterval) ??
           BillingInterval.month,

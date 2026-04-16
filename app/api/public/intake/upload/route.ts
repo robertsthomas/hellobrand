@@ -16,12 +16,17 @@ import {
   ANONYMOUS_UPLOAD_MAX_COUNT,
   ANONYMOUS_VISITOR_COOKIE_MAX_AGE_SECONDS,
   ANONYMOUS_VISITOR_COOKIE_NAME,
+  getAnonymousUploadSignInHref,
   getAnonymousUploadSignUpHref,
   hashBuffer,
   resolveAnonymousVisitorIdentity,
   validateAnonymousUploadFile,
 } from "@/lib/public-upload-guards";
 import { captureHandledError } from "@/lib/monitoring/sentry";
+import {
+  ANONYMOUS_CLAIM_TOKEN_COOKIE_MAX_AGE_SECONDS,
+  ANONYMOUS_CLAIM_TOKEN_COOKIE_NAME,
+} from "@/lib/public-upload-session";
 
 function attachVisitorCookie(
   response: NextResponse,
@@ -39,6 +44,20 @@ function attachVisitorCookie(
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+  });
+
+  return response;
+}
+
+function attachClaimCookie(response: NextResponse, analysisToken: string) {
+  response.cookies.set({
+    name: ANONYMOUS_CLAIM_TOKEN_COOKIE_NAME,
+    value: analysisToken,
+    httpOnly: true,
+    maxAge: ANONYMOUS_CLAIM_TOKEN_COOKIE_MAX_AGE_SECONDS,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/api/public/intake/claim",
   });
 
   return response;
@@ -78,16 +97,19 @@ export async function POST(request: NextRequest) {
         reused: true,
       });
 
-      return attachVisitorCookie(
-        ok(
-          {
-            analysisToken: reusable.token,
-            breakdown: reusable.breakdown,
-            expiresAt: reusable.expiresAt,
-          },
-          { status: 200 }
+      return attachClaimCookie(
+        attachVisitorCookie(
+          ok(
+            {
+              analysisToken: reusable.token,
+              breakdown: reusable.breakdown,
+              expiresAt: reusable.expiresAt,
+            },
+            { status: 200 }
+          ),
+          identity
         ),
-        identity
+        reusable.token
       );
     }
 
@@ -101,7 +123,7 @@ export async function POST(request: NextRequest) {
       counts.ipCount >= ANONYMOUS_UPLOAD_MAX_COUNT
     ) {
       const message =
-        "You’ve used all 3 free uploads. Create an account to continue inside HelloBrand.";
+        "You’ve already used your free preview. Create a free workspace to keep going inside HelloBrand.";
       await logPublicFunnelEvent("anonymous_upload_failed", {
         message,
         code: ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE,
@@ -114,7 +136,8 @@ export async function POST(request: NextRequest) {
           {
             error: message,
             code: ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE,
-            redirectTo: getAnonymousUploadSignUpHref(),
+            signUpHref: getAnonymousUploadSignUpHref(),
+            signInHref: getAnonymousUploadSignInHref(),
           },
           { status: 429 }
         ),
@@ -138,23 +161,27 @@ export async function POST(request: NextRequest) {
       reused: false,
     });
 
-    return attachVisitorCookie(
-      ok(
-        {
-          analysisToken: result.token,
-          breakdown: result.breakdown,
-          expiresAt: result.expiresAt,
-        },
-        { status: 201 }
+    return attachClaimCookie(
+      attachVisitorCookie(
+        ok(
+          {
+            analysisToken: result.token,
+            breakdown: result.breakdown,
+            expiresAt: result.expiresAt,
+          },
+          { status: 201 }
+        ),
+        identity
       ),
-      identity
+      result.token
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not analyze that document.";
     const isUserInputError =
       message.startsWith("Please ") ||
       message.includes("smaller than") ||
-      message.includes("free uploads");
+      message.includes("free uploads") ||
+      message.includes("free preview");
     const status = isUserInputError ? 400 : 500;
 
     if (!isUserInputError) {

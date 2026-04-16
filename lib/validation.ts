@@ -355,6 +355,7 @@ export const publicFunnelEventNames = [
   "anonymous_upload_succeeded",
   "anonymous_upload_failed",
   "anonymous_save_cta_clicked",
+  "anonymous_create_free_workspace_clicked",
   "anonymous_auth_returned",
   "anonymous_claim_succeeded",
   "anonymous_claim_failed",
@@ -365,8 +366,4 @@ export const publicFunnelEventSchema = z.object({
   payload: z.record(z.string(), z.unknown()).optional().default({}),
   distinctId: z.string().min(1).max(200).nullable().optional(),
   currentUrl: z.string().url().nullable().optional(),
-});
-
-export const publicAnonymousClaimSchema = z.object({
-  analysisToken: z.string().min(10).max(255),
 });
