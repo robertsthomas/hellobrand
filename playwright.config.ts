@@ -7,6 +7,9 @@ import {
   E2E_PROJECTS
 } from "./tests/e2e/runtime";
 
+process.loadEnvFile?.();
+process.loadEnvFile?.(".env.local");
+
 export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global.setup.ts",

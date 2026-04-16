@@ -8,7 +8,6 @@ import { PostHogActionLink } from "@/components/posthog-action-link";
 import { PublicContractBreakdown } from "@/components/public-contract-breakdown";
 import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config";
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
-import { ANONYMOUS_ANALYSIS_TOKEN_STORAGE_KEY } from "@/lib/public-upload-session";
 import type { AnonymousDealBreakdown } from "@/lib/types";
 
 type UploadState = "idle" | "uploading" | "done";
@@ -36,7 +35,6 @@ export function PublicUploadWorkspace() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [analysisToken, setAnalysisToken] = useState<string | null>(null);
   const [breakdown, setBreakdown] = useState<AnonymousDealBreakdown | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [uploadLimitGate, setUploadLimitGate] = useState<UploadLimitGate | null>(null);
@@ -93,18 +91,19 @@ export function PublicUploadWorkspace() {
           response.status === 429 &&
           payload.code === "ANONYMOUS_UPLOAD_LIMIT_REACHED"
         ) {
-          const redirectTo =
-            typeof payload.redirectTo === "string"
-              ? payload.redirectTo
-              : buildAuthHref("sign-up", "/app/intake/new");
-
           setUploadLimitGate({
             message:
               typeof payload.error === "string"
                 ? payload.error
-                : "You’ve used the free uploads for now.",
-            signUpHref: redirectTo,
-            signInHref: buildAuthHref("sign-in", "/app/intake/new")
+                : "You’ve already used your free preview.",
+            signUpHref:
+              typeof payload.signUpHref === "string"
+                ? payload.signUpHref
+                : buildAuthHref("sign-up", "/upload/claim"),
+            signInHref:
+              typeof payload.signInHref === "string"
+                ? payload.signInHref
+                : buildAuthHref("sign-in", "/upload/claim")
           });
           setUploadState("idle");
           return;
@@ -113,7 +112,6 @@ export function PublicUploadWorkspace() {
         throw new Error(payload.error ?? "Could not analyze that document.");
       }
 
-      setAnalysisToken(payload.analysisToken as string);
       setBreakdown(payload.breakdown as AnonymousDealBreakdown);
       setUploadState("done");
     } catch (error) {
@@ -125,18 +123,14 @@ export function PublicUploadWorkspace() {
   }
 
   async function handleSaveDeal() {
-    if (!analysisToken || isClaiming) {
+    if (!breakdown || isClaiming) {
       return;
     }
 
     setIsClaiming(true);
-    trackPublicFunnelEvent("anonymous_save_cta_clicked", {
+    trackPublicFunnelEvent("anonymous_create_free_workspace_clicked", {
       hasAccount: false
     });
-    window.sessionStorage.setItem(
-      ANONYMOUS_ANALYSIS_TOKEN_STORAGE_KEY,
-      analysisToken
-    );
     window.location.href = buildAuthHref("sign-up", "/upload/claim");
   }
 
@@ -146,7 +140,7 @@ export function PublicUploadWorkspace() {
         breakdown={breakdown}
         eyebrow="Document breakdown"
         title="Here’s what we found"
-        description="You’ve already seen the value. Save this deal to track deliverables, revisit the document, and keep payment follow-up in one place."
+        description="You’ve already seen the value. Create a free workspace to save this deal, track deliverables, and keep payment follow-up in one place."
         actions={
           <>
             <button
@@ -158,11 +152,11 @@ export function PublicUploadWorkspace() {
               {isClaiming ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving deal
+                  Creating free workspace
                 </>
               ) : (
                 <>
-                  Save My Deal
+                  Create Free Workspace
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -171,7 +165,6 @@ export function PublicUploadWorkspace() {
               type="button"
               onClick={() => {
                 setBreakdown(null);
-                setAnalysisToken(null);
                 setSelectedFile(null);
                 setUploadState("idle");
                 setIsClaiming(false);
@@ -188,10 +181,10 @@ export function PublicUploadWorkspace() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Want this saved in your workspace?
+                Want this saved in your free workspace?
               </p>
               <p className="text-sm text-muted-foreground">
-                Keep the breakdown, track deliverables, and come back anytime.
+                No card required. Save the breakdown, track deliverables, and come back anytime.
               </p>
             </div>
             <button
@@ -200,7 +193,7 @@ export function PublicUploadWorkspace() {
               disabled={isClaiming}
               className="inline-flex h-11 items-center justify-center gap-2 bg-primary px-5 text-sm font-semibold text-white transition hover:bg-primary/92 disabled:opacity-60"
             >
-              {isClaiming ? "Saving..." : "Save My Deal"}
+              {isClaiming ? "Creating..." : "Create Free Workspace"}
             </button>
           </div>
         }
@@ -226,11 +219,11 @@ export function PublicUploadWorkspace() {
               Upload a document
             </p>
             <h1 className="mt-4 text-[2.4rem] font-bold leading-[0.96] tracking-[-0.05em] text-[#17202b] sm:text-[3.4rem] dark:text-white">
-              Turn a deal document into a workspace in one step.
+              Upload free, then save your first workspace free.
             </h1>
             <p className="mx-auto mt-5 max-w-[58ch] text-[1rem] leading-relaxed text-muted-foreground sm:text-[1.08rem]">
-              Upload a contract, brief, or concept document. We’ll analyze it,
-              explain what matters, and pull out the deliverables and payment context.
+              Upload a contract, brief, or concept document. We’ll analyze it, explain what matters,
+              and pull out the deliverables and payment context. No card required to save your first workspace.
             </p>
           </div>
 
@@ -241,14 +234,13 @@ export function PublicUploadWorkspace() {
                   <ShieldAlert className="h-6 w-6" />
                 </div>
                 <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                  Your free uploads are used up.
+                  Your free preview is already used.
                 </h2>
                 <p className="mx-auto mt-4 max-w-[50ch] text-sm leading-6 text-muted-foreground">
                   {uploadLimitGate.message}
                 </p>
                 <p className="mx-auto mt-3 max-w-[50ch] text-sm leading-6 text-muted-foreground">
-                  Create an account to continue uploading documents inside HelloBrand and
-                  keep them in your workspace.
+                  Create a free workspace to keep going inside HelloBrand and save a real deal.
                 </p>
 
                 <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
@@ -258,7 +250,7 @@ export function PublicUploadWorkspace() {
                     payload={{ location: "upload_limit_gate" }}
                     className="inline-flex h-12 items-center justify-center gap-2 bg-primary px-6 text-sm font-semibold text-white transition hover:bg-primary/92"
                   >
-                    Create an account
+                    Create free workspace
                     <ArrowRight className="h-4 w-4" />
                   </PostHogActionLink>
                   <PostHogActionLink

@@ -105,10 +105,15 @@ test.describe("public upload", () => {
         page.getByRole("heading", { name: "Here’s what we found" })
       ).toBeVisible({ timeout: 10000 });
       await expect(page.getByText("Amazon Kids launch brief")).toBeVisible();
-      await expect(page.getByRole("button", { name: "Save My Deal" }).first()).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Create Free Workspace" }).first()
+      ).toBeVisible();
+
+      await page.getByRole("button", { name: "Create Free Workspace" }).first().click();
+      await expect(page).toHaveURL(/\/login\?mode=sign-up&redirect=%2Fupload%2Fclaim/);
     });
 
-    test("shows the quota signup gate when free uploads are exhausted", async ({
+    test("shows the free workspace gate when the anonymous preview is exhausted", async ({
       page
     }) => {
       await page.route("**/api/public/intake/upload", async (route) => {
@@ -117,9 +122,10 @@ test.describe("public upload", () => {
           contentType: "application/json",
           body: JSON.stringify({
             error:
-              "You’ve used all 3 free anonymous uploads. Create an account to continue inside HelloBrand.",
+              "You’ve already used your free preview. Create a free workspace to keep going inside HelloBrand.",
             code: "ANONYMOUS_UPLOAD_LIMIT_REACHED",
-            redirectTo: "/login?mode=sign-up&redirect=%2Fapp%2Fintake%2Fnew"
+            signUpHref: "/login?mode=sign-up&redirect=%2Fupload%2Fclaim",
+            signInHref: "/login?mode=sign-in&redirect=%2Fupload%2Fclaim"
           })
         });
       });
@@ -135,16 +141,19 @@ test.describe("public upload", () => {
 
       await expect(
         page.getByRole("heading", {
-          name: "Your free uploads are used up."
+          name: "Your free preview is already used."
         })
       ).toBeVisible({ timeout: 10000 });
       await expect(
-        page.getByRole("link", { name: "Create an account" })
+        page.getByRole("link", { name: "Create free workspace" })
       ).toHaveAttribute(
         "href",
-        "/login?mode=sign-up&redirect=%2Fapp%2Fintake%2Fnew"
+        "/login?mode=sign-up&redirect=%2Fupload%2Fclaim"
       );
-      await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Sign in" })).toHaveAttribute(
+        "href",
+        "/login?mode=sign-in&redirect=%2Fupload%2Fclaim"
+      );
     });
 
     test("shows the unsupported-document message returned by the server", async ({
@@ -203,6 +212,32 @@ test.describe("public upload", () => {
         page.getByText("Please upload a document smaller than 10 MB.")
       ).toBeVisible();
       expect(uploadRequests).toBe(0);
+    });
+
+    test("shows a recovery state when the claim token is missing", async ({ page }) => {
+      await page.route("**/api/public/intake/claim", async (route) => {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({
+            title: "We couldn’t find your free preview.",
+            error: "Upload a contract again to create your free workspace.",
+            code: "ANONYMOUS_CLAIM_TOKEN_MISSING",
+            href: "/upload",
+            ctaLabel: "Upload a contract"
+          })
+        });
+      });
+
+      await page.goto("/upload/claim");
+
+      await expect(
+        page.getByRole("heading", { name: "We couldn’t find your free preview." })
+      ).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole("link", { name: "Upload a contract" })).toHaveAttribute(
+        "href",
+        "/upload"
+      );
     });
   });
 });

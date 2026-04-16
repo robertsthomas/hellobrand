@@ -96,8 +96,8 @@ export default async function LandingPage() {
             </h1>
 
             <p className="mx-auto mt-5 max-w-[50ch] text-[1rem] leading-relaxed text-[#5d6876] sm:mt-6 sm:text-[1.1rem] dark:text-[#aab3bf]">
-              Upload your contract. HelloBrand breaks it down into plain English, highlights risks,
-              and shows the deliverables and payment terms before you ever need an account.
+              Upload your contract free. HelloBrand breaks it down into plain English, highlights risks,
+              and shows the deliverables and payment terms before you save your first workspace free.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
@@ -238,7 +238,7 @@ export default async function LandingPage() {
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
                   The account step should happen after the value moment, when the creator wants to
-                  keep the deal, track follow-up, and manage the thread in context.
+                  save the deal in a free workspace, track follow-up, and manage the thread in context.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
@@ -265,7 +265,7 @@ export default async function LandingPage() {
                   Keep deliverables and payments from slipping after signature.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  The public upload gets the user engaged. The saved workspace keeps the deal useful
+                  The free preview gets the user engaged. The saved workspace keeps the deal useful
                   by tracking what is due and what is still unpaid.
                 </p>
                 <ul className="mt-5 space-y-3">
@@ -303,7 +303,7 @@ export default async function LandingPage() {
                 {
                   step: "01",
                   title: "Drop in a contract",
-                  body: "Upload a PDF, DOCX, DOC, or TXT file. No signup wall comes first.",
+                  body: "Upload a PDF, DOCX, DOC, or TXT file. See the full preview before signup.",
                 },
                 {
                   step: "02",
@@ -312,8 +312,8 @@ export default async function LandingPage() {
                 },
                 {
                   step: "03",
-                  title: "Save and track it",
-                  body: "Create an account only when you want to keep the deal, manage follow-up, and return later.",
+                  title: "Create your free workspace",
+                  body: "Save the deal for free when you want to keep it, manage follow-up, and return later.",
                 },
               ].map((item) => (
                 <article key={item.step} className="app-surface p-6">
@@ -341,8 +341,8 @@ export default async function LandingPage() {
               Don’t sign another contract blindly.
             </h2>
             <p className="mx-auto mt-4 max-w-[50ch] text-[0.95rem] leading-relaxed text-white/75 sm:mt-5 sm:text-[1.05rem]">
-              Start with one upload, understand the terms quickly, and save the deal and create a
-              workspace.
+              Start with one upload, understand the terms quickly, and save the deal in your first
+              free workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
               <PublicFunnelLink
