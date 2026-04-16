@@ -1,8 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { MoreHorizontal, Search } from "lucide-react";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -13,6 +10,9 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
+import { MoreHorizontal, Search } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { Badge } from "@/components/ui/badge";

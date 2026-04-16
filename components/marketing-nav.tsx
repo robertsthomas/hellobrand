@@ -1,6 +1,6 @@
 "use client";
 
-import { Hand, Sun, Moon, Menu } from "lucide-react";
+import { Hand, Menu, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { FolderPlus, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
 import { EmptyState } from "@/components/patterns/empty-state";

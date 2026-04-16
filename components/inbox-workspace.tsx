@@ -12,26 +12,17 @@
  */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Inbox, Info, MailSearch, Plus, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
-import { Inbox, Info, MailSearch, Plus, X, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppTooltip } from "@/components/app-tooltip";
 import { InboxFilterDialog } from "@/components/inbox-filter-dialog";
 import { InboxPrivateNotesDialog } from "@/components/inbox-private-notes-dialog";
 import { InboxSelect } from "@/components/inbox-select";
 import { InboxSortDialog } from "@/components/inbox-sort-dialog";
-import { getDisplayDealLabels } from "@/lib/deal-labels";
-import { captureAppEvent } from "@/lib/posthog/events";
-import { useInboxAiSuggestions } from "@/components/use-inbox-ai-suggestions";
-import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
-import { useInboxManualAdd } from "@/components/use-inbox-manual-add";
-import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
-import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
-import { useInboxThreadSelection } from "@/components/use-inbox-thread-selection";
-import { useElementWidth } from "@/components/use-element-width";
 import {
   Dialog,
   DialogContent,
@@ -40,12 +31,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useElementWidth } from "@/components/use-element-width";
+import { useInboxAiSuggestions } from "@/components/use-inbox-ai-suggestions";
+import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
+import { useInboxManualAdd } from "@/components/use-inbox-manual-add";
+import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
+import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
+import { useInboxThreadSelection } from "@/components/use-inbox-thread-selection";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
+  type InboxSortOption,
   normalizeInboxSort,
   sortInboxThreadItems,
-  type InboxSortOption,
 } from "@/lib/email/inbox-sort";
 import { buildReplySuggestionThreadVersion } from "@/lib/email/reply-suggestion-version";
+import { captureAppEvent } from "@/lib/posthog/events";
 import type {
   DealRecord,
   EmailActionItemRecord,
@@ -56,8 +56,6 @@ import type {
 
 import { inboxSortLabel, providerLabel } from "./inbox-workspace/formatters";
 import {
-  type PreviewUpdateEntry,
-  type ThreadInvoiceAttachment,
   buildActionItemReplyPrompt,
   cleanWorkspaceText,
   combineEventUpdateTitles,
@@ -68,12 +66,14 @@ import {
   latestUpdatedAt,
   missingReplySignatureFields,
   normalizePreviewUpdateBody,
+  type PreviewUpdateEntry,
   THREAD_ACTION_BUTTON_CLASS,
+  type ThreadInvoiceAttachment,
   threadSearchText,
 } from "./inbox-workspace/helpers";
-import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
-import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
 import { InboxReplyComposer } from "./inbox-workspace/InboxReplyComposer";
+import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
+import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
 import { ThreadAttachments } from "./inbox-workspace/ThreadAttachments";
 
 export function InboxWorkspace({

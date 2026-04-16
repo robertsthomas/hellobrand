@@ -1,37 +1,37 @@
 "use client";
 
+import { FileText, Plus, Trash2, X } from "lucide-react";
 /**
  * This file renders the empty-dashboard upload and intake entry experience.
  * It manages the client-side interaction for drafts and uploads while the intake workflow itself stays in `lib/intake`.
  */
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Trash2, X } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { InfoTooltip } from "@/components/app-tooltip";
 import { ACCEPTED_DOCUMENT_TYPES } from "@/components/intake-file-field";
 import { buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { getDisplayDealLabels } from "@/lib/deal-labels";
-import { buildWorkspaceNotificationItem } from "@/lib/notifications";
-import { captureAppEvent } from "@/lib/posthog/events";
-import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
-import { dispatchWorkspaceGenerationNotification } from "@/lib/workspace-generation-hint";
 import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
 import {
   clearLocalWorkspaces,
   deleteLocalWorkspace,
+  type LocalWorkspaceInputSource,
+  type LocalWorkspaceManifestItem,
   loadLocalWorkspace,
   readLocalWorkspaceManifest,
   saveLocalWorkspace,
-  type LocalWorkspaceInputSource,
-  type LocalWorkspaceManifestItem,
 } from "@/lib/browser/local-workspace-queue";
+import { getDisplayDealLabels } from "@/lib/deal-labels";
+import { buildWorkspaceNotificationItem } from "@/lib/notifications";
+import { captureAppEvent } from "@/lib/posthog/events";
+import { type SelectedFileMeta, useIntakeUiStore } from "@/lib/stores/intake-ui-store";
 import type { IntakeDraftListItem } from "@/lib/types";
-import { useIntakeUiStore, type SelectedFileMeta } from "@/lib/stores/intake-ui-store";
 import { cn } from "@/lib/utils";
+import { dispatchWorkspaceGenerationNotification } from "@/lib/workspace-generation-hint";
+import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 
 interface ServerQueuedWorkspaceItem {
   sessionId: string;

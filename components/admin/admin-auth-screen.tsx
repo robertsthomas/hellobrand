@@ -1,9 +1,9 @@
 "use client";
 
+import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,7 @@ type AdminAuthScreenProps = {
   username: string;
 };
 
-export function AdminAuthScreen({
-  configured,
-  username
-}: AdminAuthScreenProps) {
+export function AdminAuthScreen({ configured, username }: AdminAuthScreenProps) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,14 +36,14 @@ export function AdminAuthScreen({
       const response = await fetch("/api/admin/session", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           mode: configured ? "login" : "setup",
           username,
           password,
-          confirmPassword: configured ? undefined : confirmPassword
-        })
+          confirmPassword: configured ? undefined : confirmPassword,
+        }),
       });
 
       const payload = (await response.json()) as {
@@ -70,38 +67,38 @@ export function AdminAuthScreen({
   }
 
   return (
-    <div className="min-h-screen bg-neutral-100 px-4 py-10 text-neutral-950">
+    <div className="min-h-screen bg-secondary px-4 py-10 text-foreground">
       <div className="mx-auto flex min-h-[calc(100dvh-5rem)] max-w-md items-center">
-        <div className="w-full rounded-xl border border-neutral-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="w-full rounded-xl border border-border bg-white p-6 shadow-sm sm:p-8">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-900 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white">
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-medium text-neutral-500">Admin</p>
+                <p className="text-sm font-medium text-muted-foreground">Admin</p>
                 <h1 className="text-xl font-semibold">HelloBrand Admin</h1>
               </div>
             </div>
-            <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-900">
+            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
               Back
             </Link>
           </div>
 
           <div className="mt-6 space-y-2">
-            <p className="text-sm font-medium text-neutral-500">
+            <p className="text-sm font-medium text-muted-foreground">
               {configured ? "Sign in" : "First-time setup"}
             </p>
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-muted-foreground">
               {configured
                 ? "Enter the admin password to open the board."
                 : "Create the admin password for this environment."}
             </p>
           </div>
 
-          <div className="mt-6 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm">
-            <span className="text-neutral-500">Username:</span>{" "}
-            <span className="font-medium text-neutral-900">{username}</span>
+          <div className="mt-6 rounded-lg border border-border bg-muted px-4 py-3 text-sm">
+            <span className="text-muted-foreground">Username:</span>{" "}
+            <span className="font-medium text-foreground">{username}</span>
           </div>
 
           {errorMessage ? (
@@ -112,11 +109,11 @@ export function AdminAuthScreen({
 
           <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
             <div className="grid gap-2">
-              <label htmlFor="admin-password" className="text-sm font-medium text-neutral-700">
+              <label htmlFor="admin-password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <div className="relative">
-                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="admin-password"
                   type="password"
@@ -132,11 +129,14 @@ export function AdminAuthScreen({
 
             {!configured ? (
               <div className="grid gap-2">
-                <label htmlFor="admin-password-confirm" className="text-sm font-medium text-neutral-700">
+                <label
+                  htmlFor="admin-password-confirm"
+                  className="text-sm font-medium text-foreground"
+                >
                   Confirm password
                 </label>
                 <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="admin-password-confirm"
                     type="password"

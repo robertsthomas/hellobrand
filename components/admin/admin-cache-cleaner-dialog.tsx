@@ -7,40 +7,41 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from "@/components/ui/dialog";
 
 export const ADMIN_CACHE_TARGETS = [
   {
     key: "inbox",
     label: "Inbox",
-    description: "Clear saved AI summaries, inbox preview state, AI draft/summary cache rows, and revalidate /app/inbox."
+    description:
+      "Clear saved AI summaries, inbox preview state, AI draft/summary cache rows, and revalidate /app/inbox.",
   },
   {
     key: "dashboard",
     label: "Dashboard",
-    description: "Revalidate the main workspace dashboard routes."
+    description: "Revalidate the main workspace dashboard routes.",
   },
   {
     key: "payments",
     label: "Payments",
-    description: "Revalidate payment pages and refresh payment-related workspace views."
+    description: "Revalidate payment pages and refresh payment-related workspace views.",
   },
   {
     key: "analytics",
     label: "Analytics",
-    description: "Revalidate analytics pages that depend on cached workspace data."
+    description: "Revalidate analytics pages that depend on cached workspace data.",
   },
   {
     key: "notifications",
     label: "Notifications",
-    description: "Revalidate the notifications page."
+    description: "Revalidate the notifications page.",
   },
   {
     key: "settings",
     label: "Settings",
-    description: "Revalidate app settings pages without touching /admin."
-  }
+    description: "Revalidate app settings pages without touching /admin.",
+  },
 ] as const;
 
 export type AdminCacheTargetKey = (typeof ADMIN_CACHE_TARGETS)[number]["key"];
@@ -51,7 +52,7 @@ export function AdminCacheCleanerDialog({
   selectedTargets,
   onToggleTarget,
   onSubmit,
-  clearing
+  clearing,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,7 +80,7 @@ export function AdminCacheCleanerDialog({
             return (
               <label
                 key={target.key}
-                className="flex items-start gap-3 border border-neutral-200 px-3 py-3"
+                className="flex items-start gap-3 border border-border px-3 py-3"
               >
                 <Checkbox
                   checked={checked}
@@ -87,8 +88,8 @@ export function AdminCacheCleanerDialog({
                   className="mt-0.5"
                 />
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-neutral-900">{target.label}</div>
-                  <div className="mt-1 text-sm text-neutral-600">{target.description}</div>
+                  <div className="text-sm font-medium text-foreground">{target.label}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{target.description}</div>
                 </div>
               </label>
             );
@@ -96,7 +97,7 @@ export function AdminCacheCleanerDialog({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-neutral-500">
+          <div className="text-sm text-muted-foreground">
             {hasSelection
               ? `${selectedTargets.length} target${selectedTargets.length === 1 ? "" : "s"} selected`
               : "Select at least one target."}
@@ -105,11 +106,7 @@ export function AdminCacheCleanerDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              variant="outline"
-              disabled={!hasSelection || clearing}
-              onClick={onSubmit}
-            >
+            <Button variant="outline" disabled={!hasSelection || clearing} onClick={onSubmit}>
               {clearing ? "Clearing..." : "Clear selected"}
             </Button>
           </div>
