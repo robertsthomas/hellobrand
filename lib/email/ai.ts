@@ -8,6 +8,7 @@ import {
   promptNumbered,
   promptQuotedText,
 } from "@/lib/ai/prompting";
+import { normalizeDraftText } from "@/lib/ai/draft-utils";
 import { runStructuredOpenRouterTask } from "@/lib/ai/structured";
 import {
   aiCachePolicy,
@@ -576,19 +577,6 @@ function draftTextResponse(body: string) {
   });
 }
 
-function normalizeEmailDraftText(value: string) {
-  return value
-    .replace(/\r\n/g, "\n")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/__(.*?)__/g, "$1")
-    .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
-    .replace(/\[Brand\/Agency Name\]/gi, "there")
-    .replace(/\[Brand Name\]/gi, "there")
-    .replace(/\[Agency Name\]/gi, "there")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 export async function generateEmailReplyDraft(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
@@ -623,8 +611,8 @@ export async function generateEmailReplyDraft(
 
   const draft = result?.data ?? request.fallback;
   return {
-    subject: normalizeEmailDraftText(draft.subject),
-    body: normalizeEmailDraftText(draft.body),
+    subject: normalizeDraftText(draft.subject),
+    body: normalizeDraftText(draft.body),
   };
 }
 

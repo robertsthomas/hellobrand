@@ -11,7 +11,7 @@ export function ThemeSwitch({
   className,
   compact = false,
   minimal = false,
-  iconOnly = false
+  iconOnly = false,
 }: {
   className?: string;
   compact?: boolean;
@@ -34,7 +34,7 @@ export function ThemeSwitch({
         aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
         onClick={() => setTheme(isDark ? "light" : "dark")}
         className={cn(
-          "inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white",
+          "inline-flex items-center justify-center p-0 text-black/65 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 dark:text-white/70 dark:hover:text-white",
           className
         )}
       >
@@ -52,7 +52,8 @@ export function ThemeSwitch({
       className={cn(
         "inline-flex items-center gap-3 rounded-full border border-black/10 bg-white/75 px-3 py-2 text-sm text-black/70 shadow-[0_10px_25px_rgba(25,25,20,0.08)] backdrop-blur transition-colors dark:border-white/10 dark:bg-white/5 dark:text-white/75 dark:shadow-[0_14px_30px_rgba(0,0,0,0.24)]",
         compact && "gap-2 px-2.5 py-1.5 text-xs",
-        minimal && "gap-0 rounded-full border-0 bg-transparent px-0 py-0 shadow-none dark:bg-transparent",
+        minimal &&
+          "gap-0 rounded-full border-0 bg-transparent px-0 py-0 shadow-none dark:bg-transparent",
         className
       )}
     >

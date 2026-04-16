@@ -12,7 +12,7 @@ import {
   Search,
   Shield,
   StickyNote,
-  X
+  X,
 } from "lucide-react";
 
 import type { SearchResultKind } from "@/lib/search";
@@ -30,13 +30,16 @@ interface SearchResultItem {
   updatedAt: string;
 }
 
-const KIND_CONFIG: Record<SearchResultKind, { label: string; icon: typeof FileText; color: string }> = {
+const KIND_CONFIG: Record<
+  SearchResultKind,
+  { label: string; icon: typeof FileText; color: string }
+> = {
   deal: { label: "Partnership", icon: StickyNote, color: "bg-ocean/10 text-ocean" },
   document: { label: "Document", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
   terms: { label: "Terms", icon: StickyNote, color: "bg-emerald-500/10 text-emerald-600" },
   risk: { label: "Risk", icon: Shield, color: "bg-red-500/10 text-red-600" },
   section: { label: "Section", icon: FileText, color: "bg-purple-500/10 text-purple-600" },
-  summary: { label: "Summary", icon: StickyNote, color: "bg-amber-500/10 text-amber-600" }
+  summary: { label: "Summary", icon: StickyNote, color: "bg-amber-500/10 text-amber-600" },
 };
 
 type SortMode = "relevance" | "date" | "name";
@@ -65,17 +68,11 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   });
 }
 
-export function SearchResults({
-  results,
-  query
-}: {
-  results: SearchResultItem[];
-  query: string;
-}) {
+export function SearchResults({ results, query }: { results: SearchResultItem[]; query: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sortMode, setSortMode] = useState<SortMode>("relevance");
@@ -86,7 +83,9 @@ export function SearchResults({
     let items = filterKind === "all" ? results : results.filter((r) => r.kind === filterKind);
 
     if (sortMode === "date") {
-      items = [...items].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      items = [...items].sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
     } else if (sortMode === "name") {
       items = [...items].sort((a, b) => a.dealName.localeCompare(b.dealName));
     }
@@ -129,6 +128,7 @@ export function SearchResults({
           value={localQuery}
           onChange={(e) => setLocalQuery(e.target.value)}
           placeholder="Search partnerships, documents, terms, risks..."
+          aria-label="Search partnerships"
           className="h-14 w-full border border-black/10 bg-white pl-12 pr-4 text-lg text-foreground outline-none transition placeholder:text-black/30 focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:focus:border-white/20"
         />
       </form>
@@ -138,9 +138,11 @@ export function SearchResults({
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-black/8 pb-4 dark:border-white/10">
           <div>
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{results.length}</span> result{results.length === 1 ? "" : "s"}
+              <span className="font-semibold text-foreground">{results.length}</span> result
+              {results.length === 1 ? "" : "s"}
               {" across "}
-              <span className="font-semibold text-foreground">{uniquePartnerships}</span> partnership{uniquePartnerships === 1 ? "" : "s"}
+              <span className="font-semibold text-foreground">{uniquePartnerships}</span>{" "}
+              partnership{uniquePartnerships === 1 ? "" : "s"}
               {" for "}
               <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
             </p>
@@ -174,26 +176,28 @@ export function SearchResults({
       {query && results.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          {(["all", "deal", "document", "terms", "risk", "section", "summary"] as FilterKind[]).map((kind) => {
-            const count = kindCounts[kind] ?? 0;
-            if (kind !== "all" && count === 0) return null;
-            const config = kind === "all" ? null : KIND_CONFIG[kind];
-            return (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => setFilterKind(kind)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition ${
-                  filterKind === kind
-                    ? "bg-foreground text-white"
-                    : "border border-black/8 text-muted-foreground hover:text-foreground dark:border-white/10"
-                }`}
-              >
-                {kind === "all" ? "All" : config?.label}
-                <span className="opacity-60">({count})</span>
-              </button>
-            );
-          })}
+          {(["all", "deal", "document", "terms", "risk", "section", "summary"] as FilterKind[]).map(
+            (kind) => {
+              const count = kindCounts[kind] ?? 0;
+              if (kind !== "all" && count === 0) return null;
+              const config = kind === "all" ? null : KIND_CONFIG[kind];
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => setFilterKind(kind)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition ${
+                    filterKind === kind
+                      ? "bg-foreground text-white"
+                      : "border border-black/8 text-muted-foreground hover:text-foreground dark:border-white/10"
+                  }`}
+                >
+                  {kind === "all" ? "All" : config?.label}
+                  <span className="opacity-60">({count})</span>
+                </button>
+              );
+            }
+          )}
           {filterKind !== "all" ? (
             <button
               type="button"
@@ -213,7 +217,8 @@ export function SearchResults({
           <Search className="mx-auto h-8 w-8 text-black/20 dark:text-white/20" />
           <h3 className="mt-4 text-xl font-semibold text-foreground">No results found</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Try a different search term or broaden your query. Search covers partnership names, document text, terms, risks, and summaries.
+            Try a different search term or broaden your query. Search covers partnership names,
+            document text, terms, risks, and summaries.
           </p>
         </div>
       ) : null}
@@ -223,7 +228,8 @@ export function SearchResults({
           <Search className="mx-auto h-8 w-8 text-black/20 dark:text-white/20" />
           <h3 className="mt-4 text-xl font-semibold text-foreground">Search your workspace</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-            Search across all partnerships, uploaded documents, extracted terms, risk flags, and AI-generated summaries.
+            Search across all partnerships, uploaded documents, extracted terms, risk flags, and
+            AI-generated summaries.
           </p>
         </div>
       ) : null}
@@ -240,7 +246,9 @@ export function SearchResults({
               className="group block py-5 transition-colors hover:bg-black/[0.015] dark:hover:bg-white/[0.02]"
             >
               <div className="flex items-start gap-4">
-                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center ${config.color}`}>
+                <div
+                  className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center ${config.color}`}
+                >
                   <Icon className="h-4 w-4" />
                 </div>
 

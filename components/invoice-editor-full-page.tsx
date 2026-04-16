@@ -7,7 +7,18 @@
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ChevronDown, Download, ExternalLink, Eye, LoaderCircle, Mail, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Eye,
+  LoaderCircle,
+  Mail,
+  Pencil,
+  Plus,
+  Send,
+  Trash2,
+} from "lucide-react";
 
 import { InvoicePreview } from "@/components/invoice-preview";
 import type { EmailThreadListItem } from "@/lib/types";
@@ -17,7 +28,7 @@ import {
   finalizeInvoiceAction,
   regenerateInvoiceDraftAction,
   saveInvoiceDraftAction,
-  voidInvoiceAction
+  voidInvoiceAction,
 } from "@/app/actions";
 import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { SubmitButton } from "@/components/submit-button";
@@ -26,7 +37,7 @@ import type {
   InvoiceDeliveryRecord,
   InvoiceLineItem,
   InvoiceRecord,
-  PaymentStatus
+  PaymentStatus,
 } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -46,7 +57,7 @@ function createLineItem(): InvoiceLineItem {
     channel: null,
     quantity: 1,
     unitRate: 0,
-    amount: 0
+    amount: 0,
   };
 }
 
@@ -73,9 +84,12 @@ const inputClass =
 const textareaClass = `${inputClass} min-h-24`;
 
 function statusBadgeClass(status: string) {
-  if (status === "draft") return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
-  if (status === "finalized") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-  if (status === "sent") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+  if (status === "draft")
+    return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+  if (status === "finalized")
+    return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+  if (status === "sent")
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
   return "bg-neutral-100 text-neutral-600 dark:bg-white/10 dark:text-white/60";
 }
 
@@ -87,7 +101,7 @@ export function InvoiceEditorFullPage({
   paymentStatus,
   paymentTerms,
   linkedThreads = [],
-  hasPremiumInbox = false
+  hasPremiumInbox = false,
 }: {
   dealId: string;
   invoice: InvoiceRecord;
@@ -113,19 +127,23 @@ export function InvoiceEditorFullPage({
 
   const updateItem = (
     id: string,
-    patch: Partial<Pick<InvoiceLineItem, "title" | "description" | "channel" | "quantity" | "unitRate">>
+    patch: Partial<
+      Pick<InvoiceLineItem, "title" | "description" | "channel" | "quantity" | "unitRate">
+    >
   ) => {
     setLineItems((current) =>
-      current.map((item) =>
-        item.id === id ? updateLineItemAmount({ ...item, ...patch }) : item
-      )
+      current.map((item) => (item.id === id ? updateLineItemAmount({ ...item, ...patch }) : item))
     );
   };
 
   const readFormField = useCallback((name: string) => {
     if (!formRef.current) return "";
     const el = formRef.current.elements.namedItem(name);
-    if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+    if (
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement
+    ) {
       return el.value;
     }
     return "";
@@ -144,7 +162,7 @@ export function InvoiceEditorFullPage({
         companyName: readFormField("billToCompanyName") || invoice.billTo.companyName,
         address: readFormField("billToAddress") || invoice.billTo.address,
         taxId: readFormField("billToTaxId") || invoice.billTo.taxId,
-        payoutDetails: invoice.billTo.payoutDetails
+        payoutDetails: invoice.billTo.payoutDetails,
       },
       issuer: {
         name: readFormField("issuerName") || invoice.issuer.name,
@@ -152,11 +170,11 @@ export function InvoiceEditorFullPage({
         companyName: readFormField("issuerCompanyName") || invoice.issuer.companyName,
         address: readFormField("issuerAddress") || invoice.issuer.address,
         taxId: readFormField("issuerTaxId") || invoice.issuer.taxId,
-        payoutDetails: readFormField("issuerPayoutDetails") || invoice.issuer.payoutDetails
+        payoutDetails: readFormField("issuerPayoutDetails") || invoice.issuer.payoutDetails,
       },
       lineItems,
       subtotal,
-      notes: readFormField("notes") || invoice.notes
+      notes: readFormField("notes") || invoice.notes,
     };
   }, [showPreview, lineItems, subtotal, invoice]);
 
@@ -167,13 +185,16 @@ export function InvoiceEditorFullPage({
   const isReadOnly = invoice.status === "voided";
   const isDraft = invoice.status === "draft";
   const isFinalized = invoice.status === "finalized" || invoice.status === "sent";
-  const hasPaymentFollowUp = paymentStatus === "late" || paymentStatus === "awaiting_payment" || paymentStatus === "invoiced";
+  const hasPaymentFollowUp =
+    paymentStatus === "late" ||
+    paymentStatus === "awaiting_payment" ||
+    paymentStatus === "invoiced";
   const hasPdf = Boolean(invoice.pdfDocumentId);
 
   const issuerMissingFields = [
     !invoice.issuer.companyName?.trim() && "business name",
     !invoice.issuer.address?.trim() && "address",
-    !invoice.issuer.taxId?.trim() && "tax ID"
+    !invoice.issuer.taxId?.trim() && "tax ID",
   ].filter(Boolean) as string[];
 
   return (
@@ -182,8 +203,12 @@ export function InvoiceEditorFullPage({
       {isDraft && issuerMissingFields.length > 0 ? (
         <div className="border border-black/8 bg-[#f7f4ed] px-4 py-3 dark:border-white/10 dark:bg-[#16181d]">
           <p className="text-sm text-foreground">
-            <span className="font-semibold">Missing {issuerMissingFields.join(", ")}</span> in your issuer details.{" "}
-            <Link href="/app/settings/profile" className="font-medium underline underline-offset-4 transition hover:text-primary">
+            <span className="font-semibold">Missing {issuerMissingFields.join(", ")}</span> in your
+            issuer details.{" "}
+            <Link
+              href="/app/settings/profile"
+              className="font-medium underline underline-offset-4 transition hover:text-primary"
+            >
               Set up your creator profile
             </Link>{" "}
             to prefill these for future invoices.
@@ -199,7 +224,9 @@ export function InvoiceEditorFullPage({
               <h1 className="text-xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
                 {invoice.invoiceNumber}
               </h1>
-              <span className={`px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${statusBadgeClass(invoice.status)}`}>
+              <span
+                className={`px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${statusBadgeClass(invoice.status)}`}
+              >
                 {humanizeToken(invoice.status)}
               </span>
             </div>
@@ -237,7 +264,8 @@ export function InvoiceEditorFullPage({
                   kind: "payment",
                   sourceId: invoice.id,
                   label: "Follow up on payment",
-                  prompt: "Draft a concise creator-professional payment follow-up email for this partnership."
+                  prompt:
+                    "Draft a concise creator-professional payment follow-up email for this partnership.",
                 }}
               />
             ) : null}
@@ -296,9 +324,12 @@ export function InvoiceEditorFullPage({
                               onClick={() => setEmailMenuOpen(false)}
                               className="block border-b border-black/6 px-4 py-3 transition last:border-b-0 hover:bg-sand/50 dark:border-white/8 dark:hover:bg-white/[0.03]"
                             >
-                              <p className="truncate text-sm font-medium text-foreground">{item.thread.subject}</p>
+                              <p className="truncate text-sm font-medium text-foreground">
+                                {item.thread.subject}
+                              </p>
                               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {item.account.emailAddress} · {formatDate(item.thread.lastMessageAt)}
+                                {item.account.emailAddress} ·{" "}
+                                {formatDate(item.thread.lastMessageAt)}
                               </p>
                             </Link>
                           ))}
@@ -346,21 +377,42 @@ export function InvoiceEditorFullPage({
         <input type="hidden" name="dealId" value={dealId} />
         <input type="hidden" name="lineItemsJson" value={lineItemsJson} />
         <input type="hidden" name="pdfDocumentId" value={invoice.pdfDocumentId ?? ""} />
-        <input type="hidden" name="manualNumberOverride" value={invoice.manualNumberOverride ? "true" : "false"} />
+        <input
+          type="hidden"
+          name="manualNumberOverride"
+          value={invoice.manualNumberOverride ? "true" : "false"}
+        />
 
         {/* Metadata */}
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
           <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
             Invoice number
-            <input className={inputClass} name="invoiceNumber" defaultValue={invoice.invoiceNumber} readOnly={isReadOnly} />
+            <input
+              className={inputClass}
+              name="invoiceNumber"
+              defaultValue={invoice.invoiceNumber}
+              readOnly={isReadOnly}
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Invoice date
-            <input className={inputClass} type="date" name="invoiceDate" defaultValue={invoice.invoiceDate?.slice(0, 10) ?? ""} readOnly={isReadOnly} />
+            <input
+              className={inputClass}
+              type="date"
+              name="invoiceDate"
+              defaultValue={invoice.invoiceDate?.slice(0, 10) ?? ""}
+              readOnly={isReadOnly}
+            />
           </label>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Due date
-            <input className={inputClass} type="date" name="dueDate" defaultValue={invoice.dueDate?.slice(0, 10) ?? ""} readOnly={isReadOnly} />
+            <input
+              className={inputClass}
+              type="date"
+              name="dueDate"
+              defaultValue={invoice.dueDate?.slice(0, 10) ?? ""}
+              readOnly={isReadOnly}
+            />
           </label>
         </div>
 
@@ -368,63 +420,131 @@ export function InvoiceEditorFullPage({
         <div className="grid gap-8 xl:grid-cols-2">
           {/* Bill To */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Bill to</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              Bill to
+            </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Contact name
-                <input className={inputClass} name="billToName" defaultValue={invoice.billTo.name} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="billToName"
+                  defaultValue={invoice.billTo.name}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Email
-                <input className={inputClass} name="billToEmail" defaultValue={invoice.billTo.email ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="billToEmail"
+                  defaultValue={invoice.billTo.email ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
                 Company
-                <input className={inputClass} name="billToCompanyName" defaultValue={invoice.billTo.companyName ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="billToCompanyName"
+                  defaultValue={invoice.billTo.companyName ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
                 Address
-                <textarea className={textareaClass} name="billToAddress" defaultValue={invoice.billTo.address ?? ""} readOnly={isReadOnly} />
+                <textarea
+                  className={textareaClass}
+                  name="billToAddress"
+                  defaultValue={invoice.billTo.address ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Tax ID
-                <input className={inputClass} name="billToTaxId" defaultValue={invoice.billTo.taxId ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="billToTaxId"
+                  defaultValue={invoice.billTo.taxId ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
-              <input type="hidden" name="billToPayoutDetails" value={invoice.billTo.payoutDetails ?? ""} />
+              <input
+                type="hidden"
+                name="billToPayoutDetails"
+                value={invoice.billTo.payoutDetails ?? ""}
+              />
             </div>
           </div>
 
           {/* Issuer */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">From (your details)</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              From (your details)
+            </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Name
-                <input className={inputClass} name="issuerName" defaultValue={invoice.issuer.name} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="issuerName"
+                  defaultValue={invoice.issuer.name}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Email
-                <input className={inputClass} name="issuerEmail" defaultValue={invoice.issuer.email ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="issuerEmail"
+                  defaultValue={invoice.issuer.email ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
                 Business
-                <input className={inputClass} name="issuerCompanyName" defaultValue={invoice.issuer.companyName ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="issuerCompanyName"
+                  defaultValue={invoice.issuer.companyName ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Tax ID
-                <input className={inputClass} name="issuerTaxId" defaultValue={invoice.issuer.taxId ?? ""} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="issuerTaxId"
+                  defaultValue={invoice.issuer.taxId ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Currency
-                <input className={inputClass} name="currency" defaultValue={invoice.currency ?? "USD"} readOnly={isReadOnly} />
+                <input
+                  className={inputClass}
+                  name="currency"
+                  defaultValue={invoice.currency ?? "USD"}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
                 Address
-                <textarea className={textareaClass} name="issuerAddress" defaultValue={invoice.issuer.address ?? ""} readOnly={isReadOnly} />
+                <textarea
+                  className={textareaClass}
+                  name="issuerAddress"
+                  defaultValue={invoice.issuer.address ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground sm:col-span-2">
                 Payout / remittance details
-                <textarea className={textareaClass} name="issuerPayoutDetails" defaultValue={invoice.issuer.payoutDetails ?? ""} readOnly={isReadOnly} />
+                <textarea
+                  className={textareaClass}
+                  name="issuerPayoutDetails"
+                  defaultValue={invoice.issuer.payoutDetails ?? ""}
+                  readOnly={isReadOnly}
+                />
               </label>
             </div>
           </div>
@@ -434,9 +554,12 @@ export function InvoiceEditorFullPage({
         <div className="border-t border-black/8 pt-6 dark:border-white/10">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Line items</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                Line items
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Generated from workspace deliverables. Edit if the billing breakdown needs to change.
+                Generated from workspace deliverables. Edit if the billing breakdown needs to
+                change.
               </p>
             </div>
             {!isReadOnly ? (
@@ -461,12 +584,18 @@ export function InvoiceEditorFullPage({
                     value={item.title}
                     onChange={(e) => updateItem(item.id, { title: e.currentTarget.value })}
                     placeholder="Line item title"
+                    aria-label="Line item title"
                     readOnly={isReadOnly}
                   />
                   {!isReadOnly ? (
                     <button
                       type="button"
-                      onClick={() => setLineItems((c) => c.length === 1 ? c : c.filter((e) => e.id !== item.id))}
+                      aria-label={`Remove ${item.title || "line item"}`}
+                      onClick={() =>
+                        setLineItems((c) =>
+                          c.length === 1 ? c : c.filter((e) => e.id !== item.id)
+                        )
+                      }
                       className="inline-flex h-[46px] w-10 shrink-0 items-center justify-center border border-red-200 text-red-600 transition hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -479,14 +608,18 @@ export function InvoiceEditorFullPage({
                   <input
                     className={inputClass}
                     value={item.channel ?? ""}
-                    onChange={(e) => updateItem(item.id, { channel: e.currentTarget.value || null })}
+                    onChange={(e) =>
+                      updateItem(item.id, { channel: e.currentTarget.value || null })
+                    }
                     placeholder="Channel (e.g. Instagram)"
                     readOnly={isReadOnly}
                   />
                   <textarea
                     className={`${inputClass} min-h-16 sm:min-h-20`}
                     value={item.description ?? ""}
-                    onChange={(e) => updateItem(item.id, { description: e.currentTarget.value || null })}
+                    onChange={(e) =>
+                      updateItem(item.id, { description: e.currentTarget.value || null })
+                    }
                     placeholder="Description"
                     readOnly={isReadOnly}
                   />
@@ -502,7 +635,11 @@ export function InvoiceEditorFullPage({
                       min="1"
                       step="1"
                       value={item.quantity}
-                      onChange={(e) => updateItem(item.id, { quantity: Math.max(Number(e.currentTarget.value || 1), 1) })}
+                      onChange={(e) =>
+                        updateItem(item.id, {
+                          quantity: Math.max(Number(e.currentTarget.value || 1), 1),
+                        })
+                      }
                       readOnly={isReadOnly}
                     />
                   </label>
@@ -514,7 +651,11 @@ export function InvoiceEditorFullPage({
                       min="0"
                       step="0.01"
                       value={item.unitRate}
-                      onChange={(e) => updateItem(item.id, { unitRate: Math.max(Number(e.currentTarget.value || 0), 0) })}
+                      onChange={(e) =>
+                        updateItem(item.id, {
+                          unitRate: Math.max(Number(e.currentTarget.value || 0), 0),
+                        })
+                      }
                       readOnly={isReadOnly}
                     />
                   </label>
@@ -543,7 +684,9 @@ export function InvoiceEditorFullPage({
             />
           </label>
           <div className="border border-black/8 p-5 dark:border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Subtotal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              Subtotal
+            </p>
             <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">
               {formatCurrency(subtotal, invoice.currency ?? "USD")}
             </p>
@@ -684,8 +827,9 @@ export function InvoiceEditorFullPage({
           <div className="w-full max-w-md border border-black/10 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#161a1f]">
             <h3 className="text-lg font-semibold text-foreground">Delete invoice</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This will permanently delete <span className="font-medium text-foreground">{invoice.invoiceNumber}</span> and
-              reset the workspace payment status. You can generate a new invoice afterward.
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">{invoice.invoiceNumber}</span> and reset
+              the workspace payment status. You can generate a new invoice afterward.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -700,7 +844,8 @@ export function InvoiceEditorFullPage({
                 <div>
                   <p className="text-sm font-medium text-foreground">Reserve this number</p>
                   <p className="text-xs text-muted-foreground">
-                    Keep {invoice.invoiceNumber} used. Next invoice will be the next sequential number. Best for accounting records.
+                    Keep {invoice.invoiceNumber} used. Next invoice will be the next sequential
+                    number. Best for accounting records.
                   </p>
                 </div>
               </label>

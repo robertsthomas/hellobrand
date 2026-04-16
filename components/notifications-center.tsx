@@ -18,7 +18,7 @@ import {
   Shield,
   Wallet,
   X,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -29,14 +29,14 @@ import {
   SheetContent,
   SheetDescription,
   SheetHeader,
-  SheetTitle
+  SheetTitle,
 } from "@/components/ui/sheet";
 import {
   formatNotificationRelativeTime,
   isNotificationUnread,
   type NotificationItem,
   type NotificationListResponse,
-  type NotificationType
+  type NotificationType,
 } from "@/lib/notifications";
 import { WORKSPACE_GENERATION_NOTIFICATION_EVENT } from "@/lib/workspace-generation-hint";
 import { cn } from "@/lib/utils";
@@ -72,9 +72,7 @@ function mergeNotificationItems(
     return [nextItem, ...current];
   }
 
-  return current.map((item, index) =>
-    index === existingIndex ? { ...item, ...nextItem } : item
-  );
+  return current.map((item, index) => (index === existingIndex ? { ...item, ...nextItem } : item));
 }
 
 const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
@@ -95,7 +93,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   workspace_confirmed: Check,
   workspace_cancelled: X,
   workspace_deleted: X,
-  workspace_missing_data: FileText
+  workspace_missing_data: FileText,
 };
 
 const TYPE_ICON_STYLES: Record<NotificationType, string> = {
@@ -116,13 +114,13 @@ const TYPE_ICON_STYLES: Record<NotificationType, string> = {
   workspace_confirmed: "text-[#5f6f64] dark:text-white/50",
   workspace_cancelled: "text-[#8a8f98] dark:text-white/35",
   workspace_deleted: "text-[#8a8f98] dark:text-white/35",
-  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50"
+  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50",
 };
 
 async function fetchNotifications() {
   const response = await fetch("/api/notifications?limit=100", {
     method: "GET",
-    cache: "no-store"
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -134,7 +132,7 @@ async function fetchNotifications() {
 
 export function NotificationsCenter({
   notifications,
-  hasEverCreatedWorkspace = false
+  hasEverCreatedWorkspace = false,
 }: {
   notifications: NotificationItem[];
   hasEverCreatedWorkspace?: boolean;
@@ -146,9 +144,7 @@ export function NotificationsCenter({
   const [pendingHintNotificationId, setPendingHintNotificationId] = useState<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>(notifications);
-  const [unreadCount, setUnreadCount] = useState(
-    notifications.filter(isNotificationUnread).length
-  );
+  const [unreadCount, setUnreadCount] = useState(notifications.filter(isNotificationUnread).length);
 
   type OptimisticAction =
     | { type: "mark_read"; id: string }
@@ -166,13 +162,15 @@ export function NotificationsCenter({
             n.id === action.id ? { ...n, readAt: new Date().toISOString(), read: true } : n
           );
         case "mark_unread":
-          return current.map((n) =>
-            n.id === action.id ? { ...n, readAt: null, read: false } : n
-          );
+          return current.map((n) => (n.id === action.id ? { ...n, readAt: null, read: false } : n));
         case "clear":
           return current.filter((n) => n.id !== action.id);
         case "mark_all_read":
-          return current.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString(), read: true }));
+          return current.map((n) => ({
+            ...n,
+            readAt: n.readAt ?? new Date().toISOString(),
+            read: true,
+          }));
         case "clear_all":
           return [];
       }
@@ -242,18 +240,14 @@ export function NotificationsCenter({
       }
 
       if (detail.action === "remove") {
-        setItems((current) =>
-          current.filter((item) => item.id !== detail.notificationId)
-        );
+        setItems((current) => current.filter((item) => item.id !== detail.notificationId));
         setPendingHintNotificationId((current) =>
           current === detail.notificationId ? null : current
         );
         return;
       }
 
-      setItems((current) =>
-        mergeNotificationItems(current, detail.notification, detail.replaceId)
-      );
+      setItems((current) => mergeNotificationItems(current, detail.notification, detail.replaceId));
 
       if (detail.showHint && !hasEverCreatedWorkspace) {
         setPendingHintNotificationId(detail.notification.id);
@@ -319,7 +313,7 @@ export function NotificationsCenter({
         const response = await fetch(`/api/notifications/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action })
+          body: JSON.stringify({ action }),
         });
 
         if (!response.ok) {
@@ -340,7 +334,7 @@ export function NotificationsCenter({
       const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_all_read" })
+        body: JSON.stringify({ action: "mark_all_read" }),
       });
 
       if (!response.ok) {
@@ -359,7 +353,7 @@ export function NotificationsCenter({
       const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "clear_all" })
+        body: JSON.stringify({ action: "clear_all" }),
       });
 
       if (!response.ok) {
@@ -380,7 +374,7 @@ export function NotificationsCenter({
         setOpen(true);
       }}
       data-guide="header-notifications"
-      className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors outline-none hover:text-foreground focus-visible:ring-0 dark:text-white/70 dark:hover:text-white"
+      className="relative inline-flex items-center justify-center p-0 text-black/65 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 dark:text-white/70 dark:hover:text-white"
     >
       <Bell className="h-5 w-5" />
       {optimisticUnreadCount > 0 ? (
@@ -574,10 +568,7 @@ export function NotificationsCenter({
                           <button
                             type="button"
                             onClick={() =>
-                              markNotification(
-                                item.id,
-                                isUnread ? "mark_read" : "mark_unread"
-                              )
+                              markNotification(item.id, isUnread ? "mark_read" : "mark_unread")
                             }
                             className="text-xs font-medium text-muted-foreground transition hover:text-foreground"
                           >

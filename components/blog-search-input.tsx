@@ -10,11 +10,7 @@ type BlogSearchInputProps = {
   selectedTag: string | null;
 };
 
-export function BlogSearchInput({
-  initialQuery,
-  initialSort,
-  selectedTag
-}: BlogSearchInputProps) {
+export function BlogSearchInput({ initialQuery, initialSort, selectedTag }: BlogSearchInputProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -72,7 +68,7 @@ export function BlogSearchInput({
 
   return (
     <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-      <div className="flex items-center gap-3 border border-[#e6dfd1] bg-[#fcfaf6] px-4 py-3 dark:border-[#22272d] dark:bg-[#13161b]">
+      <div className="flex items-center gap-3 border border-[#e6dfd1] bg-[#fcfaf6] px-4 py-3 focus-within:border-[#7d8898] focus-within:ring-2 focus-within:ring-ring/30 dark:border-[#22272d] dark:bg-[#13161b] dark:focus-within:border-white/30">
         <Search className="h-4 w-4 shrink-0 text-[#7b7468] dark:text-[#8b94a1]" />
         <input
           type="search"

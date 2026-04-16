@@ -420,7 +420,7 @@ export function AppFrame({
               handleSidebarSearch(e);
               handleMobileMenuOpenChange(false);
             }}
-            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
+            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 focus-within:ring-2 focus-within:ring-ring/30 dark:border-white/10 dark:bg-white/[0.04]"
           >
             <Search className="h-4 w-4 shrink-0" />
             <input
@@ -440,7 +440,7 @@ export function AppFrame({
                 Workspace
               </p>
             </div>
-            <nav className="space-y-1">
+            <nav aria-label="Mobile navigation" className="space-y-1">
               {primaryAppNavItems.map((item) =>
                 renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
               )}
@@ -591,7 +591,7 @@ export function AppFrame({
         <div className="border-b border-border px-5 py-5 dark:border-white/8">
           <form
             onSubmit={handleSidebarSearch}
-            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
+            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 focus-within:ring-2 focus-within:ring-ring/30 dark:border-white/10 dark:bg-white/[0.04]"
           >
             <Search className="h-4 w-4 shrink-0" />
             <input
@@ -614,7 +614,10 @@ export function AppFrame({
               </p>
             </div>
           )}
-          <nav className={cn("space-y-1", sidebarCollapsed ? "pt-5" : "")}>
+          <nav
+            aria-label="Main navigation"
+            className={cn("space-y-1", sidebarCollapsed ? "pt-5" : "")}
+          >
             {primaryAppNavItems.map((item) => renderNavItem(item, { collapsed: sidebarCollapsed }))}
           </nav>
           {sidebarCollapsed ? null : (

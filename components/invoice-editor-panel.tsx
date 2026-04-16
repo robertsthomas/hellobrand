@@ -9,7 +9,7 @@ import {
   generateInvoiceDraftAction,
   regenerateInvoiceDraftAction,
   saveInvoiceDraftAction,
-  voidInvoiceAction
+  voidInvoiceAction,
 } from "@/app/actions";
 import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { SubmitButton } from "@/components/submit-button";
@@ -18,7 +18,7 @@ import type {
   InvoiceDeliveryRecord,
   InvoiceLineItem,
   InvoiceRecord,
-  PaymentStatus
+  PaymentStatus,
 } from "@/lib/types";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -43,14 +43,14 @@ function createLineItem(): InvoiceLineItem {
     channel: null,
     quantity: 1,
     unitRate: 0,
-    amount: 0
+    amount: 0,
   };
 }
 
 function updateLineItemAmount(item: InvoiceLineItem) {
   return {
     ...item,
-    amount: Math.round(item.quantity * item.unitRate * 100) / 100
+    amount: Math.round(item.quantity * item.unitRate * 100) / 100,
   };
 }
 
@@ -73,7 +73,7 @@ export function InvoiceEditorPanel({
   invoiceDocuments,
   paymentStatus,
   paymentTerms,
-  sendViaInboxHref
+  sendViaInboxHref,
 }: {
   dealId: string;
   invoice: InvoiceRecord | null;
@@ -93,19 +93,18 @@ export function InvoiceEditorPanel({
   );
 
   const lineItemsJson = useMemo(() => JSON.stringify(lineItems), [lineItems]);
-  const paymentTriggerPrompt =
-    hasPaymentFollowUpStatus(paymentStatus)
-      ? "Draft a concise creator-professional payment follow-up email for this partnership. Reference the saved workspace payment timing, ask what is still needed, and keep the tone firm but professional."
-      : `Draft a concise creator-professional email asking the brand to confirm payment timing and invoice requirements for this partnership. The current workspace payment terms are ${paymentTerms ?? "not fully clear"}.`;
+  const paymentTriggerPrompt = hasPaymentFollowUpStatus(paymentStatus)
+    ? "Draft a concise creator-professional payment follow-up email for this partnership. Reference the saved workspace payment timing, ask what is still needed, and keep the tone firm but professional."
+    : `Draft a concise creator-professional email asking the brand to confirm payment timing and invoice requirements for this partnership. The current workspace payment terms are ${paymentTerms ?? "not fully clear"}.`;
 
   const updateItem = (
     id: string,
-    patch: Partial<Pick<InvoiceLineItem, "title" | "description" | "channel" | "quantity" | "unitRate">>
+    patch: Partial<
+      Pick<InvoiceLineItem, "title" | "description" | "channel" | "quantity" | "unitRate">
+    >
   ) => {
     setLineItems((current) =>
-      current.map((item) =>
-        item.id === id ? updateLineItemAmount({ ...item, ...patch }) : item
-      )
+      current.map((item) => (item.id === id ? updateLineItemAmount({ ...item, ...patch }) : item))
     );
   };
 
@@ -120,8 +119,8 @@ export function InvoiceEditorPanel({
             Generate a workspace invoice
           </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            HelloBrand will prefill the invoice from your workspace amount, dates, and
-            deliverables. Review it, edit anything you need, and finalize when ready.
+            HelloBrand will prefill the invoice from your workspace amount, dates, and deliverables.
+            Review it, edit anything you need, and finalize when ready.
           </p>
         </div>
 
@@ -143,11 +142,10 @@ export function InvoiceEditorPanel({
               trigger={{
                 kind: "payment",
                 sourceId: dealId,
-                label:
-                  hasPaymentFollowUpStatus(paymentStatus)
-                    ? "Follow up on payment"
-                    : "Clarify payment timing",
-                prompt: paymentTriggerPrompt
+                label: hasPaymentFollowUpStatus(paymentStatus)
+                  ? "Follow up on payment"
+                  : "Clarify payment timing",
+                prompt: paymentTriggerPrompt,
               }}
             />
           </div>
@@ -186,7 +184,8 @@ export function InvoiceEditorPanel({
             {invoice.invoiceNumber}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Status: {humanizeToken(invoice.status)} · Invoice date {formatDate(invoice.invoiceDate)} · Due {formatDate(invoice.dueDate)}
+            Status: {humanizeToken(invoice.status)} · Invoice date {formatDate(invoice.invoiceDate)}{" "}
+            · Due {formatDate(invoice.dueDate)}
           </p>
           {invoice.sentAt ? (
             <p className="text-sm text-muted-foreground">
@@ -204,7 +203,7 @@ export function InvoiceEditorPanel({
                 kind: "payment",
                 sourceId: invoice.id,
                 label: "Follow up on payment",
-                prompt: paymentTriggerPrompt
+                prompt: paymentTriggerPrompt,
               }}
             />
           ) : null}
@@ -285,22 +284,42 @@ export function InvoiceEditorPanel({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Contact name
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="billToName" defaultValue={invoice.billTo.name} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="billToName"
+                  defaultValue={invoice.billTo.name}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Contact email
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="billToEmail" defaultValue={invoice.billTo.email ?? ""} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="billToEmail"
+                  defaultValue={invoice.billTo.email ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Company
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="billToCompanyName" defaultValue={invoice.billTo.companyName ?? ""} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="billToCompanyName"
+                  defaultValue={invoice.billTo.companyName ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Address
-                <textarea className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="billToAddress" defaultValue={invoice.billTo.address ?? ""} />
+                <textarea
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="billToAddress"
+                  defaultValue={invoice.billTo.address ?? ""}
+                />
               </label>
               <input type="hidden" name="billToTaxId" value={invoice.billTo.taxId ?? ""} />
-              <input type="hidden" name="billToPayoutDetails" value={invoice.billTo.payoutDetails ?? ""} />
+              <input
+                type="hidden"
+                name="billToPayoutDetails"
+                value={invoice.billTo.payoutDetails ?? ""}
+              />
             </div>
           </div>
 
@@ -313,31 +332,59 @@ export function InvoiceEditorPanel({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Name
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerName" defaultValue={invoice.issuer.name} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerName"
+                  defaultValue={invoice.issuer.name}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Email
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerEmail" defaultValue={invoice.issuer.email ?? ""} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerEmail"
+                  defaultValue={invoice.issuer.email ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Business
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerCompanyName" defaultValue={invoice.issuer.companyName ?? ""} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerCompanyName"
+                  defaultValue={invoice.issuer.companyName ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Tax ID
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerTaxId" defaultValue={invoice.issuer.taxId ?? ""} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerTaxId"
+                  defaultValue={invoice.issuer.taxId ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Currency
-                <input className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="currency" defaultValue={invoice.currency ?? "USD"} />
+                <input
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="currency"
+                  defaultValue={invoice.currency ?? "USD"}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Address
-                <textarea className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerAddress" defaultValue={invoice.issuer.address ?? ""} />
+                <textarea
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerAddress"
+                  defaultValue={invoice.issuer.address ?? ""}
+                />
               </label>
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Payout details
-                <textarea className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20" name="issuerPayoutDetails" defaultValue={invoice.issuer.payoutDetails ?? ""} />
+                <textarea
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  name="issuerPayoutDetails"
+                  defaultValue={invoice.issuer.payoutDetails ?? ""}
+                />
               </label>
             </div>
           </div>
@@ -350,7 +397,8 @@ export function InvoiceEditorPanel({
                 Itemized invoice
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Generated from your workspace deliverables. Edit if the billing breakdown needs to change.
+                Generated from your workspace deliverables. Edit if the billing breakdown needs to
+                change.
               </p>
             </div>
             <button
@@ -365,13 +413,17 @@ export function InvoiceEditorPanel({
 
           <div className="space-y-3">
             {lineItems.map((item) => (
-              <div key={item.id} className="grid gap-3 border border-black/8 p-3 dark:border-white/10 sm:p-4 md:grid-cols-[minmax(0,1.6fr)_110px_140px_140px_auto]">
+              <div
+                key={item.id}
+                className="grid gap-3 border border-black/8 p-3 dark:border-white/10 sm:p-4 md:grid-cols-[minmax(0,1.6fr)_110px_140px_140px_auto]"
+              >
                 <div className="space-y-3">
                   <input
                     className="w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/20"
                     value={item.title}
                     onChange={(event) => updateItem(item.id, { title: event.currentTarget.value })}
                     placeholder="Line item title"
+                    aria-label="Line item title"
                   />
                   <textarea
                     className="min-h-20 w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/20"
@@ -380,6 +432,7 @@ export function InvoiceEditorPanel({
                       updateItem(item.id, { description: event.currentTarget.value || null })
                     }
                     placeholder="Description"
+                    aria-label="Line item description"
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-3 md:contents">
@@ -393,7 +446,7 @@ export function InvoiceEditorPanel({
                       value={item.quantity}
                       onChange={(event) =>
                         updateItem(item.id, {
-                          quantity: Math.max(Number(event.currentTarget.value || 1), 1)
+                          quantity: Math.max(Number(event.currentTarget.value || 1), 1),
                         })
                       }
                     />
@@ -408,7 +461,7 @@ export function InvoiceEditorPanel({
                       value={item.unitRate}
                       onChange={(event) =>
                         updateItem(item.id, {
-                          unitRate: Math.max(Number(event.currentTarget.value || 0), 0)
+                          unitRate: Math.max(Number(event.currentTarget.value || 0), 0),
                         })
                       }
                     />
@@ -423,6 +476,7 @@ export function InvoiceEditorPanel({
                 <div className="flex items-start justify-end">
                   <button
                     type="button"
+                    aria-label={`Remove ${item.title || "line item"}`}
                     onClick={() =>
                       setLineItems((current) =>
                         current.length === 1
@@ -464,7 +518,10 @@ export function InvoiceEditorPanel({
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-black/8 pt-5 dark:border-white/10">
           <div className="space-y-1 text-sm text-muted-foreground">
-            <p>{invoiceDocuments.length} attached invoice document{invoiceDocuments.length === 1 ? "" : "s"}</p>
+            <p>
+              {invoiceDocuments.length} attached invoice document
+              {invoiceDocuments.length === 1 ? "" : "s"}
+            </p>
             {invoice.finalizedAt ? <p>Finalized {formatDate(invoice.finalizedAt)}</p> : null}
             {invoice.sentAt ? <p>Sent {formatDate(invoice.sentAt)}</p> : null}
           </div>

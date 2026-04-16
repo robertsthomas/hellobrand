@@ -777,28 +777,42 @@ function PaymentsPreview() {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <div className="min-w-[380px] border border-black/[0.06] dark:border-white/[0.08]">
-            <div className="grid grid-cols-4 gap-3 bg-[#f9f8f6] px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground dark:bg-white/[0.02]">
-              <span>Brand</span>
-              <span>Amount</span>
-              <span>Due</span>
-              <span>Status</span>
-            </div>
-            {[
-              ["Northline", "$4,800", "Mar 28", "Invoiced"],
-              ["Studio Meridian", "$3,250", "Apr 12", "Not invoiced"],
-              ["Cedar Goods", "$2,900", "Paid", "Complete"],
-            ].map(([brand, amount, due, status]) => (
-              <div
-                key={brand}
-                className="grid grid-cols-4 gap-3 border-t border-black/[0.06] bg-white px-4 py-3 text-[13px] dark:border-white/[0.08] dark:bg-[#13181d]"
-              >
-                <span className="font-medium text-foreground">{brand}</span>
-                <span className="font-medium text-foreground">{amount}</span>
-                <span className="text-muted-foreground">{due}</span>
-                <span className="text-muted-foreground">{status}</span>
-              </div>
-            ))}
+          <div className="min-w-[380px] overflow-x-auto border border-black/[0.06] dark:border-white/[0.08]">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#f9f8f6] px-4 py-2.5 text-[11px] uppercase tracking-[0.16em] text-muted-foreground dark:bg-white/[0.02]">
+                  <th scope="col" className="px-4 py-2.5 font-medium">
+                    Brand
+                  </th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">
+                    Amount
+                  </th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">
+                    Due
+                  </th>
+                  <th scope="col" className="px-4 py-2.5 font-medium">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Northline", "$4,800", "Mar 28", "Invoiced"],
+                  ["Studio Meridian", "$3,250", "Apr 12", "Not invoiced"],
+                  ["Cedar Goods", "$2,900", "Paid", "Complete"],
+                ].map(([brand, amount, due, status]) => (
+                  <tr
+                    key={brand}
+                    className="border-t border-black/[0.06] bg-white text-[13px] dark:border-white/[0.08] dark:bg-[#13181d]"
+                  >
+                    <td className="px-4 py-3 font-medium text-foreground">{brand}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">{amount}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{due}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

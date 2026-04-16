@@ -9,7 +9,7 @@ const CANONICAL_SECTIONS = [
   "What you deliver",
   "What you get paid",
   "Rights and restrictions",
-  "Watchouts"
+  "Watchouts",
 ] as const;
 
 function presentText(value: string | null | undefined) {
@@ -34,17 +34,21 @@ function canonicalizeSectionTitle(raw: string) {
 }
 
 function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "overview";
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "overview"
+  );
 }
 
 export function stripInlineMarkdown(value: string) {
   return value
     .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
     .replace(/[_*`>#]+/g, " ")
+    .replace(/\s*[—–]\s*/g, ", ")
     .replace(/\s+/g, " ")
+    .replace(/,\s*,+/g, ",")
     .replace(/\s+([,.;!?])/g, "$1")
     .trim();
 }
@@ -64,14 +68,8 @@ function prepareForSectionParsing(value: string) {
 
   for (const title of CANONICAL_SECTIONS) {
     const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    next = next.replace(
-      new RegExp(`\\s*(#{1,6}\\s*${escaped}\\b)`, "gi"),
-      "\n$1"
-    );
-    next = next.replace(
-      new RegExp(`\\s*(${escaped})\\s*:`, "gi"),
-      "\n## $1\n"
-    );
+    next = next.replace(new RegExp(`\\s*(#{1,6}\\s*${escaped}\\b)`, "gi"), "\n$1");
+    next = next.replace(new RegExp(`\\s*(${escaped})\\s*:`, "gi"), "\n## $1\n");
   }
 
   return next;
@@ -95,8 +93,8 @@ export function parseDealSummarySections(body: string | null | undefined) {
           {
             id: "overview",
             title: "Overview",
-            paragraphs: [paragraph]
-          }
+            paragraphs: [paragraph],
+          },
         ]
       : [];
   }
@@ -109,7 +107,10 @@ export function parseDealSummarySections(body: string | null | undefined) {
     const title = canonicalizeSectionTitle(current[1] ?? current[0]);
     const start = (current.index ?? 0) + current[0].length;
     const end = next?.index ?? prepared.length;
-    const rawContent = prepared.slice(start, end).trim().replace(/^[:\-\s]+/, "");
+    const rawContent = prepared
+      .slice(start, end)
+      .trim()
+      .replace(/^[:\-\s]+/, "");
 
     const paragraphs = rawContent
       .split(/\n{2,}/)
@@ -137,7 +138,7 @@ export function parseDealSummarySections(body: string | null | undefined) {
     sections.push({
       id: slugify(title),
       title,
-      paragraphs
+      paragraphs,
     });
   }
 

@@ -1,20 +1,12 @@
 import { buildAssistantAppManual } from "@/lib/assistant/app-manual";
-import { isoDateContext, joinPromptSections, promptBullets, promptNumbered } from "@/lib/ai/prompting";
-import type { AssistantClientContext, AssistantScope, AssistantTone } from "@/lib/types";
-
-function toneInstruction(tone: AssistantTone) {
-  switch (tone) {
-    case "friendly":
-      return "Write in a friendly, approachable tone. Keep it warm but still practical and grounded.";
-    case "direct":
-      return "Write in a direct tone. Keep it concise, sharp, and easy to scan.";
-    case "warm":
-      return "Write in a warm, human tone. Keep it supportive without becoming vague.";
-    case "professional":
-    default:
-      return "Write in a professional tone. Keep it polished, clear, and business-ready.";
-  }
-}
+import {
+  isoDateContext,
+  joinPromptSections,
+  promptBullets,
+  promptNumbered,
+} from "@/lib/ai/prompting";
+import { toneInstruction } from "@/lib/ai/draft-utils";
+import type { AssistantClientContext, AssistantScope } from "@/lib/types";
 
 export function buildAssistantPrompt(input: {
   scope: AssistantScope;
@@ -25,7 +17,7 @@ export function buildAssistantPrompt(input: {
   return joinPromptSections([
     {
       tag: "identity",
-      content: buildAssistantAppManual()
+      content: buildAssistantAppManual(),
     },
     {
       tag: "runtime_context",
@@ -33,9 +25,7 @@ export function buildAssistantPrompt(input: {
         `Today: ${isoDateContext()}`,
         `Current page: ${input.context.pageTitle} (${input.context.pathname})`,
         input.context.tab ? `Current partnership tab: ${input.context.tab}` : null,
-        input.context.pageContext
-          ? `Page purpose: ${input.context.pageContext.purpose}`
-          : null,
+        input.context.pageContext ? `Page purpose: ${input.context.pageContext.purpose}` : null,
         input.context.pageContext && input.context.pageContext.availableActions.length > 0
           ? `Available actions on this page: ${input.context.pageContext.availableActions.join("; ")}`
           : null,
@@ -48,8 +38,8 @@ export function buildAssistantPrompt(input: {
         input.context.trigger?.label ? `Trigger label: ${input.context.trigger.label}` : null,
         input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null,
         `Scope: ${input.scope}`,
-        `Selected tone: ${input.context.tone}`
-      ])
+        `Selected tone: ${input.context.tone}`,
+      ]),
     },
     {
       tag: "grounding_context",
@@ -57,8 +47,8 @@ export function buildAssistantPrompt(input: {
         input.scope === "deal" && input.snapshotSummary
           ? `Current partnership snapshot: ${input.snapshotSummary}`
           : "No active partnership snapshot is loaded.",
-        input.userSnapshotSummary ? `Portfolio snapshot: ${input.userSnapshotSummary}` : null
-      ])
+        input.userSnapshotSummary ? `Portfolio snapshot: ${input.userSnapshotSummary}` : null,
+      ]),
     },
     {
       tag: "behavior_rules",
@@ -73,8 +63,8 @@ export function buildAssistantPrompt(input: {
         "For drafting requests, call the draftReply tool instead of drafting from memory.",
         "If you call draftReply, do not repeat the full draft in text. The draft block should contain the full draft. At most, add one short lead-in sentence.",
         "If the user asks for a partnership-specific draft or negotiation move and no workspace is active, use a workspace selection block first.",
-        "Prefer creator-native framing. Lead with what the creator needs to post, when it is due, how they get paid, and anything risky or unusual before adding legal detail."
-      ])
+        "Prefer creator-native framing. Lead with what the creator needs to post, when it is due, how they get paid, and anything risky or unusual before adding legal detail.",
+      ]),
     },
     {
       tag: "style_rules",
@@ -82,8 +72,8 @@ export function buildAssistantPrompt(input: {
         toneInstruction(input.context.tone),
         "Keep replies concise, creator-professional, and grounded in the current workspace.",
         "Translate legal or operational language into simple creator-facing terms first, then add grounded specifics.",
-        "Never use em dashes or en dashes. Replace them with commas."
-      ])
-    }
+        "Never use em dashes or en dashes. Replace them with commas.",
+      ]),
+    },
   ]);
 }

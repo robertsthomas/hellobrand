@@ -54,8 +54,8 @@ export function MaintenancePage() {
 
             {/* Description */}
             <p className="mt-5 max-w-[38ch] text-[1rem] leading-relaxed text-[#5d6876]">
-              We're building the operating layer for creator partnerships. Join
-              the waitlist and be the first to know when we launch.
+              We're building the operating layer for creator partnerships. Join the waitlist and be
+              the first to know when we launch.
             </p>
 
             {/* Waitlist form */}
@@ -73,6 +73,7 @@ export function MaintenancePage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
+                  aria-label="Email address"
                   className="h-12 flex-1 border border-r-0 border-black/10 bg-[#fafaf8] px-4 text-[15px] text-[#1a2634] placeholder:text-black/35 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button
@@ -91,9 +92,7 @@ export function MaintenancePage() {
                 </button>
               </form>
             )}
-            {errorMsg && (
-              <p className="mt-2 text-sm text-red-600">{errorMsg}</p>
-            )}
+            {errorMsg && <p className="mt-2 text-sm text-red-600">{errorMsg}</p>}
           </div>
         </div>
       </main>

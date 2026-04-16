@@ -21,44 +21,50 @@ export type LlmRoute = {
 
 export const extractionResponseSchema = z.object({
   data: z.record(z.unknown()).default({}),
-  evidence: z.array(
-    z.object({
-      fieldPath: z.string().trim().min(1),
-      snippet: z.string().trim().min(1),
-      confidence: z.number().nullable().optional()
-    })
-  ).default([]),
-  confidence: z.number().nullable().optional()
+  evidence: z
+    .array(
+      z.object({
+        fieldPath: z.string().trim().min(1),
+        snippet: z.string().trim().min(1),
+        confidence: z.number().nullable().optional(),
+      })
+    )
+    .default([]),
+  confidence: z.number().nullable().optional(),
 });
 
 export const riskFlagsResponseSchema = z.object({
-  riskFlags: z.array(
-    z.object({
-      category: z.enum([
-        "usage_rights",
-        "exclusivity",
-        "payment_terms",
-        "deliverables",
-        "termination",
-        "other"
-      ]),
-      title: z.string().trim().min(1),
-      detail: z.string().trim().min(1),
-      severity: z.enum(["low", "medium", "high"]),
-      suggestedAction: z.string().trim().nullable().optional(),
-      evidence: z.array(z.string().trim().min(1)).default([])
-    })
-  ).default([])
+  riskFlags: z
+    .array(
+      z.object({
+        category: z.enum([
+          "usage_rights",
+          "exclusivity",
+          "payment_terms",
+          "deliverables",
+          "termination",
+          "other",
+        ]),
+        title: z.string().trim().min(1),
+        detail: z.string().trim().min(1),
+        severity: z.enum(["low", "medium", "high"]),
+        suggestedAction: z.string().trim().nullable().optional(),
+        evidence: z.array(z.string().trim().min(1)).default([]),
+      })
+    )
+    .default([]),
 });
 
 export const summaryResponseSchema = z.object({
-  sections: z.array(
-    z.object({
-      title: z.string().trim().min(1),
-      paragraphs: z.array(z.string().trim().min(1)).min(1)
-    })
-  ).default([]),
-  body: z.string().default("")
+  sections: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1),
+        paragraphs: z.array(z.string().trim().min(1)).min(1),
+      })
+    )
+    .default([]),
+  body: z.string().default(""),
 });
 
 export const briefExtractionResponseSchema = z.object({
@@ -107,18 +113,20 @@ export const briefExtractionResponseSchema = z.object({
   agencyContactName: z.string().nullable().optional(),
   agencyContactTitle: z.string().nullable().optional(),
   agencyContactEmail: z.string().nullable().optional(),
-  agencyContactPhone: z.string().nullable().optional()
+  agencyContactPhone: z.string().nullable().optional(),
 });
 
 export const generatedBriefResponseSchema = z.object({
-  sections: z.array(
-    z.object({
-      id: z.string().trim().min(1),
-      title: z.string().trim().min(1),
-      content: z.string().trim().min(1),
-      items: z.array(z.string().trim().min(1)).optional()
-    })
-  ).default([])
+  sections: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1),
+        title: z.string().trim().min(1),
+        content: z.string().trim().min(1),
+        items: z.array(z.string().trim().min(1)).optional(),
+      })
+    )
+    .default([]),
 });
 
 export const clauseConsolidationResponseSchema = z.object({
@@ -126,7 +134,7 @@ export const clauseConsolidationResponseSchema = z.object({
   exclusivity: z.string().trim().nullable().optional(),
   deliverablesSummary: z.string().trim().nullable().optional(),
   termination: z.string().trim().nullable().optional(),
-  notes: z.string().trim().nullable().optional()
+  notes: z.string().trim().nullable().optional(),
 });
 
 export interface ClauseConsolidationResult {
@@ -142,11 +150,7 @@ function shouldLogLlmDebug() {
   return process.env.DEBUG_DOCUMENT_PIPELINE === "1" || process.env.NODE_ENV !== "production";
 }
 
-function logLlmDebug(
-  level: "info" | "error",
-  event: string,
-  details: Record<string, unknown>
-) {
+function logLlmDebug(level: "info" | "error", event: string, details: Record<string, unknown>) {
   if (!shouldLogLlmDebug()) {
     return;
   }
@@ -154,7 +158,7 @@ function logLlmDebug(
   const logger = level === "error" ? console.error : console.info;
   logger(`[document-llm] ${event}`, {
     at: new Date().toISOString(),
-    ...details
+    ...details,
   });
 }
 
@@ -211,36 +215,34 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
   const defaultRoutes: Record<LlmTask, LlmRoute> = {
     extract_section: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-mini"]
+      fallbacks: ["openai/gpt-5-mini"],
     },
     analyze_risks: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-mini"]
+      fallbacks: ["openai/gpt-5-mini"],
     },
     generate_summary: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-mini"]
+      fallbacks: ["openai/gpt-5-mini"],
     },
     generate_brief: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-mini"]
+      fallbacks: ["openai/gpt-5-mini"],
     },
     consolidate_clauses: {
       primary: "google/gemini-3-flash-preview",
-      fallbacks: ["openai/gpt-5-mini"]
-    }
+      fallbacks: ["openai/gpt-5-mini"],
+    },
   };
 
   const sharedFallbacks = parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS);
   const requestedPrimary =
-    process.env.OPENROUTER_MODEL ||
-    taskSpecificModel(task) ||
-    defaultRoutes[task].primary;
+    process.env.OPENROUTER_MODEL || taskSpecificModel(task) || defaultRoutes[task].primary;
   const primary = requestedPrimary;
   const fallbacks = [
     ...taskSpecificFallbacks(task),
     ...sharedFallbacks,
-    ...defaultRoutes[task].fallbacks
+    ...defaultRoutes[task].fallbacks,
   ].filter((model, index, list) => model !== primary && list.indexOf(model) === index);
 
   return { primary, fallbacks };
@@ -262,7 +264,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
     typeof debugMeta?.documentId === "string" ? debugMeta.documentId : null,
     typeof debugMeta?.dealId === "string" ? debugMeta.dealId : null,
     typeof debugMeta?.sectionIndex === "number" ? String(debugMeta.sectionIndex) : null,
-    typeof debugMeta?.purpose === "string" ? debugMeta.purpose : null
+    typeof debugMeta?.purpose === "string" ? debugMeta.purpose : null,
   ].filter(Boolean);
   const cache = aiCachePolicy({
     taskKey: task,
@@ -271,15 +273,15 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
       task,
       systemPrompt,
       userPrompt,
-      debugMeta
-    }
+      debugMeta,
+    },
   });
 
   logLlmDebug("info", "request_start", {
     model,
     fallbacks: route.fallbacks,
     task,
-    ...debugMeta
+    ...debugMeta,
   });
 
   try {
@@ -287,11 +289,9 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
       context: {
         featureKey: task === "generate_brief" ? "brief_generation" : "document_analysis",
         taskKey: task,
-        metadata: debugMeta
+        metadata: debugMeta,
       },
-      systemPrompt:
-        systemPrompt +
-        "\n\nIMPORTANT: Never use em dashes (—) or en dashes (–) in any output. Use commas, periods, or semicolons instead.",
+      systemPrompt,
       userPrompt,
       temperature: 0.1,
       schema,
@@ -312,7 +312,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
       responseChars: JSON.stringify(response.data).length,
       cacheHit: response.cacheHit,
       budgetDecision: response.budgetDecision,
-      ...debugMeta
+      ...debugMeta,
     });
 
     return response.data;
@@ -323,7 +323,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
       task,
       durationMs: Date.now() - startedAt,
       error: error instanceof Error ? error.message : "Unknown LLM error",
-      ...debugMeta
+      ...debugMeta,
     });
     throw error;
   }

@@ -6,7 +6,7 @@ function formatMoney(value: number | null | undefined, currency: string) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency || "USD",
-    minimumFractionDigits: 2
+    minimumFractionDigits: 2,
   }).format(value ?? 0);
 }
 
@@ -16,7 +16,7 @@ function formatDate(value: string | null | undefined) {
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
-      year: "numeric"
+      year: "numeric",
     }).format(new Date(value));
   } catch {
     return value;
@@ -50,7 +50,7 @@ export function InvoicePreview({
   issuer,
   lineItems,
   subtotal,
-  notes
+  notes,
 }: {
   invoiceNumber: string;
   invoiceDate: string | null;
@@ -89,32 +89,48 @@ export function InvoicePreview({
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b-2 border-black/10 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">
-                <th className="pb-2 pr-4">Description</th>
-                <th className="w-16 pb-2 pr-4 text-right">Qty</th>
-                <th className="w-24 pb-2 pr-4 text-right">Rate</th>
-                <th className="w-24 pb-2 text-right">Amount</th>
+                <th scope="col" className="pb-2 pr-4">
+                  Description
+                </th>
+                <th scope="col" className="w-16 pb-2 pr-4 text-right">
+                  Qty
+                </th>
+                <th scope="col" className="w-24 pb-2 pr-4 text-right">
+                  Rate
+                </th>
+                <th scope="col" className="w-24 pb-2 text-right">
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody>
-              {lineItems.filter((item) => item.title.trim()).map((item) => (
-                <tr key={item.id} className="border-b border-black/6">
-                  <td className="py-2.5 pr-4">
-                    <p className="font-medium text-black/80">{item.title}</p>
-                    {item.channel ? (
-                      <p className="mt-0.5 text-[11px] text-black/40">{item.channel}</p>
-                    ) : null}
-                    {item.description ? (
-                      <p className="mt-0.5 text-[11px] text-black/40">{item.description}</p>
-                    ) : null}
-                  </td>
-                  <td className="py-2.5 pr-4 text-right text-black/70">{item.quantity}</td>
-                  <td className="py-2.5 pr-4 text-right text-black/70">{formatMoney(item.unitRate, currency)}</td>
-                  <td className="py-2.5 text-right font-medium text-black/80">{formatMoney(item.amount, currency)}</td>
-                </tr>
-              ))}
+              {lineItems
+                .filter((item) => item.title.trim())
+                .map((item) => (
+                  <tr key={item.id} className="border-b border-black/6">
+                    <td className="py-2.5 pr-4">
+                      <p className="font-medium text-black/80">{item.title}</p>
+                      {item.channel ? (
+                        <p className="mt-0.5 text-[11px] text-black/40">{item.channel}</p>
+                      ) : null}
+                      {item.description ? (
+                        <p className="mt-0.5 text-[11px] text-black/40">{item.description}</p>
+                      ) : null}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right text-black/70">{item.quantity}</td>
+                    <td className="py-2.5 pr-4 text-right text-black/70">
+                      {formatMoney(item.unitRate, currency)}
+                    </td>
+                    <td className="py-2.5 text-right font-medium text-black/80">
+                      {formatMoney(item.amount, currency)}
+                    </td>
+                  </tr>
+                ))}
               {lineItems.filter((item) => item.title.trim()).length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-6 text-center text-black/30">No line items</td>
+                  <td colSpan={4} className="py-6 text-center text-black/30">
+                    No line items
+                  </td>
                 </tr>
               ) : null}
             </tbody>
@@ -124,7 +140,9 @@ export function InvoicePreview({
         {/* Subtotal */}
         <div className="mt-4 flex justify-end">
           <div className="w-48 border-t-2 border-black/10 pt-3 text-right">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">Subtotal</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">
+              Subtotal
+            </p>
             <p className="mt-1 text-xl font-bold text-black">{formatMoney(subtotal, currency)}</p>
           </div>
         </div>
@@ -133,15 +151,21 @@ export function InvoicePreview({
         {notes?.trim() ? (
           <div className="mt-8 border-t border-black/6 pt-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">Notes</p>
-            <p className="mt-1.5 whitespace-pre-line text-[13px] leading-6 text-black/60">{notes}</p>
+            <p className="mt-1.5 whitespace-pre-line text-[13px] leading-6 text-black/60">
+              {notes}
+            </p>
           </div>
         ) : null}
 
         {/* Payout details */}
         {issuer.payoutDetails?.trim() ? (
           <div className="mt-6 border-t border-black/6 pt-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">Remittance / payout details</p>
-            <p className="mt-1.5 whitespace-pre-line text-[13px] leading-6 text-black/60">{issuer.payoutDetails}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/40">
+              Remittance / payout details
+            </p>
+            <p className="mt-1.5 whitespace-pre-line text-[13px] leading-6 text-black/60">
+              {issuer.payoutDetails}
+            </p>
           </div>
         ) : null}
       </div>

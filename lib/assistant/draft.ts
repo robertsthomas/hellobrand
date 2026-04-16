@@ -6,10 +6,10 @@ import {
   joinPromptSections,
   promptBullets,
   promptNumbered,
-  promptQuotedText
+  promptQuotedText,
 } from "@/lib/ai/prompting";
+import { normalizeDraftText, toneInstruction } from "@/lib/ai/draft-utils";
 import { runStructuredOpenRouterTask } from "@/lib/ai/structured";
-import { replaceDashesWithCommas } from "@/lib/assistant/text";
 import { generateEmailDraft } from "@/lib/email/generate";
 import type {
   AssistantClientContext,
@@ -17,28 +17,14 @@ import type {
   DealAggregate,
   DraftIntent,
   ProfileRecord,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 const assistantDraftSchema = z.object({
   subject: z.string().trim().min(1),
-  body: z.string().trim().min(1)
+  body: z.string().trim().min(1),
 });
-
-function toneInstruction(tone: AssistantTone) {
-  switch (tone) {
-    case "friendly":
-      return "Write in a friendly, approachable tone. Keep it warm and specific.";
-    case "direct":
-      return "Write in a direct tone. Keep it concise, sharp, and easy to scan.";
-    case "warm":
-      return "Write in a warm, human tone. Keep it supportive without becoming vague.";
-    case "professional":
-    default:
-      return "Write in a professional tone. Keep it polished, practical, and business-ready.";
-  }
-}
 
 function intentGuidance(intent: DraftIntent | null | undefined) {
   switch (intent) {
@@ -93,12 +79,8 @@ function workspaceSnapshot(partnership: DealAggregate) {
     `Status: ${partnership.deal.status}`,
     `Payment status: ${partnership.deal.paymentStatus}`,
     `Payment amount: ${
-      partnership.terms?.paymentAmount !== null &&
-      partnership.terms?.paymentAmount !== undefined
-        ? formatCurrency(
-            partnership.terms.paymentAmount,
-            partnership.terms?.currency ?? "USD"
-          )
+      partnership.terms?.paymentAmount !== null && partnership.terms?.paymentAmount !== undefined
+        ? formatCurrency(partnership.terms.paymentAmount, partnership.terms?.currency ?? "USD")
         : "Unknown"
     }`,
     `Payment terms: ${partnership.terms?.paymentTerms ?? "Unknown"}`,
@@ -106,9 +88,7 @@ function workspaceSnapshot(partnership: DealAggregate) {
     `Usage rights: ${partnership.terms?.usageRights ?? "Unknown"}`,
     `Usage duration: ${partnership.terms?.usageDuration ?? "Unknown"}`,
     `Usage territory: ${partnership.terms?.usageTerritory ?? "Unknown"}`,
-    `Usage channels: ${
-      partnership.terms?.usageChannels?.join(", ") || "Unknown"
-    }`,
+    `Usage channels: ${partnership.terms?.usageChannels?.join(", ") || "Unknown"}`,
     `Exclusivity: ${
       partnership.terms?.exclusivityApplies === null
         ? "Unknown"
@@ -137,45 +117,32 @@ function workspaceSnapshot(partnership: DealAggregate) {
       partnership.currentSummary?.body ??
       partnership.deal.summary ??
       "No current summary available."
-    }`
+    }`,
   ].join("\n");
 }
 
-function buildGenericFallback(subjectBase: string, recipient: string, focus: string, sender: string) {
+function buildGenericFallback(
+  subjectBase: string,
+  recipient: string,
+  focus: string,
+  sender: string
+) {
   return {
     subject: `${subjectBase} follow-up`,
     body:
       `Hi ${recipient},\n\n` +
       `I’m following up on ${focus}. I want to make sure we’re aligned on the current terms and next steps before moving forward.\n\n` +
       "If helpful, I can send proposed wording or a clean summary of what I’m asking to revise.\n\n" +
-      `Best,\n${sender}`
+      `Best,\n${sender}`,
   };
 }
 
-function normalizeDraftText(value: string) {
-  return replaceDashesWithCommas(
-    value
-      .replace(/\r\n/g, "\n")
-      .replace(/\*\*(.*?)\*\*/g, "$1")
-      .replace(/__(.*?)__/g, "$1")
-      .replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "")
-      .replace(/\[Brand\/Agency Name\]/gi, "there")
-      .replace(/\[Brand Name\]/gi, "there")
-      .replace(/\[Agency Name\]/gi, "there")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()
-  );
-}
-
-function assistantDraftSystemPrompt(input: {
-  intent: DraftIntent | null;
-  tone: AssistantTone;
-}) {
+function assistantDraftSystemPrompt(input: { intent: DraftIntent | null; tone: AssistantTone }) {
   return joinPromptSections([
     {
       tag: "role",
       content:
-        "You draft creator-professional outbound emails inside HelloBrand. Your job is to produce one usable message grounded in saved workspace facts, not generic AI filler."
+        "You draft creator-professional outbound emails inside HelloBrand. Your job is to produce one usable message grounded in saved workspace facts, not generic AI filler.",
     },
     {
       tag: "instruction_hierarchy",
@@ -183,12 +150,12 @@ function assistantDraftSystemPrompt(input: {
         "Saved workspace facts are highest priority.",
         "Then use the requested draft job, current page context, and trigger context.",
         "Use evidence and risk guidance to shape the ask, but do not copy snippets verbatim unless they fit naturally.",
-        "If a fact is unknown, avoid asserting it as true."
-      ])
+        "If a fact is unknown, avoid asserting it as true.",
+      ]),
     },
     {
       tag: "draft_job",
-      content: intentGuidance(input.intent)
+      content: intentGuidance(input.intent),
     },
     {
       tag: "rules",
@@ -202,36 +169,36 @@ function assistantDraftSystemPrompt(input: {
         "Do not use bullets, numbered lists, headings, placeholder names, or legal-sounding bluff language.",
         "If the recipient is unknown, use a natural greeting like Hi there, or Hi {brand} team,.",
         `Today: ${isoDateContext()}`,
-        "Never use em dashes or en dashes. Replace them with commas."
-      ])
+        "Never use em dashes or en dashes. Replace them with commas.",
+      ]),
     },
     {
       tag: "few_shot_examples",
       content: [
-        "<example name=\"protect_leverage_on_payment\">",
+        '<example name="protect_leverage_on_payment">',
         "Workspace fact: Payment terms are Net 45.",
         "Requested job: Ask for Net 15.",
         "Correct behavior: Ask whether the brand can revise the timing to Net 15. Do not say Net 15 was already agreed.",
         "</example>",
         "",
-        "<example name=\"grounded_usage_pushback\">",
+        '<example name="grounded_usage_pushback">',
         "Workspace fact: Usage rights include paid social and whitelisting.",
         "Correct behavior: Ask to narrow usage or separate paid usage compensation. Do not overstate what the contract says if the scope is still unclear.",
-        "</example>"
-      ].join("\n")
+        "</example>",
+      ].join("\n"),
     },
     {
       tag: "style",
       content: promptBullets([
         toneInstruction(input.tone),
         "Sound like a creator who understands the deal and knows what they need.",
-        "Optimize for clear next steps, not legal theatrics."
-      ])
+        "Optimize for clear next steps, not legal theatrics.",
+      ]),
     },
     {
       tag: "output_contract",
-      content: 'Return JSON with exactly this shape: { "subject": "string", "body": "string" }.'
-    }
+      content: 'Return JSON with exactly this shape: { "subject": "string", "body": "string" }.',
+    },
   ]);
 }
 
@@ -249,7 +216,7 @@ function assistantDraftUserPrompt(input: {
   return joinPromptSections([
     {
       tag: "workspace_snapshot",
-      content: promptQuotedText(workspaceSnapshot(input.partnership))
+      content: promptQuotedText(workspaceSnapshot(input.partnership)),
     },
     {
       tag: "assistant_context",
@@ -260,16 +227,16 @@ function assistantDraftUserPrompt(input: {
           ? `Creator location context: ${input.context.profileLocation}`
           : null,
         input.context.trigger?.label ? `Trigger label: ${input.context.trigger.label}` : null,
-        input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null
-      ])
+        input.context.trigger?.prompt ? `Trigger prompt: ${input.context.trigger.prompt}` : null,
+      ]),
     },
     {
       tag: "risk_context",
-      content: risks.length > 0 ? promptBullets(risks) : "No active risk flags."
+      content: risks.length > 0 ? promptBullets(risks) : "No active risk flags.",
     },
     {
       tag: "evidence_context",
-      content: evidence.length > 0 ? promptBullets(evidence) : "No extracted evidence snippets."
+      content: evidence.length > 0 ? promptBullets(evidence) : "No extracted evidence snippets.",
     },
     {
       tag: "draft_request",
@@ -277,14 +244,14 @@ function assistantDraftUserPrompt(input: {
         `Requested move: ${input.focus}`,
         input.intent ? `Intent: ${input.intent}` : null,
         `Recipient hint: ${input.recipient ?? `${input.partnership.deal.brandName} team`}`,
-        `Signature: ${input.sender}`
-      ])
+        `Signature: ${input.sender}`,
+      ]),
     },
     {
       tag: "task",
       content:
-        "Draft one creator-facing outbound email that fits the requested move and stays grounded in the saved partnership facts."
-    }
+        "Draft one creator-facing outbound email that fits the requested move and stays grounded in the saved partnership facts.",
+    },
   ]);
 }
 
@@ -311,7 +278,7 @@ export async function generateAssistantWorkspaceDraft(input: {
       );
   const systemPrompt = assistantDraftSystemPrompt({
     intent: input.intent ?? null,
-    tone: input.context.tone
+    tone: input.context.tone,
   });
   const userPrompt = assistantDraftUserPrompt({
     partnership: input.partnership,
@@ -319,7 +286,7 @@ export async function generateAssistantWorkspaceDraft(input: {
     focus: input.focus,
     recipient: input.recipient ?? null,
     sender,
-    intent: input.intent ?? null
+    intent: input.intent ?? null,
   });
 
   const result = await runStructuredOpenRouterTask({
@@ -330,8 +297,8 @@ export async function generateAssistantWorkspaceDraft(input: {
       metadata: {
         dealId: input.partnership.deal.id,
         source: "assistant_workspace_draft",
-        intent: input.intent ?? null
-      }
+        intent: input.intent ?? null,
+      },
     },
     systemPrompt,
     userPrompt,
@@ -345,7 +312,7 @@ export async function generateAssistantWorkspaceDraft(input: {
         "assistant-workspace-draft",
         input.partnership.deal.id,
         input.partnership.deal.updatedAt,
-        input.intent ?? "custom"
+        input.intent ?? "custom",
       ].join(":"),
       input: {
         focus: input.focus,
@@ -355,17 +322,17 @@ export async function generateAssistantWorkspaceDraft(input: {
           tab: input.context.tab,
           profileLocation: input.context.profileLocation,
           tone: input.context.tone,
-          trigger: input.context.trigger
+          trigger: input.context.trigger,
         },
-        workspaceSummary: workspaceSnapshot(input.partnership)
-      }
-    })
+        workspaceSummary: workspaceSnapshot(input.partnership),
+      },
+    }),
   });
 
   const draft = result?.data ?? fallback;
 
   return {
     subject: normalizeDraftText(draft.subject),
-    body: normalizeDraftText(draft.body)
+    body: normalizeDraftText(draft.body),
   };
 }
