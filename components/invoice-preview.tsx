@@ -65,7 +65,7 @@ export function InvoicePreview({
   return (
     <div className="border border-black/10 bg-white shadow-sm dark:border-white/10 dark:bg-[#fafaf9]">
       {/* Paper */}
-      <div className="mx-auto max-w-[640px] px-8 py-10 text-black sm:px-12 sm:py-14">
+      <div className="mx-auto max-w-[640px] overflow-x-auto px-4 py-8 text-black sm:px-12 sm:py-14">
         {/* Header */}
         <div className="flex items-start justify-between gap-6">
           <div>

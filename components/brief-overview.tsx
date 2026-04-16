@@ -16,7 +16,7 @@ interface BriefOverviewProps {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {title}
       </p>
       {children}
@@ -45,11 +45,11 @@ export function BriefOverview({
   dealId,
   briefData,
   documents,
-  hasPremiumInbox
+  hasPremiumInbox,
 }: BriefOverviewProps) {
   if (!briefData) {
     return (
-      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
         <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
           Brief
         </h2>
@@ -63,9 +63,9 @@ export function BriefOverview({
                 Brief Missing
               </p>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-black/65 dark:text-white/70">
-                No brand brief uploaded yet. You should usually have one by now.
-                Generate a working brief from your workspace for now, then upload
-                the real brief later so HelloBrand can compare and update it.
+                No brand brief uploaded yet. You should usually have one by now. Generate a working
+                brief from your workspace for now, then upload the real brief later so HelloBrand
+                can compare and update it.
               </p>
             </div>
           </div>
@@ -78,9 +78,7 @@ export function BriefOverview({
             Search inbox
           </Link>
           {!hasPremiumInbox ? (
-            <span className="text-xs text-black/45 dark:text-white/45">
-              Premium feature
-            </span>
+            <span className="text-xs text-black/45 dark:text-white/45">Premium feature</span>
           ) : null}
         </div>
       </section>
@@ -92,7 +90,7 @@ export function BriefOverview({
     .filter(Boolean);
 
   return (
-    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
       <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
@@ -109,7 +107,10 @@ export function BriefOverview({
           {briefData.campaignOverview && (
             <div className="md:col-span-2">
               <Section title="Campaign Overview">
-                <ProseText content={briefData.campaignOverview} className="text-sm text-foreground" />
+                <ProseText
+                  content={briefData.campaignOverview}
+                  className="text-sm text-foreground"
+                />
               </Section>
             </div>
           )}
@@ -117,7 +118,10 @@ export function BriefOverview({
           {briefData.campaignObjective && (
             <div className="md:col-span-2">
               <Section title="Objective">
-                <ProseText content={briefData.campaignObjective} className="text-sm text-foreground" />
+                <ProseText
+                  content={briefData.campaignObjective}
+                  className="text-sm text-foreground"
+                />
               </Section>
             </div>
           )}
@@ -125,25 +129,34 @@ export function BriefOverview({
           {(briefData.productName || briefData.productDescription) && (
             <Section title="Product">
               {briefData.productName ? (
-                <ProseText content={briefData.productName} className="text-sm font-medium text-foreground" />
+                <ProseText
+                  content={briefData.productName}
+                  className="text-sm font-medium text-foreground"
+                />
               ) : null}
               {briefData.productDescription ? (
-                <ProseText content={briefData.productDescription} className="mt-1 text-sm text-foreground" />
+                <ProseText
+                  content={briefData.productDescription}
+                  className="mt-1 text-sm text-foreground"
+                />
               ) : null}
             </Section>
           )}
 
-          {(briefData.deliverablesSummary || safeItems(briefData.deliverablePlatforms).length > 0) && (
+          {(briefData.deliverablesSummary ||
+            safeItems(briefData.deliverablePlatforms).length > 0) && (
             <Section title="Deliverables">
               {briefData.deliverablesSummary ? (
-                <ProseText content={briefData.deliverablesSummary} className="text-sm text-foreground" />
+                <ProseText
+                  content={briefData.deliverablesSummary}
+                  className="text-sm text-foreground"
+                />
               ) : null}
               <BulletList items={safeItems(briefData.deliverablePlatforms)} />
             </Section>
           )}
 
-          {(
-            briefData.agreementStartDate ||
+          {(briefData.agreementStartDate ||
             briefData.agreementEndDate ||
             briefData.executionTargetDate ||
             briefData.campaignFlight ||
@@ -152,21 +165,28 @@ export function BriefOverview({
             briefData.campaignLiveDate ||
             briefData.draftDueDate ||
             briefData.contentDueDate ||
-            briefData.postDuration
-          ) && (
+            briefData.postDuration) && (
             <Section title="Key Dates">
               <BulletList
                 items={[
-                  briefData.agreementStartDate ? `Agreement start: ${briefData.agreementStartDate}` : null,
-                  briefData.agreementEndDate ? `Agreement end: ${briefData.agreementEndDate}` : null,
-                  briefData.executionTargetDate ? `Execution target: ${briefData.executionTargetDate}` : null,
+                  briefData.agreementStartDate
+                    ? `Agreement start: ${briefData.agreementStartDate}`
+                    : null,
+                  briefData.agreementEndDate
+                    ? `Agreement end: ${briefData.agreementEndDate}`
+                    : null,
+                  briefData.executionTargetDate
+                    ? `Execution target: ${briefData.executionTargetDate}`
+                    : null,
                   briefData.campaignFlight ? `Campaign flight: ${briefData.campaignFlight}` : null,
-                  briefData.postingSchedule ? `Posting schedule: ${briefData.postingSchedule}` : null,
+                  briefData.postingSchedule
+                    ? `Posting schedule: ${briefData.postingSchedule}`
+                    : null,
                   briefData.conceptDueDate ? `Concept due: ${briefData.conceptDueDate}` : null,
                   briefData.campaignLiveDate ? `Live date: ${briefData.campaignLiveDate}` : null,
                   briefData.draftDueDate ? `Draft due: ${briefData.draftDueDate}` : null,
                   briefData.contentDueDate ? `Content due: ${briefData.contentDueDate}` : null,
-                  briefData.postDuration ? `Post duration: ${briefData.postDuration}` : null
+                  briefData.postDuration ? `Post duration: ${briefData.postDuration}` : null,
                 ].filter((item): item is string => Boolean(item))}
               />
             </Section>
@@ -205,7 +225,10 @@ export function BriefOverview({
           {briefData.creativeConceptOverview && (
             <div className="md:col-span-2">
               <Section title="Creative Concept">
-                <ProseText content={briefData.creativeConceptOverview} className="text-sm text-foreground" />
+                <ProseText
+                  content={briefData.creativeConceptOverview}
+                  className="text-sm text-foreground"
+                />
               </Section>
             </div>
           )}
@@ -224,19 +247,28 @@ export function BriefOverview({
 
           {briefData.approvalRequirements && (
             <Section title="Approval Requirements">
-              <ProseText content={briefData.approvalRequirements} className="text-sm text-foreground" />
+              <ProseText
+                content={briefData.approvalRequirements}
+                className="text-sm text-foreground"
+              />
             </Section>
           )}
 
           {briefData.revisionRequirements && (
             <Section title="Revision Requirements">
-              <ProseText content={briefData.revisionRequirements} className="text-sm text-foreground" />
+              <ProseText
+                content={briefData.revisionRequirements}
+                className="text-sm text-foreground"
+              />
             </Section>
           )}
 
           {briefData.reportingRequirements && (
             <Section title="Reporting Requirements">
-              <ProseText content={briefData.reportingRequirements} className="text-sm text-foreground" />
+              <ProseText
+                content={briefData.reportingRequirements}
+                className="text-sm text-foreground"
+              />
             </Section>
           )}
 
@@ -258,17 +290,26 @@ export function BriefOverview({
                 <ProseText content={briefData.usageNotes} className="text-sm text-foreground" />
               ) : null}
               {briefData.amplificationPeriod ? (
-                <ProseText content={`Amplification period: ${briefData.amplificationPeriod}`} className="mt-1 text-sm text-foreground" />
+                <ProseText
+                  content={`Amplification period: ${briefData.amplificationPeriod}`}
+                  className="mt-1 text-sm text-foreground"
+                />
               ) : null}
             </Section>
           )}
 
-          {(briefData.paymentSchedule || briefData.paymentRequirements || briefData.paymentNotes) && (
+          {(briefData.paymentSchedule ||
+            briefData.paymentRequirements ||
+            briefData.paymentNotes) && (
             <Section title="Payment Details">
               <BulletList
                 items={[
-                  briefData.paymentSchedule ? `Payment schedule: ${briefData.paymentSchedule}` : null,
-                  briefData.paymentRequirements ? `Payment requirements: ${briefData.paymentRequirements}` : null
+                  briefData.paymentSchedule
+                    ? `Payment schedule: ${briefData.paymentSchedule}`
+                    : null,
+                  briefData.paymentRequirements
+                    ? `Payment requirements: ${briefData.paymentRequirements}`
+                    : null,
                 ].filter((item): item is string => Boolean(item))}
               />
               {briefData.paymentNotes ? (
@@ -295,14 +336,12 @@ export function BriefOverview({
             </Section>
           )}
 
-          {(
-            briefData.campaignCode ||
+          {(briefData.campaignCode ||
             briefData.jobNumber ||
             briefData.referenceId ||
             briefData.creatorHandle ||
             briefData.promoCode ||
-            safeItems(briefData.linksAndAssets).length > 0
-          ) && (
+            safeItems(briefData.linksAndAssets).length > 0) && (
             <Section title="Links & Codes">
               <BulletList
                 items={[
@@ -311,7 +350,7 @@ export function BriefOverview({
                   briefData.referenceId ? `Reference ID: ${briefData.referenceId}` : null,
                   briefData.creatorHandle ? `Creator handle: ${briefData.creatorHandle}` : null,
                   briefData.promoCode ? `Promo code: ${briefData.promoCode}` : null,
-                  ...safeItems(briefData.linksAndAssets)
+                  ...safeItems(briefData.linksAndAssets),
                 ].filter((item): item is string => Boolean(item))}
               />
             </Section>

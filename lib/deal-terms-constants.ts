@@ -1,4 +1,4 @@
-import { dealCategoryOptions } from "@/lib/conflict-intelligence";
+import { dealCategoryOptions } from "@/lib/conflict-categories";
 import type { DealCategory } from "@/lib/types";
 
 export const DEAL_CATEGORY_OPTIONS: DealCategory[] = [...dealCategoryOptions];
@@ -35,7 +35,7 @@ export const CURRENCY_OPTIONS = [
   "CLP",
   "COP",
   "PEN",
-  "ARS"
+  "ARS",
 ] as const;
 
 export const DEAL_REVIEW_SECTION_FIELDS = {
@@ -44,7 +44,7 @@ export const DEAL_REVIEW_SECTION_FIELDS = {
   deliverables: ["deliverables"],
   usage: ["usageRights"],
   exclusivity: ["exclusivity", "exclusivityRestrictions"],
-  termination: ["termination", "governingLaw"]
+  termination: ["termination", "governingLaw"],
 } as const;
 
 export const DEAL_FIELD_LABELS: Record<string, string> = {
@@ -60,5 +60,5 @@ export const DEAL_FIELD_LABELS: Record<string, string> = {
   exclusivity: "Exclusivity summary",
   exclusivityRestrictions: "Restricted categories",
   termination: "Termination summary",
-  governingLaw: "Governing law"
+  governingLaw: "Governing law",
 };

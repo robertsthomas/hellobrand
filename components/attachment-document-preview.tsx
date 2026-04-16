@@ -4,14 +4,7 @@
  * This file renders the document attachment preview experience.
  * It handles preview loading and client-side display state while parsing and extraction stay outside the component.
  */
-import {
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode
-} from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,7 +12,7 @@ import {
   LoaderCircle,
   Minus,
   Plus,
-  Search
+  Search,
 } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
@@ -77,7 +70,7 @@ function MatchNavigator({
   matchCount,
   activeIndex,
   onPrevious,
-  onNext
+  onNext,
 }: {
   matchCount: number;
   activeIndex: number;
@@ -116,7 +109,7 @@ function PdfPageCanvas({
   pageNumber,
   isSearchMatch,
   zoomLevel,
-  registerRef
+  registerRef,
 }: {
   pdfDocument: PdfDocumentLike;
   pageNumber: number;
@@ -204,9 +197,7 @@ function PdfPageCanvas({
           canvasContext: context,
           viewport,
           transform:
-            devicePixelRatio !== 1
-              ? [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0]
-              : undefined
+            devicePixelRatio !== 1 ? [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0] : undefined,
         });
         renderTaskRef.current = renderTask;
 
@@ -215,11 +206,12 @@ function PdfPageCanvas({
           renderTaskRef.current = null;
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not render this PDF page.";
+        const message = error instanceof Error ? error.message : "Could not render this PDF page.";
 
         if (!cancelled && !/cancelled|canceled/i.test(message)) {
-          setRenderError(error instanceof Error ? error.message : "Could not render this PDF page.");
+          setRenderError(
+            error instanceof Error ? error.message : "Could not render this PDF page."
+          );
         }
       } finally {
         if (cancelled) {
@@ -239,8 +231,9 @@ function PdfPageCanvas({
   return (
     <div
       ref={wrapperRef}
-      className={`mx-auto w-full max-w-[860px] border bg-white p-3 sm:p-4 ${isSearchMatch ? "border-amber-300 ring-1 ring-amber-200" : "border-black/8"
-        }`}
+      className={`mx-auto w-full max-w-[860px] border bg-white p-3 sm:p-4 ${
+        isSearchMatch ? "border-amber-300 ring-1 ring-amber-200" : "border-black/8"
+      }`}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -268,7 +261,7 @@ function PdfPageCanvas({
 
 function PdfDocumentPreview({
   previewUrl,
-  downloadUrl
+  downloadUrl,
 }: {
   previewUrl: string;
   downloadUrl: string;
@@ -314,7 +307,7 @@ function PdfDocumentPreview({
             const textContent = await page.getTextContent();
             return {
               pageNumber,
-              text: textContent.items.map((item) => item.str ?? "").join(" ")
+              text: textContent.items.map((item) => item.str ?? "").join(" "),
             };
           })
         );
@@ -370,7 +363,7 @@ function PdfDocumentPreview({
     const pageNumber = matchingPages[boundedIndex];
     pageRefs.current[pageNumber]?.scrollIntoView({
       behavior: "smooth",
-      block: "start"
+      block: "start",
     });
   }
 
@@ -439,7 +432,7 @@ function PdfDocumentPreview({
                 type="button"
                 onClick={() => updateZoom("out")}
                 disabled={zoomLevel <= 0.6}
-                className="inline-flex h-9 w-9 items-center justify-center border border-black/10 bg-white text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 w-10 items-center justify-center border border-black/10 bg-white text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Zoom out"
               >
                 <Minus className="h-4 w-4" />
@@ -451,7 +444,7 @@ function PdfDocumentPreview({
                 type="button"
                 onClick={() => updateZoom("in")}
                 disabled={zoomLevel >= 2.4}
-                className="inline-flex h-9 w-9 items-center justify-center border border-black/10 bg-white text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 w-10 items-center justify-center border border-black/10 bg-white text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Zoom in"
               >
                 <Plus className="h-4 w-4" />
@@ -499,7 +492,7 @@ function PdfDocumentPreview({
 
 function TextDocumentPreview({
   previewUrl,
-  downloadUrl
+  downloadUrl,
 }: {
   previewUrl: string;
   downloadUrl: string;
@@ -599,7 +592,9 @@ function TextDocumentPreview({
           </div>
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-              {matchCount === 0 ? "No matches" : `${matchCount} matching line${matchCount === 1 ? "" : "s"}`}
+              {matchCount === 0
+                ? "No matches"
+                : `${matchCount} matching line${matchCount === 1 ? "" : "s"}`}
             </span>
             <a
               href={downloadUrl}
@@ -639,7 +634,7 @@ function TextDocumentPreview({
 export function AttachmentDocumentPreview({
   kind,
   previewUrl,
-  downloadUrl
+  downloadUrl,
 }: {
   kind: "pdf" | "text";
   previewUrl: string;

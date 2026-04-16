@@ -4,7 +4,7 @@ export function SummaryCard({
   label,
   value,
   caption,
-  accent = "ocean"
+  accent = "ocean",
 }: {
   label: string;
   value: string;
@@ -13,7 +13,7 @@ export function SummaryCard({
 }) {
   return (
     <div className="app-surface gap-0 p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </p>
       <p

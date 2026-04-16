@@ -5,21 +5,28 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
-import { ArrowRight, BarChart3, CheckCircle2, CircleAlert, RefreshCcw, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  CheckCircle2,
+  CircleAlert,
+  RefreshCcw,
+  Sparkles,
+} from "lucide-react";
 
-import { FeatureLockedState, FeatureUpgradeCard } from "@/components/feature-locked-state";
+import { FeatureUpgradeCard } from "@/components/feature-locked-state";
 import { AnalyticsSkeleton } from "@/components/skeletons";
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealAggregates, getCachedProfile } from "@/lib/cached-data";
-import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
+import { formatCurrency, humanizeToken } from "@/lib/utils";
 import {
   buildAnalyticsViewModel,
   DUMMY_METRICS,
   DUMMY_MONTHS,
   DUMMY_TOP_CONTENT,
-  getPlatformStatus
+  getPlatformStatus,
 } from "./page-helpers";
 
 function AnalyticsPreviewLocked() {
@@ -66,7 +73,9 @@ function AnalyticsPreviewLocked() {
                   <div className="mt-3 h-2 rounded-full bg-white/90">
                     <div
                       className="h-full rounded-full bg-foreground/60"
-                      style={{ width: `${metric.label === "Tracked revenue" ? 72 : metric.label === "Active partnerships" ? 52 : 34}%` }}
+                      style={{
+                        width: `${metric.label === "Tracked revenue" ? 72 : metric.label === "Active partnerships" ? 52 : 34}%`,
+                      }}
                     />
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">{metric.context}</p>
@@ -107,13 +116,20 @@ function AnalyticsPreviewLocked() {
               </h2>
               <div className="mt-4 divide-y divide-black/[0.06] border-t border-black/[0.06]">
                 {DUMMY_TOP_CONTENT.map((item) => (
-                  <div key={item.campaign} className="grid gap-3 py-3.5 md:grid-cols-[minmax(0,1fr)_100px_80px]">
+                  <div
+                    key={item.campaign}
+                    className="grid gap-3 py-3.5 md:grid-cols-[minmax(0,1fr)_100px_80px]"
+                  >
                     <div>
                       <p className="font-medium text-foreground">{item.campaign}</p>
-                      <p className="mt-0.5 text-sm text-muted-foreground">{item.brand} · {item.status}</p>
+                      <p className="mt-0.5 text-sm text-muted-foreground">
+                        {item.brand} · {item.status}
+                      </p>
                     </div>
                     <div className="text-sm text-muted-foreground">Multi-platform</div>
-                    <div className="text-right text-sm font-medium text-foreground">{item.amount}</div>
+                    <div className="text-right text-sm font-medium text-foreground">
+                      {item.amount}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -130,7 +146,8 @@ function AnalyticsPreviewLocked() {
                 Unlock analytics
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Revenue trends, partnership metrics, and payment timing analysis. See how your creator business is performing across all partnerships.
+                Revenue trends, partnership metrics, and payment timing analysis. See how your
+                creator business is performing across all partnerships.
               </p>
               <div className="mt-5 flex items-center justify-center gap-4">
                 <Link
@@ -166,31 +183,25 @@ async function AnalyticsContent() {
 
   const [aggregatesWithConflicts, profile] = await Promise.all([
     getCachedDealAggregates(viewer),
-    getCachedProfile(viewer)
+    getCachedProfile(viewer),
   ]);
-  const {
-    formattedTopContent,
-    maxRevenuePoint,
-    metadata,
-    metrics,
-    monthlyRevenue,
-    platformRows
-  } = buildAnalyticsViewModel(aggregatesWithConflicts, profile.payoutDetails);
+  const { formattedTopContent, maxRevenuePoint, metadata, metrics, monthlyRevenue, platformRows } =
+    buildAnalyticsViewModel(aggregatesWithConflicts, profile.payoutDetails);
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
       <div className="mx-auto max-w-[1380px] space-y-8">
         <section className="flex flex-col gap-4 border-b border-black/8 pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Analytics
             </p>
             <h1 className="mt-3 text-3xl sm:text-[36px] lg:text-[44px] font-semibold tracking-[-0.06em] text-foreground">
               Analytics
             </h1>
             <p className="mt-4 text-lg leading-8 text-muted-foreground">
-              A lightweight performance view for partnership value, payment timing, and
-              creator channels linked to your profile.
+              A lightweight performance view for partnership value, payment timing, and creator
+              channels linked to your profile.
             </p>
           </div>
 
@@ -217,9 +228,7 @@ async function AnalyticsContent() {
               <div className="grid gap-4 border-t border-black/8 pt-5 md:grid-cols-2 xl:grid-cols-4">
                 {metrics.map((metric) => (
                   <div key={metric.label} className="bg-[#f7f5f1] px-4 py-4">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {metric.label}
-                    </p>
+                    <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
                     <p className="mt-2 text-[22px] font-semibold tracking-[-0.04em] text-foreground">
                       {metric.value}
                     </p>
@@ -238,7 +247,7 @@ async function AnalyticsContent() {
                                     ? 46
                                     : 34,
                             8
-                          )}%`
+                          )}%`,
                         }}
                       />
                     </div>
@@ -267,7 +276,7 @@ async function AnalyticsContent() {
                             <div
                               className="w-8 border border-dashed border-black/8 bg-transparent"
                               style={{
-                                height: `${Math.max(210 - Number.parseInt(height, 10), 26)}px`
+                                height: `${Math.max(210 - Number.parseInt(height, 10), 26)}px`,
                               }}
                             />
                           </div>
@@ -292,12 +301,14 @@ async function AnalyticsContent() {
                     Best performing content
                   </h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    A simple list of top-value workspaces to keep this view useful
-                    without turning analytics into the main product surface.
+                    A simple list of top-value workspaces to keep this view useful without turning
+                    analytics into the main product surface.
                   </p>
                 </div>
                 <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="border-b border-black/10 pb-1 text-foreground">All platforms</span>
+                  <span className="border-b border-black/10 pb-1 text-foreground">
+                    All platforms
+                  </span>
                   <span>Instagram</span>
                   <span>TikTok</span>
                   <span>YouTube</span>
@@ -316,9 +327,7 @@ async function AnalyticsContent() {
                       className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_110px_110px_96px]"
                     >
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">
-                          {item.campaignName}
-                        </div>
+                        <div className="font-medium text-foreground">{item.campaignName}</div>
                         <div className="mt-1 text-sm text-muted-foreground">
                           {item.brandName} · {item.statusLabel}
                         </div>
@@ -375,10 +384,7 @@ async function AnalyticsContent() {
                   const status = getPlatformStatus(entry.handle, entry.audienceLabel);
 
                   return (
-                    <div
-                      key={entry.id}
-                      className="flex items-start justify-between gap-4 py-4"
-                    >
+                    <div key={entry.id} className="flex items-start justify-between gap-4 py-4">
                       <div className="flex items-start gap-3">
                         <div className="mt-1 flex h-9 w-9 items-center justify-center bg-[#f7f5f1] text-foreground">
                           <SocialPlatformIcon platform={entry.platform} />
@@ -387,9 +393,7 @@ async function AnalyticsContent() {
                           <div className="font-medium capitalize text-foreground">
                             {entry.platform}
                           </div>
-                          <div className={`mt-1 text-sm ${status.tone}`}>
-                            {status.label}
-                          </div>
+                          <div className={`mt-1 text-sm ${status.tone}`}>{status.label}</div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             {entry.handle || "Add your handle in profile to activate this surface."}
                           </div>

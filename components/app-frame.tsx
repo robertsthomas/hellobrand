@@ -19,9 +19,14 @@ import { AssistantProvider, useAssistant } from "@/components/assistant-provider
 import { GuideProvider } from "@/components/guide-provider";
 import { GuideMobileModal } from "@/components/guide-mobile-modal";
 import { GuideTooltip } from "@/components/guide-tooltip";
-import { NotificationsCenter } from "@/components/notifications-center";
 import type { ProductGuideState } from "@/lib/types";
 import type { NotificationItem } from "@/lib/notifications";
+
+const NotificationsCenter = lazy(() =>
+  import("@/components/notifications-center").then((m) => ({
+    default: m.NotificationsCenter,
+  }))
+);
 import {
   Sheet,
   SheetContent,
@@ -38,6 +43,7 @@ import {
   secondaryAppNavItems,
 } from "@/lib/app-shell";
 import type { SidebarMilestones } from "@/lib/sidebar-milestones";
+import type { AppFeatureFlags } from "@/lib/feature-flags";
 
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
@@ -84,6 +90,7 @@ export function AppFrame({
   notifications,
   onboardingComplete,
   sidebarMilestones,
+  featureFlags,
   workspaceNavItems = [],
 }: {
   children: ReactNode;
@@ -95,6 +102,7 @@ export function AppFrame({
   notifications?: NotificationItem[];
   onboardingComplete?: boolean;
   sidebarMilestones?: SidebarMilestones;
+  featureFlags?: AppFeatureFlags;
   workspaceNavItems?: Array<{
     dealId: string;
     label: string;
@@ -516,10 +524,12 @@ export function AppFrame({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <NotificationsCenter
-            notifications={notifications ?? []}
-            hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? false}
-          />
+          <Suspense fallback={<div className="h-5 w-5" />}>
+            <NotificationsCenter
+              notifications={notifications ?? []}
+              hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? false}
+            />
+          </Suspense>
           <ThemeSwitch iconOnly />
         </div>
       </div>

@@ -28,7 +28,7 @@ export function AssistantHeader({
   onCloseSettings,
   onToneChange,
   onMinimize,
-  onEndSession
+  onEndSession,
 }: AssistantHeaderProps) {
   const actionButtonClassName =
     "text-muted-foreground transition hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
@@ -36,7 +36,7 @@ export function AssistantHeader({
   return (
     <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-4 dark:border-white/10">
       <div>
-        <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">HelloBrand AI</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">HelloBrand AI</p>
         <h2 className="mt-1 text-lg font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{pageTitle}</p>
       </div>

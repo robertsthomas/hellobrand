@@ -20,7 +20,7 @@ export function UploadContractForm({
   dealId,
   documents,
   jobs,
-  reviewItems
+  reviewItems,
 }: {
   dealId: string;
   documents: DocumentRecord[];
@@ -39,7 +39,7 @@ export function UploadContractForm({
     ? getDocumentDisplayStatus({
         document: latestDocument,
         jobs,
-        reviewItems
+        reviewItems,
       })
     : null;
 
@@ -61,8 +61,8 @@ export function UploadContractForm({
         status: getDocumentDisplayStatus({
           document,
           jobs,
-          reviewItems
-        })
+          reviewItems,
+        }),
       })),
     [documents, jobs, reviewItems]
   );
@@ -71,18 +71,15 @@ export function UploadContractForm({
     event.preventDefault();
 
     const pastedField = event.currentTarget.elements.namedItem("pastedText");
-    const pastedText =
-      pastedField instanceof HTMLTextAreaElement ? pastedField.value.trim() : "";
+    const pastedText = pastedField instanceof HTMLTextAreaElement ? pastedField.value.trim() : "";
 
     captureAppEvent(
       posthog,
-      mode === "upload"
-        ? "workspace_documents_submitted"
-        : "workspace_pasted_context_submitted",
+      mode === "upload" ? "workspace_documents_submitted" : "workspace_pasted_context_submitted",
       {
         surface: "deal_upload_form",
         dealId,
-        fileCount: selectedFiles.length
+        fileCount: selectedFiles.length,
       }
     );
 
@@ -98,7 +95,7 @@ export function UploadContractForm({
         pastedText,
         onRegistered: async () => {
           router.refresh();
-        }
+        },
       });
 
       setSelectedFiles([]);
@@ -108,9 +105,7 @@ export function UploadContractForm({
       event.currentTarget.reset();
       router.refresh();
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Could not upload documents."
-      );
+      setSubmitError(error instanceof Error ? error.message : "Could not upload documents.");
     } finally {
       setIsSubmitting(false);
     }
@@ -119,7 +114,7 @@ export function UploadContractForm({
   return (
     <form
       onSubmit={(event) => void handleSubmit(event)}
-      className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]"
+      className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card"
     >
       <input type="hidden" name="dealId" value={dealId} />
 
@@ -139,7 +134,7 @@ export function UploadContractForm({
             onClick={() => {
               captureAppEvent(posthog, "workspace_source_mode_selected", {
                 mode: "upload",
-                surface: "deal_upload_form"
+                surface: "deal_upload_form",
               });
               setMode("upload");
             }}
@@ -158,7 +153,7 @@ export function UploadContractForm({
             onClick={() => {
               captureAppEvent(posthog, "workspace_source_mode_selected", {
                 mode: "paste",
-                surface: "deal_upload_form"
+                surface: "deal_upload_form",
               });
               setMode("paste");
             }}
@@ -185,9 +180,7 @@ export function UploadContractForm({
               name="documents"
               multiple
               accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-              onChange={(event) =>
-                setSelectedFiles(Array.from(event.currentTarget.files ?? []))
-              }
+              onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
             />
 
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -210,7 +203,7 @@ export function UploadContractForm({
                   onClick={() => {
                     captureAppEvent(posthog, "workspace_file_picker_clicked", {
                       surface: "deal_upload_form",
-                      mode
+                      mode,
                     });
                     fileInputRef.current?.click();
                   }}

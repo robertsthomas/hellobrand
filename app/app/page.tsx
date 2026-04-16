@@ -13,7 +13,6 @@ import {
   DisclosureObligations,
   QuickActionsPanel,
   RecentDealCardMenu,
-  type QuickActionItem,
 } from "@/components/dashboard";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -78,7 +77,7 @@ async function DashboardContent() {
           className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6"
         >
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-[28px] font-semibold tracking-[-0.05em] text-foreground">
+            <h2 className="text-[22px] font-semibold tracking-[-0.05em] text-foreground sm:text-[28px]">
               Active partnerships
             </h2>
 
@@ -111,7 +110,7 @@ async function DashboardContent() {
           ) : (
             <div className="mt-6 overflow-hidden border border-black/8 dark:border-white/10">
               {/* Column headers (desktop only) */}
-              <div className="hidden md:grid md:grid-cols-[minmax(0,1.4fr)_120px_140px_130px_minmax(0,1fr)_40px] border-b border-black/8 bg-[#f7f8fa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3] dark:border-white/10 dark:bg-white/[0.03] dark:text-[#667085]">
+              <div className="hidden md:grid md:grid-cols-[minmax(0,1.4fr)_120px_140px_130px_minmax(0,1fr)_40px] border-b border-black/8 bg-secondary px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-secondary dark:text-muted-foreground">
                 <span>Campaign</span>
                 <span>Stage</span>
                 <span>Amount</span>
@@ -196,14 +195,14 @@ async function DashboardContent() {
             <section className="border border-black/8 bg-white p-5 dark:border-white/10 dark:bg-[#15191f] sm:p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085] dark:text-[#8f98a6]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
                     Deliverables
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                     Upcoming deliverables
                   </h2>
                 </div>
-                <Clock3 className="h-5 w-5 text-[#98a2b3] dark:text-[#8f98a6]" />
+                <Clock3 className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
               </div>
 
               <div className="mt-6 space-y-3">
@@ -227,7 +226,7 @@ async function DashboardContent() {
             </section>
           ) : (
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
-              <Clock3 className="h-4 w-4 shrink-0 text-[#98a2b3] dark:text-[#8f98a6]" />
+              <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Deliverables</span> · Nothing due this
                 week
@@ -240,14 +239,14 @@ async function DashboardContent() {
             <section className="border border-black/8 bg-white p-5 dark:border-white/10 dark:bg-[#15191f] sm:p-6">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085] dark:text-[#8f98a6]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
                     Payments
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                     Outstanding payouts
                   </h2>
                 </div>
-                <Receipt className="h-5 w-5 text-[#98a2b3] dark:text-[#8f98a6]" />
+                <Receipt className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
               </div>
 
               <div className="mt-6 space-y-3">
@@ -255,7 +254,7 @@ async function DashboardContent() {
                   <Link
                     key={deal.id}
                     href={`/app/p/${deal.id}`}
-                    className="block border border-black/8 bg-[#fcfcfd] p-4 transition-colors hover:bg-[#f7f8fa] dark:border-white/10 dark:bg-[#12171d] dark:hover:bg-white/[0.03]"
+                    className="block border border-black/8 bg-card p-4 transition-colors hover:bg-secondary dark:border-white/10 dark:bg-card dark:hover:bg-white/[0.03]"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -277,7 +276,7 @@ async function DashboardContent() {
             </section>
           ) : (
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
-              <Receipt className="h-4 w-4 shrink-0 text-[#98a2b3] dark:text-[#8f98a6]" />
+              <Receipt className="h-4 w-4 shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Payments</span> · No outstanding
                 payouts
@@ -289,14 +288,14 @@ async function DashboardContent() {
           <section className="border border-black/8 bg-white p-5 dark:border-white/10 dark:bg-[#15191f] sm:p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085] dark:text-[#8f98a6]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
                   Portfolio snapshot
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                   At a glance
                 </h2>
               </div>
-              <DollarSign className="h-5 w-5 text-[#98a2b3] dark:text-[#8f98a6]" />
+              <DollarSign className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">

@@ -10,7 +10,7 @@ export function BillingUpgradePanel({
   hasActiveSubscription,
   billingReady,
   stripeConfigured,
-  monthlyAvailable
+  monthlyAvailable,
 }: {
   recommendedTier: PlanTier | null;
   recommendation: string | null;
@@ -25,7 +25,7 @@ export function BillingUpgradePanel({
 
   return (
     <aside className="rounded-[2rem] border border-black/8 bg-[#fbfbf8] p-8 shadow-panel">
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         Recommended next step
       </p>
       <h2 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-foreground">
@@ -57,7 +57,7 @@ export function BillingUpgradePanel({
             payload={{
               source: "recommended_upgrade_panel",
               targetTier: recommendedTier,
-              interval: BillingInterval.month
+              interval: BillingInterval.month,
             }}
             pendingLabel="Redirecting…"
             disabled={!billingReady || !stripeConfigured || !monthlyAvailable}

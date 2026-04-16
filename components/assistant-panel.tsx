@@ -346,7 +346,7 @@ export function AssistantPanel({
           {suggestedPrompts.length > 0 && !suggestedPromptsDismissed ? (
             <div className="space-y-2 border border-black/8 bg-white/70 p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Suggested Asks
                 </p>
                 <div className="flex items-center gap-2">
@@ -392,7 +392,7 @@ export function AssistantPanel({
             rows={3}
             placeholder="Ask about a partnership, request navigation, or draft a reply..."
             aria-label="Ask the assistant"
-            className="w-full resize-none border border-black/10 bg-white px-3 py-3 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/10 dark:bg-white/[0.03] dark:focus:border-white/20"
+            className="w-full resize-none border border-black/10 bg-white px-3 py-3 text-sm text-foreground outline-none transition focus:border-ring dark:border-white/10 dark:bg-white/[0.03] dark:focus:border-ring"
           />
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">

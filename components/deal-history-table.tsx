@@ -78,7 +78,7 @@ function DealHistoryRowActions({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+        className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-card"
       >
         <button
           type="button"
@@ -243,25 +243,25 @@ export function DealHistoryTable({
       </section>
 
       <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
-        <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-5 dark:bg-card">
           <p className="text-sm text-muted-foreground">Total Partnerships</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">
             {metrics.totalPartnerships}
           </p>
         </div>
-        <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-5 dark:bg-card">
           <p className="text-sm text-muted-foreground">Active</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">
             {metrics.activePartnerships}
           </p>
         </div>
-        <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-5 dark:bg-card">
           <p className="text-sm text-muted-foreground">Total Earned</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">
             {formatCurrency(metrics.totalEarned)}
           </p>
         </div>
-        <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-5 dark:bg-card">
           <p className="text-sm text-muted-foreground">Avg Partnership Size</p>
           <p className="mt-1 text-[18px] font-semibold text-foreground">
             {formatCurrency(metrics.averageDealSize)}
@@ -272,7 +272,7 @@ export function DealHistoryTable({
       <section className="space-y-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a2b3]" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
               onChange={(event) => {
@@ -280,7 +280,7 @@ export function DealHistoryTable({
                 setPage(1);
               }}
               placeholder="Search partnerships by brand or campaign..."
-              className="h-12 w-full border border-black/10 bg-white pl-11 pr-4 text-[15px] text-foreground outline-none placeholder:text-[#7d8898] dark:border-white/10 dark:bg-[#161a1f]"
+              className="h-12 w-full border border-black/10 bg-white pl-11 pr-4 text-[15px] text-foreground outline-none placeholder:text-[#7d8898] dark:border-white/10 dark:bg-card"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -293,7 +293,7 @@ export function DealHistoryTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-56 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+                className="w-56 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-card"
               >
                 <DropdownMenuLabel>Refine results</DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -353,12 +353,14 @@ export function DealHistoryTable({
                   className={cn(
                     "inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-4 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-[#111827] text-white shadow-sm dark:bg-white dark:text-[#111827]"
-                      : "text-[#667085] hover:text-foreground"
+                      ? "bg-primary text-primary-foreground shadow-sm dark:bg-background dark:text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <span>{tab.label}</span>
-                  <span className={cn("text-xs", isActive ? "opacity-60" : "text-[#98a2b3]")}>
+                  <span
+                    className={cn("text-xs", isActive ? "opacity-60" : "text-muted-foreground")}
+                  >
                     {count}
                   </span>
                 </button>
@@ -378,7 +380,7 @@ export function DealHistoryTable({
               <Link
                 key={row.id}
                 href={`/app/p/${row.id}`}
-                className="block border border-black/8 bg-white p-4 transition-colors hover:bg-secondary/20 dark:border-white/10 dark:bg-[#161a1f] dark:hover:bg-white/[0.03]"
+                className="block border border-black/8 bg-white p-4 transition-colors hover:bg-secondary/20 dark:border-white/10 dark:bg-card dark:hover:bg-white/[0.03]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -404,7 +406,7 @@ export function DealHistoryTable({
 
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                       Amount
                     </p>
                     <p className="mt-1 text-sm font-medium text-foreground">
@@ -412,7 +414,7 @@ export function DealHistoryTable({
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                       Status
                     </p>
                     <div className="mt-1 flex items-center gap-2">
@@ -426,13 +428,13 @@ export function DealHistoryTable({
                     </div>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                       Date
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">{formatDate(row.date)}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                       Risks
                     </p>
                     {row.riskCount > 0 ? (
@@ -446,7 +448,7 @@ export function DealHistoryTable({
                 </div>
 
                 <div className="mt-2 border-t border-black/6 pt-2 dark:border-white/8">
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                     Deliverables
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">{row.deliverablesLabel}</p>
@@ -458,7 +460,7 @@ export function DealHistoryTable({
 
         {/* Desktop table layout */}
         <div className="hidden md:block">
-          <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+          <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="border-black/8 bg-secondary/40 hover:bg-secondary/40 dark:border-white/10 dark:bg-white/[0.03]">

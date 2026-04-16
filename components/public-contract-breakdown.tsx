@@ -7,11 +7,7 @@ import { cleanDisplayText } from "@/lib/display-text";
 import type { AnonymousDealBreakdown } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
-function summarizeDeliverableLine(
-  title: string,
-  quantity: number | null,
-  channel: string | null
-) {
+function summarizeDeliverableLine(title: string, quantity: number | null, channel: string | null) {
   const cleanTitle = cleanDisplayText(title) ?? title;
   const cleanChannel = cleanDisplayText(channel);
   const prefix =
@@ -22,7 +18,7 @@ function summarizeDeliverableLine(
 const SEVERITY_STYLES: Record<string, string> = {
   high: "border-l-red-400 dark:border-l-red-500/60",
   medium: "border-l-amber-400 dark:border-l-amber-500/60",
-  low: "border-l-slate-300 dark:border-l-slate-500/40"
+  low: "border-l-slate-300 dark:border-l-slate-500/40",
 };
 
 export function PublicContractBreakdown({
@@ -32,7 +28,7 @@ export function PublicContractBreakdown({
   description,
   actions,
   stickyAction,
-  sourceDocument
+  sourceDocument,
 }: {
   breakdown: AnonymousDealBreakdown;
   eyebrow: string;
@@ -62,20 +58,14 @@ export function PublicContractBreakdown({
       breakdown.deliverables.length > 0
         ? `Deliverables include ${breakdown.deliverables
             .slice(0, 2)
-            .map((item) =>
-              summarizeDeliverableLine(item.title, item.quantity, item.channel)
-            )
+            .map((item) => summarizeDeliverableLine(item.title, item.quantity, item.channel))
             .join(", ")}.`
-        : null
+        : null,
     ].filter((entry): entry is string => Boolean(entry));
   }, [breakdown]);
 
   const totalDeliverableCount = useMemo(
-    () =>
-      breakdown.deliverables.reduce(
-        (count, item) => count + (item.quantity ?? 1),
-        0
-      ),
+    () => breakdown.deliverables.reduce((count, item) => count + (item.quantity ?? 1), 0),
     [breakdown.deliverables]
   );
   const displayTitle =
@@ -102,9 +92,7 @@ export function PublicContractBreakdown({
           {description}
         </p>
         {actions ? (
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-            {actions}
-          </div>
+          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">{actions}</div>
         ) : null}
       </header>
 
@@ -122,15 +110,13 @@ export function PublicContractBreakdown({
               <p className="truncate text-sm font-semibold text-foreground">
                 {sourceDocument.fileName}
               </p>
-              <p className="text-xs text-muted-foreground">
-                Tap to view source contract
-              </p>
+              <p className="text-xs text-muted-foreground">Tap to view source contract</p>
             </div>
           </button>
 
           {documentOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-8">
-              <div className="relative flex h-full max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-[#161a1f]">
+              <div className="relative flex h-full max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-card">
                 <div className="flex items-center justify-between border-b border-black/8 px-5 py-3 dark:border-white/10">
                   <p className="truncate text-sm font-semibold text-foreground">
                     {sourceDocument.fileName}
@@ -258,10 +244,7 @@ export function PublicContractBreakdown({
             </h3>
             <div className="mt-3 divide-y divide-black/[0.06] border-y border-black/[0.06] dark:divide-white/[0.08] dark:border-white/[0.08]">
               {breakdown.deliverables.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-start justify-between gap-4 py-3.5"
-                >
+                <div key={item.id} className="flex items-start justify-between gap-4 py-3.5">
                   <div className="min-w-0">
                     <p className="text-[15px] font-medium text-foreground">
                       {summarizeDeliverableLine(item.title, item.quantity, item.channel)}

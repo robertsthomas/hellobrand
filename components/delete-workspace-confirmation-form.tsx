@@ -11,17 +11,14 @@ const INITIAL_STATE = { error: null as string | null };
 export function DeleteWorkspaceConfirmationForm({
   dealId,
   dealName,
-  redirectTo
+  redirectTo,
 }: {
   dealId: string;
   dealName: string;
   redirectTo: string;
 }) {
   const [confirmationText, setConfirmationText] = useState("");
-  const [state, formAction] = useActionState(
-    deleteWorkspaceConfirmedAction,
-    INITIAL_STATE
-  );
+  const [state, formAction] = useActionState(deleteWorkspaceConfirmedAction, INITIAL_STATE);
   const normalizedConfirmation = useMemo(
     () => confirmationText.trim().toLowerCase(),
     [confirmationText]
@@ -36,7 +33,7 @@ export function DeleteWorkspaceConfirmationForm({
       <div className="space-y-2">
         <label
           htmlFor="confirmationText"
-          className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]"
+          className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
         >
           Type delete to confirm
         </label>
@@ -53,9 +50,7 @@ export function DeleteWorkspaceConfirmationForm({
         <p className="text-sm text-muted-foreground">
           This permanently deletes the workspace and its related records. This cannot be undone.
         </p>
-        {state.error ? (
-          <p className="text-sm font-medium text-destructive">{state.error}</p>
-        ) : null}
+        {state.error ? <p className="text-sm font-medium text-destructive">{state.error}</p> : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -15,20 +15,23 @@ import {
 import { PostHogActionLink } from "@/components/posthog-action-link";
 import { requireViewer } from "@/lib/auth";
 
-import {
-  loadIntakeSessionRouteData,
-  shouldRedirectToDeal
-} from "./page-helpers";
+import { loadIntakeSessionRouteData, shouldRedirectToDeal } from "./page-helpers";
 
 export default function IntakeProcessingPage({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
   searchParams: Promise<{ starting?: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="flex min-h-full items-center justify-center p-8"><div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" /></div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-full items-center justify-center p-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-primary" />
+        </div>
+      }
+    >
       <IntakeProcessingContent params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -36,7 +39,7 @@ export default function IntakeProcessingPage({
 
 async function IntakeProcessingContent({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
   searchParams: Promise<{ starting?: string }>;
@@ -66,26 +69,22 @@ async function IntakeProcessingContent({
   if (session.status === "queued" && !isStarting) {
     return (
       <div className="flex min-h-full items-center justify-center p-8">
-        <div className="w-full max-w-2xl space-y-8 border border-black/8 bg-white p-8 dark:border-white/10 dark:bg-[#161a1f]">
+        <div className="w-full max-w-2xl space-y-8 border border-black/8 bg-white p-8 dark:border-white/10 dark:bg-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
                 Ready to analyze
               </p>
-              <h1 className="text-3xl font-semibold text-ink">
-                This workspace is queued
-              </h1>
+              <h1 className="text-3xl font-semibold text-ink">This workspace is queued</h1>
               <p className="max-w-xl text-sm leading-7 text-black/60 dark:text-white/65">
-                Your sources are attached and saved. Start analysis now, or queue
-                more workspaces first and let HelloBrand run them one at a time.
+                Your sources are attached and saved. Start analysis now, or queue more workspaces
+                first and let HelloBrand run them one at a time.
               </p>
             </div>
             <form action={deleteIntakeDraftAction}>
               <input type="hidden" name="sessionId" value={session.id} />
               <input type="hidden" name="redirectTo" value="/app" />
-              <DeleteDraftButton
-                className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
-              >
+              <DeleteDraftButton className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60">
                 <Trash2 className="h-4 w-4" />
                 Delete draft
               </DeleteDraftButton>
@@ -94,7 +93,9 @@ async function IntakeProcessingContent({
 
           <div className="grid gap-4 border-t border-black/8 pt-6 dark:border-white/10">
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span>{documents.length} source{documents.length === 1 ? "" : "s"} attached</span>
+              <span>
+                {documents.length} source{documents.length === 1 ? "" : "s"} attached
+              </span>
               <span>Status: queued</span>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -136,9 +137,7 @@ async function IntakeProcessingContent({
           <form action={deleteIntakeDraftAction}>
             <input type="hidden" name="sessionId" value={session.id} />
             <input type="hidden" name="redirectTo" value="/app" />
-            <DeleteDraftButton
-              className="text-sm text-muted-foreground transition hover:text-destructive bg-primary/5 hover:bg-primary/10 rounded-full px-4 py-2"
-            >
+            <DeleteDraftButton className="text-sm text-muted-foreground transition hover:text-destructive bg-primary/5 hover:bg-primary/10 rounded-full px-4 py-2">
               Cancel Intake
             </DeleteDraftButton>
           </form>

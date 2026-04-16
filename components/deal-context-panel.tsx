@@ -38,7 +38,7 @@ function cleanContextValue(
 function ContextField({
   label,
   value,
-  kind = "generic"
+  kind = "generic",
 }: {
   label: string;
   value: string | null | undefined;
@@ -48,7 +48,7 @@ function ContextField({
 
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
       {cleanedValue ? (
@@ -70,7 +70,7 @@ export function DealContextPanel({ terms }: DealContextPanelProps) {
 
   return (
     <div className="space-y-6 border border-black/8 bg-white px-6 py-6 dark:border-white/10 dark:bg-white/[0.03]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-white/42">
         Partnership context
       </p>
 
@@ -95,9 +95,7 @@ export function DealContextPanel({ terms }: DealContextPanelProps) {
           {terms.campaignDateWindow?.endDate && (
             <ContextField label="Campaign End" value={terms.campaignDateWindow.endDate} />
           )}
-          {terms.governingLaw && (
-            <ContextField label="Governing Law" value={terms.governingLaw} />
-          )}
+          {terms.governingLaw && <ContextField label="Governing Law" value={terms.governingLaw} />}
         </div>
       )}
     </div>

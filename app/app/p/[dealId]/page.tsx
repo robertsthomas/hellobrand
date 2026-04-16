@@ -191,7 +191,7 @@ async function DealDetailContent({
               className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}
             >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   Next step
                 </p>
                 <p className="mt-1 text-sm font-medium text-foreground">{nextAction.label}</p>

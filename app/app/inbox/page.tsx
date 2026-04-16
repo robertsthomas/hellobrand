@@ -1,7 +1,7 @@
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 
 import { InboxPreviewLocked } from "@/components/inbox-preview-locked";
-import { InboxWorkspace } from "@/components/inbox-workspace";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer, getCachedProfile } from "@/lib/cached-data";
@@ -9,13 +9,18 @@ import { listDealsForViewer } from "@/lib/deals";
 import {
   getEmailThreadForViewer,
   listEmailAccountsForViewer,
-  listInboxThreadsForViewer
+  listInboxThreadsForViewer,
 } from "@/lib/email/service";
 import { normalizeInboxSort, sortInboxThreadItems } from "@/lib/email/inbox-sort";
 import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
 
+const InboxWorkspace = dynamic(
+  () => import("@/components/inbox-workspace").then((m) => ({ default: m.InboxWorkspace })),
+  { ssr: false }
+);
+
 export default function InboxPage({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Promise<{
     q?: string;
@@ -36,7 +41,7 @@ export default function InboxPage({
 }
 
 async function InboxContent({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Promise<{
     q?: string;
@@ -51,7 +56,7 @@ async function InboxContent({
 }) {
   const [viewer, resolved] = await Promise.all([
     requireViewer(),
-    (searchParams ?? Promise.resolve({})) as Promise<Record<string, string | undefined>>
+    (searchParams ?? Promise.resolve({})) as Promise<Record<string, string | undefined>>,
   ]);
   const entitlements = await getViewerEntitlements(viewer);
   if (!entitlements.features.premium_inbox) {
@@ -64,7 +69,7 @@ async function InboxContent({
   }
 
   const workflowState =
-    resolved.workflowState === "unlinked" ? null : resolved.workflowState ?? null;
+    resolved.workflowState === "unlinked" ? null : (resolved.workflowState ?? null);
   const sort = normalizeInboxSort(resolved.sort);
   const [threads, deals, emailAccounts, profile] = await Promise.all([
     listInboxThreadsForViewer(viewer, {
@@ -80,36 +85,35 @@ async function InboxContent({
         | "waiting_on_them"
         | "closed"
         | null,
-      limit: 100
+      limit: 100,
     }),
     listDealsForViewer(viewer),
     listEmailAccountsForViewer(viewer),
-    getCachedProfile(viewer)
+    getCachedProfile(viewer),
   ]);
   const connectedProviders = [...new Set(emailAccounts.map((account) => account.provider))];
   const sortedThreads = sortInboxThreadItems(threads, sort);
   const selectedProvider =
-    resolved.provider && connectedProviders.includes(resolved.provider as (typeof connectedProviders)[number])
+    resolved.provider &&
+    connectedProviders.includes(resolved.provider as (typeof connectedProviders)[number])
       ? resolved.provider
       : "";
 
   const selectedThreadId = sortedThreads.some((item) => item.thread.id === resolved.thread)
-    ? resolved.thread ?? null
-    : sortedThreads[0]?.thread.id ?? null;
+    ? (resolved.thread ?? null)
+    : (sortedThreads[0]?.thread.id ?? null);
   const threadIds = threads.map((item) => item.thread.id);
   const [selectedThread, threadPreviewStates, linkedDealAggregates] = await Promise.all([
-    selectedThreadId
-      ? getEmailThreadForViewer(viewer, selectedThreadId)
-      : Promise.resolve(null),
+    selectedThreadId ? getEmailThreadForViewer(viewer, selectedThreadId) : Promise.resolve(null),
     listEmailThreadPreviewStatesForViewer(viewer, threadIds),
     Promise.all(
-      Array.from(
-        new Set(threads.flatMap((item) => item.links.map((link) => link.dealId)))
-      ).map(async (dealId) => ({
-        dealId,
-        aggregate: await getCachedDealForViewer(viewer, dealId)
-      }))
-    )
+      Array.from(new Set(threads.flatMap((item) => item.links.map((link) => link.dealId)))).map(
+        async (dealId) => ({
+          dealId,
+          aggregate: await getCachedDealForViewer(viewer, dealId),
+        })
+      )
+    ),
   ]);
   const invoiceAttachmentsByDealId = Object.fromEntries(
     linkedDealAggregates.flatMap(({ dealId, aggregate }) => {
@@ -122,16 +126,18 @@ async function InboxContent({
         return [];
       }
 
-      return [[
-        dealId,
-        {
+      return [
+        [
           dealId,
-          documentId: invoiceDocument.id,
-          fileName: invoiceDocument.fileName,
-          invoiceNumber: invoice.invoiceNumber,
-          status: invoice.status
-        }
-      ]];
+          {
+            dealId,
+            documentId: invoiceDocument.id,
+            fileName: invoiceDocument.fileName,
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+          },
+        ],
+      ];
     })
   );
 
@@ -152,7 +158,7 @@ async function InboxContent({
         accountId: resolved.accountId ?? "",
         dealId: resolved.dealId ?? "",
         workflowState: workflowState ?? "",
-        sort
+        sort,
       }}
     />
   );

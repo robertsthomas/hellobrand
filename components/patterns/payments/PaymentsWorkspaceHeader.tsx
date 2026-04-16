@@ -25,14 +25,15 @@ export function PaymentsWorkspaceHeader({
       </Link>
 
       <div className="max-w-4xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Payments
         </p>
         <h1 className="mt-3 text-[40px] font-semibold tracking-[-0.06em] text-foreground">
           {campaignName}
         </h1>
         <p className="mt-2 text-base text-muted-foreground">
-          {brandName} · Total {formatCurrency(amount, currency ?? "USD")} · Due {formatDate(dueDate)}
+          {brandName} · Total {formatCurrency(amount, currency ?? "USD")} · Due{" "}
+          {formatDate(dueDate)}
         </p>
       </div>
     </section>

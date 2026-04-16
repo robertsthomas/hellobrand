@@ -6,6 +6,11 @@
       "url": "https://mcp.linear.app/mcp",
       "enabled": true
     },
+    "stripe": {
+      "type": "remote",
+      "url": "https://mcp.stripe.com",
+      "enabled": true
+    },
     "zai-mcp-server": {
       "type": "local",
       "command": ["npx", "-y", "@z_ai/mcp-server"],

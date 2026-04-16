@@ -3,7 +3,7 @@
 import { Hand, Sun, Moon, Menu } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useSyncExternalStore, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/components/ui/utils";
 
@@ -39,7 +39,7 @@ function ThemeButton({ className }: { className?: string }) {
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-black/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-[#1a2634] dark:hover:bg-black/[0.06] dark:hover:text-[#1a2634]",
+        "inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-black/[0.05] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-[#1a2634] dark:hover:bg-black/[0.06] dark:hover:text-[#1a2634]",
         className
       )}
     >
@@ -79,7 +79,9 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
           ) : (
             <Link
               href="/upload"
-              onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_mobile" })}
+              onClick={() =>
+                trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_mobile" })
+              }
               className="inline-flex h-10 items-center whitespace-nowrap rounded-none bg-primary px-4 text-sm font-medium text-white"
             >
               Upload free
@@ -101,14 +103,14 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
               side="right"
               className="w-[86vw] max-w-[320px] bg-[#fefcfa] [&>[data-slot=sheet-close]]:top-4 [&>[data-slot=sheet-close]]:right-4 dark:bg-[#101318]"
             >
-              <ThemeButton className="absolute right-12 top-4 z-10 h-4 w-4 rounded-none text-[#667085] dark:text-[#c4cad2]" />
+              <ThemeButton className="absolute right-12 top-4 z-10 h-4 w-4 rounded-none text-muted-foreground dark:text-muted-foreground" />
               <SheetHeader className="gap-4 border-b border-black/5 pb-5 pr-24 dark:border-white/10">
                 <div className="flex items-start gap-4">
                   <div className="space-y-1">
                     <SheetTitle className="text-left text-lg font-semibold text-[#1a2634] dark:text-[#eef2f5]">
                       HelloBrand
                     </SheetTitle>
-                    <SheetDescription className="text-left text-sm text-[#667085] dark:text-[#c4cad2]">
+                    <SheetDescription className="text-left text-sm text-muted-foreground dark:text-muted-foreground">
                       Explore the site and jump into the app.
                     </SheetDescription>
                   </div>
@@ -165,7 +167,11 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                     ) : (
                       <Link
                         href="/upload"
-                        onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_drawer" })}
+                        onClick={() =>
+                          trackPublicFunnelEvent("landing_upload_cta_clicked", {
+                            location: "nav_drawer",
+                          })
+                        }
                         className="inline-flex h-12 w-full items-center justify-center rounded-none bg-primary px-5 text-base font-semibold text-white shadow-sm transition hover:bg-primary/94"
                       >
                         Upload free
@@ -181,18 +187,27 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
         {/* Desktop */}
         <div className="hidden items-center gap-4 md:flex">
           <ThemeButton />
-          <div className="flex items-center gap-8 text-[14px] font-medium text-[#667085] dark:text-[#667085]">
+          <div className="flex items-center gap-8 text-[14px] font-medium text-muted-foreground dark:text-muted-foreground">
             <Link href="/" className="transition hover:text-foreground dark:hover:text-foreground">
               Home
             </Link>
-            <Link href="/pricing" className="transition hover:text-foreground dark:hover:text-foreground">
+            <Link
+              href="/pricing"
+              className="transition hover:text-foreground dark:hover:text-foreground"
+            >
               Pricing
             </Link>
-            <Link href="/blog" className="transition hover:text-foreground dark:hover:text-foreground">
+            <Link
+              href="/blog"
+              className="transition hover:text-foreground dark:hover:text-foreground"
+            >
               Blog
             </Link>
             {showWaitlist ? (
-              <Link href="/waitlist" className="transition hover:text-foreground dark:hover:text-foreground">
+              <Link
+                href="/waitlist"
+                className="transition hover:text-foreground dark:hover:text-foreground"
+              >
                 Waitlist
               </Link>
             ) : null}
@@ -207,12 +222,20 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
               <div className="flex items-center gap-4">
                 <Link
                   href="/upload"
-                  onClick={() => trackPublicFunnelEvent("landing_upload_cta_clicked", { location: "nav_desktop" })}
+                  onClick={() =>
+                    trackPublicFunnelEvent("landing_upload_cta_clicked", {
+                      location: "nav_desktop",
+                    })
+                  }
                   className="inline-flex h-10 items-center rounded-none bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/94 hover:shadow-md"
                 >
                   Upload free
                 </Link>
-                <Button asChild variant="outline" className="h-10 rounded-none px-5 text-[14px] font-semibold">
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-10 rounded-none px-5 text-[14px] font-semibold"
+                >
                   <Link href="/login">Login</Link>
                 </Button>
               </div>

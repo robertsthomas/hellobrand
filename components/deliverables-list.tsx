@@ -5,7 +5,7 @@ import { formatDate, humanizeToken } from "@/lib/utils";
 
 export function DeliverablesList({
   deliverables,
-  dealId
+  dealId,
 }: {
   deliverables: DeliverableItem[];
   dealId?: string;
@@ -17,15 +17,15 @@ export function DeliverablesList({
 
   if (deliverables.length === 0) {
     return (
-      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
               Deliverables
             </h2>
             <p className="mt-4 text-sm text-black/60 dark:text-white/65">
-              No deliverables have been extracted yet. Upload a contract, brief, or
-              email thread, then confirm them in the key terms editor.
+              No deliverables have been extracted yet. Upload a contract, brief, or email thread,
+              then confirm them in the key terms editor.
             </p>
           </div>
           {dealId ? (
@@ -36,7 +36,7 @@ export function DeliverablesList({
                 sourceId: dealId,
                 label: "Clarify deliverables",
                 prompt:
-                  "Draft a concise creator-professional email asking the brand to confirm the deliverables, timeline, and approval flow for this partnership because the workspace does not show a reliable deliverables list yet."
+                  "Draft a concise creator-professional email asking the brand to confirm the deliverables, timeline, and approval flow for this partnership because the workspace does not show a reliable deliverables list yet.",
               }}
             />
           ) : null}
@@ -46,15 +46,15 @@ export function DeliverablesList({
   }
 
   return (
-    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
             Deliverables
           </h2>
           <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-            Creator obligations extracted from the partnership documents. Edit them in
-            Key Terms if anything looks off.
+            Creator obligations extracted from the partnership documents. Edit them in Key Terms if
+            anything looks off.
           </p>
         </div>
         {dealId ? (
@@ -65,7 +65,7 @@ export function DeliverablesList({
                 kind: "deliverable",
                 sourceId: dealId,
                 label: "Confirm deliverables",
-                prompt: `Draft a concise creator-professional email confirming the current deliverables for this partnership. Use these deliverables as the starting point: ${deliverableNames || "the saved workspace deliverables"}. Ask the brand to correct anything that is off.`
+                prompt: `Draft a concise creator-professional email confirming the current deliverables for this partnership. Use these deliverables as the starting point: ${deliverableNames || "the saved workspace deliverables"}. Ask the brand to correct anything that is off.`,
               }}
             />
             <AssistantTriggerButton
@@ -75,7 +75,7 @@ export function DeliverablesList({
                 sourceId: dealId,
                 label: "Clarify timeline",
                 prompt:
-                  "Draft a concise creator-professional email clarifying the production timeline, approval window, and posting deadlines for the current deliverables in this partnership."
+                  "Draft a concise creator-professional email clarifying the production timeline, approval window, and posting deadlines for the current deliverables in this partnership.",
               }}
             />
           </div>
@@ -94,7 +94,10 @@ export function DeliverablesList({
               </p>
               {item.description ? (
                 <div className="mt-2 line-clamp-3 text-sm leading-6 text-black/60 dark:text-white/65">
-                  <ProseText content={item.description} className="text-sm text-black/60 dark:text-white/65" />
+                  <ProseText
+                    content={item.description}
+                    className="text-sm text-black/60 dark:text-white/65"
+                  />
                 </div>
               ) : null}
             </div>

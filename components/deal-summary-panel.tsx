@@ -1,31 +1,15 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import {
-  ChevronDown,
-  GitCompareArrows,
-  History,
-  LoaderCircle,
-  RotateCcw
-} from "lucide-react";
+import { ChevronDown, GitCompareArrows, History, LoaderCircle, RotateCcw } from "lucide-react";
 
-import {
-  activateSummaryVariantAction,
-  restoreSummaryVersionAction
-} from "@/app/actions";
+import { activateSummaryVariantAction, restoreSummaryVersionAction } from "@/app/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
-import {
-  getSummaryTypeLabel,
-  getWorkspaceSummaries
-} from "@/lib/summaries";
+import { getSummaryTypeLabel, getWorkspaceSummaries } from "@/lib/summaries";
 import type { SummaryRecord, SummaryType } from "@/lib/types";
 import { cn, formatDate, humanizeToken } from "@/lib/utils";
 
@@ -38,7 +22,7 @@ interface DealSummaryPanelProps {
 const VARIANT_TABS: { type: SummaryType; label: string }[] = [
   { type: "legal", label: "Legal" },
   { type: "plain_language", label: "Plain language" },
-  { type: "short", label: "Short" }
+  { type: "short", label: "Short" },
 ];
 
 function SummaryBody({ summary }: { summary: SummaryRecord }) {
@@ -56,8 +40,11 @@ function SummaryBody({ summary }: { summary: SummaryRecord }) {
   return (
     <div className="space-y-5">
       {sections.map((section) => (
-        <div key={section.id} className="space-y-2 border-b border-black/6 pb-4 last:border-b-0 last:pb-0 dark:border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-white/42">
+        <div
+          key={section.id}
+          className="space-y-2 border-b border-black/6 pb-4 last:border-b-0 last:pb-0 dark:border-white/10"
+        >
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-white/42">
             {section.title}
           </p>
           {section.paragraphs.map((paragraph, index) => (
@@ -74,21 +61,14 @@ function SummaryBody({ summary }: { summary: SummaryRecord }) {
   );
 }
 
-export function DealSummaryPanel({
-  dealId,
-  summaries,
-  currentSummary
-}: DealSummaryPanelProps) {
+export function DealSummaryPanel({ dealId, summaries, currentSummary }: DealSummaryPanelProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compareSummaryId, setCompareSummaryId] = useState<string | null>(null);
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const workspaceSummaries = useMemo(
-    () => getWorkspaceSummaries(summaries),
-    [summaries]
-  );
+  const workspaceSummaries = useMemo(() => getWorkspaceSummaries(summaries), [summaries]);
   const compareSummary =
     workspaceSummaries.find((summary) => summary.id === compareSummaryId) ?? null;
 
@@ -124,7 +104,8 @@ export function DealSummaryPanel({
     return (
       <div className="max-w-4xl">
         <p className="text-[15px] leading-8 text-black/72 dark:text-white/72">
-          Upload documents to generate a plain-English summary, extracted creator terms, and negotiation watchouts.
+          Upload documents to generate a plain-English summary, extracted creator terms, and
+          negotiation watchouts.
         </p>
       </div>
     );
@@ -175,7 +156,7 @@ export function DealSummaryPanel({
                 />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4 w-full min-w-[320px] border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-black/10 md:max-w-[520px]">
+            <CollapsibleContent className="mt-4 w-full max-w-full border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-black/10 md:max-w-[520px]">
               <div className="space-y-3">
                 {workspaceSummaries.map((summary) => {
                   const isCurrent = summary.id === currentSummary.id;
@@ -200,7 +181,8 @@ export function DealSummaryPanel({
                           ) : null}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {formatDate(summary.createdAt)} · {humanizeToken(summary.source ?? "analysis")}
+                          {formatDate(summary.createdAt)} ·{" "}
+                          {humanizeToken(summary.source ?? "analysis")}
                         </p>
                       </div>
 
@@ -269,7 +251,9 @@ export function DealSummaryPanel({
           </div>
           <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Current</span>
+              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Current
+              </span>
               <span className="text-sm font-medium text-foreground">
                 {currentSummary.summaryType
                   ? getSummaryTypeLabel(currentSummary.summaryType)

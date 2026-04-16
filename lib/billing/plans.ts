@@ -5,11 +5,13 @@ import { hasStripePriceId } from "@/lib/billing/config";
 export type BillingPlanCatalogEntry = {
   tier: PlanTier;
   name: string;
+  persona: string;
   monthlyPriceUsd: number;
   annualPriceUsd: number;
   monthlyPriceLabel: string;
   annualPriceLabel: string;
   annualEquivalentLabel: string;
+  annualSavingsLabel: string;
   summary: string;
   caption: string;
   popular?: boolean;
@@ -68,38 +70,44 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
   {
     tier: PlanTier.basic,
     name: "Basic",
+    persona: "Just starting out",
     monthlyPriceUsd: 19,
     annualPriceUsd: 180,
     monthlyPriceLabel: "$19/mo",
     annualPriceLabel: "$180/yr",
     annualEquivalentLabel: "$15/mo billed annually",
+    annualSavingsLabel: "Save $48/yr",
     summary: "Core partnership intelligence for lighter creator workflows.",
-    caption:
-      "For creators getting started with active contract understanding and light operations",
+    caption: "For creators getting started with active contract understanding and light operations",
     features: [
       "3 active workspaces",
       "AI extraction, summary, and risk review",
       "Basic deliverables and payment tracking",
-      "AI assistant with capped usage"
+      "AI assistant with capped usage",
+      "Revenue tracking and basic analytics",
     ],
     marketingFeatures: [
       "3 active partnership workspaces",
+      "25 AI assistant messages / month",
+      "10 AI draft generations / month",
       "Document upload and paste intake",
       "AI extraction, summary, and risk review",
       "Editable partnership terms",
       "Basic deliverables and payments tracking",
+      "Revenue tracking and basic analytics",
       "Search and notifications",
-      "AI assistant with monthly usage caps"
-    ]
+    ],
   },
   {
     tier: PlanTier.standard,
     name: "Standard",
+    persona: "Active creator",
     monthlyPriceUsd: 49,
     annualPriceUsd: 468,
     monthlyPriceLabel: "$49/mo",
     annualPriceLabel: "$468/yr",
     annualEquivalentLabel: "$39/mo billed annually",
+    annualSavingsLabel: "Save $120/yr",
     summary: "The full solo-creator workflow with deeper AI and workspace operations.",
     caption: "For active solo creators managing multiple brand partnerships",
     popular: true,
@@ -107,27 +115,30 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
       "Everything in Basic",
       "Unlimited active workspaces",
       "Full AI drafting and brief generation",
-      "Revenue analytics and conflict intelligence"
+      "Revenue analytics and conflict intelligence",
     ],
     marketingFeatures: [
       "Everything in Basic",
       "Unlimited active partnership workspaces",
-      "Full AI assistant access",
+      "250 AI assistant messages / month",
+      "100 AI draft generations / month",
+      "30 AI campaign brief generations / month",
       "Negotiation and follow-up drafting",
-      "AI campaign brief generation",
       "Cross-partnership conflict detection",
       "Full document diff review",
-      "Full deliverables, approvals, and payment workflow"
-    ]
+      "Full deliverables, approvals, and payment workflow",
+    ],
   },
   {
     tier: PlanTier.premium,
     name: "Premium",
+    persona: "Power creator & managers",
     monthlyPriceUsd: 99,
     annualPriceUsd: 948,
     monthlyPriceLabel: "$99/mo",
     annualPriceLabel: "$948/yr",
     annualEquivalentLabel: "$79/mo billed annually",
+    annualSavingsLabel: "Save $240/yr",
     summary: "Connected inbox, advanced intelligence, and premium operations.",
     caption:
       "For power creators, managers, or creator businesses that want HelloBrand as an operational system",
@@ -135,19 +146,20 @@ const BILLING_PLAN_CATALOG: BillingPlanCatalogEntry[] = [
       "Everything in Standard",
       "Synced inbox and thread intelligence",
       "Email action items and discrepancy tracking",
-      "Advanced analytics and reporting"
+      "Advanced analytics and reporting",
     ],
     marketingFeatures: [
       "Everything in Standard",
+      "Unlimited AI assistant, drafts, and briefs",
       "Gmail / Outlook synced inbox",
       "Smart inbox matching and communication intelligence",
       "Action-item extraction from email",
       "Promise discrepancy detection",
       "Cross-partnership conflict surfacing from email",
       "Advanced analytics and reporting",
-      "Priority support"
-    ]
-  }
+      "Priority support",
+    ],
+  },
 ];
 
 function formatTrialLabel(tier: PlanTier) {
@@ -163,7 +175,7 @@ export function buildPlanAvailability() {
     ...plan,
     monthlyAvailable: hasStripePriceId(plan.tier, BillingInterval.month),
     yearlyAvailable: hasStripePriceId(plan.tier, BillingInterval.year),
-    trialLabel: formatTrialLabel(plan.tier)
+    trialLabel: formatTrialLabel(plan.tier),
   }));
 }
 
@@ -174,6 +186,6 @@ export async function buildMarketingPlanAvailability(): Promise<MarketingPlanAva
     displayMonthlyPriceLabel: plan.monthlyPriceLabel,
     displayAnnualEquivalentLabel: plan.yearlyAvailable
       ? plan.annualEquivalentLabel
-      : "Monthly billing only right now"
+      : "Monthly billing only right now",
   }));
 }

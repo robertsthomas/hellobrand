@@ -2,10 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { PostHogActionLink } from "@/components/posthog-action-link";
-import {
-  PaymentsSkeleton,
-  PaymentsSummaryHeader,
-} from "@/components/payments";
+import { PaymentsSkeleton, PaymentsSummaryHeader } from "@/components/payments";
 import { requireViewer } from "@/lib/auth";
 import { getCachedDealAggregates } from "@/lib/cached-data";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
@@ -30,25 +27,26 @@ async function PaymentsContent() {
       deal: {
         ...aggregate.deal,
         brandName: labels.brandName ?? aggregate.deal.brandName,
-        campaignName: labels.campaignName ?? aggregate.deal.campaignName
+        campaignName: labels.campaignName ?? aggregate.deal.campaignName,
       },
       invoice: aggregate.invoiceRecord ?? null,
-      invoiceDocuments: aggregate.documents.filter((document) => document.documentKind === "invoice"),
-      payment:
-        aggregate.paymentRecord ?? {
-          id: `payment-${aggregate.deal.id}`,
-          dealId: aggregate.deal.id,
-          amount: aggregate.terms?.paymentAmount ?? null,
-          currency: aggregate.terms?.currency ?? "USD",
-          invoiceDate: null,
-          dueDate: null,
-          paidDate: null,
-          status: aggregate.deal.paymentStatus,
-          notes: null,
-          source: null,
-          createdAt: aggregate.deal.createdAt,
-          updatedAt: aggregate.deal.updatedAt
-        }
+      invoiceDocuments: aggregate.documents.filter(
+        (document) => document.documentKind === "invoice"
+      ),
+      payment: aggregate.paymentRecord ?? {
+        id: `payment-${aggregate.deal.id}`,
+        dealId: aggregate.deal.id,
+        amount: aggregate.terms?.paymentAmount ?? null,
+        currency: aggregate.terms?.currency ?? "USD",
+        invoiceDate: null,
+        dueDate: null,
+        paidDate: null,
+        status: aggregate.deal.paymentStatus,
+        notes: null,
+        source: null,
+        createdAt: aggregate.deal.createdAt,
+        updatedAt: aggregate.deal.updatedAt,
+      },
     };
   });
   const summary = summarizePaymentRows(rows);
@@ -64,8 +62,8 @@ async function PaymentsContent() {
               No payments tracked yet
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-muted-foreground">
-              Upload documents from the intake flow and confirm a workspace to
-              start tracking payout details here.
+              Upload documents from the intake flow and confirm a workspace to start tracking payout
+              details here.
             </p>
             <PostHogActionLink
               href="/app/intake/new"
@@ -78,7 +76,7 @@ async function PaymentsContent() {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="hidden gap-4 border border-black/8 bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]">
+            <div className="hidden gap-4 border border-black/8 bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]">
               <span>Workspace</span>
               <span>Payment status</span>
               <span>Invoice</span>
@@ -102,7 +100,7 @@ async function PaymentsContent() {
                     className="block border-b border-black/8 bg-white px-4 py-5 transition hover:bg-[#fbfbfa] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px] md:items-center md:gap-4 md:py-6"
                   >
                     <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
                         {deal.brandName}
                       </p>
                       <h2 className="mt-2 truncate text-xl font-semibold tracking-[-0.04em] text-foreground md:text-[24px]">
@@ -115,23 +113,31 @@ async function PaymentsContent() {
 
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 md:contents">
                       <div className="md:contents">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Status</p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+                          Status
+                        </p>
                         <p className="mt-0.5 text-sm capitalize text-foreground md:mt-0">
                           {payment.status.replaceAll("_", " ")}
                         </p>
                       </div>
                       <div className="md:contents">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Invoice</p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+                          Invoice
+                        </p>
                         <p className="mt-0.5 text-sm text-foreground md:mt-0">{invoiceState}</p>
                       </div>
                       <div className="md:contents">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Due</p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+                          Due
+                        </p>
                         <p className="mt-0.5 text-sm text-foreground md:mt-0">
                           {payment.dueDate ? payment.dueDate.slice(0, 10) : "Not set"}
                         </p>
                       </div>
                       <div className="md:contents">
-                        <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] md:hidden">Total</p>
+                        <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground md:hidden">
+                          Total
+                        </p>
                         <p className="mt-0.5 text-sm font-semibold text-foreground md:mt-0">
                           {formatCurrency(payment.amount, payment.currency ?? "USD")}
                         </p>

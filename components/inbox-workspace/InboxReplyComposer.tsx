@@ -5,10 +5,8 @@
  */
 "use client";
 
-import { useRef } from "react";
 import Link from "next/link";
 import { ChevronDown, LoaderCircle, Paperclip, Send, Sparkles, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   CommandDialog,
@@ -25,12 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { NegotiationStance } from "@/lib/types";
-import {
-  DRAFT_REFINEMENT_OPTIONS,
-  INBOX_SIGNATURE_BANNER_DISMISS_KEY,
-  THREAD_ACTION_BUTTON_CLASS,
-} from "./helpers";
+import { DRAFT_REFINEMENT_OPTIONS } from "./helpers";
 import type { DraftPromptSuggestion, ThreadInvoiceAttachment } from "./helpers";
 
 type InboxReplyComposerProps = {
@@ -144,7 +137,7 @@ export function InboxReplyComposer({
               <button
                 type="button"
                 onClick={onDismissSignatureBanner}
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-black/8 bg-white text-muted-foreground transition hover:bg-secondary"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center border border-black/8 bg-white text-muted-foreground transition hover:bg-secondary"
                 aria-label="Dismiss inbox signature reminder"
               >
                 <X className="h-3.5 w-3.5" />
@@ -202,7 +195,7 @@ export function InboxReplyComposer({
                     <button
                       type="button"
                       aria-label="Open AI reply options"
-                      className="inline-flex h-9 w-8 items-center justify-center border border-l-0 border-black/10 text-muted-foreground transition hover:bg-black/[0.03] hover:text-foreground"
+                      className="inline-flex h-9 w-10 items-center justify-center border border-l-0 border-black/10 text-muted-foreground transition hover:bg-black/[0.03] hover:text-foreground"
                     >
                       <ChevronDown className="h-3 w-3" />
                     </button>

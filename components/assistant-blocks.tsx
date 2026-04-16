@@ -14,7 +14,7 @@ function AssistantNavigationBlock({
   label,
   description,
   href,
-  onNavigate
+  onNavigate,
 }: {
   label: string;
   description?: string | null;
@@ -34,17 +34,11 @@ function AssistantNavigationBlock({
   );
 }
 
-function AssistantDraftBlock({
-  subject,
-  body
-}: {
-  subject: string;
-  body: string;
-}) {
+function AssistantDraftBlock({ subject, body }: { subject: string; body: string }) {
   return (
     <div className="space-y-3 border border-black/10 bg-black/3 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
       <div>
-        <p className="text-[11px] uppercase tracking-[0.16em] text-[#98a2b3]">Draft Reply</p>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Draft Reply</p>
         <p className="mt-2 text-sm font-semibold text-foreground">{subject}</p>
       </div>
       <pre className="whitespace-pre-wrap font-sans text-sm leading-6 text-black/75 dark:text-white/78">
@@ -66,7 +60,7 @@ function AssistantWorkspaceList({
   description,
   prompt,
   workspaces,
-  onNavigate
+  onNavigate,
 }: {
   title: string;
   description: string;
@@ -77,7 +71,9 @@ function AssistantWorkspaceList({
   return (
     <div className="space-y-3 border border-black/10 bg-black/3 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="space-y-1">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-[#98a2b3]">Choose Workspace</p>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+          Choose Workspace
+        </p>
         <p className="text-sm font-semibold text-foreground">{title}</p>
         <p className="text-xs leading-5 text-black/60 dark:text-white/65">{description}</p>
       </div>
@@ -94,7 +90,7 @@ function AssistantWorkspaceList({
                 onClick={() =>
                   onNavigate(workspace.href, {
                     prompt: workspace.prompt ?? prompt,
-                    close: false
+                    close: false,
                   })
                 }
                 className="flex w-full items-start justify-between gap-3 border border-black/10 bg-white px-3 py-3 text-left transition hover:border-black/20 dark:border-white/10 dark:bg-white/[0.04] dark:hover:border-white/20"
@@ -107,7 +103,7 @@ function AssistantWorkspaceList({
                     {labels.campaignName ?? workspace.campaignName}
                   </p>
                 </div>
-                <div className="shrink-0 text-right text-[11px] uppercase tracking-[0.12em] text-[#98a2b3]">
+                <div className="shrink-0 text-right text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                   <p>{workspace.status.replaceAll("_", " ")}</p>
                   <p className="mt-1">{workspace.paymentStatus.replaceAll("_", " ")}</p>
                 </div>

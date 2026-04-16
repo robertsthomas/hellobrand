@@ -6,7 +6,7 @@ import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 
 function cleanRiskEvidence(evidence: string[]) {
@@ -15,17 +15,11 @@ function cleanRiskEvidence(evidence: string[]) {
     .filter((snippet): snippet is string => Boolean(snippet));
 }
 
-export function RiskFlags({
-  flags,
-  dealId
-}: {
-  flags: RiskFlagRecord[];
-  dealId?: string;
-}) {
+export function RiskFlags({ flags, dealId }: { flags: RiskFlagRecord[]; dealId?: string }) {
   const leadFlag = flags[0] ?? null;
 
   return (
-    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
@@ -47,8 +41,8 @@ export function RiskFlags({
                 leadFlag.suggestedAction
                   ? `Use this as the primary ask: ${leadFlag.suggestedAction}.`
                   : "Ask for a concrete revision or clarification.",
-                "Keep it grounded in the saved workspace facts and avoid inventing prior agreements."
-              ].join(" ")
+                "Keep it grounded in the saved workspace facts and avoid inventing prior agreements.",
+              ].join(" "),
             }}
           />
         ) : null}
@@ -67,7 +61,11 @@ export function RiskFlags({
             const suggestedAction = cleanDisplayText(flag.suggestedAction);
 
             return (
-              <AccordionItem key={flag.id} value={flag.id} className="border-black/8 dark:border-white/10">
+              <AccordionItem
+                key={flag.id}
+                value={flag.id}
+                className="border-black/8 dark:border-white/10"
+              >
                 <AccordionTrigger className="py-4 hover:no-underline">
                   <div className="flex flex-wrap items-center gap-3 pr-6 text-left">
                     <h3 className="text-base font-semibold text-black/80 dark:text-white/85">
@@ -87,9 +85,7 @@ export function RiskFlags({
                 </AccordionTrigger>
                 <AccordionContent className="pb-5">
                   <div className="max-w-4xl space-y-4">
-                    <p className="text-sm leading-6 text-black/65 dark:text-white/70">
-                      {detail}
-                    </p>
+                    <p className="text-sm leading-6 text-black/65 dark:text-white/70">{detail}</p>
                     {suggestedAction ? (
                       <p className="text-sm font-medium text-black/75 dark:text-white/80">
                         Suggested action: {suggestedAction}
@@ -102,10 +98,7 @@ export function RiskFlags({
                         </summary>
                         <div className="mt-3 divide-y divide-black/8 border border-black/8 dark:divide-white/10 dark:border-white/10">
                           {evidence.slice(0, 2).map((snippet, index) => (
-                            <div
-                              key={snippet}
-                              className="px-3 py-3"
-                            >
+                            <div key={snippet} className="px-3 py-3">
                               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
                                 Evidence {index + 1}
                               </p>

@@ -28,8 +28,7 @@ function getScrollParents(element: Element) {
     const overflowY = style.overflowY;
     const overflowX = style.overflowX;
     const isScrollable =
-      /(auto|scroll|overlay)/.test(overflowY) ||
-      /(auto|scroll|overlay)/.test(overflowX);
+      /(auto|scroll|overlay)/.test(overflowY) || /(auto|scroll|overlay)/.test(overflowX);
 
     if (isScrollable) {
       parents.push(current);
@@ -95,7 +94,7 @@ export function GuideTooltip() {
         element.scrollIntoView({
           block: "center",
           inline: "nearest",
-          behavior: "smooth"
+          behavior: "smooth",
         });
       }
 
@@ -149,13 +148,17 @@ export function GuideTooltip() {
   };
 
   const preferredSide = displayedStep.side ?? "right";
-  const { style: tooltipStyle, resolvedSide, anchorMid } = getTooltipPosition(anchorRect, preferredSide);
+  const {
+    style: tooltipStyle,
+    resolvedSide,
+    anchorMid,
+  } = getTooltipPosition(anchorRect, preferredSide);
 
   return createPortal(
     <>
       {/* Tooltip card — must be above the highlight ring */}
       <div
-        className="fixed z-[100] w-72 border border-black/10 bg-white p-4 shadow-lg transition-[top,left] duration-300 ease-out dark:border-white/10 dark:bg-[#1a1d24]"
+        className="fixed z-[100] w-72 border border-black/10 bg-white p-4 shadow-lg transition-transform duration-300 ease-out dark:border-white/10 dark:bg-[#1a1d24]"
         style={{ ...tooltipStyle, touchAction: "auto" }}
       >
         {/* Arrow caret */}
@@ -164,9 +167,7 @@ export function GuideTooltip() {
           style={getArrowStyle(resolvedSide, anchorMid)}
         />
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-semibold text-ink">
-            {displayedStep.title}
-          </h3>
+          <h3 className="text-sm font-semibold text-ink">{displayedStep.title}</h3>
           <button
             type="button"
             onClick={skipAll}
@@ -238,7 +239,7 @@ function getTooltipPosition(
     top: rect.top,
     bottom: vh - rect.bottom,
     left: rect.left,
-    right: vw - rect.right
+    right: vw - rect.right,
   };
 
   // Check if the preferred side fits
@@ -251,9 +252,7 @@ function getTooltipPosition(
   let side = preferredSide;
   if (!fitsH(side)) {
     // Try all four sides, pick the one with the most room
-    const ranked = (Object.keys(space) as Side[]).sort(
-      (a, b) => space[b] - space[a]
-    );
+    const ranked = (Object.keys(space) as Side[]).sort((a, b) => space[b] - space[a]);
     side = ranked.find(fitsH) ?? ranked[0];
   }
 
@@ -289,5 +288,9 @@ function getTooltipPosition(
       ? clamp(rect.left + rect.width / 2 - left, 16, TOOLTIP_WIDTH - 16)
       : clamp(rect.top + rect.height / 2 - top, 16, TOOLTIP_HEIGHT_ESTIMATE - 16);
 
-  return { style: { top, left }, resolvedSide: side, anchorMid };
+  return {
+    style: { top: 0, left: 0, transform: `translate(${left}px, ${top}px)` },
+    resolvedSide: side,
+    anchorMid,
+  };
 }

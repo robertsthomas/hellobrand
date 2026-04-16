@@ -96,7 +96,7 @@ export default function HelpPage() {
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search for help..."
-              className="h-11 border-black/10 bg-white pl-10 shadow-none dark:border-white/10 dark:bg-[#161a1f]"
+              className="h-11 border-black/10 bg-white pl-10 shadow-none dark:border-white/10 dark:bg-card"
             />
           </div>
         </section>
@@ -109,7 +109,7 @@ export default function HelpPage() {
             description="The questions below cover the current product behavior and the workflows already live in the app."
           />
 
-          <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+          <div className="border border-black/8 bg-white dark:border-white/10 dark:bg-card">
             <Accordion type="single" collapsible>
               {faqs.map((faq, index) => (
                 <AccordionItem

@@ -19,7 +19,7 @@ function SectionCard({
   editedItems,
   onToggleEdit,
   onContentChange,
-  onItemsChange
+  onItemsChange,
 }: {
   section: GeneratedBriefSection;
   isEditing: boolean;
@@ -32,7 +32,7 @@ function SectionCard({
   return (
     <div className="space-y-2 border border-black/8 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {section.title}
         </p>
         <button
@@ -115,7 +115,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
       const response = await fetch(`/api/p/${dealId}/brief`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: hasUploadedBrief ? "summary" : "brief" })
+        body: JSON.stringify({ mode: hasUploadedBrief ? "summary" : "brief" }),
       });
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -129,7 +129,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
       for (const section of generated.sections) {
         initial[section.id] = {
           content: section.content,
-          items: section.items ?? []
+          items: section.items ?? [],
         };
       }
       setEditedSections(initial);
@@ -164,7 +164,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
     const sections = brief.sections.map((s) => ({
       title: s.title,
       content: editedSections[s.id]?.content ?? s.content,
-      items: editedSections[s.id]?.items ?? s.items ?? []
+      items: editedSections[s.id]?.items ?? s.items ?? [],
     }));
     await navigator.clipboard.writeText(formatBriefAsText(sections));
     setCopyFeedback(true);
@@ -173,7 +173,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
 
   if (!brief) {
     return (
-      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+      <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
@@ -209,7 +209,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
   }
 
   return (
-    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card">
       <div className="space-y-6">
         {errorMessage ? (
           <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -280,8 +280,8 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
                     [section.id]: {
                       ...prev[section.id],
                       content: value,
-                      items: prev[section.id]?.items ?? section.items ?? []
-                    }
+                      items: prev[section.id]?.items ?? section.items ?? [],
+                    },
                   }))
                 }
                 onItemsChange={(value) =>
@@ -290,8 +290,8 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
                     [section.id]: {
                       ...prev[section.id],
                       content: prev[section.id]?.content ?? section.content,
-                      items: value
-                    }
+                      items: value,
+                    },
                   }))
                 }
               />

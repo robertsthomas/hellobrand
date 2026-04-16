@@ -110,9 +110,9 @@ export function InvoiceEditorPanel({
 
   if (!invoice) {
     return (
-      <section className="space-y-6 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+      <section className="space-y-6 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Invoices
           </p>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
@@ -153,7 +153,7 @@ export function InvoiceEditorPanel({
 
         {invoiceDocuments.length > 0 ? (
           <div className="space-y-3 border-t border-black/8 pt-5 dark:border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Attached invoices
             </p>
             {invoiceDocuments.map((document) => (
@@ -174,10 +174,10 @@ export function InvoiceEditorPanel({
   }
 
   return (
-    <section className="space-y-6 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-[#161a1f] sm:p-6">
+    <section className="space-y-6 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Workspace invoice
           </p>
           <h2 className="text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-3xl">
@@ -249,7 +249,7 @@ export function InvoiceEditorPanel({
           <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
             Invoice number
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               name="invoiceNumber"
               defaultValue={invoice.invoiceNumber}
             />
@@ -257,7 +257,7 @@ export function InvoiceEditorPanel({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Invoice date
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="date"
               name="invoiceDate"
               defaultValue={invoice.invoiceDate?.slice(0, 10) ?? ""}
@@ -266,7 +266,7 @@ export function InvoiceEditorPanel({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Due date
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="date"
               name="dueDate"
               defaultValue={invoice.dueDate?.slice(0, 10) ?? ""}
@@ -277,7 +277,7 @@ export function InvoiceEditorPanel({
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Bill to
               </p>
             </div>
@@ -285,7 +285,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Contact name
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="billToName"
                   defaultValue={invoice.billTo.name}
                 />
@@ -293,7 +293,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Contact email
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="billToEmail"
                   defaultValue={invoice.billTo.email ?? ""}
                 />
@@ -301,7 +301,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Company
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="billToCompanyName"
                   defaultValue={invoice.billTo.companyName ?? ""}
                 />
@@ -309,7 +309,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Address
                 <textarea
-                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="billToAddress"
                   defaultValue={invoice.billTo.address ?? ""}
                 />
@@ -325,7 +325,7 @@ export function InvoiceEditorPanel({
 
           <div className="space-y-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 From
               </p>
             </div>
@@ -333,7 +333,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Name
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerName"
                   defaultValue={invoice.issuer.name}
                 />
@@ -341,7 +341,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Email
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerEmail"
                   defaultValue={invoice.issuer.email ?? ""}
                 />
@@ -349,7 +349,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Business
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerCompanyName"
                   defaultValue={invoice.issuer.companyName ?? ""}
                 />
@@ -357,7 +357,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Tax ID
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerTaxId"
                   defaultValue={invoice.issuer.taxId ?? ""}
                 />
@@ -365,7 +365,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 Currency
                 <input
-                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="currency"
                   defaultValue={invoice.currency ?? "USD"}
                 />
@@ -373,7 +373,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Address
                 <textarea
-                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerAddress"
                   defaultValue={invoice.issuer.address ?? ""}
                 />
@@ -381,7 +381,7 @@ export function InvoiceEditorPanel({
               <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
                 Payout details
                 <textarea
-                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+                  className="min-h-24 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
                   name="issuerPayoutDetails"
                   defaultValue={invoice.issuer.payoutDetails ?? ""}
                 />
@@ -393,7 +393,7 @@ export function InvoiceEditorPanel({
         <div className="space-y-4 border-t border-black/8 pt-5 dark:border-white/10">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Itemized invoice
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -419,14 +419,14 @@ export function InvoiceEditorPanel({
               >
                 <div className="space-y-3">
                   <input
-                    className="w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/20"
+                    className="w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-ring"
                     value={item.title}
                     onChange={(event) => updateItem(item.id, { title: event.currentTarget.value })}
                     placeholder="Line item title"
                     aria-label="Line item title"
                   />
                   <textarea
-                    className="min-h-20 w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/20"
+                    className="min-h-20 w-full border border-black/10 bg-white px-3 py-2 text-sm outline-none transition focus:border-ring"
                     value={item.description ?? ""}
                     onChange={(event) =>
                       updateItem(item.id, { description: event.currentTarget.value || null })
@@ -436,10 +436,10 @@ export function InvoiceEditorPanel({
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-3 md:contents">
-                  <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Qty
                     <input
-                      className="border border-black/10 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
+                      className="border border-black/10 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring"
                       type="number"
                       min="1"
                       step="1"
@@ -451,10 +451,10 @@ export function InvoiceEditorPanel({
                       }
                     />
                   </label>
-                  <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <label className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Unit rate
                     <input
-                      className="border border-black/10 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
+                      className="border border-black/10 bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring"
                       type="number"
                       min="0"
                       step="0.01"
@@ -466,7 +466,7 @@ export function InvoiceEditorPanel({
                       }
                     />
                   </label>
-                  <div className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <div className="grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Amount
                     <div className="flex items-center border border-black/10 px-3 py-2 text-sm font-semibold text-foreground">
                       {formatCurrency(item.amount, invoice.currency ?? "USD")}
@@ -498,13 +498,13 @@ export function InvoiceEditorPanel({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Notes
             <textarea
-              className="min-h-28 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="min-h-28 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               name="notes"
               defaultValue={invoice.notes ?? ""}
             />
           </label>
           <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Subtotal
             </p>
             <p className="text-2xl font-semibold tracking-[-0.04em] text-foreground">
@@ -567,7 +567,7 @@ export function InvoiceEditorPanel({
 
       {invoiceDocuments.length > 0 ? (
         <div className="space-y-3 border-t border-black/8 pt-5 dark:border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Attached invoices
           </p>
           {invoiceDocuments.map((document) => (
@@ -585,7 +585,7 @@ export function InvoiceEditorPanel({
       ) : null}
       {invoiceDeliveries.length > 0 ? (
         <div className="space-y-3 border-t border-black/8 pt-5 dark:border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Delivery history
           </p>
           {invoiceDeliveries.map((delivery) => (

@@ -3,7 +3,7 @@ import { BillingSubscriptionStatus, PlanTier } from "@prisma/client";
 import { getDevPlanOverrideAsync } from "@/lib/billing/config";
 import {
   isActiveBillingSubscriptionStatus,
-  resolveEffectiveEntitlementTier
+  resolveEffectiveEntitlementTier,
 } from "@/lib/billing/rules";
 import { prisma } from "@/lib/prisma";
 import { getRepository } from "@/lib/repository";
@@ -17,14 +17,14 @@ export const FEATURE_KEYS = [
   "analytics",
   "analytics_advanced",
   "premium_inbox",
-  "email_connections"
+  "email_connections",
 ] as const;
 
 export const USAGE_LIMIT_KEYS = [
   "active_workspaces",
   "assistant_messages_monthly",
   "deal_drafts_monthly",
-  "brief_generations_monthly"
+  "brief_generations_monthly",
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -60,10 +60,10 @@ const FEATURE_MATRIX: FeatureMatrix = {
     assistant_chat: true,
     deal_draft_generation: true,
     brief_generation: false,
-    analytics: false,
+    analytics: true,
     analytics_advanced: false,
     premium_inbox: false,
-    email_connections: false
+    email_connections: false,
   },
   standard: {
     workspace_creation: true,
@@ -73,7 +73,7 @@ const FEATURE_MATRIX: FeatureMatrix = {
     analytics: true,
     analytics_advanced: false,
     premium_inbox: false,
-    email_connections: false
+    email_connections: false,
   },
   premium: {
     workspace_creation: true,
@@ -83,8 +83,8 @@ const FEATURE_MATRIX: FeatureMatrix = {
     analytics: true,
     analytics_advanced: true,
     premium_inbox: true,
-    email_connections: true
-  }
+    email_connections: true,
+  },
 };
 
 const USAGE_LIMIT_MATRIX: UsageLimitMatrix = {
@@ -92,20 +92,20 @@ const USAGE_LIMIT_MATRIX: UsageLimitMatrix = {
     active_workspaces: 3,
     assistant_messages_monthly: 25,
     deal_drafts_monthly: 10,
-    brief_generations_monthly: 3
+    brief_generations_monthly: 3,
   },
   standard: {
     active_workspaces: null,
     assistant_messages_monthly: 250,
     deal_drafts_monthly: 100,
-    brief_generations_monthly: 30
+    brief_generations_monthly: 30,
   },
   premium: {
     active_workspaces: null,
     assistant_messages_monthly: null,
     deal_drafts_monthly: null,
-    brief_generations_monthly: null
-  }
+    brief_generations_monthly: null,
+  },
 };
 
 function currentWindowKey(now = new Date()) {
@@ -119,18 +119,16 @@ function usageFeatureKey(key: UsageLimitKey) {
 async function getActiveWorkspaceCount(viewer: Viewer) {
   if (!process.env.DATABASE_URL) {
     const deals = await getRepository().listDeals(viewer.id);
-    return deals.filter(
-      (deal) => deal.status !== "completed" && deal.status !== "paid"
-    ).length;
+    return deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid").length;
   }
 
   return prisma.deal.count({
     where: {
       userId: viewer.id,
       status: {
-        notIn: ["completed", "paid"]
-      }
-    }
+        notIn: ["completed", "paid"],
+      },
+    },
   });
 }
 
@@ -138,12 +136,12 @@ async function ensureBillingAccountForUsage(viewer: Viewer) {
   return prisma.billingAccount.upsert({
     where: { userId: viewer.id },
     update: {
-      billingEmail: viewer.email
+      billingEmail: viewer.email,
     },
     create: {
       userId: viewer.id,
-      billingEmail: viewer.email
-    }
+      billingEmail: viewer.email,
+    },
   });
 }
 
@@ -154,7 +152,7 @@ function featureErrorMessage(feature: FeatureKey, effectiveTier: PlanTier) {
     case "email_connections":
       return "Email connections are available on Premium.";
     case "analytics":
-      return "Analytics is available on Standard and Premium.";
+      return "Analytics is available on Basic, Standard, and Premium.";
     case "analytics_advanced":
       return "Advanced reporting is available on Premium.";
     case "brief_generation":
@@ -197,8 +195,8 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
             current,
             limit,
             remaining: limit === null ? null : Math.max(limit - current, 0),
-            blocked
-          }
+            blocked,
+          },
         ];
       })
     ) as Record<UsageLimitKey, UsageEntitlement>;
@@ -212,7 +210,7 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
       currentSubscriptionStatus: null,
       hasActiveSubscription: false,
       features: FEATURE_MATRIX[effectiveTier],
-      usage
+      usage,
     };
   }
 
@@ -223,19 +221,18 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
         currentPlanTier: true,
         currentTrialPlanTier: true,
         currentSubscriptionStatus: true,
-        id: true
-      }
+        id: true,
+      },
     }),
-    Promise.resolve(workspaceCount)
+    Promise.resolve(workspaceCount),
   ]);
 
-  const effectiveSubscriptionStatus =
-    billingAccount?.currentSubscriptionStatus ?? null;
+  const effectiveSubscriptionStatus = billingAccount?.currentSubscriptionStatus ?? null;
   const effectiveTier = resolveEffectiveEntitlementTier({
     overrideTier,
     currentPlanTier: billingAccount?.currentPlanTier ?? null,
     currentTrialPlanTier: billingAccount?.currentTrialPlanTier ?? null,
-    currentSubscriptionStatus: effectiveSubscriptionStatus
+    currentSubscriptionStatus: effectiveSubscriptionStatus,
   });
   const source: EntitlementSource = overrideTier
     ? "override"
@@ -248,15 +245,18 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
     ? await prisma.billingUsageLedger.findMany({
         where: {
           billingAccountId: billingAccount.id,
-          windowKey
-        }
+          windowKey,
+        },
       })
     : [];
 
   const usageMap = new Map(usageRows.map((row) => [row.featureKey, row.quantity]));
   const usage = Object.fromEntries(
     USAGE_LIMIT_KEYS.map((key) => {
-      const current = key === "active_workspaces" ? activeWorkspaceCount : usageMap.get(usageFeatureKey(key)) ?? 0;
+      const current =
+        key === "active_workspaces"
+          ? activeWorkspaceCount
+          : (usageMap.get(usageFeatureKey(key)) ?? 0);
       const limit = USAGE_LIMIT_MATRIX[effectiveTier][key];
       const blocked = limit !== null && current >= limit;
       return [
@@ -266,8 +266,8 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
           current,
           limit,
           remaining: limit === null ? null : Math.max(limit - current, 0),
-          blocked
-        }
+          blocked,
+        },
       ];
     })
   ) as Record<UsageLimitKey, UsageEntitlement>;
@@ -281,7 +281,7 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
     currentSubscriptionStatus: effectiveSubscriptionStatus,
     hasActiveSubscription: isActiveBillingSubscriptionStatus(effectiveSubscriptionStatus),
     features: FEATURE_MATRIX[effectiveTier],
-    usage
+    usage,
   };
 }
 
@@ -323,21 +323,21 @@ export async function recordViewerUsage(
       billingAccountId_featureKey_windowKey: {
         billingAccountId: billingAccount.id,
         featureKey: usageFeatureKey(key),
-        windowKey
-      }
+        windowKey,
+      },
     },
     update: {
       quantity: {
-        increment: quantity
+        increment: quantity,
       },
-      limit
+      limit,
     },
     create: {
       billingAccountId: billingAccount.id,
       featureKey: usageFeatureKey(key),
       windowKey,
       quantity,
-      limit
-    }
+      limit,
+    },
   });
 }

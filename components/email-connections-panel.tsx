@@ -316,7 +316,7 @@ export function EmailConnectionsPanel({
                           value={yahooEmail}
                           onChange={(event) => setYahooEmail(event.target.value)}
                           placeholder="name@yahoo.com"
-                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
+                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring"
                           autoComplete="email"
                           required
                         />
@@ -335,7 +335,7 @@ export function EmailConnectionsPanel({
                           value={yahooAppPassword}
                           onChange={(event) => setYahooAppPassword(event.target.value)}
                           placeholder="Paste the app password from Yahoo"
-                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-black/20"
+                          className="w-full border border-border bg-white px-3 py-2 text-sm text-foreground outline-none transition focus:border-ring"
                           autoComplete="current-password"
                           required
                         />

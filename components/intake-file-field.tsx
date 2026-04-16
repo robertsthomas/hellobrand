@@ -27,20 +27,14 @@ export const ACCEPTED_DOCUMENT_TYPES = [
   "application/vnd.ms-powerpoint",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ].join(",");
 
-export function IntakeFileField({
-  autoOpenPicker = false
-}: {
-  autoOpenPicker?: boolean;
-}) {
+export function IntakeFileField({ autoOpenPicker = false }: { autoOpenPicker?: boolean }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selectedFiles = useIntakeUiStore((state) => state.selectedFiles);
   const pendingFiles = useIntakeUiStore((state) => state.pendingFiles);
-  const setSelectedFilesFromList = useIntakeUiStore(
-    (state) => state.setSelectedFilesFromList
-  );
+  const setSelectedFilesFromList = useIntakeUiStore((state) => state.setSelectedFilesFromList);
   const removeFileByIndex = useIntakeUiStore((state) => state.removeFileByIndex);
   const hasAutoOpened = useRef(false);
 
@@ -69,9 +63,7 @@ export function IntakeFileField({
 
   return (
     <label className="grid gap-3">
-      <span className="text-sm font-medium text-black/70 dark:text-white/75">
-        Upload files
-      </span>
+      <span className="text-sm font-medium text-black/70 dark:text-white/75">Upload files</span>
       <div className="rounded-xl border border-dashed border-black/15 bg-white px-4 py-5 dark:border-white/12 dark:bg-white/[0.03]">
         <input
           ref={inputRef}
@@ -100,7 +92,7 @@ export function IntakeFileField({
             {pendingFiles.slice(0, 6).map((file, index) => (
               <div
                 key={`${file.name}:${file.size}:${file.type}:${index}`}
-                className="group flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
+                className="group flex min-w-0 items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"
               >
                 <FileText className="h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
@@ -115,15 +107,15 @@ export function IntakeFileField({
               </div>
             ))}
             {pendingFiles.length > 6 && (
-              <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+              <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                 +{pendingFiles.length - 6} more
               </div>
             )}
           </div>
         )}
         <p className="mt-3 text-xs text-black/45 dark:text-white/45">
-          Supports contract and campaign document formats only: PDF, DOC, DOCX,
-          RTF, TXT, EML, MSG, PPT, PPTX, XLS, and XLSX.
+          Supports contract and campaign document formats only: PDF, DOC, DOCX, RTF, TXT, EML, MSG,
+          PPT, PPTX, XLS, and XLSX.
         </p>
       </div>
     </label>

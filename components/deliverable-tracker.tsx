@@ -9,7 +9,7 @@ import {
   computeDeliverableProgress,
   isOverdue,
   DELIVERABLE_STATUSES,
-  type DeliverableStatus
+  type DeliverableStatus,
 } from "@/lib/deliverables";
 import { ProseText } from "@/components/prose-text";
 import { formatDate, humanizeToken } from "@/lib/utils";
@@ -19,31 +19,29 @@ interface DeliverableTrackerProps {
   deliverables: DeliverableItem[];
 }
 
-const STATUS_CONFIG: Record<
-  DeliverableStatus,
-  { icon: typeof Circle; color: string; bg: string }
-> = {
-  pending: {
-    icon: Circle,
-    color: "text-black/45 dark:text-white/45",
-    bg: "bg-black/5 dark:bg-white/5"
-  },
-  in_progress: {
-    icon: Clock,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-50 dark:bg-blue-500/10"
-  },
-  completed: {
-    icon: CheckCircle2,
-    color: "text-emerald-600 dark:text-emerald-400",
-    bg: "bg-emerald-50 dark:bg-emerald-500/10"
-  },
-  overdue: {
-    icon: AlertTriangle,
-    color: "text-clay",
-    bg: "bg-clay/5"
-  }
-};
+const STATUS_CONFIG: Record<DeliverableStatus, { icon: typeof Circle; color: string; bg: string }> =
+  {
+    pending: {
+      icon: Circle,
+      color: "text-black/45 dark:text-white/45",
+      bg: "bg-black/5 dark:bg-white/5",
+    },
+    in_progress: {
+      icon: Clock,
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-50 dark:bg-blue-500/10",
+    },
+    completed: {
+      icon: CheckCircle2,
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    },
+    overdue: {
+      icon: AlertTriangle,
+      color: "text-clay",
+      bg: "bg-clay/5",
+    },
+  };
 
 function ProgressBar({ percent }: { percent: number }) {
   return (
@@ -79,9 +77,7 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
 
   const updateStatus = useCallback(
     (id: string, newStatus: DeliverableStatus) => {
-      const updated = deliverables.map((d) =>
-        d.id === id ? { ...d, status: newStatus } : d
-      );
+      const updated = deliverables.map((d) => (d.id === id ? { ...d, status: newStatus } : d));
       setDeliverables(updated);
       setPendingDeliverableId(id);
 
@@ -98,20 +94,19 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
 
   if (deliverables.length === 0) {
     return (
-      <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+      <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card">
         <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
           Deliverable Tracker
         </h2>
         <p className="mt-4 text-sm text-black/60 dark:text-white/65">
-          No deliverables have been extracted yet. Upload a contract or brief to
-          get started.
+          No deliverables have been extracted yet. Upload a contract or brief to get started.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card">
       <div className="space-y-6">
         <div>
           <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
@@ -137,15 +132,9 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
           </div>
           <ProgressBar percent={progress.percentComplete} />
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-            {progress.overdue > 0 && (
-              <span className="text-clay">{progress.overdue} overdue</span>
-            )}
-            {progress.inProgress > 0 && (
-              <span>{progress.inProgress} in progress</span>
-            )}
-            {progress.pending > 0 && (
-              <span>{progress.pending} pending</span>
-            )}
+            {progress.overdue > 0 && <span className="text-clay">{progress.overdue} overdue</span>}
+            {progress.inProgress > 0 && <span>{progress.inProgress} in progress</span>}
+            {progress.pending > 0 && <span>{progress.pending} pending</span>}
           </div>
         </div>
 
@@ -164,21 +153,24 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
                 }`}
               >
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-black/80 dark:text-white/85">
-                    {item.title}
-                  </h3>
+                  <h3 className="font-semibold text-black/80 dark:text-white/85">{item.title}</h3>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     {item.channel && <span>{item.channel}</span>}
                     {item.quantity && <span>Qty: {item.quantity}</span>}
                     {item.dueDate && (
-                      <span className={effectiveStatus === "overdue" ? "font-medium text-clay" : ""}>
+                      <span
+                        className={effectiveStatus === "overdue" ? "font-medium text-clay" : ""}
+                      >
                         Due: {formatDate(item.dueDate)}
                       </span>
                     )}
                   </div>
                   {item.description && (
                     <div className="mt-2 line-clamp-3 text-sm text-black/50 dark:text-white/55">
-                      <ProseText content={item.description} className="text-sm text-black/50 dark:text-white/55" />
+                      <ProseText
+                        content={item.description}
+                        className="text-sm text-black/50 dark:text-white/55"
+                      />
                     </div>
                   )}
                 </div>
@@ -189,9 +181,7 @@ export function DeliverableTracker({ dealId, deliverables: initial }: Deliverabl
                     className="h-8 border border-black/10 bg-transparent px-2 text-xs text-foreground outline-none dark:border-white/10"
                     value={item.status ?? "pending"}
                     disabled={isPending}
-                    onChange={(e) =>
-                      updateStatus(item.id, e.target.value as DeliverableStatus)
-                    }
+                    onChange={(e) => updateStatus(item.id, e.target.value as DeliverableStatus)}
                   >
                     {DELIVERABLE_STATUSES.map((s) => (
                       <option key={s} value={s}>

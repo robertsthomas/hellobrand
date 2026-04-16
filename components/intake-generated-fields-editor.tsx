@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 
 import { FormInput, FormSelect, FormTextarea } from "@/components/generic/form";
 import { IntakeAccordion } from "@/components/intake";
-import { dealCategoryLabel, dealCategoryOptions } from "@/lib/conflict-intelligence";
+import { dealCategoryLabel, dealCategoryOptions } from "@/lib/conflict-categories";
 import { createClientRowId, dedupeRowsById } from "@/lib/row-identity";
 import type {
   CampaignDateWindow,
@@ -17,7 +17,7 @@ import type {
   DeliverableItem,
   DisclosureObligation,
   IntakeAnalyticsRecord,
-  IntakeTimelineItem
+  IntakeTimelineItem,
 } from "@/lib/types";
 
 function joinLines(values: string[]) {
@@ -84,7 +84,7 @@ function normalizeDeliverables(deliverables: DeliverableItem[]) {
       quantity: item.quantity,
       status: item.status ?? "pending",
       description: item.description ?? "",
-      source: item.source ?? null
+      source: item.source ?? null,
     }))
   );
 }
@@ -96,7 +96,7 @@ function normalizeTimelineItems(items: IntakeTimelineItem[]) {
       label: item.label ?? "",
       date: toDateInputValue(item.date),
       source: item.source ?? "",
-      status: item.status ?? "unknown"
+      status: item.status ?? "unknown",
     }))
   );
 }
@@ -107,7 +107,7 @@ function normalizeDisclosureObligations(items: DisclosureObligation[]) {
       id: item.id || `disclosure-${index + 1}`,
       title: item.title ?? "",
       detail: item.detail ?? "",
-      source: item.source ?? ""
+      source: item.source ?? "",
     }))
   );
 }
@@ -121,7 +121,7 @@ export function IntakeGeneratedFieldsEditor({
   initialDeliverables,
   initialTimelineItems,
   initialAnalytics,
-  conflictMessagesByField = {}
+  conflictMessagesByField = {},
 }: {
   initialBrandCategory: DealCategory | null;
   initialCompetitorCategories: string[];
@@ -133,9 +133,7 @@ export function IntakeGeneratedFieldsEditor({
   initialAnalytics: IntakeAnalyticsRecord | null;
   conflictMessagesByField?: Partial<Record<ConflictFieldId, string[]>>;
 }) {
-  const [brandCategory, setBrandCategory] = useState<DealCategory | "">(
-    initialBrandCategory ?? ""
-  );
+  const [brandCategory, setBrandCategory] = useState<DealCategory | "">(initialBrandCategory ?? "");
   const [competitorCategories, setCompetitorCategories] = useState(
     joinLines(initialCompetitorCategories)
   );
@@ -145,17 +143,13 @@ export function IntakeGeneratedFieldsEditor({
   const [campaignDateWindow, setCampaignDateWindow] = useState({
     startDate: toDateInputValue(initialCampaignDateWindow?.startDate),
     endDate: toDateInputValue(initialCampaignDateWindow?.endDate),
-    postingWindow: initialCampaignDateWindow?.postingWindow ?? ""
+    postingWindow: initialCampaignDateWindow?.postingWindow ?? "",
   });
   const [disclosureObligations, setDisclosureObligations] = useState(
     normalizeDisclosureObligations(initialDisclosureObligations)
   );
-  const [deliverables, setDeliverables] = useState(
-    normalizeDeliverables(initialDeliverables)
-  );
-  const [timelineItems, setTimelineItems] = useState(
-    normalizeTimelineItems(initialTimelineItems)
-  );
+  const [deliverables, setDeliverables] = useState(normalizeDeliverables(initialDeliverables));
+  const [timelineItems, setTimelineItems] = useState(normalizeTimelineItems(initialTimelineItems));
   const [analyticsHighlights, setAnalyticsHighlights] = useState(
     joinLines(initialAnalytics?.highlights ?? [])
   );
@@ -175,7 +169,7 @@ export function IntakeGeneratedFieldsEditor({
                 : null,
             status: item.status,
             description: item.description?.trim() ? item.description.trim() : null,
-            source: item.source
+            source: item.source,
           }))
           .filter((item) => item.title.length > 0)
       ),
@@ -191,7 +185,7 @@ export function IntakeGeneratedFieldsEditor({
             label: item.label.trim(),
             date: item.date?.trim() ? item.date.trim() : null,
             source: item.source?.trim() ? item.source.trim() : null,
-            status: item.status
+            status: item.status,
           }))
           .filter((item) => item.label.length > 0)
       ),
@@ -206,7 +200,7 @@ export function IntakeGeneratedFieldsEditor({
             id: item.id,
             title: item.title.trim(),
             detail: item.detail.trim(),
-            source: item.source?.trim() ? item.source.trim() : null
+            source: item.source?.trim() ? item.source.trim() : null,
           }))
           .filter((item) => item.title.length > 0 && item.detail.length > 0)
       ),
@@ -228,7 +222,7 @@ export function IntakeGeneratedFieldsEditor({
       JSON.stringify({
         startDate: campaignDateWindow.startDate || null,
         endDate: campaignDateWindow.endDate || null,
-        postingWindow: campaignDateWindow.postingWindow.trim() || null
+        postingWindow: campaignDateWindow.postingWindow.trim() || null,
       }),
     [campaignDateWindow]
   );
@@ -236,7 +230,7 @@ export function IntakeGeneratedFieldsEditor({
   const analyticsJson = useMemo(
     () =>
       JSON.stringify({
-        highlights: splitLines(analyticsHighlights)
+        highlights: splitLines(analyticsHighlights),
       }),
     [analyticsHighlights]
   );
@@ -256,39 +250,21 @@ export function IntakeGeneratedFieldsEditor({
       return null;
     }
 
-    return (
-      <div className="border-l-2 border-clay/45 pl-3 text-xs text-clay">
-        {messages[0]}
-      </div>
-    );
+    return <div className="border-l-2 border-clay/45 pl-3 text-xs text-clay">{messages[0]}</div>;
   }
 
-  const hasConflicts = Object.values(conflictMessagesByField).some((messages) => (messages ?? []).length > 0);
+  const hasConflicts = Object.values(conflictMessagesByField).some(
+    (messages) => (messages ?? []).length > 0
+  );
 
   return (
     <div className="space-y-3">
       <input type="hidden" name="deliverablesJson" value={deliverablesJson} />
       <input type="hidden" name="timelineItemsJson" value={timelineItemsJson} />
-      <input
-        type="hidden"
-        name="disclosureObligationsJson"
-        value={disclosureObligationsJson}
-      />
-      <input
-        type="hidden"
-        name="competitorCategoriesJson"
-        value={competitorCategoriesJson}
-      />
-      <input
-        type="hidden"
-        name="restrictedCategoriesJson"
-        value={restrictedCategoriesJson}
-      />
-      <input
-        type="hidden"
-        name="campaignDateWindowJson"
-        value={campaignDateWindowJson}
-      />
+      <input type="hidden" name="disclosureObligationsJson" value={disclosureObligationsJson} />
+      <input type="hidden" name="competitorCategoriesJson" value={competitorCategoriesJson} />
+      <input type="hidden" name="restrictedCategoriesJson" value={restrictedCategoriesJson} />
+      <input type="hidden" name="campaignDateWindowJson" value={campaignDateWindowJson} />
       <input type="hidden" name="analyticsJson" value={analyticsJson} />
 
       <IntakeAccordion
@@ -326,7 +302,7 @@ export function IntakeGeneratedFieldsEditor({
                 onChange={(event) =>
                   setCampaignDateWindow((current) => ({
                     ...current,
-                    startDate: event.target.value
+                    startDate: event.target.value,
                   }))
                 }
               />
@@ -340,7 +316,7 @@ export function IntakeGeneratedFieldsEditor({
                 onChange={(event) =>
                   setCampaignDateWindow((current) => ({
                     ...current,
-                    endDate: event.target.value
+                    endDate: event.target.value,
                   }))
                 }
               />
@@ -355,7 +331,7 @@ export function IntakeGeneratedFieldsEditor({
               onChange={(event) =>
                 setCampaignDateWindow((current) => ({
                   ...current,
-                  postingWindow: event.target.value
+                  postingWindow: event.target.value,
                 }))
               }
               placeholder="Apr 19, 2026 to Apr 22, 2026"
@@ -413,8 +389,8 @@ export function IntakeGeneratedFieldsEditor({
                     id: createClientRowId("disclosure"),
                     title: "",
                     detail: "",
-                    source: ""
-                  }
+                    source: "",
+                  },
                 ])
               }
             >
@@ -425,11 +401,12 @@ export function IntakeGeneratedFieldsEditor({
           {disclosureObligations.length > 0 ? (
             <div className="grid gap-3">
               {disclosureObligations.map((item, index) => (
-                <div key={item.id} className="grid gap-3 border border-black/8 p-4 dark:border-white/10">
+                <div
+                  key={item.id}
+                  className="grid gap-3 border border-black/8 p-4 dark:border-white/10"
+                >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-ink">
-                      Obligation {index + 1}
-                    </div>
+                    <div className="text-sm font-medium text-ink">Obligation {index + 1}</div>
                     <button
                       type="button"
                       className="text-black/45 hover:text-clay dark:text-white/45 dark:hover:text-clay"
@@ -508,8 +485,8 @@ export function IntakeGeneratedFieldsEditor({
                     quantity: null,
                     status: "pending",
                     description: "",
-                    source: null
-                  }
+                    source: null,
+                  },
                 ])
               }
             >
@@ -517,18 +494,21 @@ export function IntakeGeneratedFieldsEditor({
               Add
             </button>
           </div>
-          <div className={`grid gap-3 ${(conflictMessagesByField.deliverables ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}>
+          <div
+            className={`grid gap-3 ${(conflictMessagesByField.deliverables ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}
+          >
             {deliverables.map((item, index) => (
-              <div key={item.id} className="grid gap-3 border border-black/8 p-4 dark:border-white/10">
+              <div
+                key={item.id}
+                className="grid gap-3 border border-black/8 p-4 dark:border-white/10"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium text-ink">Deliverable {index + 1}</div>
                   <button
                     type="button"
                     className="text-black/45 hover:text-clay dark:text-white/45 dark:hover:text-clay"
                     onClick={() =>
-                      setDeliverables((current) =>
-                        current.filter((entry) => entry.id !== item.id)
-                      )
+                      setDeliverables((current) => current.filter((entry) => entry.id !== item.id))
                     }
                     aria-label={`Remove deliverable ${index + 1}`}
                   >
@@ -570,7 +550,7 @@ export function IntakeGeneratedFieldsEditor({
                                 quantity:
                                   event.target.value.trim().length > 0
                                     ? Number(event.target.value)
-                                    : null
+                                    : null,
                               }
                             : entry
                         )
@@ -596,9 +576,7 @@ export function IntakeGeneratedFieldsEditor({
                   onChange={(event) =>
                     setDeliverables((current) =>
                       current.map((entry) =>
-                        entry.id === item.id
-                          ? { ...entry, description: event.target.value }
-                          : entry
+                        entry.id === item.id ? { ...entry, description: event.target.value } : entry
                       )
                     )
                   }
@@ -632,8 +610,8 @@ export function IntakeGeneratedFieldsEditor({
                     label: "",
                     date: "",
                     source: "",
-                    status: "unknown"
-                  }
+                    status: "unknown",
+                  },
                 ])
               }
             >
@@ -641,18 +619,21 @@ export function IntakeGeneratedFieldsEditor({
               Add
             </button>
           </div>
-          <div className={`grid gap-3 ${(conflictMessagesByField.timelineItems ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}>
+          <div
+            className={`grid gap-3 ${(conflictMessagesByField.timelineItems ?? []).length > 0 ? "border-l-2 border-clay/45 pl-3" : ""}`}
+          >
             {timelineItems.map((item, index) => (
-              <div key={item.id} className="grid gap-3 border border-black/8 p-4 dark:border-white/10">
+              <div
+                key={item.id}
+                className="grid gap-3 border border-black/8 p-4 dark:border-white/10"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-sm font-medium text-ink">Timeline item {index + 1}</div>
                   <button
                     type="button"
                     className="text-black/45 hover:text-clay dark:text-white/45 dark:hover:text-clay"
                     onClick={() =>
-                      setTimelineItems((current) =>
-                        current.filter((entry) => entry.id !== item.id)
-                      )
+                      setTimelineItems((current) => current.filter((entry) => entry.id !== item.id))
                     }
                     aria-label={`Remove timeline item ${index + 1}`}
                   >
@@ -701,7 +682,7 @@ export function IntakeGeneratedFieldsEditor({
                           entry.id === item.id
                             ? {
                                 ...entry,
-                                status: event.target.value as IntakeTimelineItem["status"]
+                                status: event.target.value as IntakeTimelineItem["status"],
                               }
                             : entry
                         )

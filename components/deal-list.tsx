@@ -19,7 +19,7 @@ function statusBadgeClass(status: string) {
     return "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50";
   }
 
-  return "border-black/8 bg-[#f5f6f8] text-[#667085] hover:bg-[#f5f6f8]";
+  return "border-black/8 bg-secondary text-muted-foreground hover:bg-secondary";
 }
 
 function paymentBadgeClass(status: string) {
@@ -35,11 +35,11 @@ function paymentBadgeClass(status: string) {
     return "border-orange-200 bg-orange-50 text-orange-700";
   }
 
-  return "border-black/8 bg-[#f5f6f8] text-[#667085]";
+  return "border-black/8 bg-secondary text-muted-foreground";
 }
 
 export function DealList({
-  deals
+  deals,
 }: {
   deals: Array<DealRecord & { paymentAmount?: number | null; currency?: string | null }>;
 }) {
@@ -48,7 +48,7 @@ export function DealList({
     return {
       ...deal,
       brandName: labels.brandName ?? deal.brandName,
-      campaignName: labels.campaignName ?? deal.campaignName
+      campaignName: labels.campaignName ?? deal.campaignName,
     };
   });
 
@@ -58,7 +58,7 @@ export function DealList({
         icon={<FolderPlus className="h-5 w-5" />}
         title="No workspaces yet"
         description="Start a new partnership workspace by uploading the first contract or brand documents."
-        action={(
+        action={
           <Button asChild aria-label="Upload documents for a new partnership workspace">
             <PostHogActionLink
               href="/app/intake/new"
@@ -69,7 +69,7 @@ export function DealList({
               New workspace
             </PostHogActionLink>
           </Button>
-        )}
+        }
       />
     );
   }
@@ -77,7 +77,7 @@ export function DealList({
   return (
     <section className="border border-black/8 bg-white p-6 shadow-[0_20px_50px_rgba(15,23,42,0.05)]">
       <div className="overflow-hidden border border-black/8">
-        <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] border-b border-black/8 bg-[#f7f8fa] px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+        <div className="hidden md:grid grid-cols-[minmax(0,1.6fr)_150px_160px_170px_150px_64px] border-b border-black/8 bg-secondary px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           <span>Campaign</span>
           <span>Stage</span>
           <span>Payment status</span>
@@ -100,9 +100,7 @@ export function DealList({
 
             <div className="flex items-center justify-between md:block">
               <span className="text-xs text-muted-foreground md:hidden">Stage</span>
-              <Badge className={statusBadgeClass(deal.status)}>
-                {humanizeToken(deal.status)}
-              </Badge>
+              <Badge className={statusBadgeClass(deal.status)}>{humanizeToken(deal.status)}</Badge>
             </div>
 
             <div className="flex items-center justify-between md:block">
@@ -131,7 +129,7 @@ export function DealList({
                 dealId={deal.id}
                 dealName={deal.campaignName}
                 redirectTo="/app/p/history"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-black/8 text-[#667085] transition hover:border-accent/30 hover:text-accent"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-black/8 text-muted-foreground transition hover:border-accent/30 hover:text-accent"
                 triggerLabel={`Delete ${deal.campaignName}`}
               >
                 <Trash2 className="h-4 w-4" />

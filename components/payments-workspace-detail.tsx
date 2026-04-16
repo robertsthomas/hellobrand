@@ -23,7 +23,7 @@ export function PaymentsWorkspaceDetail({
   invoice,
   invoiceDocuments,
   breakdownItems,
-  sendViaInboxHref
+  sendViaInboxHref,
 }: {
   deal: {
     id: string;
@@ -43,7 +43,7 @@ export function PaymentsWorkspaceDetail({
       <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Payment breakdown
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -61,8 +61,8 @@ export function PaymentsWorkspaceDetail({
           </Link>
         </div>
 
-        <div className="overflow-hidden border border-black/8 bg-white">
-          <div className="grid grid-cols-[minmax(0,1.6fr)_90px_130px_130px] bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+        <div className="overflow-x-auto border border-black/8 bg-white">
+          <div className="grid grid-cols-[minmax(0,1.6fr)_90px_130px_130px] bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             <span>Item</span>
             <span>Qty</span>
             <span>Unit rate</span>
@@ -92,7 +92,7 @@ export function PaymentsWorkspaceDetail({
 
         <div className="flex flex-wrap items-center justify-between gap-4 border border-black/8 bg-white px-4 py-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Invoice attachments
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -135,12 +135,15 @@ export function PaymentsWorkspaceDetail({
         <input type="hidden" name="dealId" value={deal.id} />
 
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment editor</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            Payment editor
+          </p>
           <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
             Update payout state
           </h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            Keep due dates and payment status current here. Invoice generation and attachments live in the workspace Invoices tab.
+            Keep due dates and payment status current here. Invoice generation and attachments live
+            in the workspace Invoices tab.
           </p>
         </div>
 
@@ -148,7 +151,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Amount
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="number"
               step="0.01"
               name="amount"
@@ -159,7 +162,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Currency
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               name="currency"
               defaultValue={payment.currency ?? "USD"}
             />
@@ -168,7 +171,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Invoice date
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="date"
               name="invoiceDate"
               defaultValue={payment.invoiceDate?.slice(0, 10) ?? ""}
@@ -178,7 +181,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Due date
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="date"
               name="dueDate"
               defaultValue={payment.dueDate?.slice(0, 10) ?? ""}
@@ -188,7 +191,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Paid date
             <input
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               type="date"
               name="paidDate"
               defaultValue={payment.paidDate?.slice(0, 10) ?? ""}
@@ -198,7 +201,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground">
             Status
             <select
-              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               name="status"
               defaultValue={payment.status}
             >
@@ -214,7 +217,7 @@ export function PaymentsWorkspaceDetail({
           <label className="grid gap-2 text-sm font-medium text-foreground md:col-span-2">
             Notes
             <textarea
-              className="min-h-28 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-black/20"
+              className="min-h-28 border border-black/10 bg-white px-4 py-3 text-sm outline-none transition focus:border-ring"
               name="notes"
               defaultValue={payment.notes ?? ""}
             />
@@ -223,7 +226,7 @@ export function PaymentsWorkspaceDetail({
 
         <div className="grid gap-4 border-t border-black/8 pt-4 text-sm md:grid-cols-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Invoice
             </p>
             <p className="mt-2 text-foreground">
@@ -232,16 +235,20 @@ export function PaymentsWorkspaceDetail({
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Issued
             </p>
-            <p className="mt-2 text-foreground">{formatDate(invoice?.invoiceDate ?? payment.invoiceDate)}</p>
+            <p className="mt-2 text-foreground">
+              {formatDate(invoice?.invoiceDate ?? payment.invoiceDate)}
+            </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Due
             </p>
-            <p className="mt-2 text-foreground">{formatDate(invoice?.dueDate ?? payment.dueDate)}</p>
+            <p className="mt-2 text-foreground">
+              {formatDate(invoice?.dueDate ?? payment.dueDate)}
+            </p>
           </div>
         </div>
 

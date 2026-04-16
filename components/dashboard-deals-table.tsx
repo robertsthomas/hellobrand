@@ -52,7 +52,7 @@ function statusBadgeClass(status: string) {
     return "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/10";
   }
 
-  return "border-black/8 bg-[#f5f6f8] text-[#667085] hover:bg-[#f5f6f8] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#a3acb9] dark:hover:bg-white/[0.04]";
+  return "border-black/8 bg-secondary text-muted-foreground hover:bg-secondary dark:border-white/10 dark:bg-secondary dark:text-muted-foreground dark:hover:bg-secondary";
 }
 
 function paymentBadgeClass(status: string) {
@@ -68,7 +68,7 @@ function paymentBadgeClass(status: string) {
     return "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-300";
   }
 
-  return "border-black/8 bg-[#f5f6f8] text-[#667085] dark:border-white/10 dark:bg-white/[0.04] dark:text-[#a3acb9]";
+  return "border-black/8 bg-secondary text-muted-foreground dark:border-white/10 dark:bg-secondary dark:text-muted-foreground";
 }
 
 function sortStateForValue(value: string): SortingState {
@@ -115,11 +115,7 @@ function sortValueForState(sorting: SortingState): string {
   return "campaign-asc";
 }
 
-export function DashboardDealsTable({
-  deals,
-}: {
-  deals: DashboardDealsTableRow[];
-}) {
+export function DashboardDealsTable({ deals }: { deals: DashboardDealsTableRow[] }) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = useState<SortingState>(sortStateForValue("campaign-asc"));
@@ -133,7 +129,7 @@ export function DashboardDealsTable({
           campaignName: labels.campaignName ?? deal.campaignName,
         };
       }),
-    [deals],
+    [deals]
   );
 
   const columns = useMemo<ColumnDef<DashboardDealsTableRow>[]>(
@@ -162,7 +158,7 @@ export function DashboardDealsTable({
         header: "Stage",
         sortingFn: (left, right) =>
           humanizeToken(String(left.getValue("status"))).localeCompare(
-            humanizeToken(String(right.getValue("status"))),
+            humanizeToken(String(right.getValue("status")))
           ),
         filterFn: (row, id, value) => !value || value === "all" || row.getValue(id) === value,
         cell: ({ row }) => (
@@ -227,7 +223,7 @@ export function DashboardDealsTable({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+                className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-card"
               >
                 <DeleteDealDialog
                   dealId={row.original.id}
@@ -244,7 +240,7 @@ export function DashboardDealsTable({
         ),
       },
     ],
-    [],
+    []
   );
 
   const table = useReactTable({
@@ -259,7 +255,9 @@ export function DashboardDealsTable({
     onColumnFiltersChange: setColumnFilters,
     onSortingChange: setSorting,
     globalFilterFn: (row, _columnId, filterValue) => {
-      const normalizedFilter = String(filterValue ?? "").trim().toLowerCase();
+      const normalizedFilter = String(filterValue ?? "")
+        .trim()
+        .toLowerCase();
 
       if (!normalizedFilter) {
         return true;
@@ -281,7 +279,7 @@ export function DashboardDealsTable({
   return (
     <section className="space-y-0">
       <div className="border-b border-black/8 pb-8 dark:border-white/10">
-        <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3] dark:text-[#8f98a6]">
+        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
           Partnerships
         </p>
         <h2 className="mt-4 text-[30px] font-semibold tracking-[-0.05em] text-foreground">
@@ -292,7 +290,7 @@ export function DashboardDealsTable({
       <div className="border-b border-black/8 py-5 dark:border-white/10">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full max-w-2xl">
-            <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98a2b3] dark:text-[#8f98a6]" />
+            <Search className="pointer-events-none absolute left-0 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground" />
             <input
               type="search"
               value={globalFilter}
@@ -310,7 +308,7 @@ export function DashboardDealsTable({
                   .getColumn("status")
                   ?.setFilterValue(event.target.value === "all" ? undefined : event.target.value)
               }
-              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-[#161a1f]"
+              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-card"
             >
               <option value="all">All stages</option>
               <option value="contract_received">Contract received</option>
@@ -324,11 +322,9 @@ export function DashboardDealsTable({
               onChange={(event) =>
                 table
                   .getColumn("paymentStatus")
-                  ?.setFilterValue(
-                    event.target.value === "all" ? undefined : event.target.value,
-                  )
+                  ?.setFilterValue(event.target.value === "all" ? undefined : event.target.value)
               }
-              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-[#161a1f]"
+              className="h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[170px] dark:border-white/15 dark:bg-card"
             >
               <option value="all">All payments</option>
               <option value="not_invoiced">Not invoiced</option>
@@ -340,7 +336,7 @@ export function DashboardDealsTable({
             <select
               value={sortValue}
               onChange={(event) => setSorting(sortStateForValue(event.target.value))}
-              className="col-span-2 h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[160px] dark:border-white/15 dark:bg-[#161a1f]"
+              className="col-span-2 h-12 w-full rounded-none border border-black/30 bg-white px-4 text-[15px] text-foreground outline-none sm:w-auto sm:min-w-[160px] dark:border-white/15 dark:bg-card"
             >
               <option value="campaign-asc">Campaign A-Z</option>
               <option value="campaign-desc">Campaign Z-A</option>
@@ -359,7 +355,7 @@ export function DashboardDealsTable({
           <Link
             key={row.id}
             href={`/app/p/${row.original.id}`}
-            className="block border border-black/8 bg-white p-4 transition-colors hover:bg-[#f6f7f8] dark:border-white/10 dark:bg-[#161a1f] dark:hover:bg-white/[0.03]"
+            className="block border border-black/8 bg-white p-4 transition-colors hover:bg-[#f6f7f8] dark:border-white/10 dark:bg-card dark:hover:bg-white/[0.03]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -375,7 +371,7 @@ export function DashboardDealsTable({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center text-black/45 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
+                      className="inline-flex h-10 w-10 items-center justify-center text-black/45 transition hover:text-black/70 dark:text-white/40 dark:hover:text-white/70"
                       aria-label={`Open actions for ${row.original.campaignName}`}
                     >
                       <MoreHorizontal className="h-4 w-4" />
@@ -383,7 +379,7 @@ export function DashboardDealsTable({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-[#161a1f]"
+                    className="w-44 border-black/10 bg-white shadow-lg dark:border-white/10 dark:bg-card"
                   >
                     <DeleteDealDialog
                       dealId={row.original.id}
@@ -401,7 +397,9 @@ export function DashboardDealsTable({
 
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Stage</p>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
+                  Stage
+                </p>
                 <div className="mt-1">
                   <Badge className={statusBadgeClass(row.original.status)}>
                     {humanizeToken(row.original.status)}
@@ -409,7 +407,9 @@ export function DashboardDealsTable({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Payment</p>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
+                  Payment
+                </p>
                 <div className="mt-1">
                   <Badge className={paymentBadgeClass(row.original.paymentStatus)}>
                     {humanizeToken(row.original.paymentStatus)}
@@ -417,13 +417,17 @@ export function DashboardDealsTable({
                 </div>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Amount</p>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
+                  Amount
+                </p>
                 <p className="mt-1 text-sm font-medium text-foreground">
                   {formatCurrency(row.original.paymentAmount, row.original.currency)}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Next due</p>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
+                  Next due
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {formatDate(row.original.nextDeliverableDate)}
                 </p>
@@ -442,7 +446,7 @@ export function DashboardDealsTable({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="px-0 py-5 text-[11px] uppercase tracking-[0.22em] text-[#98a2b3] dark:text-[#8f98a6]"
+                    className="px-0 py-5 text-[11px] uppercase tracking-[0.22em] text-muted-foreground dark:text-muted-foreground"
                   >
                     {header.isPlaceholder
                       ? null
@@ -458,9 +462,7 @@ export function DashboardDealsTable({
                 {row.getVisibleCells().map((cell) => (
                   <TableCell
                     key={cell.id}
-                    className={
-                      cell.column.id === "actions" ? "px-0 py-7 text-right" : "px-0 py-7"
-                    }
+                    className={cell.column.id === "actions" ? "px-0 py-7 text-right" : "px-0 py-7"}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>

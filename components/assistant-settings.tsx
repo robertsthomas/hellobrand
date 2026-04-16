@@ -6,23 +6,23 @@ const toneOptions: { value: AssistantTone; label: string; description: string }[
   {
     value: "professional",
     label: "Professional",
-    description: "Polished, practical, and business-ready."
+    description: "Polished, practical, and business-ready.",
   },
   {
     value: "friendly",
     label: "Friendly",
-    description: "Warm and approachable without losing clarity."
+    description: "Warm and approachable without losing clarity.",
   },
   {
     value: "direct",
     label: "Direct",
-    description: "Concise, sharp, and easy to scan."
+    description: "Concise, sharp, and easy to scan.",
   },
   {
     value: "warm",
     label: "Warm",
-    description: "Human and supportive while staying grounded."
-  }
+    description: "Human and supportive while staying grounded.",
+  },
 ];
 
 type AssistantSettingsProps = {
@@ -32,12 +32,7 @@ type AssistantSettingsProps = {
   onClose: () => void;
 };
 
-export function AssistantSettings({
-  open,
-  tone,
-  onToneChange,
-  onClose
-}: AssistantSettingsProps) {
+export function AssistantSettings({ open, tone, onToneChange, onClose }: AssistantSettingsProps) {
   if (!open) {
     return null;
   }
@@ -52,7 +47,7 @@ export function AssistantSettings({
       </div>
 
       <div className="mt-3 space-y-1.5">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-[#98a2b3]">Tone</p>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Tone</p>
         <div className="space-y-1.5">
           {toneOptions.map((option) => (
             <button
@@ -69,7 +64,9 @@ export function AssistantSettings({
               }`}
             >
               <p className="text-[13px] font-semibold text-foreground">{option.label}</p>
-              <p className="mt-0.5 text-[11px] leading-4.5 text-muted-foreground">{option.description}</p>
+              <p className="mt-0.5 text-[11px] leading-4.5 text-muted-foreground">
+                {option.description}
+              </p>
             </button>
           ))}
         </div>

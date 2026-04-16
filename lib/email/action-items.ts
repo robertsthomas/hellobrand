@@ -223,7 +223,9 @@ export async function extractActionItemsFromMessage(
       },
       {
         tag: "message_text",
-        content: promptQuotedText(text.slice(0, 3000)),
+        content: promptQuotedText(
+          text.length > 3000 ? text.slice(0, 2000) + "\n...\n" + text.slice(-1000) : text
+        ),
       },
       {
         tag: "task",

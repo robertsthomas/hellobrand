@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 const contentClassName =
-  "max-w-[220px] rounded-md bg-white px-2.5 py-1.5 text-center text-[11px] leading-4 text-[#475467] shadow-md ring-1 ring-black/8 dark:bg-[#161a1f] dark:text-white/70 dark:ring-white/10";
+  "max-w-[220px] rounded-md bg-white px-2.5 py-1.5 text-center text-[11px] leading-4 text-[#475467] shadow-md ring-1 ring-black/8 dark:bg-card dark:text-white/70 dark:ring-white/10";
 
 export function AppTooltip({
   children,
@@ -17,7 +17,7 @@ export function AppTooltip({
   sideOffset = 6,
   className,
   open,
-  onOpenChange
+  onOpenChange,
 }: {
   children: ReactNode;
   content: ReactNode;
@@ -49,7 +49,7 @@ export function InfoTooltip({
   label,
   content,
   className,
-  delayDuration = 250
+  delayDuration = 250,
 }: {
   label: string;
   content: ReactNode;
@@ -131,7 +131,7 @@ export function InfoTooltip({
           setOpen((current) => !current);
         }}
         className={cn(
-          "inline-flex h-8 w-8 items-center justify-center text-[#98a2b3] outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-[#8f98a6]",
+          "inline-flex h-8 w-8 items-center justify-center text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:text-muted-foreground",
           className
         )}
       >

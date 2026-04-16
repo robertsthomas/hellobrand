@@ -24,7 +24,7 @@ function providerLabel(provider: string) {
 export function DealEmailPanel({
   dealId,
   linkedThreads,
-  hasConnectedAccounts
+  hasConnectedAccounts,
 }: {
   dealId: string;
   linkedThreads: EmailThreadListItem[];
@@ -43,9 +43,9 @@ export function DealEmailPanel({
       const response = await fetch(`/api/email/threads/${threadId}/${endpoint}`, {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
-        body: JSON.stringify({ dealId })
+        body: JSON.stringify({ dealId }),
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -53,9 +53,7 @@ export function DealEmailPanel({
       }
       router.refresh();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not update thread link."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not update thread link.");
     } finally {
       setPendingThreadId(null);
     }
@@ -64,14 +62,13 @@ export function DealEmailPanel({
   return (
     <div className="space-y-6">
       {!hasConnectedAccounts ? (
-        <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-[#161a1f]">
+        <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">
-                Emails
-              </h2>
+              <h2 className="text-3xl font-semibold tracking-[-0.04em] text-foreground">Emails</h2>
               <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-                Connect Gmail, Outlook, or Yahoo in Settings to sync inbox threads into this partnership workspace.
+                Connect Gmail, Outlook, or Yahoo in Settings to sync inbox threads into this
+                partnership workspace.
               </p>
             </div>
           </div>
@@ -97,8 +94,8 @@ export function DealEmailPanel({
               Linked Threads
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              This workspace only shows email threads already linked to this partnership.
-              Open any thread in the inbox for the full conversation view.
+              This workspace only shows email threads already linked to this partnership. Open any
+              thread in the inbox for the full conversation view.
             </p>
           </div>
           <Link
@@ -116,15 +113,10 @@ export function DealEmailPanel({
             </div>
           ) : (
             linkedThreads.map((item) => (
-              <div
-                key={item.thread.id}
-                className="border border-border px-4 py-4"
-              >
+              <div key={item.thread.id} className="border border-border px-4 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {item.thread.subject}
-                    </p>
+                    <p className="text-sm font-semibold text-foreground">{item.thread.subject}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {providerLabel(item.account.provider)} · {item.account.emailAddress}
                     </p>

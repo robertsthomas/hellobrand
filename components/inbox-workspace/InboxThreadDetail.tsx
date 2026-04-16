@@ -6,27 +6,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ArrowLeft, ChevronDown, MoreHorizontal, ShieldAlert, RefreshCw } from "lucide-react";
 import { InboxActionItemRow } from "@/components/inbox-action-item-row";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type {
-  DealRecord,
-  EmailActionItemRecord,
-  EmailMessageRecord,
-  EmailThreadDetail,
-  EmailThreadPreviewStateRecord,
-} from "@/lib/types";
-import { formatDate } from "@/lib/utils";
-import {
-  providerLabel,
-  workflowStateLabel,
-  workflowBadgeClass,
-  initialsFromParticipant,
-  participantLabel,
-} from "./formatters";
+import type { EmailActionItemRecord, EmailMessageRecord, EmailThreadDetail } from "@/lib/types";
+import { providerLabel, workflowStateLabel, workflowBadgeClass } from "./formatters";
 import type { RiskSuggestion, DocumentSuggestion } from "./helpers";
-import { EmailMessageBody, MessageStrip } from "./InboxMessageView";
+import { MessageStrip } from "./InboxMessageView";
 
 type InboxThreadDetailProps = {
   selectedThread: EmailThreadDetail;
@@ -162,7 +148,7 @@ export function InboxThreadDetail({
               type="button"
               onClick={handleSyncEmails}
               disabled={isSyncing}
-              className="inline-flex h-8 w-8 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20 disabled:opacity-60"
+              className="inline-flex h-10 w-10 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20 disabled:opacity-60"
               aria-label="Sync emails"
               title="Sync for new emails"
             >
@@ -173,7 +159,7 @@ export function InboxThreadDetail({
               <button
                 type="button"
                 onClick={onToggleActionMenu}
-                className="inline-flex h-8 w-8 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
+                className="inline-flex h-10 w-10 items-center justify-center border border-black/10 text-foreground transition hover:border-black/20"
                 aria-label="Thread actions"
               >
                 <MoreHorizontal className="h-4 w-4" />

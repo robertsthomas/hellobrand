@@ -16,7 +16,6 @@ import {
   Mail,
   Pencil,
   Plus,
-  Send,
   Trash2,
 } from "lucide-react";
 
@@ -80,7 +79,7 @@ function FormLoadingOverlay() {
 }
 
 const inputClass =
-  "w-full border border-black/10 bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20";
+  "w-full border border-black/10 bg-white px-4 py-3 text-sm text-foreground outline-none transition focus:border-ring dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-ring";
 const textareaClass = `${inputClass} min-h-24`;
 
 function statusBadgeClass(status: string) {
@@ -312,7 +311,7 @@ export function InvoiceEditorFullPage({
                   {emailMenuOpen ? (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setEmailMenuOpen(false)} />
-                      <div className="fixed inset-x-4 top-auto z-50 mt-1 border border-black/10 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 dark:border-white/10 dark:bg-[#161a1f]">
+                      <div className="fixed inset-x-4 top-auto z-50 mt-1 border border-black/10 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 dark:border-white/10 dark:bg-card">
                         <div className="max-h-64 overflow-y-auto">
                           <p className="border-b border-black/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:border-white/10">
                             Choose a thread
@@ -420,7 +419,7 @@ export function InvoiceEditorFullPage({
         <div className="grid gap-8 xl:grid-cols-2">
           {/* Bill To */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Bill to
             </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -479,7 +478,7 @@ export function InvoiceEditorFullPage({
 
           {/* Issuer */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               From (your details)
             </p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -554,7 +553,7 @@ export function InvoiceEditorFullPage({
         <div className="border-t border-black/8 pt-6 dark:border-white/10">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Line items
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -626,8 +625,8 @@ export function InvoiceEditorFullPage({
                 </div>
 
                 {/* Qty / Rate / Amount */}
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Qty
                     <input
                       className={inputClass}
@@ -643,7 +642,7 @@ export function InvoiceEditorFullPage({
                       readOnly={isReadOnly}
                     />
                   </label>
-                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <label className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Rate
                     <input
                       className={inputClass}
@@ -659,7 +658,7 @@ export function InvoiceEditorFullPage({
                       readOnly={isReadOnly}
                     />
                   </label>
-                  <div className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#98a2b3]">
+                  <div className="grid gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     Amount
                     <div className="flex items-center border border-black/10 bg-sand/35 px-3 py-3 text-sm font-semibold text-foreground dark:border-white/12 dark:bg-white/[0.04]">
                       {formatCurrency(item.amount, invoice.currency ?? "USD")}
@@ -684,7 +683,7 @@ export function InvoiceEditorFullPage({
             />
           </label>
           <div className="border border-black/8 p-5 dark:border-white/10">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Subtotal
             </p>
             <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">
@@ -769,7 +768,7 @@ export function InvoiceEditorFullPage({
       {/* Attached documents */}
       {!showPreview && invoiceDocuments.length > 0 ? (
         <div className="border-t border-black/8 pt-6 dark:border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Attached invoice documents
           </p>
           <div className="mt-3 space-y-2">
@@ -791,7 +790,7 @@ export function InvoiceEditorFullPage({
       {/* Delivery history */}
       {!showPreview && invoiceDeliveries.length > 0 ? (
         <div className="border-t border-black/8 pt-6 dark:border-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
             Delivery history
           </p>
           <div className="mt-3 space-y-2">
@@ -824,7 +823,7 @@ export function InvoiceEditorFullPage({
       {/* Delete confirmation dialog */}
       {deleteDialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md border border-black/10 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#161a1f]">
+          <div className="w-full max-w-md border border-black/10 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-card">
             <h3 className="text-lg font-semibold text-foreground">Delete invoice</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               This will permanently delete{" "}

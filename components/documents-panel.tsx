@@ -29,7 +29,7 @@ export function DocumentsPanel({
   dealId,
   documents,
   jobs,
-  reviewItems
+  reviewItems,
 }: {
   dealId: string;
   documents: DocumentRecord[];
@@ -48,13 +48,13 @@ export function DocumentsPanel({
     ? getDocumentDisplayStatus({
         document: selectedDocument,
         jobs,
-        reviewItems
+        reviewItems,
       })
     : null;
 
   return (
     <section className="grid gap-6 xl:h-[min(78vh,820px)] xl:grid-cols-[320px_minmax(0,1fr)]">
-      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-card">
         <div className="shrink-0 border-b border-black/8 px-5 py-4 dark:border-white/10">
           <h2 className="text-lg font-semibold text-foreground">Documents</h2>
           <p className="mt-1 text-sm text-black/55 dark:text-white/60">
@@ -69,7 +69,7 @@ export function DocumentsPanel({
               const status = getDocumentDisplayStatus({
                 document,
                 jobs,
-                reviewItems
+                reviewItems,
               });
               return (
                 <button
@@ -93,9 +93,7 @@ export function DocumentsPanel({
                     <p className="mt-1 text-xs text-black/45 dark:text-white/45">
                       {humanizeToken(document.documentKind)} · {status.label}
                     </p>
-                    <p className="mt-1 text-xs text-black/40 dark:text-white/40">
-                      {status.detail}
-                    </p>
+                    <p className="mt-1 text-xs text-black/40 dark:text-white/40">{status.detail}</p>
                   </div>
                 </button>
               );
@@ -108,7 +106,7 @@ export function DocumentsPanel({
         )}
       </div>
 
-      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+      <div className="flex min-h-0 flex-col border border-black/8 bg-white dark:border-white/10 dark:bg-card">
         <div className="shrink-0 flex flex-col gap-3 border-b border-black/8 px-5 py-4 dark:border-white/10 md:flex-row md:items-start md:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-foreground">
@@ -116,9 +114,9 @@ export function DocumentsPanel({
             </h3>
             <p className="mt-1 text-sm text-black/55 dark:text-white/60">
               {selectedDocument
-                ? `${humanizeToken(selectedDocument.documentKind)} · ${selectedStatus?.label ?? humanizeToken(
-                    selectedDocument.processingStatus
-                  )}`
+                ? `${humanizeToken(selectedDocument.documentKind)} · ${
+                    selectedStatus?.label ?? humanizeToken(selectedDocument.processingStatus)
+                  }`
                 : "Select a document to preview it."}
             </p>
             {selectedStatus ? (
@@ -132,7 +130,9 @@ export function DocumentsPanel({
             <div className="flex items-center gap-2">
               {selectedStatus?.state === "review_needed" ? (
                 <Button size="sm" variant="outline" asChild>
-                  <Link href={`/app/p/${dealId}?tab=terms`}>Review {selectedStatus.reviewCount}</Link>
+                  <Link href={`/app/p/${dealId}?tab=terms`}>
+                    Review {selectedStatus.reviewCount}
+                  </Link>
                 </Button>
               ) : null}
               {selectedDocument.processingStatus === "failed" ? (

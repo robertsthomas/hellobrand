@@ -20,6 +20,7 @@ export type LlmRoute = {
 };
 
 export const extractionResponseSchema = z.object({
+  reasoning: z.string().optional(),
   data: z.record(z.unknown()).default({}),
   evidence: z
     .array(
@@ -285,6 +286,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
   });
 
   try {
+    const temperature = task === "analyze_risks" ? 0.2 : 0.1;
     const response = await runStructuredOpenRouterTask({
       context: {
         featureKey: task === "generate_brief" ? "brief_generation" : "document_analysis",
@@ -293,7 +295,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
       },
       systemPrompt,
       userPrompt,
-      temperature: 0.1,
+      temperature,
       schema,
       fallback,
       cache,

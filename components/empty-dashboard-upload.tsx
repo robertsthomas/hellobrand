@@ -27,7 +27,7 @@ import {
   readLocalWorkspaceManifest,
   saveLocalWorkspace,
   type LocalWorkspaceInputSource,
-  type LocalWorkspaceManifestItem
+  type LocalWorkspaceManifestItem,
 } from "@/lib/browser/local-workspace-queue";
 import type { IntakeDraftListItem } from "@/lib/types";
 import { useIntakeUiStore, type SelectedFileMeta } from "@/lib/stores/intake-ui-store";
@@ -61,9 +61,7 @@ function buildWorkspaceLabel(input: {
     return subjectLine;
   }
 
-  const fileBackedTitle = deriveWorkspaceTitleFromFileNames(
-    input.files.map((file) => file.name)
-  );
+  const fileBackedTitle = deriveWorkspaceTitleFromFileNames(input.files.map((file) => file.name));
   if (fileBackedTitle) {
     return fileBackedTitle;
   }
@@ -71,10 +69,7 @@ function buildWorkspaceLabel(input: {
   return "Pasted brand context";
 }
 
-function buildWorkspaceBrand(input: {
-  pastedText: string;
-  fallbackBrandName?: string | null;
-}) {
+function buildWorkspaceBrand(input: { pastedText: string; fallbackBrandName?: string | null }) {
   if (input.fallbackBrandName && input.fallbackBrandName !== "Untitled brand") {
     return input.fallbackBrandName;
   }
@@ -138,7 +133,7 @@ function toServerQueuedWorkspaceItem(item: IntakeDraftListItem): ServerQueuedWor
     campaignName: labels.campaignName ?? item.deal.campaignName,
     updatedAt: item.session.updatedAt,
     status: "queued",
-    inputSource: item.session.inputSource
+    inputSource: item.session.inputSource,
   };
 }
 
@@ -157,13 +152,13 @@ function buildOptimisticWorkspaceGeneratingNotification(input: {
     brandName: input.brandName,
     campaignName: input.campaignName,
     eventType: "workspace.processing_started",
-    createdAt: input.createdAt ?? new Date().toISOString()
+    createdAt: input.createdAt ?? new Date().toISOString(),
   });
 }
 
 export function EmptyDashboardUpload({
   initialMode = "upload",
-  initialQueuedWorkspaces = []
+  initialQueuedWorkspaces = [],
 }: {
   initialMode?: "upload" | "paste";
   initialQueuedWorkspaces?: IntakeDraftListItem[];
@@ -175,9 +170,7 @@ export function EmptyDashboardUpload({
   const [serverQueuedWorkspaces, setServerQueuedWorkspaces] = useState<ServerQueuedWorkspaceItem[]>(
     initialQueuedWorkspaces.map(toServerQueuedWorkspaceItem)
   );
-  const [isComposerVisible, setIsComposerVisible] = useState(
-    initialQueuedWorkspaces.length === 0
-  );
+  const [isComposerVisible, setIsComposerVisible] = useState(initialQueuedWorkspaces.length === 0);
 
   const mode = useIntakeUiStore((state) => state.mode);
   const pendingFiles = useIntakeUiStore((state) => state.pendingFiles);
@@ -187,9 +180,7 @@ export function EmptyDashboardUpload({
   const errorMessage = useIntakeUiStore((state) => state.errorMessage);
   const setMode = useIntakeUiStore((state) => state.setMode);
   const setPastedText = useIntakeUiStore((state) => state.setPastedText);
-  const setSelectedFilesFromList = useIntakeUiStore(
-    (state) => state.setSelectedFilesFromList
-  );
+  const setSelectedFilesFromList = useIntakeUiStore((state) => state.setSelectedFilesFromList);
   const removeFileByIndex = useIntakeUiStore((state) => state.removeFileByIndex);
   const setIsSubmitting = useIntakeUiStore((state) => state.setIsSubmitting);
   const setErrorMessage = useIntakeUiStore((state) => state.setErrorMessage);
@@ -210,16 +201,13 @@ export function EmptyDashboardUpload({
     [pastedText, selectedFiles]
   );
 
-  async function createDraftSessionId(input: {
-    brandName: string;
-    campaignName: string;
-  }) {
+  async function createDraftSessionId(input: { brandName: string; campaignName: string }) {
     const response = await fetch("/api/intake/draft", {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
       },
-      body: JSON.stringify(input)
+      body: JSON.stringify(input),
     });
 
     const payload = await response.json();
@@ -237,14 +225,14 @@ export function EmptyDashboardUpload({
       pastedText: pastedText.trim(),
       brandName: buildWorkspaceBrand({
         pastedText,
-        fallbackBrandName: null
+        fallbackBrandName: null,
       }),
       campaignName: buildWorkspaceLabel({
         files: pendingFiles,
         pastedText,
-        fallbackCampaignName: null
+        fallbackCampaignName: null,
       }),
-      inputSource: detectLocalInputSource(pendingFiles, pastedText)
+      inputSource: detectLocalInputSource(pendingFiles, pastedText),
     });
 
     setLocalWorkspaces((current) => [...current, item]);
@@ -266,12 +254,10 @@ export function EmptyDashboardUpload({
       captureAppEvent(posthog, "workspace_saved", {
         sourceMode: mode,
         fileCount: pendingFiles.length,
-        hasPastedText: Boolean(pastedText.trim())
+        hasPastedText: Boolean(pastedText.trim()),
       });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not save this workspace."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not save this workspace.");
     } finally {
       setIsSubmitting(false);
     }
@@ -312,7 +298,7 @@ export function EmptyDashboardUpload({
 
         const sessionId = await createDraftSessionId({
           brandName: workspace.brandName,
-          campaignName: workspace.campaignName
+          campaignName: workspace.campaignName,
         });
 
         createdSessionIds.push(sessionId);
@@ -327,7 +313,7 @@ export function EmptyDashboardUpload({
           uploadUrl: `/api/intake/${sessionId}/documents`,
           files: payload.files,
           pastedText: payload.pastedText.trim(),
-          startProcessing: false
+          startProcessing: false,
         });
 
         processedLocalWorkspaceIds.push(workspace.localId);
@@ -338,7 +324,7 @@ export function EmptyDashboardUpload({
           campaignName: uploadPayload.session?.draftCampaignName ?? workspace.campaignName,
           updatedAt: uploadPayload.session?.updatedAt ?? new Date().toISOString(),
           status: "queued",
-          inputSource: uploadPayload.session?.inputSource ?? workspace.inputSource
+          inputSource: uploadPayload.session?.inputSource ?? workspace.inputSource,
         });
       }
 
@@ -351,17 +337,17 @@ export function EmptyDashboardUpload({
 
       const sessionIds = [
         ...serverQueuedWorkspaces.map((workspace) => workspace.sessionId),
-        ...createdSessionIds
+        ...createdSessionIds,
       ];
 
       const response = await fetch("/api/intake/queue/start", {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
         },
         body: JSON.stringify({
-          sessionIds
-        })
+          sessionIds,
+        }),
       });
       const payload = await response.json();
 
@@ -378,9 +364,9 @@ export function EmptyDashboardUpload({
           draftBrandName: payload.session.draftBrandName ?? null,
           draftCampaignName: payload.session.draftCampaignName ?? null,
           eventType: "workspace.processing_started",
-          createdAt: payload.session.updatedAt ?? new Date().toISOString()
+          createdAt: payload.session.updatedAt ?? new Date().toISOString(),
         }),
-        showHint: true
+        showHint: true,
       });
 
       if (processedLocalWorkspaceIds.length > 0) {
@@ -398,11 +384,11 @@ export function EmptyDashboardUpload({
       console.error("[startAnalysisInBackground] Failed:", error);
       captureAppEvent(posthog, "workspace_analysis_failed", {
         generationId,
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
       });
       dispatchWorkspaceGenerationNotification({
         action: "remove",
-        notificationId: optimisticNotificationId
+        notificationId: optimisticNotificationId,
       });
       if (navigationSessionId) {
         onStartFailed?.(navigationSessionId);
@@ -427,7 +413,7 @@ export function EmptyDashboardUpload({
       generationId,
       queuedCount,
       localWorkspaceCount: localWorkspaces.length,
-      serverQueuedCount: serverQueuedWorkspaces.length
+      serverQueuedCount: serverQueuedWorkspaces.length,
     });
 
     setIsSubmitting(true);
@@ -443,7 +429,7 @@ export function EmptyDashboardUpload({
       (firstLocal
         ? {
             brandName: firstLocal.brandName,
-            campaignName: firstLocal.campaignName
+            campaignName: firstLocal.campaignName,
           }
         : null);
 
@@ -455,9 +441,9 @@ export function EmptyDashboardUpload({
           sessionId: firstServerQueued?.sessionId ?? optimisticNotificationId,
           dealId: firstServerQueued?.dealId ?? optimisticNotificationId,
           brandName: primaryQueuedWorkspace.brandName,
-          campaignName: primaryQueuedWorkspace.campaignName
+          campaignName: primaryQueuedWorkspace.campaignName,
         }),
-        showHint: true
+        showHint: true,
       });
     }
 
@@ -504,7 +490,7 @@ export function EmptyDashboardUpload({
                 onClick={() => {
                   captureAppEvent(posthog, "workspace_source_mode_selected", {
                     mode: "upload",
-                    surface: "empty_dashboard_upload"
+                    surface: "empty_dashboard_upload",
                   });
                   setMode("upload");
                   setErrorMessage(null);
@@ -524,7 +510,7 @@ export function EmptyDashboardUpload({
                 onClick={() => {
                   captureAppEvent(posthog, "workspace_source_mode_selected", {
                     mode: "paste",
-                    surface: "empty_dashboard_upload"
+                    surface: "empty_dashboard_upload",
                   });
                   setMode("paste");
                   setErrorMessage(null);
@@ -580,7 +566,7 @@ export function EmptyDashboardUpload({
                     onClick={() => {
                       captureAppEvent(posthog, "workspace_file_picker_clicked", {
                         surface: "empty_dashboard_upload",
-                        mode
+                        mode,
                       });
                       inputRef.current?.click();
                     }}
@@ -588,8 +574,7 @@ export function EmptyDashboardUpload({
                     className={cn(
                       buttonVariants({
                         size: "sm",
-                        className:
-                          "w-auto self-start justify-center gap-2 px-4 sm:self-auto"
+                        className: "w-auto self-start justify-center gap-2 px-4 sm:self-auto",
                       })
                     )}
                   >
@@ -602,7 +587,7 @@ export function EmptyDashboardUpload({
                     {selectedFiles.slice(0, 8).map((file, index) => (
                       <div
                         key={`${file.name}:${file.size}:${file.type}:${index}`}
-                        className="group flex min-w-0 items-center gap-2 text-sm text-[#667085] dark:text-[#a3acb9]"
+                        className="group flex min-w-0 items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground"
                       >
                         <FileText className="h-3.5 w-3.5 shrink-0" />
                         <span className="min-w-0 flex-1 truncate">{file.name}</span>
@@ -618,7 +603,7 @@ export function EmptyDashboardUpload({
                       </div>
                     ))}
                     {selectedFiles.length > 8 ? (
-                      <div className="text-xs font-medium uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                      <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground dark:text-muted-foreground">
                         +{selectedFiles.length - 8} more
                       </div>
                     ) : null}
@@ -659,8 +644,7 @@ export function EmptyDashboardUpload({
                 onClick={() => void finishWorkspace()}
                 className={cn(
                   buttonVariants({
-                    className:
-                      "w-full justify-center gap-2"
+                    className: "w-full justify-center gap-2",
                   })
                 )}
               >
@@ -703,7 +687,7 @@ export function EmptyDashboardUpload({
                         <p className="text-sm text-muted-foreground">
                           {labels.brandName ?? workspace.brandName}
                         </p>
-                        <p className="text-sm text-[#667085] dark:text-[#a3acb9]">
+                        <p className="text-sm text-muted-foreground dark:text-muted-foreground">
                           {sourceSummary(workspace.inputSource)}
                           {workspace.fileCount > 0
                             ? ` • ${workspace.fileCount} file${workspace.fileCount === 1 ? "" : "s"}`
@@ -736,7 +720,7 @@ export function EmptyDashboardUpload({
                   className={cn(
                     buttonVariants({
                       variant: "outline",
-                      className: GENERATE_WORKSPACE_BUTTON_CLASS
+                      className: GENERATE_WORKSPACE_BUTTON_CLASS,
                     })
                   )}
                 >
@@ -748,7 +732,7 @@ export function EmptyDashboardUpload({
                     disabled={isSubmitting}
                     onClick={() => {
                       captureAppEvent(posthog, "workspace_add_another_clicked", {
-                        surface: "queued_workspaces"
+                        surface: "queued_workspaces",
                       });
                       reset(initialMode);
                       setErrorMessage(null);
@@ -772,7 +756,7 @@ export function EmptyDashboardUpload({
                 className={cn(
                   buttonVariants({
                     variant: "outline",
-                    className: GENERATE_WORKSPACE_BUTTON_CLASS
+                    className: GENERATE_WORKSPACE_BUTTON_CLASS,
                   })
                 )}
               >
@@ -780,15 +764,15 @@ export function EmptyDashboardUpload({
               </button>
               {!isComposerVisible ? (
                 <button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={() => {
-                      captureAppEvent(posthog, "workspace_add_another_clicked", {
-                        surface: "server_queued_workspaces"
-                      });
-                      reset(initialMode);
-                      setErrorMessage(null);
-                      setIsComposerVisible(true);
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    captureAppEvent(posthog, "workspace_add_another_clicked", {
+                      surface: "server_queued_workspaces",
+                    });
+                    reset(initialMode);
+                    setErrorMessage(null);
+                    setIsComposerVisible(true);
                   }}
                   className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
                 >
@@ -800,7 +784,7 @@ export function EmptyDashboardUpload({
 
           {serverQueuedWorkspaces.length > 0 ? (
             <div className="grid gap-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3] dark:text-[#8f98a6]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground dark:text-muted-foreground">
                 Already queued
               </p>
               <div className="divide-y divide-black/8 border-y border-black/8 dark:divide-white/10 dark:border-white/10">
@@ -819,12 +803,12 @@ export function EmptyDashboardUpload({
                         <p className="mt-1 text-sm text-muted-foreground">
                           {labels.brandName ?? workspace.brandName}
                         </p>
-                        <p className="mt-2 text-sm text-[#667085] dark:text-[#a3acb9]">
+                        <p className="mt-2 text-sm text-muted-foreground dark:text-muted-foreground">
                           {sourceSummary(workspace.inputSource)}
                         </p>
                       </div>
                       <div className="flex items-center justify-between gap-3 md:flex-col md:items-end">
-                        <span className="text-xs font-medium text-[#98a2b3] dark:text-[#8f98a6]">
+                        <span className="text-xs font-medium text-muted-foreground dark:text-muted-foreground">
                           Queued on server
                         </span>
                         <Link

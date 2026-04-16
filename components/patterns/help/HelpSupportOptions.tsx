@@ -12,7 +12,7 @@ export function HelpSupportOptions() {
   return (
     <>
       <div className="mt-6 grid gap-px overflow-hidden border border-black/8 bg-black/8 md:grid-cols-2 dark:border-white/10 dark:bg-white/10">
-        <div className="bg-white px-6 py-6 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-6 dark:bg-card">
           <MessageCircle className="mb-3 h-5 w-5 text-[#1E6A4E]" />
           <h3 className="text-base font-medium text-foreground">Chat with Assistant</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -24,7 +24,7 @@ export function HelpSupportOptions() {
           </Button>
         </div>
 
-        <div className="bg-white px-6 py-6 dark:bg-[#161a1f]">
+        <div className="bg-white px-6 py-6 dark:bg-card">
           <Mail className="mb-3 h-5 w-5 text-[#D76742]" />
           <h3 className="text-base font-medium text-foreground">Email Support</h3>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">

@@ -51,7 +51,6 @@ import type {
   EmailActionItemRecord,
   EmailThreadDetail,
   EmailThreadListItem,
-  NegotiationStance,
   ProfileRecord,
 } from "@/lib/types";
 
@@ -698,7 +697,7 @@ export function InboxWorkspace({
     return (
       <div className="flex h-full min-h-0 flex-col px-5 py-4 lg:px-8 lg:py-5">
         <div className="mx-auto w-full max-w-[1520px]">
-          <h1 className="text-[31px] font-semibold tracking-[-0.05em] text-foreground lg:text-[36px]">
+          <h1 className="text-[26px] font-semibold tracking-[-0.05em] text-foreground lg:text-[36px]">
             Inbox
           </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
@@ -742,7 +741,7 @@ export function InboxWorkspace({
                     onChange={(event) => setQuery(event.currentTarget.value)}
                     placeholder="Search linked emails"
                     aria-label="Search linked emails"
-                    className="h-9 rounded-none border-black/10 bg-white text-[12px] shadow-none dark:border-white/10 dark:bg-[#161a1f]"
+                    className="h-9 rounded-none border-black/10 bg-white text-[12px] shadow-none dark:border-white/10 dark:bg-card"
                   />
                 </div>
                 {hasConnectedAccounts && hasLinkedThreads ? (
@@ -810,7 +809,7 @@ export function InboxWorkspace({
                           className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
-                          <Info className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                          <Info className="h-4 w-4 shrink-0 text-muted-foreground" />
                         </button>
                       </AppTooltip>
                       <button
@@ -996,7 +995,7 @@ export function InboxWorkspace({
               <button
                 type="button"
                 onClick={closeCandidateModal}
-                className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground transition hover:text-foreground"
+                className="inline-flex h-10 w-10 items-center justify-center text-muted-foreground transition hover:text-foreground"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />

@@ -54,28 +54,26 @@ export function WorkspaceDetailHeader({
           </div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#7CB08B]" />
-            <span className="text-sm font-medium text-foreground">
-              {humanizeToken(status)}
-            </span>
+            <span className="text-sm font-medium text-foreground">{humanizeToken(status)}</span>
           </div>
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="border-b border-black/8 pb-3 dark:border-white/10">
-          <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Payment</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Payment</p>
           <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
             {formatCurrency(paymentAmount, currency ?? "USD")}
           </p>
         </div>
         <div className="border-b border-black/8 pb-3 dark:border-white/10">
-          <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Next due</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Next due</p>
           <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
             {nextDeliverableValue}
           </p>
         </div>
         <div className="border-b border-black/8 pb-3 dark:border-white/10">
-          <p className="text-xs uppercase tracking-[0.16em] text-[#98a2b3]">Deliverables</p>
+          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Deliverables</p>
           <p className="mt-1.5 text-xl font-semibold tracking-[-0.03em] text-foreground sm:text-[22px]">
             {deliverableCount} pending
           </p>

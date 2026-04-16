@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 import { BillingInterval, PlanTier } from "@prisma/client";
 import { Check } from "lucide-react";
 
-import { cancelSubscriptionAction, openBillingPortalAction, startCheckoutAction } from "@/app/actions";
+import {
+  cancelSubscriptionAction,
+  openBillingPortalAction,
+  startCheckoutAction,
+} from "@/app/actions";
 import { InfoTooltip } from "@/components/app-tooltip";
 import { BillingUpgradePanel } from "@/components/billing-upgrade-panel";
 import { PostHogSubmitButton } from "@/components/posthog-submit-button";
@@ -16,22 +20,22 @@ import {
   moneyOrLabel,
   statusBadgeLabel,
   statusTone,
-  trialCountdownLabel
+  trialCountdownLabel,
 } from "./page-helpers";
 
 function StatusBanner({
   tone,
-  children
+  children,
 }: {
   tone: "critical" | "neutral" | "notice" | "success" | "warning";
   children: ReactNode;
 }) {
   const toneClassName = {
-    critical: "border-red-200 bg-red-50 text-red-700",
-    neutral: "border-black/[0.06] bg-[#f5f6f8] text-[#667085]",
-    notice: "border-sky-200 bg-sky-50 text-sky-700",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    warning: "border-amber-200 bg-amber-50 text-amber-800"
+    critical: "border-destructive/25 bg-destructive/8 text-destructive",
+    neutral: "border-border bg-secondary text-muted-foreground",
+    notice: "border-ocean/25 bg-ocean/8 text-ocean",
+    success: "border-success/25 bg-success/8 text-success",
+    warning: "border-accent/25 bg-accent/8 text-accent-foreground dark:text-accent",
   }[tone];
 
   return (
@@ -46,51 +50,36 @@ function StatusBanner({
 }
 
 export default async function BillingSettingsPage({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Promise<{ billing_error?: string; billing_notice?: string; checkout?: string }>;
 }) {
   const viewer = await requireViewer();
   const [overview, entitlements] = await Promise.all([
     getBillingOverviewForViewer(viewer),
-    getViewerEntitlements(viewer)
+    getViewerEntitlements(viewer),
   ]);
-  const {
-    billingError,
-    billingNotice,
-    checkoutState,
-    usageCards
-  } = buildBillingPageViewModel({
-    searchParams: searchParams ? await searchParams : undefined
+  const { billingError, billingNotice, checkoutState, usageCards } = buildBillingPageViewModel({
+    searchParams: searchParams ? await searchParams : undefined,
   });
 
   return (
     <div className="space-y-6">
       {/* Status banners */}
-      {billingError && (
-        <StatusBanner tone="critical">
-          {billingError}
-        </StatusBanner>
-      )}
+      {billingError && <StatusBanner tone="critical">{billingError}</StatusBanner>}
       {checkoutState === "success" && (
         <StatusBanner tone="success">
           Checkout complete. Your plan details should update momentarily.
         </StatusBanner>
       )}
       {checkoutState === "canceled" && (
-        <StatusBanner tone="neutral">
-          Checkout was canceled.
-        </StatusBanner>
+        <StatusBanner tone="neutral">Checkout was canceled.</StatusBanner>
       )}
-      {billingNotice && (
-        <StatusBanner tone="notice">
-          {billingNotice}
-        </StatusBanner>
-      )}
+      {billingNotice && <StatusBanner tone="notice">{billingNotice}</StatusBanner>}
       {!overview.stripeConfigured && (
         <StatusBanner tone="warning">
-          Billing setup is still being finished. Add your Stripe secret, webhook secret,
-          and plan price IDs before testing paid flows.
+          Billing setup is still being finished. Add your Stripe secret, webhook secret, and plan
+          price IDs before testing paid flows.
         </StatusBanner>
       )}
 
@@ -111,14 +100,14 @@ export default async function BillingSettingsPage({
                   {statusBadgeLabel({
                     currentSubscriptionStatus: overview.currentSubscriptionStatus,
                     currentTrialEndsAt: overview.currentTrialEndsAt,
-                    currentPlanTier: overview.currentPlanTier
+                    currentPlanTier: overview.currentPlanTier,
                   })}
                 </span>
               </div>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 {billingIntro({
                   currentPlanTier: overview.currentPlanTier,
-                  currentSubscriptionStatus: overview.currentSubscriptionStatus
+                  currentSubscriptionStatus: overview.currentSubscriptionStatus,
                 })}
               </p>
             </div>
@@ -141,7 +130,7 @@ export default async function BillingSettingsPage({
                       eventName="billing_cancel_clicked"
                       payload={{ source: "billing_overview" }}
                       pendingLabel="Canceling…"
-                      className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                      className="inline-flex items-center justify-center rounded-lg border border-destructive/25 bg-white px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
                     >
                       Cancel plan
                     </PostHogSubmitButton>
@@ -155,7 +144,9 @@ export default async function BillingSettingsPage({
             <div>
               <span className="text-muted-foreground">Billing</span>
               <p className="mt-0.5 font-medium text-foreground">
-                {overview.currentPlanInterval ? humanizeToken(overview.currentPlanInterval) : "Monthly"}
+                {overview.currentPlanInterval
+                  ? humanizeToken(overview.currentPlanInterval)
+                  : "Monthly"}
               </p>
             </div>
             <div>
@@ -201,9 +192,7 @@ export default async function BillingSettingsPage({
           {usageCards.map(({ key, label }) => {
             const usage = entitlements.usage[key];
             const pct =
-              usage.limit === null
-                ? 0
-                : Math.min((usage.current / usage.limit) * 100, 100);
+              usage.limit === null ? 0 : Math.min((usage.current / usage.limit) * 100, 100);
             const isOver = usage.limit !== null && usage.current > usage.limit;
 
             return (
@@ -222,7 +211,7 @@ export default async function BillingSettingsPage({
                     aria-valuemax={usage.limit ?? usage.current}
                     aria-valuenow={usage.current}
                     className={`h-full rounded-full transition-all ${
-                      isOver ? "bg-red-500" : pct > 80 ? "bg-amber-500" : "bg-foreground/70"
+                      isOver ? "bg-destructive" : pct > 80 ? "bg-accent" : "bg-foreground/70"
                     }`}
                     style={{ width: `${Math.max(pct, 2)}%` }}
                   />
@@ -237,15 +226,12 @@ export default async function BillingSettingsPage({
         <div className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Billing insights
               </p>
               <h3 className="mt-2 flex items-center gap-1 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                 Brand earnings versus HelloBrand cost
-                <InfoTooltip
-                  label="Disclaimer"
-                  content={overview.insights.disclaimer}
-                />
+                <InfoTooltip label="Disclaimer" content={overview.insights.disclaimer} />
               </h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                 A simple creator-facing financial snapshot based on tracked deal payments and
@@ -256,10 +242,10 @@ export default async function BillingSettingsPage({
 
           <div className="mt-5 grid gap-4 lg:grid-cols-3">
             <div className="border border-black/[0.06] bg-[#faf8f4] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Paid from brands
               </p>
-              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+              <p className="mt-2 text-[26px] font-semibold tracking-[-0.05em] text-foreground sm:text-[32px]">
                 {moneyOrLabel(
                   overview.insights.paidToDateTotal,
                   overview.insights.earningsCurrency ?? "USD",
@@ -272,10 +258,10 @@ export default async function BillingSettingsPage({
             </div>
 
             <div className="border border-black/[0.06] bg-white px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Outstanding from brands
               </p>
-              <p className="mt-2 text-[32px] font-semibold tracking-[-0.05em] text-foreground">
+              <p className="mt-2 text-[26px] font-semibold tracking-[-0.05em] text-foreground sm:text-[32px]">
                 {moneyOrLabel(
                   overview.insights.outstandingTotal,
                   overview.insights.earningsCurrency ?? "USD",
@@ -288,7 +274,7 @@ export default async function BillingSettingsPage({
             </div>
 
             <div className="border border-black/[0.06] bg-white px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 HelloBrand cost
               </p>
               <div className="mt-2 space-y-1">
@@ -309,7 +295,7 @@ export default async function BillingSettingsPage({
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             <div className="border border-black/[0.06] bg-white px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 This month
               </p>
               <div className="mt-3 grid gap-2 text-sm">
@@ -343,7 +329,7 @@ export default async function BillingSettingsPage({
             </div>
 
             <div className="border border-black/[0.06] bg-white px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Year view
               </p>
               <div className="mt-3 grid gap-2 text-sm">
@@ -366,11 +352,7 @@ export default async function BillingSettingsPage({
                 <div className="flex items-center justify-between gap-4 border-t border-black/[0.06] pt-2">
                   <span className="text-muted-foreground">YTD minus yearly cost</span>
                   <span className="font-semibold text-foreground">
-                    {moneyOrLabel(
-                      overview.insights.yearToDateNetAfterPlanCostUsd,
-                      "USD",
-                      "Hidden"
-                    )}
+                    {moneyOrLabel(overview.insights.yearToDateNetAfterPlanCostUsd, "USD", "Hidden")}
                   </span>
                 </div>
               </div>
@@ -378,7 +360,9 @@ export default async function BillingSettingsPage({
           </div>
 
           {overview.insights.comparisonNotice ? (
-            <p className="mt-4 text-sm text-amber-700">{overview.insights.comparisonNotice}</p>
+            <p className="mt-4 text-sm text-accent-foreground dark:text-accent">
+              {overview.insights.comparisonNotice}
+            </p>
           ) : null}
 
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
@@ -404,12 +388,10 @@ export default async function BillingSettingsPage({
 
       {/* Plan cards */}
       <section>
-        <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
-          Compare plans
-        </h3>
+        <h3 className="mb-4 text-sm font-semibold text-muted-foreground">Compare plans</h3>
         <p className="mb-5 max-w-[42rem] text-sm leading-6 text-muted-foreground">
-          Choose the level of support that matches how often you manage paid partnerships.
-          For many creators, one organized partnership can cover multiple months of HelloBrand.
+          Choose the level of support that matches how often you manage paid partnerships. For many
+          creators, one organized partnership can cover multiple months of HelloBrand.
         </p>
         <div className="grid gap-4 lg:grid-cols-3">
           {overview.planCatalog.map((plan) => {
@@ -424,7 +406,9 @@ export default async function BillingSettingsPage({
               <article
                 key={plan.tier}
                 className={`flex flex-col border bg-white p-6 shadow-panel ${
-                  isCurrentPlan ? "border-foreground/20 ring-1 ring-foreground/10" : "border-black/[0.06]"
+                  isCurrentPlan
+                    ? "border-foreground/20 ring-1 ring-foreground/10"
+                    : "border-black/[0.06]"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -445,9 +429,7 @@ export default async function BillingSettingsPage({
                   {plan.yearlyAvailable ? plan.annualEquivalentLabel : "Monthly billing only"}
                 </p>
 
-                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  {plan.summary}
-                </p>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{plan.summary}</p>
 
                 <ul className="mt-4 flex-1 space-y-2 border-t border-black/[0.06] pt-4">
                   {plan.features.map((feature, index) => {
@@ -461,7 +443,11 @@ export default async function BillingSettingsPage({
                           aria-hidden="true"
                           className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${isHighlighted ? "text-foreground" : "text-muted-foreground/50"}`}
                         />
-                        <span className={isHighlighted ? "font-medium text-foreground" : "text-muted-foreground"}>
+                        <span
+                          className={
+                            isHighlighted ? "font-medium text-foreground" : "text-muted-foreground"
+                          }
+                        >
                           {feature}
                         </span>
                       </li>
@@ -478,7 +464,7 @@ export default async function BillingSettingsPage({
                       payload={{
                         source: "billing_plan_grid",
                         targetTier: plan.tier,
-                        interval: BillingInterval.month
+                        interval: BillingInterval.month,
                       }}
                       pendingLabel="Redirecting…"
                       disabled={disablePlanActions || !plan.monthlyAvailable}
@@ -497,7 +483,7 @@ export default async function BillingSettingsPage({
                         payload={{
                           source: "billing_plan_grid",
                           targetTier: plan.tier,
-                          interval: BillingInterval.year
+                          interval: BillingInterval.year,
                         }}
                         pendingLabel="Redirecting…"
                         disabled={disablePlanActions}

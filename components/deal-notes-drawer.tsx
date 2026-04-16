@@ -10,17 +10,11 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { sanitizePlainTextInput } from "@/lib/utils";
 
-export function DealNotesDrawer({
-  dealId,
-  notes
-}: {
-  dealId: string;
-  notes: string | null;
-}) {
+export function DealNotesDrawer({ dealId, notes }: { dealId: string; notes: string | null }) {
   const sanitizedNotes = sanitizePlainTextInput(notes);
 
   return (
@@ -46,7 +40,7 @@ export function DealNotesDrawer({
           <input type="hidden" name="dealId" value={dealId} />
           <div className="flex-1 px-6 py-5">
             <textarea
-              className="min-h-[280px] w-full border border-black/10 bg-white px-4 py-4 text-sm text-foreground outline-none transition focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-white/20"
+              className="min-h-[280px] w-full border border-black/10 bg-white px-4 py-4 text-sm text-foreground outline-none transition focus:border-ring dark:border-white/12 dark:bg-white/[0.03] dark:focus:border-ring"
               name="notes"
               defaultValue={sanitizedNotes}
               placeholder="Add notes, open questions, negotiated updates, or payment reminders."

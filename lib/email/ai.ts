@@ -1,3 +1,28 @@
+/**
+ * Email AI module — LLM-powered email thread summaries, reply drafts, and reply suggestions.
+ *
+ * This file owns all prompt construction and LLM orchestration for the inbox experience.
+ * There are three main AI features:
+ *
+ * 1. **Thread summaries** (`generateEmailThreadSummary`) — produces a short creator-facing
+ *    recap of an email thread so the creator can understand the conversation at a glance.
+ *
+ * 2. **Reply drafts** (`generateEmailReplyDraft` / `streamEmailReplyDraft`) — generates a
+ *    full email reply (subject + body) grounded in workspace facts, thread context, and the
+ *    creator's chosen negotiation stance. Two modes: structured (JSON) and streaming (text).
+ *
+ * 3. **Reply suggestions** (`generateReplySuggestions`) — produces 3 short prompt suggestions
+ *    the creator can click to trigger a draft, tailored to the thread's conversation mode.
+ *
+ * Architecture:
+ * - All prompts use XML-tagged sections via `joinPromptSections()` for consistent structure.
+ * - Thread briefs (conversation mode, key signals) are built by `lib/email/thread-brief.ts`
+ *   and injected as context into every prompt.
+ * - LLM calls go through the AI gateway (`lib/ai/gateway.ts`) which handles model routing,
+ *   budget enforcement, caching, and usage tracking.
+ * - Structured outputs are validated with Zod schemas; unstructured text (summaries) are
+ *   returned as plain strings with a deterministic fallback.
+ */
 import { z } from "zod";
 import { streamText } from "ai";
 
@@ -36,11 +61,17 @@ import type {
   Viewer,
 } from "@/lib/types";
 
+// ---------------------------------------------------------------------------
+// Zod schemas for structured LLM outputs
+// ---------------------------------------------------------------------------
+
+/** Validates that the LLM returns a complete email draft with non-empty subject and body. */
 const emailDraftSchema = z.object({
   subject: z.string().trim().min(1),
   body: z.string().trim().min(1),
 });
 
+/** Validates that the LLM returns at most 3 reply suggestions, each with a label and prompt. */
 const replySuggestionsSchema = z.object({
   suggestions: z
     .array(
@@ -52,8 +83,21 @@ const replySuggestionsSchema = z.object({
     .max(3),
 });
 
+/** Cache version key for thread summaries — bump this when the prompt format changes. */
 const EMAIL_THREAD_SUMMARY_FORMAT_VERSION = "v3_brief";
 
+// ---------------------------------------------------------------------------
+// Thread summary prompt builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the system prompt for email thread summarization.
+ * Tells the LLM to produce a factual, concise, creator-facing recap that covers
+ * five things in order: what the thread is, what they want, what the creator last
+ * said, what is unresolved, and the recommended next move.
+ *
+ * @param modeGuidance - Conversation-mode-specific focus instructions from thread-brief
+ */
 function emailThreadSummarySystemPrompt(modeGuidance: string) {
   return joinPromptSections([
     {
@@ -87,6 +131,10 @@ function emailThreadSummarySystemPrompt(modeGuidance: string) {
   ]);
 }
 
+/**
+ * Builds the user prompt for thread summarization.
+ * Provides the thread brief (structured context) and the full thread text.
+ */
 function emailThreadSummaryUserPrompt(threadText: string, briefText: string) {
   return joinPromptSections([
     {
@@ -105,6 +153,18 @@ function emailThreadSummaryUserPrompt(threadText: string, briefText: string) {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// Reply draft prompt builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the system prompt for email reply draft generation.
+ * Includes role, instruction hierarchy (workspace > thread > draft > custom prompt),
+ * behavioral rules, stance instructions, mode guidance, and few-shot examples.
+ *
+ * @param stance - Negotiation stance (firm/collaborative/exploratory/balanced)
+ * @param modeGuidance - Conversation-mode-specific draft instructions from thread-brief
+ */
 function emailDraftSystemPrompt(stance?: NegotiationStance | null, modeGuidance?: string | null) {
   const stanceInstruction =
     stance === "firm"
@@ -195,6 +255,12 @@ function emailDraftSystemPrompt(stance?: NegotiationStance | null, modeGuidance?
   ]);
 }
 
+/**
+ * Builds the user prompt for reply draft generation.
+ * Assembles all available context sections in order: thread brief, workspace terms,
+ * discrepancies, action items, private notes, existing draft, custom instructions,
+ * signature, full thread text, and the task instruction.
+ */
 function emailDraftUserPrompt(input: {
   workspaceSummary: string;
   discrepancyContext: string;
@@ -251,6 +317,17 @@ function emailDraftUserPrompt(input: {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// Reply suggestions prompt builders
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the system prompt for generating reply prompt suggestions.
+ * Produces 3 short suggestions (label + prompt) that the creator can click
+ * to trigger a draft. Suggestions are tailored to the conversation mode.
+ *
+ * @param modeGuidance - Conversation-mode-specific guidance for the current thread
+ */
 function replySuggestionsSystemPrompt(modeGuidance: string) {
   return joinPromptSections([
     {
@@ -302,6 +379,10 @@ function replySuggestionsSystemPrompt(modeGuidance: string) {
   ]);
 }
 
+/**
+ * Builds the user prompt for reply suggestion generation.
+ * Provides the thread brief and full thread text.
+ */
 function replySuggestionsUserPrompt(threadText: string, briefText: string) {
   return joinPromptSections([
     {
@@ -320,6 +401,14 @@ function replySuggestionsUserPrompt(threadText: string, briefText: string) {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// Data formatting helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Converts an email thread into a plain-text representation suitable for LLM context.
+ * Each message is formatted with sender, timestamp, subject, and body, separated by dividers.
+ */
 function plainTextThread(thread: EmailThreadDetail) {
   return thread.messages
     .map((message) => {
@@ -330,6 +419,10 @@ function plainTextThread(thread: EmailThreadDetail) {
     .join("\n\n---\n\n");
 }
 
+/**
+ * Produces a deterministic fallback summary when the LLM is unavailable or fails.
+ * Uses metadata (subject, participants, last activity) and the latest message body.
+ */
 function fallbackSummary(thread: EmailThreadDetail) {
   const participants = thread.thread.participants
     .map((participant) => participant.email)
@@ -348,6 +441,14 @@ function fallbackSummary(thread: EmailThreadDetail) {
     .join("\n");
 }
 
+/**
+ * Serializes a linked workspace (partnership) into a prompt-friendly context string.
+ * Only includes fields with known values — fields that are null, "Unknown", or "None"
+ * are omitted to save tokens and avoid confusing the LLM with noise.
+ *
+ * Includes: campaign/brand info, key payment/terms fields, summaries, risk flags,
+ * documents, and extraction evidence.
+ */
 function workspaceContext(partnership: DealAggregate | null) {
   if (!partnership) {
     return "No linked workspace context.";
@@ -376,6 +477,15 @@ function workspaceContext(partnership: DealAggregate | null) {
     })
     .join("\n");
 
+  // Helper: only include a field line when the value is known and non-trivial
+  const known = (label: string, value: string | null | undefined) =>
+    value && value !== "Unknown" && value !== "None" ? `- ${label}: ${value}` : null;
+
+  const deliverablesList = (terms?.deliverables ?? [])
+    .slice(0, 5)
+    .map((item) => `${item.quantity ?? 1} ${item.title}`)
+    .join(", ");
+
   return [
     `Workspace campaign: ${partnership.deal.campaignName}`,
     `Workspace brand: ${partnership.deal.brandName}`,
@@ -383,21 +493,23 @@ function workspaceContext(partnership: DealAggregate | null) {
     `Workspace payment status: ${partnership.deal.paymentStatus}`,
     "",
     "Key terms:",
-    `- Payment amount: ${terms?.paymentAmount ? `$${terms.paymentAmount}` : "Unknown"}`,
-    `- Currency: ${terms?.currency ?? "Unknown"}`,
-    `- Payment terms: ${terms?.paymentTerms ?? "Unknown"}`,
-    `- Payment trigger: ${terms?.paymentTrigger ?? "Unknown"}`,
-    `- Deliverables: ${(terms?.deliverables ?? []).map((item) => `${item.quantity ?? "TBD"} ${item.title}`).join(", ") || "Unknown"}`,
-    `- Usage rights: ${terms?.usageRights ?? "Unknown"}`,
-    `- Usage duration: ${terms?.usageDuration ?? "Unknown"}`,
-    `- Usage territory: ${terms?.usageTerritory ?? "Unknown"}`,
-    `- Usage channels: ${(terms?.usageChannels ?? []).join(", ") || "Unknown"}`,
-    `- Exclusivity applies: ${terms?.exclusivityApplies === null ? "Unknown" : terms?.exclusivityApplies ? "Yes" : "No"}`,
-    `- Exclusivity category: ${terms?.exclusivityCategory ?? "Unknown"}`,
-    `- Exclusivity duration: ${terms?.exclusivityDuration ?? "Unknown"}`,
-    `- Revisions: ${terms?.revisions ?? "Unknown"}`,
-    `- Termination: ${terms?.termination ?? "Unknown"}`,
-    `- Notes: ${terms?.notes ?? "None"}`,
+    known("Payment amount", terms?.paymentAmount ? `$${terms.paymentAmount}` : null),
+    known("Currency", terms?.currency),
+    known("Payment terms", terms?.paymentTerms),
+    known("Payment trigger", terms?.paymentTrigger),
+    deliverablesList ? `- Deliverables: ${deliverablesList}` : null,
+    known("Usage rights", terms?.usageRights),
+    known("Usage duration", terms?.usageDuration),
+    known("Usage territory", terms?.usageTerritory),
+    terms?.usageChannels?.length ? `- Usage channels: ${terms.usageChannels.join(", ")}` : null,
+    terms?.exclusivityApplies != null
+      ? `- Exclusivity applies: ${terms.exclusivityApplies ? "Yes" : "No"}`
+      : null,
+    known("Exclusivity category", terms?.exclusivityCategory),
+    known("Exclusivity duration", terms?.exclusivityDuration),
+    known("Revisions", terms?.revisions),
+    known("Termination", terms?.termination),
+    terms?.notes ? `- Notes: ${terms.notes}` : null,
     "",
     "Workspace summaries:",
     summaries || "- None",
@@ -410,9 +522,27 @@ function workspaceContext(partnership: DealAggregate | null) {
     "",
     "Workspace extracted structure:",
     extractionEvidence || "- None",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
+// ---------------------------------------------------------------------------
+// Exported: Thread summary generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a short creator-facing summary of an email thread.
+ *
+ * Flow:
+ * 1. Build a deterministic fallback summary from thread metadata
+ * 2. Analyze the thread to determine its conversation mode via `buildThreadBrief`
+ * 3. Construct system + user prompts with mode-specific guidance
+ * 4. Call the LLM (returns plain text, not JSON)
+ * 5. Return the LLM output or the fallback if unavailable
+ *
+ * Results are cached by thread ID + thread version + format version.
+ */
 export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
   const fallback = fallbackSummary(thread);
   const threadText = plainTextThread(thread);
@@ -446,6 +576,17 @@ export async function generateEmailThreadSummary(thread: EmailThreadDetail) {
   return result?.data ?? fallback;
 }
 
+// ---------------------------------------------------------------------------
+// Reply draft helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Produces a deterministic fallback draft when the LLM is unavailable or fails.
+ *
+ * Priority:
+ * 1. If a thread brief exists, use the mode-specific fallback template
+ * 2. Otherwise, build a generic reply using the existing draft or a template
+ */
 function fallbackDraft(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
@@ -477,6 +618,13 @@ function fallbackDraft(
   };
 }
 
+/**
+ * Assembles everything needed for a reply draft LLM call: prompts, fallback, cache policy,
+ * and temperature. Shared by both the structured and streaming draft paths.
+ *
+ * Gathers context from: thread brief, workspace terms, discrepancies between email and
+ * contract, action items, private notes, existing draft, custom instructions, and signature.
+ */
 function buildEmailReplyDraftRequest(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
@@ -490,6 +638,8 @@ function buildEmailReplyDraftRequest(
   const briefText = threadBriefForPrompt(brief);
   const modeGuidance = modeSpecificDraftGuidance(brief.mode, brief);
   const fallback = fallbackDraft(thread, partnership, profile, instructions, currentDraft, brief);
+
+  // Discrepancies between what the email claims and what the contract actually says
   const discrepancyContext =
     thread.promiseDiscrepancies.length > 0
       ? thread.promiseDiscrepancies
@@ -499,12 +649,15 @@ function buildEmailReplyDraftRequest(
           .join("\n")
       : "- None";
 
+  // Action items extracted from the thread (e.g. "send invoice by April 4")
   const actionContext =
     thread.actionItems.length > 0
       ? thread.actionItems
           .map((a) => `- ${a.action}${a.dueDate ? ` (due: ${a.dueDate})` : ""}`)
           .join("\n")
       : "- None";
+
+  // Private notes the creator has attached to this thread
   const noteContext =
     notes && notes.length > 0
       ? notes
@@ -564,10 +717,15 @@ function buildEmailReplyDraftRequest(
       threadText,
       briefText,
     }),
+    // Higher temperature for exploratory (more creative questions) and lower for firm (more precise boundaries)
     temperature: stance === "firm" ? 0.25 : stance === "exploratory" ? 0.45 : 0.35,
   };
 }
 
+/**
+ * Creates a plain-text HTTP response for streaming draft fallbacks.
+ * Used when the AI budget is blocked or the provider is unavailable.
+ */
 function draftTextResponse(body: string) {
   return new Response(body, {
     headers: {
@@ -577,6 +735,23 @@ function draftTextResponse(body: string) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Exported: Structured reply draft (JSON)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates an email reply draft as a structured JSON response (subject + body).
+ *
+ * This is the non-streaming path used for pre-generating drafts and for API routes
+ * that return a complete draft object. The LLM output is validated against
+ * `emailDraftSchema` and post-processed to strip markdown and placeholder names.
+ *
+ * Flow:
+ * 1. Build the request (prompts, fallback, cache policy, temperature)
+ * 2. Call the LLM via the structured task runner
+ * 3. Normalize the output (strip markdown, fix placeholders)
+ * 4. Return the draft or the fallback
+ */
 export async function generateEmailReplyDraft(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,
@@ -616,6 +791,47 @@ export async function generateEmailReplyDraft(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Exported: Streaming reply draft (text stream)
+// ---------------------------------------------------------------------------
+
+/**
+ * Adapts the full draft system prompt for streaming mode.
+ *
+ * The structured path tells the LLM to return JSON `{ subject, body }`, but the streaming
+ * path needs plain text (just the body). This function strips the JSON output contract and
+ * few-shot examples (which demonstrate JSON output) and replaces them with a streaming
+ * instruction to return plain prose only. This avoids conflicting instructions where the
+ * prompt simultaneously says "return JSON" and "return plain text".
+ */
+function buildStreamingDraftSystemPrompt(systemPrompt: string) {
+  const withoutOutputContract = systemPrompt
+    .replace(/<output_contract>[\s\S]*?<\/output_contract>/g, "")
+    .replace(/<few_shot_examples>[\s\S]*?<\/few_shot_examples>/g, "");
+  return [
+    withoutOutputContract.trim(),
+    "",
+    "<streaming_instruction>",
+    "Return only the email body text as plain prose.",
+    "Do not include a subject line, JSON, markdown, bullets, or headings.",
+    "</streaming_instruction>",
+  ].join("\n");
+}
+
+/**
+ * Streams an email reply draft as a text stream using the Vercel AI SDK.
+ *
+ * This is the streaming path used by the inbox UI for real-time draft generation.
+ * Unlike `generateEmailReplyDraft`, this returns a `Response` that streams plain text
+ * (just the body), not JSON. The client receives tokens as they are generated.
+ *
+ * Flow:
+ * 1. Build the request (same prompts and context as the structured path)
+ * 2. Check budget and provider availability; return fallback if blocked
+ * 3. Stream via `streamText()` with a modified system prompt (no JSON contract)
+ * 4. Record usage metrics on completion via `finalizeAiStreamExecution`
+ * 5. Return the text stream response
+ */
 export async function streamEmailReplyDraft(input: {
   viewer: Viewer;
   thread: EmailThreadDetail;
@@ -635,6 +851,8 @@ export async function streamEmailReplyDraft(input: {
     input.currentDraft ?? null,
     input.notes ?? []
   );
+
+  // Check budget and prepare the stream execution (may block if over budget)
   const prepared = await prepareAiStreamExecution({
     userId: input.viewer.id,
     taskKey: "email_draft",
@@ -645,6 +863,7 @@ export async function streamEmailReplyDraft(input: {
     },
   });
 
+  // Budget blocked or no provider available — return the deterministic fallback
   if (prepared.budgetDecision === "blocked") {
     return draftTextResponse(request.fallback.body);
   }
@@ -664,6 +883,7 @@ export async function streamEmailReplyDraft(input: {
     userPrompt: request.userPrompt,
   });
 
+  // Stream the draft using the Vercel AI SDK with the streaming-adapted system prompt
   const result = streamText({
     model: provider.chat(prepared.requestedModel, {
       user: input.viewer.id,
@@ -677,7 +897,7 @@ export async function streamEmailReplyDraft(input: {
         ttl: "5m",
       },
     }),
-    system: `${request.systemPrompt}\n\nReturn only the email body text. Do not include a subject line, JSON, markdown, bullets, or headings.`,
+    system: buildStreamingDraftSystemPrompt(request.systemPrompt),
     prompt: request.userPrompt,
     maxOutputTokens: prepared.maxTokens,
     temperature: request.temperature,
@@ -713,6 +933,26 @@ export async function streamEmailReplyDraft(input: {
   return result.toTextStreamResponse();
 }
 
+// ---------------------------------------------------------------------------
+// Exported: Reply suggestion generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates 3 reply prompt suggestions for a creator responding to a brand email.
+ *
+ * Each suggestion has a short label (shown as a button) and a prompt (the instruction
+ * that will be sent to the draft generator when clicked). Suggestions are tailored to
+ * the thread's conversation mode (e.g., decline_affiliate, go_live, rate_negotiation).
+ *
+ * Flow:
+ * 1. Analyze the thread to determine its conversation mode
+ * 2. Build mode-specific fallback suggestions from templates
+ * 3. Construct system + user prompts with mode guidance and few-shot examples
+ * 4. Call the LLM; validate output against `replySuggestionsSchema`
+ * 5. Return the LLM suggestions or the mode-specific fallbacks
+ *
+ * Results are cached by thread ID + thread version.
+ */
 export async function generateReplySuggestions(
   thread: EmailThreadDetail
 ): Promise<{ id: string; label: string; prompt: string }[]> {

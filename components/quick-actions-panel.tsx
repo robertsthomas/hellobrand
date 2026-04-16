@@ -16,7 +16,7 @@ function toneClasses(tone: QuickActionItem["tone"]) {
     return {
       card: "border-orange-200/80 bg-orange-50/70 dark:border-orange-500/20 dark:bg-orange-500/10",
       icon: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-      label: "text-orange-700 dark:text-orange-300"
+      label: "text-orange-700 dark:text-orange-300",
     };
   }
 
@@ -24,7 +24,7 @@ function toneClasses(tone: QuickActionItem["tone"]) {
     return {
       card: "border-emerald-200/80 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-500/10",
       icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
-      label: "text-emerald-700 dark:text-emerald-300"
+      label: "text-emerald-700 dark:text-emerald-300",
     };
   }
 
@@ -32,14 +32,14 @@ function toneClasses(tone: QuickActionItem["tone"]) {
     return {
       card: "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]",
       icon: "bg-[#dceae3] text-[#234b3c] dark:bg-[#1a3128] dark:text-[#9fd7bf]",
-      label: "text-[#2c5b49] dark:text-[#9fd7bf]"
+      label: "text-[#2c5b49] dark:text-[#9fd7bf]",
     };
   }
 
   return {
-    card: "border-black/8 bg-[#f7f8fa] dark:border-white/10 dark:bg-white/[0.03]",
-    icon: "bg-white text-[#667085] dark:bg-white/[0.06] dark:text-[#a3acb9]",
-    label: "text-[#667085] dark:text-[#a3acb9]"
+    card: "border-black/8 bg-secondary dark:border-white/10 dark:bg-white/[0.03]",
+    icon: "bg-white text-muted-foreground dark:bg-white/[0.06] dark:text-muted-foreground",
+    label: "text-muted-foreground dark:text-muted-foreground",
   };
 }
 
@@ -73,10 +73,7 @@ function QuickActionRow({ item }: { item: QuickActionItem }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <div
-            className={cn(
-              "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center",
-              tone.icon
-            )}
+            className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center", tone.icon)}
           >
             {item.tone === "warning" ? (
               <AlertTriangle className="h-4.5 w-4.5" />
@@ -103,9 +100,7 @@ function QuickActionRow({ item }: { item: QuickActionItem }) {
         </div>
       </div>
 
-      <div className="mt-4 text-sm font-medium text-foreground">
-        {item.ctaLabel ?? "Open"}
-      </div>
+      <div className="mt-4 text-sm font-medium text-foreground">{item.ctaLabel ?? "Open"}</div>
     </Link>
   );
 }
@@ -118,7 +113,7 @@ export function QuickActionsPanel({ items }: { items: QuickActionItem[] }) {
   return (
     <section className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#667085] dark:text-[#8f98a6]">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
           Next up
         </p>
         <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-foreground">
@@ -130,7 +125,9 @@ export function QuickActionsPanel({ items }: { items: QuickActionItem[] }) {
       </div>
 
       <div className="mt-6 grid gap-3 lg:grid-cols-2">
-        {items.map((item) => <QuickActionRow key={`${item.title}:${item.href}`} item={item} />)}
+        {items.map((item) => (
+          <QuickActionRow key={`${item.title}:${item.href}`} item={item} />
+        ))}
       </div>
     </section>
   );

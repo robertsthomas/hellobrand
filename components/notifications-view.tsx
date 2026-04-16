@@ -13,7 +13,7 @@ import {
   Shield,
   Wallet,
   X,
-  type LucideIcon
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   isNotificationUnread,
   type NotificationItem,
   type NotificationListResponse,
-  type NotificationType
+  type NotificationType,
 } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,7 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "workspaces", label: "Workspaces" },
   { key: "payments", label: "Payments" },
   { key: "deadlines", label: "Deadlines" },
-  { key: "risks", label: "Risks" }
+  { key: "risks", label: "Risks" },
 ];
 
 const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
@@ -55,7 +55,7 @@ const TYPE_ICONS: Record<NotificationType, LucideIcon> = {
   workspace_confirmed: Check,
   workspace_cancelled: X,
   workspace_deleted: X,
-  workspace_missing_data: FileText
+  workspace_missing_data: FileText,
 };
 
 const TYPE_ICON_STYLES: Record<NotificationType, string> = {
@@ -76,13 +76,13 @@ const TYPE_ICON_STYLES: Record<NotificationType, string> = {
   workspace_confirmed: "text-[#5f6f64] dark:text-white/50",
   workspace_cancelled: "text-[#8a8f98] dark:text-white/35",
   workspace_deleted: "text-[#8a8f98] dark:text-white/35",
-  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50"
+  workspace_missing_data: "text-[#7a6a4f] dark:text-white/50",
 };
 
 async function fetchNotifications() {
   const response = await fetch("/api/notifications?limit=200", {
     method: "GET",
-    cache: "no-store"
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -111,17 +111,11 @@ function matchesFilter(item: NotificationItem, filter: FilterTab): boolean {
   }
 }
 
-export function NotificationsView({
-  notifications
-}: {
-  notifications: NotificationItem[];
-}) {
+export function NotificationsView({ notifications }: { notifications: NotificationItem[] }) {
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [isPending, startTransition] = useTransition();
   const [items, setItems] = useState<NotificationItem[]>(notifications);
-  const [unreadCount, setUnreadCount] = useState(
-    notifications.filter(isNotificationUnread).length
-  );
+  const [unreadCount, setUnreadCount] = useState(notifications.filter(isNotificationUnread).length);
 
   type OptimisticAction =
     | { type: "mark_read"; id: string }
@@ -139,13 +133,15 @@ export function NotificationsView({
             n.id === action.id ? { ...n, readAt: new Date().toISOString(), read: true } : n
           );
         case "mark_unread":
-          return current.map((n) =>
-            n.id === action.id ? { ...n, readAt: null, read: false } : n
-          );
+          return current.map((n) => (n.id === action.id ? { ...n, readAt: null, read: false } : n));
         case "clear":
           return current.filter((n) => n.id !== action.id);
         case "mark_all_read":
-          return current.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString(), read: true }));
+          return current.map((n) => ({
+            ...n,
+            readAt: n.readAt ?? new Date().toISOString(),
+            read: true,
+          }));
         case "clear_all":
           return [];
       }
@@ -192,7 +188,7 @@ export function NotificationsView({
         const response = await fetch(`/api/notifications/${id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action })
+          body: JSON.stringify({ action }),
         });
 
         if (!response.ok) {
@@ -213,7 +209,7 @@ export function NotificationsView({
       const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_all_read" })
+        body: JSON.stringify({ action: "mark_all_read" }),
       });
 
       if (!response.ok) {
@@ -232,7 +228,7 @@ export function NotificationsView({
       const response = await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "clear_all" })
+        body: JSON.stringify({ action: "clear_all" }),
       });
 
       if (!response.ok) {
@@ -261,7 +257,7 @@ export function NotificationsView({
       workspaces: optimisticItems.filter((item) => item.category === "workspace").length,
       payments: optimisticItems.filter((item) => item.category === "payments").length,
       deadlines: optimisticItems.filter((item) => item.category === "deadlines").length,
-      risks: optimisticItems.filter((item) => item.category === "risks").length
+      risks: optimisticItems.filter((item) => item.category === "risks").length,
     };
     return counts;
   }, [optimisticItems, optimisticUnreadCount]);
@@ -284,23 +280,23 @@ export function NotificationsView({
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="inline-flex h-10 items-center gap-1 rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveFilter(tab.key)}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
-                activeFilter === tab.key
-                  ? "bg-[#111827] text-white shadow-sm dark:bg-white dark:text-[#111827]"
-                  : "text-[#667085] hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span className="text-xs opacity-60">{tabCounts[tab.key]}</span>
-            </button>
-          ))}
-        </div>
+          <div className="inline-flex h-10 items-center gap-1 rounded-md border border-black/8 bg-white p-1 dark:border-white/10 dark:bg-white/[0.03]">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveFilter(tab.key)}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors ${
+                  activeFilter === tab.key
+                    ? "bg-primary text-primary-foreground shadow-sm dark:bg-background dark:text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+                <span className="text-xs opacity-60">{tabCounts[tab.key]}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -368,12 +364,12 @@ export function NotificationsView({
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm ${isUnread ? "font-semibold" : "font-medium"} text-foreground`}>
+                    <p
+                      className={`text-sm ${isUnread ? "font-semibold" : "font-medium"} text-foreground`}
+                    >
                       {item.title}
                     </p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {item.description}
-                    </p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{item.description}</p>
                     <span className="mt-1 block text-xs text-muted-foreground sm:hidden">
                       {formatNotificationRelativeTime(item.createdAt)}
                     </span>

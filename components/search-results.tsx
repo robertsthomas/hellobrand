@@ -129,7 +129,7 @@ export function SearchResults({ results, query }: { results: SearchResultItem[];
           onChange={(e) => setLocalQuery(e.target.value)}
           placeholder="Search partnerships, documents, terms, risks..."
           aria-label="Search partnerships"
-          className="h-14 w-full border border-black/10 bg-white pl-12 pr-4 text-lg text-foreground outline-none transition placeholder:text-black/30 focus:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:focus:border-white/20"
+          className="h-14 w-full border border-black/10 bg-white pl-12 pr-4 text-lg text-foreground outline-none transition placeholder:text-black/30 focus:border-ring dark:border-white/12 dark:bg-white/[0.03] dark:placeholder:text-white/30 dark:focus:border-ring"
         />
       </form>
 
