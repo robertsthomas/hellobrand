@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { BlogSummarizeButton } from "@/components/blog-summarize-button";
+import { blogSummarizeEnabled } from "@/flags";
 import { MarketingNav } from "@/components/marketing-nav";
 import {
   getBlogPostBySlug,
@@ -12,7 +13,7 @@ import {
   getBlogPostPlainText,
   getBlogPosts,
   getBlogPostUrl,
-  getBlogPostWordCount
+  getBlogPostWordCount,
 } from "@/lib/blog";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import { formatDate, slugify } from "@/lib/utils";
@@ -25,19 +26,17 @@ type BlogPostPageProps = {
 
 export async function generateStaticParams() {
   return getBlogPosts().map((post) => ({
-    slug: post.slug
+    slug: post.slug,
   }));
 }
 
-export async function generateMetadata({
-  params
-}: BlogPostPageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = getBlogPostBySlug(slug);
 
   if (!post) {
     return {
-      title: "Post not found | HelloBrand"
+      title: "Post not found | HelloBrand",
     };
   }
 
@@ -50,10 +49,10 @@ export async function generateMetadata({
     category: post.category,
     robots: {
       index: true,
-      follow: true
+      follow: true,
     },
     alternates: {
-      canonical: `/blog/${post.slug}`
+      canonical: `/blog/${post.slug}`,
     },
     openGraph: {
       title: post.title,
@@ -71,16 +70,16 @@ export async function generateMetadata({
           url: getBlogPostOgImageUrl(post.slug),
           width: 1200,
           height: 630,
-          alt: post.title
-        }
-      ]
+          alt: post.title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: post.title,
       description: post.description,
-      images: [getBlogPostOgImageUrl(post.slug)]
-    }
+      images: [getBlogPostOgImageUrl(post.slug)],
+    },
   };
 }
 
@@ -107,16 +106,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     articleSection: post.category,
     author: {
       "@type": "Organization",
-      name: post.author
+      name: post.author,
     },
     publisher: {
       "@type": "Organization",
       name: siteConfig.name,
-      url: absoluteUrl("/")
+      url: absoluteUrl("/"),
     },
     mainEntityOfPage: getBlogPostUrl(post.slug),
     keywords: post.keywords.join(", "),
-    wordCount: getBlogPostWordCount(post)
+    wordCount: getBlogPostWordCount(post),
   };
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
@@ -126,15 +125,15 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         "@type": "ListItem",
         position: 1,
         name: "Blog",
-        item: absoluteUrl("/blog")
+        item: absoluteUrl("/blog"),
       },
       {
         "@type": "ListItem",
         position: 2,
         name: post.title,
-        item: getBlogPostUrl(post.slug)
-      }
-    ]
+        item: getBlogPostUrl(post.slug),
+      },
+    ],
   };
   const articlePlainText = getBlogPostPlainText(post);
 
@@ -189,12 +188,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               <span aria-hidden="true">&middot;</span>
               <span>{post.readingTime}</span>
             </div>
-            <BlogSummarizeButton
-              cacheKey={post.slug}
-              title={post.title}
-              description={post.description}
-              articleText={articlePlainText}
-            />
+            {(await blogSummarizeEnabled()) === true ? (
+              <BlogSummarizeButton
+                cacheKey={post.slug}
+                title={post.title}
+                description={post.description}
+                articleText={articlePlainText}
+              />
+            ) : null}
           </div>
           <figure className="mt-8 overflow-hidden rounded-[1.8rem] border border-[#ececec] bg-[#f4f1eb] dark:border-[#222]">
             <div className="relative aspect-[16/9]">

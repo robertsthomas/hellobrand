@@ -4,10 +4,15 @@
  */
 import { NextResponse } from "next/server";
 
+import { isProviderEnabled } from "@/lib/email/config";
 import { getIntegrationBaseUrl } from "@/lib/email/config";
 
 export async function GET() {
-  return NextResponse.redirect(
-    `${getIntegrationBaseUrl()}/api/email/google/connect`
-  );
+  if (!(await isProviderEnabled("gmail"))) {
+    return NextResponse.redirect(
+      `${getIntegrationBaseUrl()}/app/settings?email_error=Google+Gmail+is+not+available&email_provider=gmail`
+    );
+  }
+
+  return NextResponse.redirect(`${getIntegrationBaseUrl()}/api/email/google/connect`);
 }

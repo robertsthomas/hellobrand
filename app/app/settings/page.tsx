@@ -2,14 +2,12 @@ import { Suspense } from "react";
 
 import { PlanTier } from "@prisma/client";
 
-import {
-  EmailConnectionsPanel,
-  FeatureUpgradeCard,
-  SettingsEditor,
-} from "@/components/settings";
+import { EmailConnectionsPanel, FeatureUpgradeCard, SettingsEditor } from "@/components/settings";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedProfile } from "@/lib/cached-data";
+import { getEmailProviderFlagStates } from "@/lib/email/config";
+import type { EmailProviderFlagState } from "@/lib/email/config";
 import { resolveEmailSubscriptionEnabled } from "@/lib/email-subscriptions";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 
@@ -26,28 +24,46 @@ function emailProviderLabel(provider: string | undefined) {
 }
 
 export default function SettingsPage({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Promise<{ email_status?: string; email_error?: string; email_provider?: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="animate-pulse space-y-4"><div className="h-10 w-48 rounded bg-black/[0.06]" /><div className="h-96 w-full rounded bg-black/[0.06]" /></div>}>
+    <Suspense
+      fallback={
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 w-48 rounded bg-black/[0.06]" />
+          <div className="h-96 w-full rounded bg-black/[0.06]" />
+        </div>
+      }
+    >
       <SettingsContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
 async function SettingsContent({
-  searchParams
+  searchParams,
 }: {
   searchParams?: Promise<{ email_status?: string; email_error?: string; email_provider?: string }>;
 }) {
   const viewer = await requireViewer();
   const entitlements = await getViewerEntitlements(viewer);
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const [profile, emailAccounts] = await Promise.all([
+  const [profile, emailAccounts, providerFlags] = await Promise.all([
     getCachedProfile(viewer),
-    entitlements.features.email_connections ? listEmailAccountsForViewer(viewer) : Promise.resolve([])
+    entitlements.features.email_connections
+      ? listEmailAccountsForViewer(viewer)
+      : Promise.resolve([]),
+    entitlements.features.email_connections
+      ? getEmailProviderFlagStates()
+      : Promise.resolve({
+          gmail: true,
+          outlook: true,
+          yahoo: false,
+          yahooOAuth: true,
+          yahooAppPassword: true,
+        } satisfies EmailProviderFlagState),
   ]);
   const productUpdatesEnabled = await resolveEmailSubscriptionEnabled(
     profile.contactEmail ?? viewer.email,
@@ -63,6 +79,7 @@ async function SettingsContent({
       />
       {entitlements.features.email_connections ? (
         <EmailConnectionsPanel
+          providerFlags={providerFlags}
           accounts={emailAccounts.map((account) => ({
             id: account.id,
             provider: account.provider,
@@ -77,7 +94,7 @@ async function SettingsContent({
             lastErrorCode: account.lastErrorCode,
             lastErrorMessage: account.lastErrorMessage,
             createdAt: account.createdAt,
-            updatedAt: account.updatedAt
+            updatedAt: account.updatedAt,
           }))}
           statusMessage={
             resolvedSearchParams?.email_status === "connected"

@@ -11,8 +11,7 @@ import type {
   InvoiceLineItem,
   InvoiceParty,
   InvoiceRecord,
-  InvoiceReminderTouchpointRecord,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 import { getProfileForViewer } from "@/lib/profile";
 import { parseProfileMetadata } from "@/lib/profile-metadata";
@@ -23,6 +22,7 @@ import { updatePaymentForViewer } from "@/lib/payments";
 import { renderInvoicePdf, buildInvoicePlainText } from "@/lib/invoice-pdf";
 import { emitNotificationSeedForUser } from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
+import { invoiceRemindersEnabled } from "@/flags";
 
 const TOUCHPOINT_OFFSETS = [0, 1, 3] as const;
 
@@ -54,7 +54,7 @@ function formatInvoiceDateLabel(value: string | null | undefined) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric"
+    year: "numeric",
   }).format(parsed);
 }
 
@@ -99,15 +99,17 @@ function buildEmptyParty(name = ""): InvoiceParty {
     companyName: null,
     address: null,
     taxId: null,
-    payoutDetails: null
+    payoutDetails: null,
   };
 }
 
 function latestDeliverableDate(deliverables: DeliverableItem[]) {
-  return [...deliverables]
-    .map((item) => safeIsoDate(item.dueDate))
-    .filter((value): value is string => Boolean(value))
-    .sort((left, right) => right.localeCompare(left))[0] ?? null;
+  return (
+    [...deliverables]
+      .map((item) => safeIsoDate(item.dueDate))
+      .filter((value): value is string => Boolean(value))
+      .sort((left, right) => right.localeCompare(left))[0] ?? null
+  );
 }
 
 function computeAnchorFromTerms(
@@ -164,8 +166,8 @@ function createFallbackLineItems(input: {
       channel: null,
       quantity: 1,
       unitRate: amountFromCents(input.amount),
-      amount: amountFromCents(input.amount)
-    }
+      amount: amountFromCents(input.amount),
+    },
   ] satisfies InvoiceLineItem[];
 }
 
@@ -186,14 +188,11 @@ export function buildInvoiceLineItems(input: {
     return createFallbackLineItems({
       campaignName: input.fallbackTitle,
       amount: cents(totalAmount),
-      paymentStructure: input.paymentStructure
+      paymentStructure: input.paymentStructure,
     });
   }
 
-  const unitCount = deliverables.reduce(
-    (sum, item) => sum + Math.max(item.quantity ?? 1, 1),
-    0
-  );
+  const unitCount = deliverables.reduce((sum, item) => sum + Math.max(item.quantity ?? 1, 1), 0);
 
   if (unitCount <= 0 || totalAmount <= 0) {
     return deliverables.map((item) => ({
@@ -204,7 +203,7 @@ export function buildInvoiceLineItems(input: {
       channel: item.channel ?? null,
       quantity: Math.max(item.quantity ?? 1, 1),
       unitRate: 0,
-      amount: 0
+      amount: 0,
     }));
   }
 
@@ -226,21 +225,24 @@ export function buildInvoiceLineItems(input: {
       id: item.id || randomUUID(),
       deliverableId: item.id,
       title: item.title,
-      description: [
-        normalizeNullableString(item.description),
-        formatInvoiceDateLabel(item.dueDate) ? `Due ${formatInvoiceDateLabel(item.dueDate)}` : null,
-        input.revisionRounds && input.revisionRounds > 0
-          ? input.revisionRounds === 1
-            ? "Includes 1 revision round"
-            : `Includes ${input.revisionRounds} revision rounds`
-          : null
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join(" · ") || null,
+      description:
+        [
+          normalizeNullableString(item.description),
+          formatInvoiceDateLabel(item.dueDate)
+            ? `Due ${formatInvoiceDateLabel(item.dueDate)}`
+            : null,
+          input.revisionRounds && input.revisionRounds > 0
+            ? input.revisionRounds === 1
+              ? "Includes 1 revision round"
+              : `Includes ${input.revisionRounds} revision rounds`
+            : null,
+        ]
+          .filter((value): value is string => Boolean(value))
+          .join(" · ") || null,
       channel: item.channel ?? null,
       quantity,
       unitRate: amountFromCents(baseRateCents),
-      amount: amountFromCents(amountCents)
+      amount: amountFromCents(amountCents),
     } satisfies InvoiceLineItem;
   });
 }
@@ -279,8 +281,8 @@ function buildPaymentTermsInvoiceNote(input: {
   const paymentTrigger = normalizeNullableString(input.paymentTrigger);
   const paymentStructure = normalizeNullableString(input.paymentStructure);
 
-  const parts = [paymentStructure, paymentTerms, paymentTrigger].filter(
-    (value): value is string => Boolean(value)
+  const parts = [paymentStructure, paymentTerms, paymentTrigger].filter((value): value is string =>
+    Boolean(value)
   );
 
   if (parts.length === 0) {
@@ -326,22 +328,20 @@ export function buildInvoiceDraftNotes(input: {
     buildDeliverablesInvoiceNote(input.deliverables),
     buildRevisionInvoiceNote({
       revisions: input.revisions,
-      revisionRounds: input.revisionRounds
+      revisionRounds: input.revisionRounds,
     }),
     buildPaymentTermsInvoiceNote({
       paymentTerms: input.paymentTerms,
       paymentTrigger: input.paymentTrigger,
-      paymentStructure: input.paymentStructure
-    })
+      paymentStructure: input.paymentStructure,
+    }),
   ].filter((value): value is string => Boolean(value));
 
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
 function computeSubtotal(lineItems: InvoiceLineItem[]) {
-  return amountFromCents(
-    lineItems.reduce((sum, item) => sum + cents(item.amount), 0)
-  );
+  return amountFromCents(lineItems.reduce((sum, item) => sum + cents(item.amount), 0));
 }
 
 export async function allocateNextInvoiceNumber(userId: string) {
@@ -355,11 +355,7 @@ export async function allocateNextInvoiceNumber(userId: string) {
   return `HB-${maxNumber + 1}`;
 }
 
-async function assertInvoiceNumberAvailable(
-  userId: string,
-  invoiceNumber: string,
-  dealId: string
-) {
+async function assertInvoiceNumberAvailable(userId: string, invoiceNumber: string, dealId: string) {
   const records = await getRepository().listInvoiceRecords(userId);
   const conflict = records.find(
     (record) =>
@@ -380,41 +376,32 @@ async function buildInvoiceDraftPayload(
   const profile = await getProfileForViewer(viewer);
   const { metadata } = parseProfileMetadata(profile.payoutDetails);
   const normalized = buildNormalizedIntakeRecord(aggregate);
-  const paymentAmount =
-    aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? 0;
+  const paymentAmount = aggregate.paymentRecord?.amount ?? aggregate.terms?.paymentAmount ?? 0;
   const currency = normalizeCurrency(
-    aggregate.paymentRecord?.currency ??
-      aggregate.terms?.currency ??
-      profile.defaultCurrency
+    aggregate.paymentRecord?.currency ?? aggregate.terms?.currency ?? profile.defaultCurrency
   );
   const invoiceNumber =
     existingInvoice?.invoiceNumber ?? (await allocateNextInvoiceNumber(viewer.id));
-  const invoiceDate =
-    existingInvoice?.invoiceDate ?? new Date().toISOString();
+  const invoiceDate = existingInvoice?.invoiceDate ?? new Date().toISOString();
   const dueDate =
     existingInvoice?.dueDate ??
     aggregate.paymentRecord?.dueDate ??
-    (aggregate.terms?.netTermsDays
-      ? addDays(invoiceDate, aggregate.terms.netTermsDays)
-      : null);
+    (aggregate.terms?.netTermsDays ? addDays(invoiceDate, aggregate.terms.netTermsDays) : null);
 
   const issuer: InvoiceParty = existingInvoice?.issuer ?? {
-    name:
-      profile.creatorLegalName?.trim() ||
-      profile.displayName?.trim() ||
-      viewer.displayName,
+    name: profile.creatorLegalName?.trim() || profile.displayName?.trim() || viewer.displayName,
     email: profile.contactEmail ?? viewer.email,
     companyName: profile.businessName ?? null,
     address: metadata.address ?? null,
     taxId: metadata.taxId ?? null,
-    payoutDetails: metadata.payoutNotes ?? null
+    payoutDetails: metadata.payoutNotes ?? null,
   };
 
   const billToContactName = normalized?.primaryContact?.name?.trim() || null;
   const billToContactEmail = normalized?.primaryContact?.email?.trim() || null;
   const billToCompany =
     normalized?.primaryContact?.organizationType === "agency"
-      ? aggregate.terms?.agencyName ?? aggregate.deal.brandName
+      ? (aggregate.terms?.agencyName ?? aggregate.deal.brandName)
       : aggregate.deal.brandName;
 
   const billTo: InvoiceParty = existingInvoice?.billTo ?? {
@@ -423,19 +410,18 @@ async function buildInvoiceDraftPayload(
     companyName: billToCompany ?? aggregate.deal.brandName,
     address: null,
     taxId: null,
-    payoutDetails: null
+    payoutDetails: null,
   };
 
-  const lineItems =
-    existingInvoice?.lineItems?.length
-      ? existingInvoice.lineItems
-      : buildInvoiceLineItems({
-          deliverables: aggregate.terms?.deliverables ?? [],
-          amount: paymentAmount,
-          fallbackTitle: aggregate.deal.campaignName,
-          paymentStructure: aggregate.terms?.paymentStructure ?? null,
-          revisionRounds: aggregate.terms?.revisionRounds ?? null
-        });
+  const lineItems = existingInvoice?.lineItems?.length
+    ? existingInvoice.lineItems
+    : buildInvoiceLineItems({
+        deliverables: aggregate.terms?.deliverables ?? [],
+        amount: paymentAmount,
+        fallbackTitle: aggregate.deal.campaignName,
+        paymentStructure: aggregate.terms?.paymentStructure ?? null,
+        revisionRounds: aggregate.terms?.revisionRounds ?? null,
+      });
 
   return {
     invoiceNumber,
@@ -454,7 +440,7 @@ async function buildInvoiceDraftPayload(
       paymentTrigger: aggregate.terms?.paymentTrigger,
       paymentStructure: aggregate.terms?.paymentStructure,
       revisions: aggregate.terms?.revisions,
-      revisionRounds: aggregate.terms?.revisionRounds
+      revisionRounds: aggregate.terms?.revisionRounds,
     }),
     billTo,
     issuer,
@@ -464,11 +450,8 @@ async function buildInvoiceDraftPayload(
     lastSentThreadId: existingInvoice?.lastSentThreadId ?? null,
     lastSentMessageId: existingInvoice?.lastSentMessageId ?? null,
     lastSentAccountId: existingInvoice?.lastSentAccountId ?? null,
-    lastSentToEmail: existingInvoice?.lastSentToEmail ?? null
-  } satisfies Omit<
-    InvoiceRecord,
-    "id" | "dealId" | "userId" | "createdAt" | "updatedAt"
-  >;
+    lastSentToEmail: existingInvoice?.lastSentToEmail ?? null,
+  } satisfies Omit<InvoiceRecord, "id" | "dealId" | "userId" | "createdAt" | "updatedAt">;
 }
 
 export async function getInvoiceForViewer(viewer: Viewer, dealId: string) {
@@ -520,7 +503,7 @@ export async function regenerateInvoiceDraftForViewer(viewer: Viewer, dealId: st
     lastSentMessageId: null,
     lastSentAccountId: null,
     lastSentToEmail: null,
-    status: "draft"
+    status: "draft",
   });
 
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
@@ -544,7 +527,7 @@ export async function saveInvoiceDraftForViewer(
     ...item,
     quantity: Math.max(item.quantity, 1),
     unitRate: Math.max(item.unitRate, 0),
-    amount: Math.max(item.amount, 0)
+    amount: Math.max(item.amount, 0),
   }));
 
   const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
@@ -556,14 +539,17 @@ export async function saveInvoiceDraftForViewer(
     currency: normalizeCurrency(input.currency),
     subtotal: computeSubtotal(lineItems),
     lineItems,
-    pdfDocumentId: existing?.status === "draft" ? existing?.pdfDocumentId ?? input.pdfDocumentId ?? null : null,
+    pdfDocumentId:
+      existing?.status === "draft"
+        ? (existing?.pdfDocumentId ?? input.pdfDocumentId ?? null)
+        : null,
     manualNumberOverride:
       input.manualNumberOverride ||
       Boolean(existing && existing.invoiceNumber !== input.invoiceNumber),
     lastSentThreadId: null,
     lastSentMessageId: null,
     lastSentAccountId: null,
-    lastSentToEmail: null
+    lastSentToEmail: null,
   });
 
   await cancelInvoiceReminderTouchpointsForViewer(viewer, dealId);
@@ -582,7 +568,7 @@ export async function finalizeInvoiceForViewer(
 
   const draft = await saveInvoiceDraftForViewer(viewer, dealId, {
     ...input,
-    status: "draft"
+    status: "draft",
   });
 
   if (!draft) {
@@ -598,24 +584,24 @@ export async function finalizeInvoiceForViewer(
     lastSentThreadId: null,
     lastSentMessageId: null,
     lastSentAccountId: null,
-    lastSentToEmail: null
+    lastSentToEmail: null,
   });
 
   const pdfBytes = renderInvoicePdf({
     invoice: finalizedRecord,
-    workspaceLabel: `${aggregate.deal.brandName} • ${aggregate.deal.campaignName}`
+    workspaceLabel: `${aggregate.deal.brandName} • ${aggregate.deal.campaignName}`,
   });
   const fileName = `${finalizedRecord.invoiceNumber}.pdf`;
   const { storagePath } = await storeUploadedBytes({
     fileName,
     bytes: pdfBytes,
     contentType: "application/pdf",
-    folder: dealId
+    folder: dealId,
   });
 
   const rawText = buildInvoicePlainText({
     invoice: finalizedRecord,
-    workspaceLabel: `${aggregate.deal.brandName} • ${aggregate.deal.campaignName}`
+    workspaceLabel: `${aggregate.deal.brandName} • ${aggregate.deal.campaignName}`,
   });
 
   const document = await getRepository().createDocument({
@@ -635,12 +621,12 @@ export async function finalizeInvoiceForViewer(
     errorMessage: null,
     processingRunId: null,
     processingRunStateJson: null,
-    processingStartedAt: null
+    processingStartedAt: null,
   });
 
   const saved = await getRepository().upsertInvoiceRecord(viewer.id, dealId, {
     ...finalizedRecord,
-    pdfDocumentId: document.id
+    pdfDocumentId: document.id,
   });
 
   if (process.env.DATABASE_URL) {
@@ -658,17 +644,18 @@ export async function finalizeInvoiceForViewer(
       paidDate: aggregate.paymentRecord?.paidDate ?? null,
       status: resolvedPaymentStatus,
       notes: aggregate.paymentRecord?.notes ?? saved.notes,
-      source: "invoice_finalize"
+      source: "invoice_finalize",
     });
   } else {
-    const resolvedDealPaymentStatus = aggregate.deal.paymentStatus === "paid"
-      ? "paid"
-      : saved.dueDate
-        ? "awaiting_payment"
-        : "invoiced";
+    const resolvedDealPaymentStatus =
+      aggregate.deal.paymentStatus === "paid"
+        ? "paid"
+        : saved.dueDate
+          ? "awaiting_payment"
+          : "invoiced";
 
     await getRepository().updateDeal(viewer.id, dealId, {
-      paymentStatus: resolvedDealPaymentStatus
+      paymentStatus: resolvedDealPaymentStatus,
     });
   }
 
@@ -694,7 +681,7 @@ export async function voidInvoiceForViewer(viewer: Viewer, dealId: string) {
     lastSentThreadId: null,
     lastSentMessageId: null,
     lastSentAccountId: null,
-    lastSentToEmail: null
+    lastSentToEmail: null,
   });
 
   if (process.env.DATABASE_URL) {
@@ -706,11 +693,11 @@ export async function voidInvoiceForViewer(viewer: Viewer, dealId: string) {
       paidDate: aggregate.paymentRecord?.paidDate ?? null,
       status: aggregate.paymentRecord?.paidDate ? "paid" : "not_invoiced",
       notes: aggregate.paymentRecord?.notes ?? saved.notes,
-      source: "invoice_void"
+      source: "invoice_void",
     });
   } else {
     await getRepository().updateDeal(viewer.id, dealId, {
-      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced"
+      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced",
     });
   }
 
@@ -752,11 +739,11 @@ export async function deleteInvoiceForViewer(
       paidDate: aggregate.paymentRecord?.paidDate ?? null,
       status: aggregate.paymentRecord?.paidDate ? "paid" : "not_invoiced",
       notes: aggregate.paymentRecord?.notes ?? null,
-      source: "invoice_delete"
+      source: "invoice_delete",
     });
   } else {
     await getRepository().updateDeal(viewer.id, dealId, {
-      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced"
+      paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "not_invoiced",
     });
   }
 
@@ -793,7 +780,7 @@ export async function markInvoiceSentForViewer(
     lastSentThreadId: input.threadId,
     lastSentMessageId: input.messageId,
     lastSentAccountId: input.accountId,
-    lastSentToEmail: input.toEmail
+    lastSentToEmail: input.toEmail,
   });
 
   await getRepository().createInvoiceDeliveryRecord(viewer.id, dealId, {
@@ -806,7 +793,7 @@ export async function markInvoiceSentForViewer(
     subject: input.subject,
     status: input.errorMessage ? "failed" : "sent",
     errorMessage: input.errorMessage ?? null,
-    sentAt
+    sentAt,
   });
 
   if (!input.errorMessage) {
@@ -819,11 +806,11 @@ export async function markInvoiceSentForViewer(
         paidDate: aggregate.paymentRecord?.paidDate ?? null,
         status: aggregate.paymentRecord?.paidDate ? "paid" : "awaiting_payment",
         notes: aggregate.paymentRecord?.notes ?? saved.notes,
-        source: "invoice_send"
+        source: "invoice_send",
       });
     } else {
       await getRepository().updateDeal(viewer.id, dealId, {
-        paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "awaiting_payment"
+        paymentStatus: aggregate.deal.paymentStatus === "paid" ? "paid" : "awaiting_payment",
       });
     }
   }
@@ -833,8 +820,10 @@ export async function markInvoiceSentForViewer(
 }
 
 export async function cancelInvoiceReminderTouchpointsForViewer(viewer: Viewer, dealId: string) {
+  if ((await invoiceRemindersEnabled()) !== true) return;
+
   const touchpoints = await getRepository().listInvoiceReminderTouchpoints(viewer.id, {
-    dealId
+    dealId,
   });
 
   await Promise.all(
@@ -842,16 +831,15 @@ export async function cancelInvoiceReminderTouchpointsForViewer(viewer: Viewer, 
       .filter((touchpoint) => touchpoint.status === "pending")
       .map((touchpoint) =>
         getRepository().updateInvoiceReminderTouchpoint(touchpoint.id, {
-          status: "cancelled"
+          status: "cancelled",
         })
       )
   );
 }
 
-export async function syncInvoiceReminderTouchpointsForViewer(
-  viewer: Viewer,
-  dealId: string
-) {
+export async function syncInvoiceReminderTouchpointsForViewer(viewer: Viewer, dealId: string) {
+  if ((await invoiceRemindersEnabled()) !== true) return [];
+
   const aggregate = await getRepository().getDealAggregate(viewer.id, dealId);
   if (!aggregate) {
     return [];
@@ -867,7 +855,7 @@ export async function syncInvoiceReminderTouchpointsForViewer(
         offsetDays,
         sendOn: startOfDayIso(addDays(sendAnchorDate, offsetDays)),
         status: "pending",
-        notificationId: null
+        notificationId: null,
       }))
     );
   }
@@ -886,7 +874,7 @@ export async function syncInvoiceReminderTouchpointsForViewer(
       offsetDays,
       sendOn: startOfDayIso(addDays(anchorDate, offsetDays)),
       status: "pending",
-      notificationId: null
+      notificationId: null,
     }))
   );
 }
@@ -928,10 +916,9 @@ function invoiceReminderSeed(input: {
 
   return {
     category: "payments" as const,
-    eventType:
-      (input.reminderType === "send"
-        ? "invoice.send_prompt"
-        : "invoice.generate_prompt") as "invoice.generate_prompt" | "invoice.send_prompt",
+    eventType: (input.reminderType === "send"
+      ? "invoice.send_prompt"
+      : "invoice.generate_prompt") as "invoice.generate_prompt" | "invoice.send_prompt",
     entityType: "deal",
     entityId: input.dealId,
     dealId: input.dealId,
@@ -939,32 +926,34 @@ function invoiceReminderSeed(input: {
     description,
     href: `/app/p/${input.dealId}?tab=invoices`,
     dedupeKey: `invoice.${input.reminderType}_prompt:${input.dealId}:${input.offsetDays}`,
-    createdAt: input.sendOn
+    createdAt: input.sendOn,
   };
 }
 
 export async function syncAllInvoiceReminderTouchpoints() {
+  if ((await invoiceRemindersEnabled()) !== true) return 0;
+
   if (!process.env.DATABASE_URL) {
     return 0;
   }
 
   const deals = await prisma.deal.findMany({
     where: {
-      confirmedAt: { not: null }
+      confirmedAt: { not: null },
     },
     include: {
       terms: true,
       documents: {
         select: {
-          documentKind: true
-        }
-      }
-    }
+          documentKind: true,
+        },
+      },
+    },
   });
   const invoiceRecords = deals.length
     ? await prisma.invoiceRecord.findMany({
         where: {
-          dealId: { in: deals.map((deal) => deal.id) }
+          dealId: { in: deals.map((deal) => deal.id) },
         },
         select: {
           dealId: true,
@@ -973,13 +962,11 @@ export async function syncAllInvoiceReminderTouchpoints() {
           sentAt: true,
           status: true,
           pdfDocumentId: true,
-          updatedAt: true
-        }
+          updatedAt: true,
+        },
       })
     : [];
-  const invoiceRecordByDealId = new Map(
-    invoiceRecords.map((record) => [record.dealId, record])
-  );
+  const invoiceRecordByDealId = new Map(invoiceRecords.map((record) => [record.dealId, record]));
 
   for (const deal of deals) {
     const invoiceRecord = invoiceRecordByDealId.get(deal.id);
@@ -990,36 +977,31 @@ export async function syncAllInvoiceReminderTouchpoints() {
               ? (deal.terms.deliverables as unknown as DeliverableItem[])
               : [],
             campaignDateWindow:
-              deal.terms.campaignDateWindow &&
-              typeof deal.terms.campaignDateWindow === "object"
+              deal.terms.campaignDateWindow && typeof deal.terms.campaignDateWindow === "object"
                 ? (deal.terms.campaignDateWindow as unknown as NonNullable<
                     DealAggregate["terms"]
                   >["campaignDateWindow"])
-                : null
+                : null,
           }
         : null
     );
     const sendAnchor =
-      invoiceRecord?.status === "finalized" &&
-      invoiceRecord.pdfDocumentId &&
-      !invoiceRecord.sentAt
+      invoiceRecord?.status === "finalized" && invoiceRecord.pdfDocumentId && !invoiceRecord.sentAt
         ? startOfDayIso(
-            invoiceRecord.finalizedAt ??
-              invoiceRecord.draftSavedAt ??
-              invoiceRecord.updatedAt
+            invoiceRecord.finalizedAt ?? invoiceRecord.draftSavedAt ?? invoiceRecord.updatedAt
           )
         : null;
 
     if (!sendAnchor && !generationAnchor) {
       const existing = await getRepository().listInvoiceReminderTouchpoints(deal.userId, {
-        dealId: deal.id
+        dealId: deal.id,
       });
       await Promise.all(
         existing
           .filter((touchpoint) => touchpoint.status === "pending")
           .map((touchpoint) =>
             getRepository().updateInvoiceReminderTouchpoint(touchpoint.id, {
-              status: "cancelled"
+              status: "cancelled",
             })
           )
       );
@@ -1034,7 +1016,7 @@ export async function syncAllInvoiceReminderTouchpoints() {
         offsetDays,
         sendOn: startOfDayIso(addDays(sendAnchor ?? generationAnchor!, offsetDays)),
         status: "pending",
-        notificationId: null
+        notificationId: null,
       }))
     );
   }
@@ -1043,6 +1025,10 @@ export async function syncAllInvoiceReminderTouchpoints() {
 }
 
 export async function runInvoiceReminderSweep() {
+  if ((await invoiceRemindersEnabled()) !== true) {
+    return { processedDeals: 0, notified: 0 };
+  }
+
   if (!process.env.DATABASE_URL) {
     return { processedDeals: 0, notified: 0 };
   }
@@ -1054,24 +1040,24 @@ export async function runInvoiceReminderSweep() {
   const dueTouchpoints = await prisma.invoiceReminderTouchpoint.findMany({
     where: {
       status: "pending",
-      sendOn: { lte: now }
+      sendOn: { lte: now },
     },
     include: {
       deal: {
         include: {
           documents: {
             select: {
-              documentKind: true
-            }
-          }
-        }
-      }
-    }
+              documentKind: true,
+            },
+          },
+        },
+      },
+    },
   });
   const invoiceRecords = dueTouchpoints.length
     ? await prisma.invoiceRecord.findMany({
         where: {
-          dealId: { in: dueTouchpoints.map((touchpoint) => touchpoint.dealId) }
+          dealId: { in: dueTouchpoints.map((touchpoint) => touchpoint.dealId) },
         },
         select: {
           dealId: true,
@@ -1080,13 +1066,11 @@ export async function runInvoiceReminderSweep() {
           sentAt: true,
           status: true,
           pdfDocumentId: true,
-          updatedAt: true
-        }
+          updatedAt: true,
+        },
       })
     : [];
-  const invoiceRecordByDealId = new Map(
-    invoiceRecords.map((record) => [record.dealId, record])
-  );
+  const invoiceRecordByDealId = new Map(invoiceRecords.map((record) => [record.dealId, record]));
 
   let notified = 0;
 
@@ -1095,13 +1079,14 @@ export async function runInvoiceReminderSweep() {
     const reminderType =
       invoiceRecord?.status === "finalized" && invoiceRecord.pdfDocumentId && !invoiceRecord.sentAt
         ? "send"
-        : !invoiceRecord && !touchpoint.deal.documents.some((document) => document.documentKind === "invoice")
+        : !invoiceRecord &&
+            !touchpoint.deal.documents.some((document) => document.documentKind === "invoice")
           ? "generate"
           : null;
 
     if (!reminderType) {
       await getRepository().updateInvoiceReminderTouchpoint(touchpoint.id, {
-        status: "cancelled"
+        status: "cancelled",
       });
       continue;
     }
@@ -1115,13 +1100,13 @@ export async function runInvoiceReminderSweep() {
         campaignName: touchpoint.deal.campaignName,
         reminderType,
         offsetDays: touchpoint.offsetDays,
-        sendOn: touchpoint.sendOn.toISOString()
+        sendOn: touchpoint.sendOn.toISOString(),
       })
     );
 
     await getRepository().updateInvoiceReminderTouchpoint(touchpoint.id, {
       status: "sent",
-      notificationId: notification?.id ?? null
+      notificationId: notification?.id ?? null,
     });
     notified += 1;
   }

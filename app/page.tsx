@@ -4,9 +4,9 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -20,10 +20,9 @@ import {
   Receipt,
   Search,
   Shield,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
 
-import { DocumentScanShowcase } from "@/components/document-scan-showcase";
 import { MaintenancePage } from "@/components/maintenance-page";
 import { MarketingNav } from "@/components/marketing-nav";
 import { PublicFunnelLink } from "@/components/public-funnel-link";
@@ -32,24 +31,28 @@ import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
+const DocumentScanShowcase = dynamic(() =>
+  import("@/components/document-scan-showcase").then((m) => m.DocumentScanShowcase)
+);
+
 export const metadata: Metadata = {
   title: "HelloBrand",
   description: siteConfig.description,
   alternates: {
-    canonical: "/"
+    canonical: "/",
   },
   openGraph: {
     title: "HelloBrand",
     description: siteConfig.description,
     url: absoluteUrl("/"),
     siteName: siteConfig.name,
-    type: "website"
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "HelloBrand",
-    description: siteConfig.description
-  }
+    description: siteConfig.description,
+  },
 };
 
 function isMaintenanceModeEnabled() {
@@ -57,10 +60,7 @@ function isMaintenanceModeEnabled() {
 }
 
 export default async function LandingPage() {
-  const [session, appSettings] = await Promise.all([
-    auth(),
-    getAppSettings()
-  ]);
+  const [session, appSettings] = await Promise.all([auth(), getAppSettings()]);
 
   if (session.userId) {
     redirect("/app");
@@ -91,15 +91,13 @@ export default async function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.25),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.10),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.08),transparent)]" />
 
           <div className="relative mx-auto max-w-[1200px] px-5 pb-16 pt-12 text-center sm:px-6 md:pb-20 md:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
-
             <h1 className="mx-auto mt-5 max-w-[13ch] text-balance text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
               Understand your brand deals in seconds.
             </h1>
 
             <p className="mx-auto mt-5 max-w-[50ch] text-[1rem] leading-relaxed text-[#5d6876] sm:mt-6 sm:text-[1.1rem] dark:text-[#aab3bf]">
-              Upload your contract. HelloBrand breaks it down into plain English,
-              highlights risks, and shows the deliverables and payment terms before
-              you ever need an account.
+              Upload your contract. HelloBrand breaks it down into plain English, highlights risks,
+              and shows the deliverables and payment terms before you ever need an account.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
@@ -142,8 +140,8 @@ export default async function LandingPage() {
                 Enough value to know whether the deal needs a closer look.
               </h2>
               <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                The first upload should already answer the questions creators care
-                about before anything gets saved into a workspace.
+                The first upload should already answer the questions creators care about before
+                anything gets saved into a workspace.
               </p>
             </div>
 
@@ -152,18 +150,18 @@ export default async function LandingPage() {
                 {
                   icon: FileText,
                   title: "Plain-English summary",
-                  body: "See what the contract is asking for without reading every clause line by line."
+                  body: "See what the contract is asking for without reading every clause line by line.",
                 },
                 {
                   icon: AlertTriangle,
                   title: "Risk watchouts",
-                  body: "Spot usage rights, payment gaps, and other terms that deserve a second look."
+                  body: "Spot usage rights, payment gaps, and other terms that deserve a second look.",
                 },
                 {
                   icon: Receipt,
                   title: "Deliverables and payment",
-                  body: "Pull out what you owe, what the brand owes, and when each part should happen."
-                }
+                  body: "Pull out what you owe, what the brand owes, and when each part should happen.",
+                },
               ].map((card) => {
                 const Icon = card.icon;
                 return (
@@ -196,14 +194,14 @@ export default async function LandingPage() {
                   See the kind of output you get before you upload your own deal.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  HelloBrand surfaces the plain-English summary, the risky terms,
-                  and the core money and deliverable details in one pass.
+                  HelloBrand surfaces the plain-English summary, the risky terms, and the core money
+                  and deliverable details in one pass.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
                     "Plain-language summary of the contract",
                     "Risk flags with simple explanations",
-                    "A clear list of deliverables and payment timing"
+                    "A clear list of deliverables and payment timing",
                   ].map((item) => (
                     <li
                       key={item}
@@ -239,15 +237,14 @@ export default async function LandingPage() {
                   Once the contract looks real, turn it into a workspace.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  The account step should happen after the value moment, when the
-                  creator wants to keep the deal, track follow-up, and manage the
-                  thread in context.
+                  The account step should happen after the value moment, when the creator wants to
+                  keep the deal, track follow-up, and manage the thread in context.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
                     "Keep brand emails attached to the saved deal",
                     "Store the contract breakdown in one place",
-                    "Come back to the workspace without starting over"
+                    "Come back to the workspace without starting over",
                   ].map((item) => (
                     <li
                       key={item}
@@ -268,14 +265,14 @@ export default async function LandingPage() {
                   Keep deliverables and payments from slipping after signature.
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  The public upload gets the user engaged. The saved workspace keeps
-                  the deal useful by tracking what is due and what is still unpaid.
+                  The public upload gets the user engaged. The saved workspace keeps the deal useful
+                  by tracking what is due and what is still unpaid.
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
                     "Track due dates and outstanding balances",
                     "Keep payment status beside the contract terms",
-                    "Stay organized after the initial contract review"
+                    "Stay organized after the initial contract review",
                   ].map((item) => (
                     <li
                       key={item}
@@ -306,18 +303,18 @@ export default async function LandingPage() {
                 {
                   step: "01",
                   title: "Drop in a contract",
-                  body: "Upload a PDF, DOCX, DOC, or TXT file. No signup wall comes first."
+                  body: "Upload a PDF, DOCX, DOC, or TXT file. No signup wall comes first.",
                 },
                 {
                   step: "02",
                   title: "See the breakdown",
-                  body: "Get the plain-English summary, risk watchouts, payment details, and deliverables."
+                  body: "Get the plain-English summary, risk watchouts, payment details, and deliverables.",
                 },
                 {
                   step: "03",
                   title: "Save and track it",
-                  body: "Create an account only when you want to keep the deal, manage follow-up, and return later."
-                }
+                  body: "Create an account only when you want to keep the deal, manage follow-up, and return later.",
+                },
               ].map((item) => (
                 <article key={item.step} className="app-surface p-6">
                   <span className="text-[3rem] font-bold leading-none tracking-[-0.06em] text-primary/20 dark:text-[#8ec6b1]/20">
@@ -344,8 +341,8 @@ export default async function LandingPage() {
               Don’t sign another contract blindly.
             </h2>
             <p className="mx-auto mt-4 max-w-[50ch] text-[0.95rem] leading-relaxed text-white/75 sm:mt-5 sm:text-[1.05rem]">
-              Start with one upload, understand the terms quickly, and save the deal
-              and create a workspace.
+              Start with one upload, understand the terms quickly, and save the deal and create a
+              workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
               <PublicFunnelLink
@@ -393,7 +390,7 @@ function Eyebrow({ children, className = "" }: { children: ReactNode; className?
 function PreviewChrome({
   title,
   children,
-  className = ""
+  className = "",
 }: {
   title: string;
   children: ReactNode;
@@ -421,7 +418,7 @@ function PreviewChrome({
 function SidebarItem({
   icon: Icon,
   label,
-  active = false
+  active = false,
 }: {
   icon: LucideIcon;
   label: string;
@@ -429,12 +426,11 @@ function SidebarItem({
 }) {
   return (
     <div
-      className={`flex h-9 items-center gap-3 px-3 text-[13px] font-medium ${active ? "bg-secondary/55 text-foreground" : "text-muted-foreground"
-        }`}
+      className={`flex h-9 items-center gap-3 px-3 text-[13px] font-medium ${
+        active ? "bg-secondary/55 text-foreground" : "text-muted-foreground"
+      }`}
     >
-      <Icon
-        className={`h-4 w-4 shrink-0 ${active ? "text-primary dark:text-[#8ec6b1]" : ""}`}
-      />
+      <Icon className={`h-4 w-4 shrink-0 ${active ? "text-primary dark:text-[#8ec6b1]" : ""}`} />
       <span>{label}</span>
     </div>
   );
@@ -512,7 +508,7 @@ function HeroDashboard() {
                   ["Deliverables", "5 items", "3 TikToks, 2 Stories"],
                   ["Payment", "$2,500", "Net 60 after final post"],
                   ["Risk flags", "2", "Usage rights and payment timing"],
-                  ["Status", "Needs review", "Before creator signs"]
+                  ["Status", "Needs review", "Before creator signs"],
                 ].map(([label, value, note]) => (
                   <div
                     key={label}
@@ -542,20 +538,19 @@ function HeroDashboard() {
                     </h3>
                   </div>
                   <span className="flex items-center gap-1.5 border border-accent/20 bg-accent/[0.06] px-2.5 py-1 text-[11px] font-medium text-accent dark:border-accent/30 dark:bg-accent/[0.1]">
-                    <AlertTriangle className="h-3 w-3" />
-                    2 flagged
+                    <AlertTriangle className="h-3 w-3" />2 flagged
                   </span>
                 </div>
                 <div className="mt-4 space-y-3">
                   {[
                     {
                       title: "Perpetual usage rights",
-                      note: "Brand can reuse the creator content forever unless the clause gets narrowed."
+                      note: "Brand can reuse the creator content forever unless the clause gets narrowed.",
                     },
                     {
                       title: "Payment has no late-fee leverage",
-                      note: "Contract says net 60 but does not define a penalty or escalation if payment is late."
-                    }
+                      note: "Contract says net 60 but does not define a penalty or escalation if payment is late.",
+                    },
                   ].map((item) => (
                     <div
                       key={item.title}
@@ -579,7 +574,10 @@ function HeroDashboard() {
                     {[
                       ["3 TikTok posts", "Draft and publish by March 30"],
                       ["2 Instagram stories", "Tag brand and include campaign link"],
-                      ["Final payment after approval", "Paid within 60 days of final accepted post"]
+                      [
+                        "Final payment after approval",
+                        "Paid within 60 days of final accepted post",
+                      ],
                     ].map(([title, body]) => (
                       <div
                         key={title}
@@ -603,14 +601,16 @@ function HeroDashboard() {
                     {[
                       ["Keep this deal", "Turn the breakdown into a saved workspace"],
                       ["Track deliverables", "Use the contract terms as a checklist"],
-                      ["Follow up on payment", "Come back when payout timing matters"]
+                      ["Follow up on payment", "Come back when payout timing matters"],
                     ].map(([title, status]) => (
                       <div
                         key={title}
                         className="flex items-center justify-between gap-3 border border-black/[0.06] bg-[#fcfbf9] px-3.5 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.02]"
                       >
                         <div className="min-w-0">
-                          <p className="truncate text-[13px] font-medium text-foreground">{title}</p>
+                          <p className="truncate text-[13px] font-medium text-foreground">
+                            {title}
+                          </p>
                           <p className="text-[12px] text-muted-foreground">{status}</p>
                         </div>
                         <span className="text-[13px] font-semibold text-foreground">Ready</span>
@@ -650,7 +650,7 @@ function PartnershipsPreview() {
             ["Summary", "5 items", "3 TikToks + 2 Stories"],
             ["Payment", "$2.5K", "Net 60 after approval"],
             ["Deadline", "Mar 30", "Final post due"],
-            ["Risks", "2 flags", "Usage + payment terms"]
+            ["Risks", "2 flags", "Usage + payment terms"],
           ].map(([label, value, note]) => (
             <div
               key={label}
@@ -660,29 +660,23 @@ function PartnershipsPreview() {
               <p className="mt-2 text-[1.05rem] font-bold tracking-[-0.04em] text-foreground sm:mt-3 sm:text-[1.25rem]">
                 {value}
               </p>
-              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                {note}
-              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">{note}</p>
             </div>
           ))}
         </div>
 
         <div className="mt-4 grid gap-3 sm:mt-5">
           <div className="border border-black/[0.06] bg-white p-4 dark:border-white/[0.08] dark:bg-[#13181d]">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Summary
-            </p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Summary</p>
             <p className="mt-2 text-[13px] leading-relaxed text-foreground">
               You are required to post 3 TikToks and 2 Instagram stories by March 30.
             </p>
           </div>
           <div className="border border-black/[0.06] bg-white p-4 dark:border-white/[0.08] dark:bg-[#13181d]">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-              Risks
-            </p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Risks</p>
             <p className="mt-2 text-[13px] leading-relaxed text-foreground">
-              Brand has perpetual usage rights and the contract does not add clear
-              leverage for late payment.
+              Brand has perpetual usage rights and the contract does not add clear leverage for late
+              payment.
             </p>
           </div>
         </div>
@@ -715,27 +709,28 @@ function InboxPreview() {
               title: "Northline campaign follow-up",
               note: "Linked to spring creator launch",
               time: "5m ago",
-              active: true
+              active: true,
             },
             {
               title: "Studio Meridian revision",
               note: "Possible match for weekly edit",
               time: "22m ago",
-              active: false
+              active: false,
             },
             {
               title: "Cedar Goods invoice question",
               note: "Linked to home refresh reel",
               time: "1h ago",
-              active: false
-            }
+              active: false,
+            },
           ].map((thread) => (
             <div
               key={thread.title}
-              className={`border px-3.5 py-2.5 ${thread.active
+              className={`border px-3.5 py-2.5 ${
+                thread.active
                   ? "border-primary/15 bg-primary/[0.04] dark:border-[#8ec6b1]/20 dark:bg-[#8ec6b1]/[0.06]"
                   : "border-black/[0.06] bg-white dark:border-white/[0.08] dark:bg-white/[0.02]"
-                }`}
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -765,7 +760,7 @@ function PaymentsPreview() {
           {[
             ["Tracked", "$18,400"],
             ["Outstanding", "$2,150"],
-            ["Late", "$0"]
+            ["Late", "$0"],
           ].map(([label, value]) => (
             <div
               key={label}
@@ -792,7 +787,7 @@ function PaymentsPreview() {
             {[
               ["Northline", "$4,800", "Mar 28", "Invoiced"],
               ["Studio Meridian", "$3,250", "Apr 12", "Not invoiced"],
-              ["Cedar Goods", "$2,900", "Paid", "Complete"]
+              ["Cedar Goods", "$2,900", "Paid", "Complete"],
             ].map(([brand, amount, due, status]) => (
               <div
                 key={brand}

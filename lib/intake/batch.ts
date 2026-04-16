@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { assertViewerWithinUsageLimit } from "@/lib/billing/entitlements";
 import { getRepository } from "@/lib/repository";
 import { uploadDocumentsForViewer } from "@/lib/deals";
+import { intakeClusteringEnabled } from "@/flags";
 import type { ClusterInput } from "@/lib/intake-clustering";
 import { clusterDocuments } from "@/lib/intake-clustering";
 import type { IntakeBatchRecord, Viewer } from "@/lib/types";
@@ -34,7 +35,7 @@ export async function createBulkIntakeForViewer(
   await uploadDocumentsForViewer(viewer, tempDeal.id, {
     files,
     pastedText: null,
-    startProcessing: false
+    startProcessing: false,
   });
 
   const documents = await getRepository().listDocuments(viewer.id, tempDeal.id);
@@ -44,10 +45,17 @@ export async function createBulkIntakeForViewer(
     fileName: doc.fileName,
     rawText: doc.rawText ?? "",
     documentKind: doc.documentKind,
-    brandHint: null
+    brandHint: null,
   }));
 
-  const clusterResult = clusterDocuments(clusterInputs);
+  const clusterResult =
+    (await intakeClusteringEnabled()) === true
+      ? clusterDocuments(clusterInputs)
+      : {
+          groups: [
+            { label: "Untitled brand", confidence: 0.9, documentIds: documents.map((d) => d.id) },
+          ],
+        };
 
   if (clusterResult.groups.length <= 1) {
     const group = clusterResult.groups[0];
@@ -55,7 +63,7 @@ export async function createBulkIntakeForViewer(
 
     await getRepository().updateDeal(viewer.id, tempDeal.id, {
       brandName,
-      campaignName: brandName
+      campaignName: brandName,
     } as Partial<import("@/lib/types").DealRecord>);
 
     const session = await prisma.intakeSession.create({
@@ -69,28 +77,27 @@ export async function createBulkIntakeForViewer(
         draftNotes: input.notes?.trim() || null,
         draftPastedText: null,
         draftPastedTextTitle: null,
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
-      }
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
+      },
     });
 
     if (documents.length > 0) {
       await prisma.intakeDocument.createMany({
         data: documents.map((doc) => ({
           intakeSessionId: session.id,
-          documentId: doc.id
+          documentId: doc.id,
         })),
-        skipDuplicates: true
+        skipDuplicates: true,
       });
     }
 
-    const batch = await getRepository().createBatch(
-      viewer.id,
-      [{
+    const batch = await getRepository().createBatch(viewer.id, [
+      {
         label: brandName,
         confidence: group?.confidence ?? 0.9,
-        documentIds: documents.map((d) => d.id)
-      }]
-    );
+        documentIds: documents.map((d) => d.id),
+      },
+    ]);
 
     return batch;
   }
@@ -100,7 +107,7 @@ export async function createBulkIntakeForViewer(
     clusterResult.groups.map((group) => ({
       label: group.label,
       confidence: group.confidence,
-      documentIds: group.documentIds
+      documentIds: group.documentIds,
     }))
   );
 }
@@ -140,7 +147,7 @@ export async function confirmBatchGroupForViewer(
     viewer.id,
     {
       brandName: input.brandName.trim() || group.label,
-      campaignName: input.campaignName.trim() || group.label
+      campaignName: input.campaignName.trim() || group.label,
     },
     { confirmedAt: null }
   );
@@ -156,8 +163,8 @@ export async function confirmBatchGroupForViewer(
       draftNotes: null,
       draftPastedText: null,
       draftPastedTextTitle: null,
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
-    }
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
+    },
   });
 
   for (const docId of group.documentIds) {
@@ -180,27 +187,25 @@ export async function confirmBatchGroupForViewer(
         errorMessage: null,
         processingRunId: null,
         processingRunStateJson: null,
-        processingStartedAt: null
+        processingStartedAt: null,
       });
 
       await prisma.intakeDocument.create({
         data: {
           intakeSessionId: session.id,
-          documentId: newDoc.id
-        }
+          documentId: newDoc.id,
+        },
       });
     }
   }
 
   await getRepository().updateBatchGroup(groupId, {
     status: "confirmed",
-    intakeSessionId: session.id
+    intakeSessionId: session.id,
   });
 
   const allGroups = batch.groups;
-  const allProcessed = allGroups.every(
-    (g) => g.id === groupId || g.status !== "pending"
-  );
+  const allProcessed = allGroups.every((g) => g.id === groupId || g.status !== "pending");
   if (allProcessed) {
     await getRepository().updateBatchStatus(batchId, "confirmed");
   }
@@ -232,11 +237,11 @@ export async function reassignDocumentInBatch(
   }
 
   await getRepository().updateBatchGroup(fromGroupId, {
-    documentIds: fromGroup.documentIds.filter((id) => id !== documentId)
+    documentIds: fromGroup.documentIds.filter((id) => id !== documentId),
   });
 
   await getRepository().updateBatchGroup(toGroupId, {
-    documentIds: [...toGroup.documentIds, documentId]
+    documentIds: [...toGroup.documentIds, documentId],
   });
 
   return getRepository().getBatch(viewer.id, batchId);

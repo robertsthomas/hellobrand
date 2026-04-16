@@ -7,7 +7,7 @@
 import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bot, ChevronRight, Hand, Menu, MessageSquareMore, Search } from "lucide-react";
@@ -30,7 +30,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ThemeSwitch } from "@/components/theme-switch";
-import { FeedbackWidget } from "@/components/feedback-widget";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
   getAppRouteMeta,
@@ -42,6 +41,10 @@ import type { SidebarMilestones } from "@/lib/sidebar-milestones";
 
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
+
+const FeedbackWidget = lazy(() =>
+  import("@/components/feedback-widget").then((m) => ({ default: m.FeedbackWidget }))
+);
 
 function MobileAssistantButton({ onClick }: { onClick?: () => void }) {
   const { openAssistant } = useAssistant();
@@ -542,13 +545,15 @@ export function AppFrame({
           <div className="flex min-h-full min-w-0 flex-col">{content}</div>
         </div>
       </main>
-      <FeedbackWidget
-        viewerId={viewerId}
-        pagePath={pathname}
-        pageTitle={meta.title}
-        dealId={feedbackDealId}
-        openRequestKey={feedbackOpenRequestKey}
-      />
+      <Suspense fallback={null}>
+        <FeedbackWidget
+          viewerId={viewerId}
+          pagePath={pathname}
+          pageTitle={meta.title}
+          dealId={feedbackDealId}
+          openRequestKey={feedbackOpenRequestKey}
+        />
+      </Suspense>
     </>
   );
 

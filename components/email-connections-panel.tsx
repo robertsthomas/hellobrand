@@ -7,6 +7,7 @@ import { usePostHog } from "posthog-js/react";
 
 import { captureAppEvent } from "@/lib/posthog/events";
 import type { ConnectedEmailAccountRecord } from "@/lib/types";
+import type { EmailProviderFlagState } from "@/lib/email/config";
 import { formatDate } from "@/lib/utils";
 
 type SafeEmailAccount = Omit<
@@ -85,10 +86,12 @@ function providerDescription(provider: SafeEmailAccount["provider"]) {
 
 export function EmailConnectionsPanel({
   accounts,
+  providerFlags,
   statusMessage,
-  errorMessage
+  errorMessage,
 }: {
   accounts: SafeEmailAccount[];
+  providerFlags: EmailProviderFlagState;
   statusMessage?: string | null;
   errorMessage?: string | null;
 }) {
@@ -108,7 +111,7 @@ export function EmailConnectionsPanel({
     () => ({
       gmail: accounts.filter((account) => account.provider === "gmail"),
       outlook: accounts.filter((account) => account.provider === "outlook"),
-      yahoo: accounts.filter((account) => account.provider === "yahoo")
+      yahoo: accounts.filter((account) => account.provider === "yahoo"),
     }),
     [accounts]
   );
@@ -120,12 +123,12 @@ export function EmailConnectionsPanel({
     captureAppEvent(posthog, "email_disconnect_clicked", {
       accountId,
       provider: account?.provider ?? "unknown",
-      status: account?.status ?? "unknown"
+      status: account?.status ?? "unknown",
     });
 
     try {
       const response = await fetch(`/api/email/accounts/${accountId}/disconnect`, {
-        method: "POST"
+        method: "POST",
       });
       const payload = await response.json();
 
@@ -135,9 +138,7 @@ export function EmailConnectionsPanel({
 
       router.refresh();
     } catch (error) {
-      setPanelError(
-        error instanceof Error ? error.message : "Could not disconnect email account."
-      );
+      setPanelError(error instanceof Error ? error.message : "Could not disconnect email account.");
     } finally {
       setPendingAccountId(null);
     }
@@ -152,7 +153,7 @@ export function EmailConnectionsPanel({
     captureAppEvent(posthog, "email_connection_started", {
       provider: "yahoo",
       hasExistingAccount: grouped.yahoo.length > 0,
-      surface: "settings_email_connections_app_password"
+      surface: "settings_email_connections_app_password",
     });
 
     try {
@@ -161,8 +162,8 @@ export function EmailConnectionsPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           emailAddress: yahooEmail,
-          appPassword: yahooAppPassword
-        })
+          appPassword: yahooAppPassword,
+        }),
       });
       const payload = await response.json();
 
@@ -180,12 +181,18 @@ export function EmailConnectionsPanel({
     }
   }
 
+  const activeProviders = useMemo(() => {
+    const providers: Array<"gmail" | "outlook" | "yahoo"> = [];
+    if (providerFlags.gmail || grouped.gmail.length > 0) providers.push("gmail");
+    if (providerFlags.outlook || grouped.outlook.length > 0) providers.push("outlook");
+    if (providerFlags.yahoo || grouped.yahoo.length > 0) providers.push("yahoo");
+    return providers;
+  }, [providerFlags, grouped]);
+
   return (
     <section className="border-b border-border py-10">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">
-          Email Connections
-        </h2>
+        <h2 className="text-2xl font-bold tracking-[-0.03em] text-foreground">Email Connections</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
           Connect Gmail, Outlook, or Yahoo to sync inbox threads, attach them to partnerships, and
           draft replies from your workspace context.
@@ -209,15 +216,13 @@ export function EmailConnectionsPanel({
       ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
-        {(["gmail", "outlook", "yahoo"] as const).map((provider) => {
+        {activeProviders.map((provider) => {
           const records = grouped[provider];
+          const isProviderFlagOn = providerFlags[provider];
           const connectPath = providerConnectPath(provider);
 
           return (
-            <div
-              key={provider}
-              className="border border-border bg-white p-5"
-            >
+            <div key={provider} className="border border-border bg-white p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -232,23 +237,29 @@ export function EmailConnectionsPanel({
                 </div>
 
                 <div className="flex shrink-0 flex-col gap-2">
-                  {provider === "yahoo" ? (
+                  {!isProviderFlagOn ? null : provider === "yahoo" ? (
                     <>
-                      <a
-                        href={connectPath ?? ""}
-                        onClick={() =>
-                          captureAppEvent(posthog, "email_connection_started", {
-                            provider,
-                            hasExistingAccount: records.length > 0,
-                            surface: "settings_email_connections"
-                          })
-                        }
-                        className="border border-black/10 px-4 py-2 text-center text-sm font-semibold text-foreground transition hover:border-black/20"
-                      >
-                        {records.some((record) => ["connected", "syncing", "error", "reconnect_required"].includes(record.status))
-                          ? "Reconnect OAuth"
-                          : "Connect OAuth"}
-                      </a>
+                      {providerFlags.yahooOAuth ? (
+                        <a
+                          href={connectPath ?? ""}
+                          onClick={() =>
+                            captureAppEvent(posthog, "email_connection_started", {
+                              provider,
+                              hasExistingAccount: records.length > 0,
+                              surface: "settings_email_connections",
+                            })
+                          }
+                          className="border border-black/10 px-4 py-2 text-center text-sm font-semibold text-foreground transition hover:border-black/20"
+                        >
+                          {records.some((record) =>
+                            ["connected", "syncing", "error", "reconnect_required"].includes(
+                              record.status
+                            )
+                          )
+                            ? "Reconnect OAuth"
+                            : "Connect OAuth"}
+                        </a>
+                      ) : null}
                     </>
                   ) : connectPath ? (
                     <a
@@ -257,12 +268,16 @@ export function EmailConnectionsPanel({
                         captureAppEvent(posthog, "email_connection_started", {
                           provider,
                           hasExistingAccount: records.length > 0,
-                          surface: "settings_email_connections"
+                          surface: "settings_email_connections",
                         })
                       }
                       className="self-start border border-black/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20"
                     >
-                      {records.some((record) => ["connected", "syncing", "error", "reconnect_required"].includes(record.status))
+                      {records.some((record) =>
+                        ["connected", "syncing", "error", "reconnect_required"].includes(
+                          record.status
+                        )
+                      )
                         ? "Reconnect"
                         : "Connect"}
                     </a>
@@ -271,7 +286,9 @@ export function EmailConnectionsPanel({
               </div>
 
               <div className="mt-5 space-y-3">
-                {provider === "yahoo" && isYahooCredentialsOpen ? (
+                {provider === "yahoo" &&
+                isYahooCredentialsOpen &&
+                providerFlags.yahooAppPassword ? (
                   <details open className="border border-border bg-[#faf8f4]">
                     <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:hidden">
                       <span className="flex items-center justify-between gap-3">
@@ -339,7 +356,8 @@ export function EmailConnectionsPanel({
                       </div>
 
                       <p className="text-sm text-muted-foreground">
-                        We test both IMAP and SMTP before saving. Yahoo inbox updates are polled on an interval instead of using webhooks.
+                        We test both IMAP and SMTP before saving. Yahoo inbox updates are polled on
+                        an interval instead of using webhooks.
                       </p>
                     </form>
                   </details>
@@ -347,8 +365,12 @@ export function EmailConnectionsPanel({
 
                 {records.length === 0 ? (
                   <div className="border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
-                    <p>No {providerLabel(provider)} accounts connected yet.</p>
-                    {provider === "yahoo" ? (
+                    {!isProviderFlagOn ? (
+                      <p>Temporarily unavailable.</p>
+                    ) : (
+                      <p>No {providerLabel(provider)} accounts connected yet.</p>
+                    )}
+                    {provider === "yahoo" && isProviderFlagOn && providerFlags.yahooAppPassword ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
@@ -370,10 +392,7 @@ export function EmailConnectionsPanel({
                   </div>
                 ) : (
                   records.map((account) => (
-                    <div
-                      key={account.id}
-                      className="border border-border px-4 py-4"
-                    >
+                    <div key={account.id} className="border border-border px-4 py-4">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
                           <p className="text-sm font-semibold text-foreground">

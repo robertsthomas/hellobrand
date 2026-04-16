@@ -5,25 +5,24 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR?.trim() || ".next",
   cacheComponents: true,
   images: {
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "images.unsplash.com"
-      }
-    ]
+        hostname: "images.unsplash.com",
+      },
+    ],
   },
   logging: {
     fetches: {
-      fullUrl: true,
-      hmrRefreshes: true
+      fullUrl: process.env.NODE_ENV === "development",
     },
-    incomingRequests: true
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "10mb"
-    }
-  }
+      bodySizeLimit: "10mb",
+    },
+  },
 };
 
 export default withSentryConfig(nextConfig, {
@@ -32,5 +31,5 @@ export default withSentryConfig(nextConfig, {
   authToken: process.env.SENTRY_AUTH_TOKEN,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-  silent: !process.env.CI
+  silent: !process.env.CI,
 });

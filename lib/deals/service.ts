@@ -2,25 +2,14 @@
  * Deal CRUD operations and summary variant management.
  * This is the main entry point for reading and writing deal records.
  */
-import {
-  buildConflictResults,
-} from "@/lib/conflict-intelligence";
+import { buildConflictResultsIfEnabled } from "@/lib/conflict-intelligence";
 import { syncIntakeSessionForDealId } from "@/lib/intake-state";
-import {
-  assertViewerWithinUsageLimit,
-} from "@/lib/billing/entitlements";
-import {
-  emitNotificationSeedForUser
-} from "@/lib/notification-service";
+import { assertViewerWithinUsageLimit } from "@/lib/billing/entitlements";
+import { emitNotificationSeedForUser } from "@/lib/notification-service";
 import { getRepository } from "@/lib/repository";
 import { buildGeneratedSummaryVariant } from "@/lib/summary-variants";
 import { getLatestSummaryByType } from "@/lib/summaries";
-import type {
-  DealAggregate,
-  DealRecord,
-  SummaryType,
-  Viewer
-} from "@/lib/types";
+import type { DealAggregate, DealRecord, SummaryType, Viewer } from "@/lib/types";
 import {
   createEmptyTerms,
   hydrateProfileBackedCreatorName,
@@ -46,9 +35,7 @@ export async function loadRawDealAggregatesForViewer(viewer: Viewer) {
     }
   }
 
-  await Promise.all(
-    Array.from({ length: Math.min(3, deals.length) }, () => worker())
-  );
+  await Promise.all(Array.from({ length: Math.min(3, deals.length) }, () => worker()));
 
   return results.filter((aggregate): aggregate is DealAggregate => aggregate !== null);
 }
@@ -56,10 +43,13 @@ export async function loadRawDealAggregatesForViewer(viewer: Viewer) {
 export async function listDealAggregatesForViewer(viewer: Viewer) {
   const aggregates = await loadRawDealAggregatesForViewer(viewer);
 
-  return aggregates.map((aggregate) => ({
-    ...aggregate,
-    conflictResults: buildConflictResults(aggregate, aggregates)
-  }));
+  const withConflicts = await Promise.all(
+    aggregates.map(async (aggregate) => ({
+      ...aggregate,
+      conflictResults: await buildConflictResultsIfEnabled(aggregate, aggregates),
+    }))
+  );
+  return withConflicts;
 }
 
 export async function listDocumentsForViewer(viewer: Viewer, dealId: string) {
@@ -80,7 +70,7 @@ export async function getDealForViewer(viewer: Viewer, dealId: string) {
 
   return {
     ...normalizedTarget,
-    conflictResults: buildConflictResults(normalizedTarget, comparisonSet)
+    conflictResults: await buildConflictResultsIfEnabled(normalizedTarget, comparisonSet),
   };
 }
 
@@ -96,7 +86,7 @@ export async function createDealForViewer(
       deal.id,
       mergeTerms(createEmptyTerms(deal), {
         ...createEmptyTerms(deal),
-        notes: input.notes.trim()
+        notes: input.notes.trim(),
       })
     );
   }
@@ -126,7 +116,7 @@ export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
       if (deal) {
         const session = await prisma.intakeSession.findUnique({
           where: { dealId },
-          select: { id: true }
+          select: { id: true },
         });
         const sessionId = session?.id ?? dealId;
 
@@ -141,7 +131,7 @@ export async function deleteDealForViewer(viewer: Viewer, dealId: string) {
           description: "This workspace was deleted and cannot be recovered.",
           href: "/app",
           dedupeKey: `workspace.deleted:${sessionId}`,
-          createdAt: new Date()
+          createdAt: new Date(),
         });
       }
     } catch {
@@ -177,7 +167,7 @@ export async function activateSummaryVariantForViewer(
     }
 
     await repository.updateDeal(viewer.id, dealId, {
-      summary: restored.body
+      summary: restored.body,
     });
     void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
     return restored;
@@ -192,7 +182,7 @@ export async function activateSummaryVariantForViewer(
     }
 
     await repository.updateDeal(viewer.id, dealId, {
-      summary: restored.body
+      summary: restored.body,
     });
     void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
     return restored;
@@ -201,22 +191,18 @@ export async function activateSummaryVariantForViewer(
   const generated = await buildGeneratedSummaryVariant({
     aggregate,
     baseSummary: latestLegal,
-    targetType: summaryType
+    targetType: summaryType,
   });
   const saved = await repository.saveSummary(dealId, latestLegal.documentId, generated);
 
   await repository.updateDeal(viewer.id, dealId, {
-    summary: saved.body
+    summary: saved.body,
   });
   void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
   return saved;
 }
 
-export async function restoreSummaryForViewer(
-  viewer: Viewer,
-  dealId: string,
-  summaryId: string
-) {
+export async function restoreSummaryForViewer(viewer: Viewer, dealId: string, summaryId: string) {
   const repository = getRepository();
   const aggregate = await repository.getDealAggregate(viewer.id, dealId);
 
@@ -236,7 +222,7 @@ export async function restoreSummaryForViewer(
   }
 
   await repository.updateDeal(viewer.id, dealId, {
-    summary: restored.body
+    summary: restored.body,
   });
   void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
   return restored;

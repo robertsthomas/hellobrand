@@ -1,9 +1,6 @@
 import { fallbackAnalyzeDocument } from "@/lib/analysis/fallback";
-import {
-  analyzeRisksWithLlm,
-  generateSummaryWithLlm,
-  hasLlmKey
-} from "@/lib/analysis/llm";
+import { analyzeRisksWithLlm, generateSummaryWithLlm, hasLlmKey } from "@/lib/analysis/llm";
+import { aiRiskAnalysisEnabled } from "@/flags";
 import type { DocumentAnalysisResult, DocumentKind } from "@/lib/types";
 
 export async function analyzeDocument(
@@ -12,7 +9,7 @@ export async function analyzeDocument(
 ): Promise<DocumentAnalysisResult> {
   const fallback = fallbackAnalyzeDocument(text, options);
 
-  if (!hasLlmKey()) {
+  if (!hasLlmKey() || (await aiRiskAnalysisEnabled()) === false) {
     return fallback;
   }
 
@@ -27,16 +24,12 @@ export async function analyzeDocument(
           "pending-document"
         )
       : fallback.riskFlags;
-    const summary = await generateSummaryWithLlm(
-      fallback.extraction,
-      riskFlags,
-      fallback.summary
-    );
+    const summary = await generateSummaryWithLlm(fallback.extraction, riskFlags, fallback.summary);
 
     return {
       ...fallback,
       riskFlags,
-      summary
+      summary,
     };
   } catch {
     return fallback;

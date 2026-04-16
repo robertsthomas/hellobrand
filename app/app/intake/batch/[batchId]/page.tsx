@@ -5,27 +5,31 @@ import { BatchReviewPanel } from "@/components/batch-review-panel";
 import { IntakeBatchReviewHeader } from "@/components/patterns/intake";
 import { CardSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
+import { batchIntakeEnabled } from "@/flags";
 import { getBatchForViewer } from "@/lib/intake";
 import { getRepository } from "@/lib/repository";
 
-export default function BatchReviewPage({
-  params
-}: {
-  params: Promise<{ batchId: string }>;
-}) {
+export default function BatchReviewPage({ params }: { params: Promise<{ batchId: string }> }) {
   return (
-    <Suspense fallback={<div className="p-8"><div className="mx-auto max-w-4xl"><CardSkeleton /></div></div>}>
+    <Suspense
+      fallback={
+        <div className="p-8">
+          <div className="mx-auto max-w-4xl">
+            <CardSkeleton />
+          </div>
+        </div>
+      }
+    >
       <BatchReviewContent params={params} />
     </Suspense>
   );
 }
 
-async function BatchReviewContent({
-  params
-}: {
-  params: Promise<{ batchId: string }>;
-}) {
+async function BatchReviewContent({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params;
+  if ((await batchIntakeEnabled()) !== true) {
+    notFound();
+  }
   const viewer = await requireViewer();
 
   let batch;

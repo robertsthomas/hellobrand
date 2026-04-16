@@ -2,20 +2,28 @@
 
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode
+  type ReactNode,
 } from "react";
 import type { UIMessage } from "ai";
 import { Bot, Loader2 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { AssistantPanel } from "@/components/assistant-panel";
-import { assistantPageTitle, getPageContext, isValidAssistantTab } from "@/lib/assistant/app-manual";
+const AssistantPanel = lazy(() =>
+  import("@/components/assistant-panel").then((m) => ({ default: m.AssistantPanel }))
+);
+import {
+  assistantPageTitle,
+  getPageContext,
+  isValidAssistantTab,
+} from "@/lib/assistant/app-manual";
 import { assistantRecordToUIMessage } from "@/lib/assistant/messages";
 import { parseProfileMetadata } from "@/lib/profile-metadata";
 import type {
@@ -23,7 +31,7 @@ import type {
   AssistantDealTab,
   AssistantTone,
   AssistantThreadRecord,
-  AssistantTrigger
+  AssistantTrigger,
 } from "@/lib/types";
 
 type AssistantContextValue = {
@@ -56,7 +64,7 @@ async function loadOrCreateThreadWithMode(
       const detailPayload = await detailRes.json();
       return {
         thread,
-        messages: (detailPayload.messages ?? []).map(assistantRecordToUIMessage)
+        messages: (detailPayload.messages ?? []).map(assistantRecordToUIMessage),
       };
     }
   }
@@ -67,13 +75,13 @@ async function loadOrCreateThreadWithMode(
     body: JSON.stringify({
       scope,
       dealId,
-      context
-    })
+      context,
+    }),
   });
   const createPayload = await createRes.json();
   return {
     thread: createPayload.thread as AssistantThreadRecord,
-    messages: [] as UIMessage[]
+    messages: [] as UIMessage[],
   };
 }
 
@@ -98,7 +106,7 @@ async function loadAssistantProfileLocation() {
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const dealId = pathname.startsWith("/app/p/") ? pathname.split("/")[3] ?? null : null;
+  const dealId = pathname.startsWith("/app/p/") ? (pathname.split("/")[3] ?? null) : null;
   const currentTab = searchParams.get("tab");
   const [open, setOpen] = useState(false);
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
@@ -142,7 +150,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       profileLocation,
       trigger,
       tone,
-      pageContext: getPageContext(pathname)
+      pageContext: getPageContext(pathname),
     }),
     [currentTab, dealId, pathname, profileLocation, tone, trigger]
   );
@@ -237,7 +245,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     try {
       if (threadId) {
         await fetch(`/api/assistant/threads/${threadId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
       }
     } catch {
@@ -287,28 +295,37 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
               Loading assistant...
             </div>
           ) : (
-            <AssistantPanel
-              key={`${threadState.thread.id}-${context.pathname}-${context.tab ?? "none"}`}
-              thread={threadState.thread}
-              initialMessages={threadState.messages}
-              context={context}
-              suggestedPromptsDismissed={Boolean(
-                dismissedSuggestedPromptsByThread[threadState.thread.id]
-              )}
-              onDismissSuggestedPrompts={() =>
-                setDismissedSuggestedPromptsByThread((current) => ({
-                  ...current,
-                  [threadState.thread.id]: true
-                }))
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading assistant...
+                </div>
               }
-              queuedPrompt={queuedPrompt}
-              onPromptConsumed={() => setQueuedPrompt(null)}
-              tone={tone}
-              onToneChange={setTone}
-              onMinimize={closeAssistant}
-              onEndSession={endAssistantSession}
-              onQueuePrompt={setQueuedPrompt}
-            />
+            >
+              <AssistantPanel
+                key={`${threadState.thread.id}-${context.pathname}-${context.tab ?? "none"}`}
+                thread={threadState.thread}
+                initialMessages={threadState.messages}
+                context={context}
+                suggestedPromptsDismissed={Boolean(
+                  dismissedSuggestedPromptsByThread[threadState.thread.id]
+                )}
+                onDismissSuggestedPrompts={() =>
+                  setDismissedSuggestedPromptsByThread((current) => ({
+                    ...current,
+                    [threadState.thread.id]: true,
+                  }))
+                }
+                queuedPrompt={queuedPrompt}
+                onPromptConsumed={() => setQueuedPrompt(null)}
+                tone={tone}
+                onToneChange={setTone}
+                onMinimize={closeAssistant}
+                onEndSession={endAssistantSession}
+                onQueuePrompt={setQueuedPrompt}
+              />
+            </Suspense>
           )}
         </div>
       ) : null}

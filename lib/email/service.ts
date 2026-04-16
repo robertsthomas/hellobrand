@@ -12,9 +12,14 @@ import type {
 } from "@/lib/types";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { detectPromiseDiscrepancies } from "@/lib/email/smart-inbox";
+import { smartInboxEnabled } from "@/flags";
 import { fetchGmailAttachment, sendGmailThreadReply } from "@/lib/email/providers/gmail";
 import { fetchOutlookAttachment, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
-import { fetchYahooAttachment, isYahooAppPasswordAccount, sendYahooThreadReply } from "@/lib/email/providers/yahoo";
+import {
+  fetchYahooAttachment,
+  isYahooAppPasswordAccount,
+  sendYahooThreadReply,
+} from "@/lib/email/providers/yahoo";
 import { getRepository } from "@/lib/repository";
 import {
   createEmailThreadNoteForUser,
@@ -239,13 +244,15 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
   }
 
   for (const message of detail.messages) {
-    const discrepancies = detectPromiseDiscrepancies(aggregate, message);
-    detail.promiseDiscrepancies.push(...discrepancies);
+    if ((await smartInboxEnabled()) === true) {
+      const discrepancies = detectPromiseDiscrepancies(aggregate, message);
+      detail.promiseDiscrepancies.push(...discrepancies);
+    }
   }
 
   const latestMessage = detail.messages[detail.messages.length - 1];
   if (latestMessage) {
-    const conflicts = checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
+    const conflicts = await checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
     detail.crossDealConflicts.push(...conflicts);
   }
 
@@ -281,7 +288,7 @@ export async function sendEmailThreadReplyForViewer(
   const credentials = await ensureActiveEmailCredentials(account);
   const accessToken = credentials.accessToken ?? "";
   const yahooAppPassword = isYahooAppPasswordAccount(account.scopes);
-  const yahooCredential = yahooAppPassword ? credentials.mailPassword ?? "" : accessToken;
+  const yahooCredential = yahooAppPassword ? (credentials.mailPassword ?? "") : accessToken;
   const normalizedSubject = input.subject.trim() || detail.thread.subject;
   const normalizedBody = input.body.trim();
 
@@ -352,24 +359,29 @@ export async function sendEmailThreadReplyForViewer(
               bytes,
             })),
           })
-        : await sendYahooThreadReply(account.emailAddress, yahooCredential, {
-            threadId: detail.thread.providerThreadId,
-            subject: normalizedSubject,
-            body: normalizedBody,
-            to,
-            cc,
-            bcc,
-            inReplyTo: anchor?.internetMessageId ?? null,
-            references: detail.messages
-              .map((message) => message.internetMessageId)
-              .filter((value): value is string => Boolean(value))
-              .slice(-8),
-            attachments: attachmentDocuments.map(({ document, bytes }) => ({
-              filename: document.fileName,
-              mimeType: document.mimeType,
-              bytes,
-            })),
-          }, yahooAppPassword);
+        : await sendYahooThreadReply(
+            account.emailAddress,
+            yahooCredential,
+            {
+              threadId: detail.thread.providerThreadId,
+              subject: normalizedSubject,
+              body: normalizedBody,
+              to,
+              cc,
+              bcc,
+              inReplyTo: anchor?.internetMessageId ?? null,
+              references: detail.messages
+                .map((message) => message.internetMessageId)
+                .filter((value): value is string => Boolean(value))
+                .slice(-8),
+              attachments: attachmentDocuments.map(({ document, bytes }) => ({
+                filename: document.fileName,
+                mimeType: document.mimeType,
+                bytes,
+              })),
+            },
+            yahooAppPassword
+          );
 
   const sentAt = new Date().toISOString();
   const savedMessage = await saveOutboundEmailMessage({
@@ -450,8 +462,8 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
   const accessToken = credentials.accessToken;
   const yahooAttachmentAppPassword = isYahooAppPasswordAccount(attachment.account.scopes);
   const yahooAttachmentCredential = yahooAttachmentAppPassword
-    ? credentials.mailPassword ?? ""
-    : accessToken ?? "";
+    ? (credentials.mailPassword ?? "")
+    : (accessToken ?? "");
 
   if (
     !accessToken &&

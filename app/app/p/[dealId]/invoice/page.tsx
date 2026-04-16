@@ -14,16 +14,16 @@ import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer } from "@/lib/cached-data";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
+import { invoiceEditorEnabled } from "@/flags";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import { listInvoiceDeliveriesForViewer } from "@/lib/invoices";
-import { listEmailAccountsForViewer, listLinkedEmailThreadsForViewerDeal } from "@/lib/email/service";
+import {
+  listEmailAccountsForViewer,
+  listLinkedEmailThreadsForViewerDeal,
+} from "@/lib/email/service";
 import { deriveWorkspaceTitleFromFileNames } from "@/lib/workspace-labels";
 
-export default function InvoiceEditorPage({
-  params
-}: {
-  params: Promise<{ dealId: string }>;
-}) {
+export default function InvoiceEditorPage({ params }: { params: Promise<{ dealId: string }> }) {
   return (
     <Suspense fallback={<InvoiceEditorSkeleton />}>
       <InvoiceEditorContent params={params} />
@@ -31,12 +31,11 @@ export default function InvoiceEditorPage({
   );
 }
 
-async function InvoiceEditorContent({
-  params
-}: {
-  params: Promise<{ dealId: string }>;
-}) {
+async function InvoiceEditorContent({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params;
+  if ((await invoiceEditorEnabled()) !== true) {
+    notFound();
+  }
   const viewer = await requireViewer();
   const entitlements = await getViewerEntitlements(viewer);
   const aggregate = await getCachedDealForViewer(viewer, dealId);
@@ -49,7 +48,7 @@ async function InvoiceEditorContent({
   const normalized = buildNormalizedIntakeRecord(aggregate);
   const displayLabels = getDisplayDealLabels({
     brandName: normalized?.brandName ?? deal.brandName,
-    campaignName: normalized?.contractTitle ?? deal.campaignName
+    campaignName: normalized?.contractTitle ?? deal.campaignName,
   });
   const displayCampaignName =
     displayLabels.campaignName ??
@@ -62,7 +61,7 @@ async function InvoiceEditorContent({
     ? await Promise.all([
         listLinkedEmailThreadsForViewerDeal(viewer, dealId),
         listEmailAccountsForViewer(viewer),
-        listInvoiceDeliveriesForViewer(viewer, dealId)
+        listInvoiceDeliveriesForViewer(viewer, dealId),
       ])
     : [[], [], []];
 
@@ -74,7 +73,9 @@ async function InvoiceEditorContent({
     : `/app/p/${deal.id}?tab=deliverables`;
 
   const paymentTriggerPrompt =
-    deal.paymentStatus === "late" || deal.paymentStatus === "awaiting_payment" || deal.paymentStatus === "invoiced"
+    deal.paymentStatus === "late" ||
+    deal.paymentStatus === "awaiting_payment" ||
+    deal.paymentStatus === "invoiced"
       ? "Draft a concise creator-professional payment follow-up email for this partnership."
       : `Draft a concise creator-professional email asking the brand to confirm payment timing. Current terms: ${terms?.paymentTerms ?? "not fully clear"}.`;
 
@@ -107,7 +108,7 @@ async function InvoiceEditorContent({
                     kind: "payment",
                     sourceId: deal.id,
                     label: "Clarify payment timing",
-                    prompt: paymentTriggerPrompt
+                    prompt: paymentTriggerPrompt,
                   }}
                 />
               </div>

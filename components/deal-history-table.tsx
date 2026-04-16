@@ -17,9 +17,16 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 
@@ -38,13 +45,7 @@ export interface DealHistoryRow {
   riskCount: number;
 }
 
-function ValueTooltip({
-  children,
-  content
-}: {
-  children: React.ReactNode;
-  content: string;
-}) {
+function ValueTooltip({ children, content }: { children: React.ReactNode; content: string }) {
   return (
     <AppTooltip content={content}>
       <span className="inline-flex max-w-full cursor-help items-center">{children}</span>
@@ -55,7 +56,7 @@ function ValueTooltip({
 function DealHistoryRowActions({
   dealId,
   dealName,
-  isArchived
+  isArchived,
 }: {
   dealId: string;
   dealName: string;
@@ -141,7 +142,7 @@ function exportRows(rows: DealHistoryRow[]) {
     "Stage",
     "Date",
     "Deliverables",
-    "Risk Count"
+    "Risk Count",
   ];
   const lines = rows.map((row) => [
     row.brandName,
@@ -151,14 +152,10 @@ function exportRows(rows: DealHistoryRow[]) {
     row.stageLabel,
     row.date ?? "",
     row.deliverablesLabel,
-    row.riskCount
+    row.riskCount,
   ]);
   const csv = [header, ...lines]
-    .map((line) =>
-      line
-        .map((value) => `"${String(value).replace(/"/g, "\"\"")}"`)
-        .join(",")
-    )
+    .map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
     .join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -172,7 +169,7 @@ function exportRows(rows: DealHistoryRow[]) {
 
 export function DealHistoryTable({
   rows,
-  metrics
+  metrics,
 }: {
   rows: DealHistoryRow[];
   metrics: {
@@ -196,7 +193,7 @@ export function DealHistoryTable({
         return {
           ...row,
           brandName: labels.brandName ?? row.brandName,
-          campaignName: labels.campaignName ?? row.campaignName
+          campaignName: labels.campaignName ?? row.campaignName,
         };
       }),
     [rows]
@@ -210,11 +207,9 @@ export function DealHistoryTable({
         normalizedQuery.length === 0 ||
         row.brandName.toLowerCase().includes(normalizedQuery) ||
         row.campaignName.toLowerCase().includes(normalizedQuery);
-      const matchesStage =
-        stageFilter === "all" || row.stageGroup === stageFilter;
+      const matchesStage = stageFilter === "all" || row.stageGroup === stageFilter;
       const matchesRisks = !includeRisksOnly || row.riskCount > 0;
-      const matchesDeliverables =
-        !hasDeliverablesOnly || row.deliverablesLabel !== "Not started";
+      const matchesDeliverables = !hasDeliverablesOnly || row.deliverablesLabel !== "Not started";
 
       return matchesQuery && matchesStage && matchesRisks && matchesDeliverables;
     });
@@ -230,7 +225,7 @@ export function DealHistoryTable({
       active: displayRows.filter((row) => row.stageGroup === "active").length,
       under_review: displayRows.filter((row) => row.stageGroup === "under_review").length,
       completed: displayRows.filter((row) => row.stageGroup === "completed").length,
-      archived: displayRows.filter((row) => row.stageGroup === "archived").length
+      archived: displayRows.filter((row) => row.stageGroup === "archived").length,
     };
   }, [displayRows]);
 
@@ -250,11 +245,15 @@ export function DealHistoryTable({
       <section className="grid gap-px overflow-hidden border border-black/8 bg-black/8 grid-cols-2 md:grid-cols-4 dark:border-white/10 dark:bg-white/10">
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Total Partnerships</p>
-          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.totalPartnerships}</p>
+          <p className="mt-1 text-[18px] font-semibold text-foreground">
+            {metrics.totalPartnerships}
+          </p>
         </div>
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Active</p>
-          <p className="mt-1 text-[18px] font-semibold text-foreground">{metrics.activePartnerships}</p>
+          <p className="mt-1 text-[18px] font-semibold text-foreground">
+            {metrics.activePartnerships}
+          </p>
         </div>
         <div className="bg-white px-6 py-5 dark:bg-[#161a1f]">
           <p className="text-sm text-muted-foreground">Total Earned</p>
@@ -338,7 +337,7 @@ export function DealHistoryTable({
               { key: "active", label: "Active" },
               { key: "under_review", label: "Under Review" },
               { key: "completed", label: "Completed" },
-              { key: "archived", label: "Archived" }
+              { key: "archived", label: "Archived" },
             ].map((tab) => {
               const isActive = stageFilter === tab.key;
               const count = stageCounts[tab.key as keyof typeof stageCounts];
@@ -359,7 +358,9 @@ export function DealHistoryTable({
                   )}
                 >
                   <span>{tab.label}</span>
-                  <span className={cn("text-xs", isActive ? "opacity-60" : "text-[#98a2b3]")}>{count}</span>
+                  <span className={cn("text-xs", isActive ? "opacity-60" : "text-[#98a2b3]")}>
+                    {count}
+                  </span>
                 </button>
               );
             })}
@@ -381,10 +382,18 @@ export function DealHistoryTable({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold text-foreground">{row.campaignName}</p>
+                    <p className="truncate text-[15px] font-semibold text-foreground">
+                      {row.campaignName}
+                    </p>
                     <p className="mt-0.5 truncate text-sm text-muted-foreground">{row.brandName}</p>
                   </div>
-                  <div className="shrink-0" onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
+                  <div
+                    className="shrink-0"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                  >
                     <DealHistoryRowActions
                       dealId={row.id}
                       dealName={row.campaignName}
@@ -395,22 +404,37 @@ export function DealHistoryTable({
 
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Amount</p>
-                    <p className="mt-1 text-sm font-medium text-foreground">{formatCurrency(row.amount, row.currency)}</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                      Amount
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-foreground">
+                      {formatCurrency(row.amount, row.currency)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Status</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                      Status
+                    </p>
                     <div className="mt-1 flex items-center gap-2">
-                      <span className={cn("h-2 w-2 shrink-0 rounded-full", stageDotClass(row.stageGroup))} />
+                      <span
+                        className={cn(
+                          "h-2 w-2 shrink-0 rounded-full",
+                          stageDotClass(row.stageGroup)
+                        )}
+                      />
                       <span className="text-sm text-foreground">{row.stageLabel}</span>
                     </div>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Date</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                      Date
+                    </p>
                     <p className="mt-1 text-sm text-muted-foreground">{formatDate(row.date)}</p>
                   </div>
                   <div>
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Risks</p>
+                    <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                      Risks
+                    </p>
                     {row.riskCount > 0 ? (
                       <span className="mt-1 inline-flex border border-[#f2c6b8] px-2 py-0.5 text-xs text-[#d76742]">
                         {row.riskCount} flag{row.riskCount === 1 ? "" : "s"}
@@ -422,7 +446,9 @@ export function DealHistoryTable({
                 </div>
 
                 <div className="mt-2 border-t border-black/6 pt-2 dark:border-white/8">
-                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">Deliverables</p>
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-[#98a2b3] dark:text-[#8f98a6]">
+                    Deliverables
+                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">{row.deliverablesLabel}</p>
                 </div>
               </Link>
@@ -432,105 +458,132 @@ export function DealHistoryTable({
 
         {/* Desktop table layout */}
         <div className="hidden md:block">
-        <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-black/8 bg-secondary/40 hover:bg-secondary/40 dark:border-white/10 dark:bg-white/[0.03]">
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Brand</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Campaign</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Amount</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Status</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Date</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Deliverables</TableHead>
-                <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">Risks</TableHead>
-                <TableHead className="px-6 py-4 text-right text-sm font-medium text-muted-foreground" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagedRows.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={8} className="px-6 py-10 text-center text-sm text-muted-foreground">
-                    No partnerships match the current filters.
-                  </TableCell>
+          <div className="overflow-hidden border border-black/8 bg-white dark:border-white/10 dark:bg-[#161a1f]">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-black/8 bg-secondary/40 hover:bg-secondary/40 dark:border-white/10 dark:bg-white/[0.03]">
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Brand
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Campaign
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Amount
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Status
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Date
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Deliverables
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-sm font-medium text-muted-foreground">
+                    Risks
+                  </TableHead>
+                  <TableHead className="px-6 py-4 text-right text-sm font-medium text-muted-foreground" />
                 </TableRow>
-              ) : (
-                pagedRows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer border-black/8 hover:bg-secondary/20 dark:border-white/10 dark:hover:bg-white/[0.03]"
-                    onClick={() => router.push(`/app/p/${row.id}`)}
-                  >
-                    <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
-                      <ValueTooltip content="Brand associated with this partnership.">
-                        <span>{row.brandName}</span>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5 text-sm text-muted-foreground">
-                      <ValueTooltip content="Campaign or workspace title for this partnership.">
-                        <span>{row.campaignName}</span>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
-                      <ValueTooltip content="Primary payment amount currently tracked.">
-                        <span>{formatCurrency(row.amount, row.currency)}</span>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5">
-                      <ValueTooltip content="Current stage of the partnership workflow.">
-                        <div className="flex items-center gap-2">
-                          <span className={cn("h-2 w-2 rounded-full", stageDotClass(row.stageGroup))} />
-                          <span className="text-sm text-foreground">{row.stageLabel}</span>
-                        </div>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5 text-sm text-muted-foreground">
-                      <ValueTooltip content="Most relevant tracked date for this partnership.">
-                        <span>{formatDate(row.date)}</span>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5 text-sm text-muted-foreground">
-                      <ValueTooltip content="Current deliverable progress summary.">
-                        <span>{row.deliverablesLabel}</span>
-                      </ValueTooltip>
-                    </TableCell>
-                    <TableCell className="px-6 py-5">
-                      {row.riskCount > 0 ? (
-                        <ValueTooltip content="Open risk flags that still need review.">
-                          <span className="inline-flex border border-[#f2c6b8] px-2 py-1 text-xs text-[#d76742]">
-                            {row.riskCount} flag{row.riskCount === 1 ? "" : "s"}
-                          </span>
-                        </ValueTooltip>
-                      ) : (
-                        <ValueTooltip content="No active risk flags are currently tracked.">
-                          <span className="text-sm text-muted-foreground">-</span>
-                        </ValueTooltip>
-                      )}
-                    </TableCell>
+              </TableHeader>
+              <TableBody>
+                {pagedRows.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
                     <TableCell
-                      className="px-6 py-5 text-right"
-                      onClick={(event) => event.stopPropagation()}
+                      colSpan={8}
+                      className="px-6 py-10 text-center text-sm text-muted-foreground"
                     >
-                      <div className="flex items-center justify-end gap-3">
-                        <Link
-                          href={`/app/p/${row.id}`}
-                          className="text-sm font-medium text-foreground transition hover:text-primary"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          View
-                        </Link>
-                        <DealHistoryRowActions
-                          dealId={row.id}
-                          dealName={row.campaignName}
-                          isArchived={row.stageGroup === "archived"}
-                        />
-                      </div>
+                      No partnerships match the current filters.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  pagedRows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer border-black/8 hover:bg-secondary/20 dark:border-white/10 dark:hover:bg-white/[0.03]"
+                      tabIndex={0}
+                      role="link"
+                      onClick={() => router.push(`/app/p/${row.id}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          router.push(`/app/p/${row.id}`);
+                        }
+                      }}
+                    >
+                      <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
+                        <ValueTooltip content="Brand associated with this partnership.">
+                          <span>{row.brandName}</span>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-sm text-muted-foreground">
+                        <ValueTooltip content="Campaign or workspace title for this partnership.">
+                          <span>{row.campaignName}</span>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-sm font-medium text-foreground">
+                        <ValueTooltip content="Primary payment amount currently tracked.">
+                          <span>{formatCurrency(row.amount, row.currency)}</span>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
+                        <ValueTooltip content="Current stage of the partnership workflow.">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={cn("h-2 w-2 rounded-full", stageDotClass(row.stageGroup))}
+                            />
+                            <span className="text-sm text-foreground">{row.stageLabel}</span>
+                          </div>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-sm text-muted-foreground">
+                        <ValueTooltip content="Most relevant tracked date for this partnership.">
+                          <span>{formatDate(row.date)}</span>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5 text-sm text-muted-foreground">
+                        <ValueTooltip content="Current deliverable progress summary.">
+                          <span>{row.deliverablesLabel}</span>
+                        </ValueTooltip>
+                      </TableCell>
+                      <TableCell className="px-6 py-5">
+                        {row.riskCount > 0 ? (
+                          <ValueTooltip content="Open risk flags that still need review.">
+                            <span className="inline-flex border border-[#f2c6b8] px-2 py-1 text-xs text-[#d76742]">
+                              {row.riskCount} flag{row.riskCount === 1 ? "" : "s"}
+                            </span>
+                          </ValueTooltip>
+                        ) : (
+                          <ValueTooltip content="No active risk flags are currently tracked.">
+                            <span className="text-sm text-muted-foreground">-</span>
+                          </ValueTooltip>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        className="px-6 py-5 text-right"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            href={`/app/p/${row.id}`}
+                            className="text-sm font-medium text-foreground transition hover:text-primary"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            View
+                          </Link>
+                          <DealHistoryRowActions
+                            dealId={row.id}
+                            dealName={row.campaignName}
+                            isArchived={row.stageGroup === "archived"}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">

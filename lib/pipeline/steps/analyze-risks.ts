@@ -4,9 +4,14 @@
  */
 import { analyzeCreatorRisks } from "@/lib/analysis/fallback";
 import { analyzeRisksWithLlm, getLlmRoute, hasLlmKey } from "@/lib/analysis/llm";
+import { aiRiskAnalysisEnabled } from "@/flags";
 import { getRepository } from "@/lib/repository";
 import { saveArtifact } from "@/lib/pipeline/artifacts";
-import { assertCurrentRun, executePipelineStep, loadExtractionFromRecords } from "@/lib/pipeline/run-state";
+import {
+  assertCurrentRun,
+  executePipelineStep,
+  loadExtractionFromRecords,
+} from "@/lib/pipeline/run-state";
 
 export async function runAnalyzeRisksStep(documentId: string, runId: string) {
   return executePipelineStep({ documentId, runId, step: "analyze_risks" }, async ({ document }) => {
@@ -20,15 +25,16 @@ export async function runAnalyzeRisksStep(documentId: string, runId: string) {
       document.id,
       extraction as Parameters<typeof analyzeCreatorRisks>[2]
     );
-    const risks = !hasLlmKey()
-      ? fallbackRisks
-      : await analyzeRisksWithLlm(
-          document.normalizedText,
-          document.documentKind,
-          extraction,
-          fallbackRisks,
-          document.id
-        ).catch(() => fallbackRisks);
+    const risks =
+      !hasLlmKey() || (await aiRiskAnalysisEnabled()) === false
+        ? fallbackRisks
+        : await analyzeRisksWithLlm(
+            document.normalizedText,
+            document.documentKind,
+            extraction,
+            fallbackRisks,
+            document.id
+          ).catch(() => fallbackRisks);
 
     await assertCurrentRun(document.id, runId);
     await getRepository().replaceRiskFlagsForDocument(document.dealId, document.id, risks);
@@ -40,8 +46,8 @@ export async function runAnalyzeRisksStep(documentId: string, runId: string) {
       kind: "risk_analysis",
       processor: hasLlmKey() ? getLlmRoute("analyze_risks").primary : "fallback_risk_analysis",
       payload: {
-        risks
-      }
+        risks,
+      },
     });
 
     return risks;

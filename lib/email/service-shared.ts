@@ -9,35 +9,28 @@ import type {
   DealTermsRecord,
   EmailDealCandidateMatchGroup,
   EmailThreadDetail,
-  NegotiationStance,
   PendingExtractionData,
-  Viewer
+  Viewer,
 } from "@/lib/types";
 import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
 import {
   buildEmailTermSuggestion,
   detectImportantEmailEvents,
   detectPromiseDiscrepancies,
-  scoreThreadAgainstDeal
+  scoreThreadAgainstDeal,
 } from "@/lib/email/smart-inbox";
+import { smartInboxEnabled } from "@/flags";
 import { extractActionItemsFromMessage } from "@/lib/email/action-items";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
-import {
-  refreshGoogleAccessToken
-} from "@/lib/email/providers/gmail";
-import {
-  refreshOutlookAccessToken
-} from "@/lib/email/providers/outlook";
-import {
-  isYahooAppPasswordAccount,
-  refreshYahooAccessToken
-} from "@/lib/email/providers/yahoo";
+import { refreshGoogleAccessToken } from "@/lib/email/providers/gmail";
+import { refreshOutlookAccessToken } from "@/lib/email/providers/outlook";
+import { isYahooAppPasswordAccount, refreshYahooAccessToken } from "@/lib/email/providers/yahoo";
 import type { ProviderThreadPayload } from "@/lib/email/providers/types";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
 import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
 import {
   clearEmailResyncRequiredNotification,
-  emitEmailResyncRequiredNotification
+  emitEmailResyncRequiredNotification,
 } from "@/lib/notification-service";
 import {
   createEmailThreadNoteForUser,
@@ -56,7 +49,7 @@ import {
   saveSyncedEmailThread,
   upsertBrandContact,
   updateConnectedEmailAccount,
-  upsertEmailCandidateMatch
+  upsertEmailCandidateMatch,
 } from "@/lib/email/repository";
 
 const DEFAULT_TRANSACTIONAL_MAILBOX_SENDER = "onboarding@resend.dev";
@@ -66,7 +59,7 @@ const HELLOBRAND_TRANSACTIONAL_MARKERS = [
   "workspace is ready for review",
   "workspace could not be processed",
   "inbox needs to reconnect",
-  "thanks for joining the hellobrand waitlist"
+  "thanks for joining the hellobrand waitlist",
 ];
 
 export const YAHOO_POLL_INTERVAL_MS = 15 * 60 * 1000;
@@ -76,7 +69,10 @@ export const OUTLOOK_WEBHOOK_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 export const EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW = "5s";
 export const EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE = 5;
 
-export function redirectTarget(pathname: string, searchParams?: Record<string, string | null | undefined>) {
+export function redirectTarget(
+  pathname: string,
+  searchParams?: Record<string, string | null | undefined>
+) {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(searchParams ?? {})) {
     if (value) {
@@ -116,19 +112,13 @@ function stripHtmlTags(value: string | null | undefined) {
 
 function getTransactionalMailboxSenders() {
   return new Set(
-    [
-      process.env.RESEND_FROM_EMAIL,
-      DEFAULT_TRANSACTIONAL_MAILBOX_SENDER
-    ]
+    [process.env.RESEND_FROM_EMAIL, DEFAULT_TRANSACTIONAL_MAILBOX_SENDER]
       .map((value) => normalizeMailboxAddress(value))
       .filter((value): value is string => Boolean(value))
   );
 }
 
-function isHelloBrandTransactionalThread(
-  accountEmail: string,
-  payload: ProviderThreadPayload
-) {
+function isHelloBrandTransactionalThread(accountEmail: string, payload: ProviderThreadPayload) {
   const normalizedAccountEmail = normalizeMailboxAddress(accountEmail);
   const knownSenders = getTransactionalMailboxSenders();
 
@@ -161,8 +151,8 @@ function isHelloBrandTransactionalThread(
     ...payload.messages.flatMap((message) => [
       message.subject,
       message.textBody ?? "",
-      stripHtmlTags(message.htmlBody)
-    ])
+      stripHtmlTags(message.htmlBody),
+    ]),
   ]
     .join("\n")
     .toLowerCase();
@@ -202,14 +192,9 @@ export function latestReplyTarget(detail: EmailThreadDetail) {
 
   return {
     anchor,
-    to:
-      latestInbound?.from
-        ? [latestInbound.from]
-        : anchor?.to?.length
-          ? anchor.to
-          : [],
+    to: latestInbound?.from ? [latestInbound.from] : anchor?.to?.length ? anchor.to : [],
     cc: latestInbound?.cc ?? anchor?.cc ?? [],
-    bcc: [] as EmailThreadDetail["messages"][number]["bcc"]
+    bcc: [] as EmailThreadDetail["messages"][number]["bcc"],
   };
 }
 
@@ -294,7 +279,7 @@ export function groupCandidateMatches(
 
     grouped.set(match.deal.id, {
       deal: match.deal,
-      matches: [match]
+      matches: [match],
     });
   }
 
@@ -346,7 +331,7 @@ function emptyTermsPatch(
     governingLaw: aggregate.terms?.governingLaw ?? null,
     notes: aggregate.terms?.notes ?? null,
     manuallyEditedFields: aggregate.terms?.manuallyEditedFields ?? [],
-    briefData: aggregate.terms?.briefData ?? null
+    briefData: aggregate.terms?.briefData ?? null,
   };
 }
 
@@ -359,7 +344,7 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
       await updateConnectedEmailAccount(account.id, {
         status: "reconnect_required",
         lastErrorCode: "missing_yahoo_app_password",
-        lastErrorMessage: "Reconnect Yahoo with a fresh app password."
+        lastErrorMessage: "Reconnect Yahoo with a fresh app password.",
       });
       throw new Error("Reconnect required.");
     }
@@ -367,7 +352,7 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
     return {
       accessToken: null as string | null,
       refreshToken,
-      mailPassword: refreshToken
+      mailPassword: refreshToken,
     };
   }
 
@@ -375,16 +360,13 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
     await updateConnectedEmailAccount(account.id, {
       status: "reconnect_required",
       lastErrorCode: "legacy_yahoo_app_password",
-      lastErrorMessage: "Reconnect Yahoo with Yahoo OAuth."
+      lastErrorMessage: "Reconnect Yahoo with Yahoo OAuth.",
     });
     throw new Error("Reconnect required.");
   }
 
   const expiresAt = account.tokenExpiresAt ? new Date(account.tokenExpiresAt).getTime() : 0;
-  const needsRefresh =
-    !accessToken ||
-    !expiresAt ||
-    expiresAt <= Date.now() + 60 * 1000;
+  const needsRefresh = !accessToken || !expiresAt || expiresAt <= Date.now() + 60 * 1000;
 
   if (!needsRefresh) {
     return { accessToken, refreshToken };
@@ -396,9 +378,7 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
       lastErrorCode:
         account.provider === "yahoo" ? "missing_yahoo_refresh_token" : "missing_refresh_token",
       lastErrorMessage:
-        account.provider === "yahoo"
-          ? "Reconnect Yahoo with Yahoo OAuth."
-          : "Reconnect required."
+        account.provider === "yahoo" ? "Reconnect Yahoo with Yahoo OAuth." : "Reconnect required.",
     });
     throw new Error("Reconnect required.");
   }
@@ -421,12 +401,12 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
     tokenExpiresAt: tokenExpiresAt(refreshed.expires_in),
     status: "connected",
     lastErrorCode: null,
-    lastErrorMessage: null
+    lastErrorMessage: null,
   });
 
   return {
     accessToken: decryptSecret(updated.accessTokenEncrypted),
-    refreshToken: decryptSecret(updated.refreshTokenEncrypted)
+    refreshToken: decryptSecret(updated.refreshTokenEncrypted),
   };
 }
 
@@ -439,9 +419,11 @@ export async function refreshEmailDealSuggestionsForViewer(
 ) {
   const [threads, aggregates] = await Promise.all([
     listEmailThreadsForUser(viewer.id, {
-      limit: options?.limit ?? 250
+      limit: options?.limit ?? 250,
     }),
-    import("@/lib/cached-data").then(({ getCachedDealAggregates }) => getCachedDealAggregates(viewer))
+    import("@/lib/cached-data").then(({ getCachedDealAggregates }) =>
+      getCachedDealAggregates(viewer)
+    ),
   ]);
 
   const threadIds = new Set(options?.threadIds ?? []);
@@ -449,13 +431,11 @@ export async function refreshEmailDealSuggestionsForViewer(
     threadIds.size > 0 ? threads.filter((thread) => threadIds.has(thread.thread.id)) : threads;
   const threadsForScoring =
     threadIds.size > 0
-      ? (
-          await Promise.all(
-            scopedThreads.map(async (thread) => {
-              const detail = await getEmailThreadDetailForUser(viewer.id, thread.thread.id);
-              return detail ?? thread;
-            })
-          )
+      ? await Promise.all(
+          scopedThreads.map(async (thread) => {
+            const detail = await getEmailThreadDetailForUser(viewer.id, thread.thread.id);
+            return detail ?? thread;
+          })
         )
       : scopedThreads;
 
@@ -465,7 +445,8 @@ export async function refreshEmailDealSuggestionsForViewer(
         continue;
       }
 
-      const match = scoreThreadAgainstDeal(thread, aggregate);
+      const match =
+        (await smartInboxEnabled()) === true ? scoreThreadAgainstDeal(thread, aggregate) : null;
       if (!match) {
         continue;
       }
@@ -486,7 +467,7 @@ export async function refreshEmailDealSuggestionsForViewer(
         status: "suggested",
         confidence: match.confidence,
         reasons: match.reasons,
-        evidence: match.evidence
+        evidence: match.evidence,
       });
     }
   }
@@ -509,32 +490,28 @@ async function applyEmailTermSuggestionToDeal(
     ...currentTermsBase,
     pendingExtraction: null,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
-  const existingPending = (aggregate.terms?.pendingExtraction as PendingExtractionData | null) ??
-    currentTermsBase;
+  const existingPending =
+    (aggregate.terms?.pendingExtraction as PendingExtractionData | null) ?? currentTermsBase;
   const { mergeTerms } = await import("@/lib/deals");
-  const mergedPending = coalesceExtractions(
-    existingPending,
-    patch,
-    (base, next) => {
-      const merged = mergeTerms(
-        {
-          ...base,
-          pendingExtraction: null
-        },
-        {
-          ...next,
-          pendingExtraction: null
-        },
-        {
-          manuallyEditedFields: currentTermsBase.manuallyEditedFields ?? []
-        }
-      );
-      const { pendingExtraction: _pendingExtraction, ...rest } = merged;
-      return rest as PendingExtractionData;
-    }
-  );
+  const mergedPending = coalesceExtractions(existingPending, patch, (base, next) => {
+    const merged = mergeTerms(
+      {
+        ...base,
+        pendingExtraction: null,
+      },
+      {
+        ...next,
+        pendingExtraction: null,
+      },
+      {
+        manuallyEditedFields: currentTermsBase.manuallyEditedFields ?? [],
+      }
+    );
+    const { pendingExtraction: _pendingExtraction, ...rest } = merged;
+    return rest as PendingExtractionData;
+  });
 
   if (!hasMeaningfulChanges(currentTermsRecord, mergedPending)) {
     return null;
@@ -542,7 +519,7 @@ async function applyEmailTermSuggestionToDeal(
 
   await getRepository().upsertTerms(dealId, {
     ...currentTermsBase,
-    pendingExtraction: mergedPending
+    pendingExtraction: mergedPending,
   });
   return mergedPending;
 }
@@ -566,12 +543,10 @@ function inferContactRole(message: { subject: string; textBody: string | null })
   return null;
 }
 
-export async function processLinkedThreadUpdates(
-  viewer: Viewer,
-  threadIds: string[]
-) {
+export async function processLinkedThreadUpdates(viewer: Viewer, threadIds: string[]) {
   const { getCachedDealAggregates } = await import("@/lib/cached-data");
   const allAggregates = await getCachedDealAggregates(viewer);
+  const smartInboxOn = (await smartInboxEnabled()) === true;
 
   for (const threadId of threadIds) {
     const thread = await getEmailThreadDetailForUser(viewer.id, threadId);
@@ -586,16 +561,18 @@ export async function processLinkedThreadUpdates(
       }
 
       for (const message of thread.messages) {
-        const events = detectImportantEmailEvents(message);
+        const events = smartInboxOn ? detectImportantEmailEvents(message) : [];
         await replaceEmailDealEventsForMessage({
           userId: viewer.id,
           dealId: link.dealId,
           threadId: thread.thread.id,
           messageId: message.id,
-          events
+          events,
         });
 
-        const suggestion = buildEmailTermSuggestion(aggregate, thread, message);
+        const suggestion = smartInboxOn
+          ? buildEmailTermSuggestion(aggregate, thread, message)
+          : null;
         if (suggestion) {
           const pendingPatch = await applyEmailTermSuggestionToDeal(
             viewer,
@@ -611,7 +588,7 @@ export async function processLinkedThreadUpdates(
               title: suggestion.title,
               summary: suggestion.summary,
               patch: suggestion.patch,
-              evidence: suggestion.evidence
+              evidence: suggestion.evidence,
             });
           }
         }
@@ -626,27 +603,35 @@ export async function processLinkedThreadUpdates(
             action: item.action,
             dueDate: item.dueDate,
             urgency: item.urgency,
-            sourceText: item.sourceText
+            sourceText: item.sourceText,
           });
         }
 
-        const discrepancies = detectPromiseDiscrepancies(aggregate, message);
-        for (const discrepancy of discrepancies) {
-          await saveEmailRiskFlag({
-            dealId: link.dealId,
-            category: discrepancy.field === "paymentAmount" ? "payment_terms"
-              : discrepancy.field === "exclusivity" ? "exclusivity"
-              : discrepancy.field === "deliverables" ? "deliverables"
-              : discrepancy.field === "usageDuration" ? "usage_rights"
-              : "other",
-            title: `Email contradicts contract: ${discrepancy.field}`,
-            detail: `Email claims "${discrepancy.emailClaim}" but contract says "${discrepancy.contractValue}".`,
-            severity: discrepancy.severity,
-            suggestedAction: "Review the email thread and compare with your signed contract terms.",
-            evidence: [discrepancy.sourceText],
-            sourceType: "email",
-            sourceMessageId: discrepancy.messageId
-          });
+        if (smartInboxOn) {
+          const discrepancies = detectPromiseDiscrepancies(aggregate, message);
+          for (const discrepancy of discrepancies) {
+            await saveEmailRiskFlag({
+              dealId: link.dealId,
+              category:
+                discrepancy.field === "paymentAmount"
+                  ? "payment_terms"
+                  : discrepancy.field === "exclusivity"
+                    ? "exclusivity"
+                    : discrepancy.field === "deliverables"
+                      ? "deliverables"
+                      : discrepancy.field === "usageDuration"
+                        ? "usage_rights"
+                        : "other",
+              title: `Email contradicts contract: ${discrepancy.field}`,
+              detail: `Email claims "${discrepancy.emailClaim}" but contract says "${discrepancy.contractValue}".`,
+              severity: discrepancy.severity,
+              suggestedAction:
+                "Review the email thread and compare with your signed contract terms.",
+              evidence: [discrepancy.sourceText],
+              sourceType: "email",
+              sourceMessageId: discrepancy.messageId,
+            });
+          }
         }
 
         if (message.direction === "inbound" && message.from?.email) {
@@ -657,14 +642,14 @@ export async function processLinkedThreadUpdates(
             email: message.from.email,
             organization: aggregate.deal.brandName,
             inferredRole: inferContactRole(message),
-            lastSeenAt: message.receivedAt ?? message.sentAt
+            lastSeenAt: message.receivedAt ?? message.sentAt,
           });
         }
       }
 
       const latestMessage = thread.messages[thread.messages.length - 1];
       if (latestMessage) {
-        checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
+        await checkCrossDealConflicts(aggregate, allAggregates, latestMessage);
       }
     }
   }
@@ -689,5 +674,5 @@ export {
   emitEmailResyncRequiredNotification,
   getConnectedEmailAccount,
   getEmailSyncState,
-  saveConnectedEmailAccount
+  saveConnectedEmailAccount,
 };

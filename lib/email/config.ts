@@ -1,4 +1,11 @@
 import type { EmailProvider } from "@/lib/types";
+import {
+  gmailProviderEnabled,
+  outlookProviderEnabled,
+  yahooAppPasswordEnabled,
+  yahooOAuthEnabled,
+  yahooProviderEnabled,
+} from "@/flags";
 
 function normalizeBaseUrl(value: string | undefined) {
   const fallback = "http://localhost:3011";
@@ -76,6 +83,51 @@ export function hasProviderConfig(provider: EmailProvider) {
   }
 
   return false;
+}
+
+export async function isProviderEnabled(provider: EmailProvider): Promise<boolean> {
+  if (!hasProviderConfig(provider)) {
+    return false;
+  }
+
+  switch (provider) {
+    case "gmail":
+      return (await gmailProviderEnabled()) === true;
+    case "outlook":
+      return (await outlookProviderEnabled()) === true;
+    case "yahoo":
+      return (await yahooProviderEnabled()) === true;
+    default:
+      return false;
+  }
+}
+
+export async function isYahooOAuthEnabled(): Promise<boolean> {
+  return (await yahooOAuthEnabled()) === true;
+}
+
+export async function isYahooAppPasswordEnabled(): Promise<boolean> {
+  return (await yahooAppPasswordEnabled()) === true;
+}
+
+export type EmailProviderFlagState = {
+  gmail: boolean;
+  outlook: boolean;
+  yahoo: boolean;
+  yahooOAuth: boolean;
+  yahooAppPassword: boolean;
+};
+
+export async function getEmailProviderFlagStates(): Promise<EmailProviderFlagState> {
+  const [gmail, outlook, yahoo, yahooOAuth, yahooAppPassword] = await Promise.all([
+    isProviderEnabled("gmail"),
+    isProviderEnabled("outlook"),
+    isProviderEnabled("yahoo"),
+    isYahooOAuthEnabled(),
+    isYahooAppPasswordEnabled(),
+  ]);
+
+  return { gmail, outlook, yahoo, yahooOAuth, yahooAppPassword };
 }
 
 export const gmailScopes = [

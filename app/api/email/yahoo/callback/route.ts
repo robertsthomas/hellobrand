@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
-import { getAppBaseUrl, resolveEmailAppBaseUrl } from "@/lib/email/config";
+import { getAppBaseUrl, isProviderEnabled, resolveEmailAppBaseUrl } from "@/lib/email/config";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import { handleYahooCallbackForViewer } from "@/lib/email/service";
 
@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
 
     const viewer = await requireApiViewer();
     await assertViewerHasFeature(viewer, "email_connections");
+    if (!(await isProviderEnabled("yahoo"))) {
+      throw new Error("Yahoo email is not available.");
+    }
     const redirectUrl = await handleYahooCallbackForViewer(viewer, { code, state });
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
     })();
     const params = new URLSearchParams({
       email_error: error instanceof Error ? error.message : "Yahoo connection failed.",
-      email_provider: "yahoo"
+      email_provider: "yahoo",
     });
     return NextResponse.redirect(`${returnBaseUrl}/app/settings?${params.toString()}`);
   }

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { assertViewerHasFeature } from "@/lib/billing/entitlements";
-import { resolveEmailAppBaseUrl } from "@/lib/email/config";
+import { isProviderEnabled, resolveEmailAppBaseUrl } from "@/lib/email/config";
 import { createOutlookConnectUrlForViewerWithReturnBaseUrl } from "@/lib/email/service";
 
 export async function GET(request: NextRequest) {
@@ -15,22 +15,22 @@ export async function GET(request: NextRequest) {
   try {
     const viewer = await requireApiViewer();
     await assertViewerHasFeature(viewer, "email_connections");
-    const url = await createOutlookConnectUrlForViewerWithReturnBaseUrl(
-      viewer,
-      requestBaseUrl
-    );
+    if (!(await isProviderEnabled("outlook"))) {
+      throw new Error("Outlook email is not available.");
+    }
+    const url = await createOutlookConnectUrlForViewerWithReturnBaseUrl(viewer, requestBaseUrl);
     return NextResponse.redirect(url);
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       const params = new URLSearchParams({
-        redirect_url: `${requestBaseUrl}/app/settings`
+        redirect_url: `${requestBaseUrl}/app/settings`,
       });
       return NextResponse.redirect(`${requestBaseUrl}/sign-in?${params.toString()}`);
     }
 
     const params = new URLSearchParams({
       email_error: error instanceof Error ? error.message : "Could not start Outlook connection.",
-      email_provider: "outlook"
+      email_provider: "outlook",
     });
     return NextResponse.redirect(`${requestBaseUrl}/app/settings?${params.toString()}`);
   }

@@ -37,3 +37,4 @@ hellobrand-*.json
 # opencode config (can include secrets)
 opencode*.json
 /tmp/
+.env*.local

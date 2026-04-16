@@ -5,8 +5,9 @@ import type {
   DealCategory,
   DealTermsRecord,
   DisclosureObligation,
-  FieldEvidence
+  FieldEvidence,
 } from "@/lib/types";
+import { aiConflictIntelligence } from "@/flags";
 
 type TermsData = Omit<
   DealTermsRecord,
@@ -26,7 +27,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "fragrance",
     "wellness beauty",
     "sephora",
-    "ulta"
+    "ulta",
   ],
   fashion_apparel: [
     "fashion",
@@ -39,7 +40,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "shoe",
     "footwear",
     "style",
-    "streetwear"
+    "streetwear",
   ],
   food_beverage: [
     "food",
@@ -52,7 +53,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "grocery",
     "protein bar",
     "lunchables",
-    "cpg"
+    "cpg",
   ],
   entertainment_media: [
     "movie",
@@ -65,7 +66,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "netflix",
     "hulu",
     "disney+",
-    "prime video"
+    "prime video",
   ],
   fitness_wellness: [
     "fitness",
@@ -76,7 +77,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "recovery",
     "pilates",
     "nutrition",
-    "running"
+    "running",
   ],
   parenting_family: [
     "parenting",
@@ -86,7 +87,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "kids",
     "children",
     "mom",
-    "maternal"
+    "maternal",
   ],
   tech_gaming: [
     "tech",
@@ -98,7 +99,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "pc",
     "laptop",
     "phone",
-    "creator tool"
+    "creator tool",
   ],
   travel_hospitality: [
     "travel",
@@ -108,7 +109,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "tourism",
     "vacation",
     "destination",
-    "booking"
+    "booking",
   ],
   finance: [
     "finance",
@@ -118,7 +119,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "investment",
     "fintech",
     "tax",
-    "crypto"
+    "crypto",
   ],
   home_lifestyle: [
     "home",
@@ -128,7 +129,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "appliance",
     "mattress",
     "cleaning",
-    "lifestyle"
+    "lifestyle",
   ],
   retail_ecommerce: [
     "retail",
@@ -137,7 +138,7 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "shopping",
     "subscription box",
     "storewide",
-    "shop now"
+    "shop now",
   ],
   sports_outdoors: [
     "sports",
@@ -148,9 +149,9 @@ const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "hiking",
     "cycling",
     "golf",
-    "pickleball"
+    "pickleball",
   ],
-  other: []
+  other: [],
 };
 
 const CATEGORY_LABELS: Record<DealCategory, string> = {
@@ -166,7 +167,7 @@ const CATEGORY_LABELS: Record<DealCategory, string> = {
   home_lifestyle: "Home & lifestyle",
   retail_ecommerce: "Retail & ecommerce",
   sports_outdoors: "Sports & outdoors",
-  other: "Other"
+  other: "Other",
 };
 
 export const dealCategoryOptions = Object.keys(CATEGORY_LABELS) as DealCategory[];
@@ -186,7 +187,7 @@ const KNOWN_BRAND_CATEGORY_HINTS: Array<{
   { match: /\bchips ahoy\b/i, brand: "Chips Ahoy", category: "food_beverage" },
   { match: /\bgoldfish\b/i, brand: "Goldfish", category: "food_beverage" },
   { match: /\bsephora\b/i, brand: "Sephora", category: "beauty_personal_care" },
-  { match: /\bulta\b/i, brand: "Ulta", category: "beauty_personal_care" }
+  { match: /\bulta\b/i, brand: "Ulta", category: "beauty_personal_care" },
 ];
 
 function normalizeWhitespace(value: string | null | undefined) {
@@ -220,7 +221,7 @@ function pushEvidence(
     fieldPath,
     snippet,
     sectionKey,
-    confidence
+    confidence,
   });
 }
 
@@ -386,11 +387,7 @@ function chooseBrandCategory(
   fallbacks: Array<string | null | undefined>
 ): { category: DealCategory | null; confidence: number; snippet: string | null } {
   const combined = uniqueStrings([...fallbacks, ...texts]).join("\n");
-  const brandHint = detectKnownBrandCategoryFromValues([
-    ...fallbacks,
-    ...texts,
-    combined
-  ]);
+  const brandHint = detectKnownBrandCategoryFromValues([...fallbacks, ...texts, combined]);
   if (!combined && !brandHint) {
     return { category: null, confidence: 0, snippet: null };
   }
@@ -417,7 +414,7 @@ function chooseBrandCategory(
       snippet:
         bestCategory && bestCategory !== brandHint.category
           ? `${brandHint.brand} is a known ${CATEGORY_LABELS[brandHint.category]} brand, which overrides conflicting category language in the source.`
-          : `${brandHint.brand} is a known ${CATEGORY_LABELS[brandHint.category]} brand.`
+          : `${brandHint.brand} is a known ${CATEGORY_LABELS[brandHint.category]} brand.`,
     };
   }
 
@@ -425,7 +422,7 @@ function chooseBrandCategory(
     return {
       category: "other",
       confidence: 0.2,
-      snippet: normalizeWhitespace(combined.slice(0, 180))
+      snippet: normalizeWhitespace(combined.slice(0, 180)),
     };
   }
 
@@ -440,7 +437,7 @@ function chooseBrandCategory(
   return {
     category: bestCategory,
     confidence: Number(Math.min(0.95, 0.45 + bestScore * 0.08).toFixed(2)),
-    snippet
+    snippet,
   };
 }
 
@@ -451,7 +448,7 @@ function extractRestrictionPhrases(text: string) {
     /may\s+not\s+work\s+with\s+(?:competing\s+)?([a-z0-9&/' -]{3,80}?)(?:\s+brands?)?(?=\s+(?:for|during|within)\b|[.,;:]|$)/gi,
     /exclusive(?:ly)?\s+within\s+([a-z0-9&/' -]{3,80})/gi,
     /(?:category|vertical)\s+exclusivity(?:\s+for|\s+within)?\s+([a-z0-9&/' -]{3,80})/gi,
-    /restricted\s+from\s+working\s+with\s+([a-z0-9&/' -]{3,80})/gi
+    /restricted\s+from\s+working\s+with\s+([a-z0-9&/' -]{3,80})/gi,
   ];
 
   for (const pattern of patterns) {
@@ -496,22 +493,21 @@ function extractDisclosureObligationsFromText(
       pattern: /(?:#ad|#sponsored|paid partnership|\bdisclose\b|\bdisclosure\b)/i,
       title: "Disclosure required",
       detail:
-        "This deal appears to require sponsored-content disclosure such as #ad, #sponsored, or a paid partnership label."
+        "This deal appears to require sponsored-content disclosure such as #ad, #sponsored, or a paid partnership label.",
     },
     {
       field: "disclosureObligations",
       pattern: /\b(ftc|advertising standards|endorsement guidelines)\b/i,
       title: "Compliance requirement",
       detail:
-        "This deal references compliance or endorsement guidance. Confirm the final post includes the required disclosure language."
+        "This deal references compliance or endorsement guidance. Confirm the final post includes the required disclosure language.",
     },
     {
       field: "disclosureObligations",
       pattern: /\b(pre-approval|approval required|must be approved|brand approval)\b/i,
       title: "Approval required",
-      detail:
-        "Content appears to require brand or agency approval before posting."
-    }
+      detail: "Content appears to require brand or agency approval before posting.",
+    },
   ];
 
   for (const entry of entries) {
@@ -526,13 +522,13 @@ function extractDisclosureObligationsFromText(
       id: `${entry.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${obligations.length + 1}`,
       title: entry.title,
       detail: entry.detail,
-      source: snippet
+      source: snippet,
     });
   }
 
   return {
     obligations,
-    evidence
+    evidence,
   };
 }
 
@@ -542,7 +538,7 @@ function campaignDateWindowFromTerms(terms: TermsData) {
       .map((item) => item.dueDate)
       .concat([
         terms.campaignDateWindow?.startDate ?? null,
-        terms.campaignDateWindow?.endDate ?? null
+        terms.campaignDateWindow?.endDate ?? null,
       ])
   )
     .map((value) => parseDate(value))
@@ -562,7 +558,7 @@ function campaignDateWindowFromTerms(terms: TermsData) {
     postingWindow:
       startDate && endDate && startDate !== endDate
         ? `${startDate.slice(0, 10)} to ${endDate.slice(0, 10)}`
-        : startDate?.slice(0, 10) ?? endDate?.slice(0, 10) ?? null
+        : (startDate?.slice(0, 10) ?? endDate?.slice(0, 10) ?? null),
   } satisfies CampaignDateWindow;
 }
 
@@ -577,7 +573,7 @@ export function buildConflictIntelligencePatch(args: {
     fallbackTerms.brandName,
     fallbackTerms.campaignName,
     fallbackTerms.exclusivityCategory,
-    fallbackTerms.exclusivityRestrictions
+    fallbackTerms.exclusivityRestrictions,
   ]);
 
   if (categoryChoice.snippet) {
@@ -594,7 +590,7 @@ export function buildConflictIntelligencePatch(args: {
   const normalizedRestrictionLabels = normalizeCategoryLabels([
     ...restrictionPhrases,
     fallbackTerms.exclusivityCategory ?? "",
-    fallbackTerms.exclusivityRestrictions ?? ""
+    fallbackTerms.exclusivityRestrictions ?? "",
   ]);
 
   if (normalizedRestrictionLabels.length > 0) {
@@ -632,9 +628,9 @@ export function buildConflictIntelligencePatch(args: {
       disclosureObligations:
         disclosure.obligations.length > 0
           ? disclosure.obligations
-          : fallbackTerms.disclosureObligations
+          : fallbackTerms.disclosureObligations,
     },
-    evidence
+    evidence,
   };
 }
 
@@ -668,7 +664,11 @@ function windowsOverlap(left: CampaignDateWindow | null, right: CampaignDateWind
   return leftStart.getTime() <= rightEnd.getTime() && rightStart.getTime() <= leftEnd.getTime();
 }
 
-function withinDays(left: CampaignDateWindow | null, right: CampaignDateWindow | null, days: number) {
+function withinDays(
+  left: CampaignDateWindow | null,
+  right: CampaignDateWindow | null,
+  days: number
+) {
   if (!left || !right) {
     return false;
   }
@@ -729,7 +729,7 @@ export function buildConflictResults(
         title: `Similar category to ${other.deal.brandName}`,
         detail: `Both deals appear to sit in ${dealCategoryLabel(targetCategory)}. Review whether category overlap or exclusivity language creates risk before moving forward.`,
         relatedDealIds: [other.deal.id],
-        evidenceRefs: [dealCategoryLabel(targetCategory) ?? "Category overlap"]
+        evidenceRefs: [dealCategoryLabel(targetCategory) ?? "Category overlap"],
       });
     }
 
@@ -745,7 +745,7 @@ export function buildConflictResults(
         title: `Restricted competitor overlap with ${other.deal.brandName}`,
         detail: `This deal restricts work in ${targetRestrictedCategories.join(", ")}, and ${other.deal.brandName} appears to fall inside that restriction.`,
         relatedDealIds: [other.deal.id],
-        evidenceRefs: targetRestrictedCategories
+        evidenceRefs: targetRestrictedCategories,
       });
     }
 
@@ -761,7 +761,7 @@ export function buildConflictResults(
         title: `Existing deal restrictions may block this deal`,
         detail: `${other.deal.brandName} includes restricted categories (${otherRestrictedCategories.join(", ")}), and this deal appears to overlap with them.`,
         relatedDealIds: [other.deal.id],
-        evidenceRefs: otherRestrictedCategories
+        evidenceRefs: otherRestrictedCategories,
       });
     }
 
@@ -784,8 +784,8 @@ export function buildConflictResults(
           targetTerms.exclusivityDuration,
           otherTerms.exclusivityDuration,
           targetWindow?.postingWindow,
-          otherWindow?.postingWindow
-        ])
+          otherWindow?.postingWindow,
+        ]),
       });
     }
 
@@ -798,10 +798,7 @@ export function buildConflictResults(
         title: `Schedule overlap with ${other.deal.brandName}`,
         detail: `The posting or deliverable window for this deal appears to overlap with ${other.deal.brandName}. Check that the creator calendar and approval deadlines are realistic.`,
         relatedDealIds: [other.deal.id],
-        evidenceRefs: uniqueStrings([
-          targetWindow?.postingWindow,
-          otherWindow?.postingWindow
-        ])
+        evidenceRefs: uniqueStrings([targetWindow?.postingWindow, otherWindow?.postingWindow]),
       });
     }
   }
@@ -829,6 +826,16 @@ export function buildConflictResults(
 
     return right.confidence - left.confidence;
   });
+}
+
+export async function buildConflictResultsIfEnabled(
+  target: DealAggregate,
+  others: DealAggregate[]
+): Promise<ConflictResult[]> {
+  if ((await aiConflictIntelligence()) !== true) {
+    return [];
+  }
+  return buildConflictResults(target, others);
 }
 
 export function mergeConflictIntelligence(
@@ -865,21 +872,21 @@ export function mergeConflictIntelligence(
     brandCategory: patch.brandCategory ?? base.brandCategory,
     competitorCategories: uniqueStrings([
       ...baseCompetitorCategories,
-      ...patchCompetitorCategories
+      ...patchCompetitorCategories,
     ]),
     restrictedCategories: uniqueStrings([
       ...baseRestrictedCategories,
-      ...patchRestrictedCategories
+      ...patchRestrictedCategories,
     ]),
     disclosureObligations: Array.from(
       new Map(
         [...baseDisclosureObligations, ...patchDisclosureObligations].map((entry) => [
           `${entry.title}:${entry.detail}`,
-          entry
+          entry,
         ])
       ).values()
     ),
-    campaignDateWindow: patch.campaignDateWindow ?? base.campaignDateWindow
+    campaignDateWindow: patch.campaignDateWindow ?? base.campaignDateWindow,
   };
 }
 
@@ -906,7 +913,12 @@ export function dateWindowLabel(window: CampaignDateWindow | null | undefined) {
     return "Not detected";
   }
 
-  return window.postingWindow ?? window.startDate?.slice(0, 10) ?? window.endDate?.slice(0, 10) ?? "Not detected";
+  return (
+    window.postingWindow ??
+    window.startDate?.slice(0, 10) ??
+    window.endDate?.slice(0, 10) ??
+    "Not detected"
+  );
 }
 
 export function compareDateWindow(a: CampaignDateWindow | null, b: CampaignDateWindow | null) {

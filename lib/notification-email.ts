@@ -2,6 +2,7 @@ import { Resend } from "resend";
 
 import { getAppSettings } from "@/lib/admin-settings";
 import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
+import { emailDeliveryEnabled } from "@/flags";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { inngest } from "@/lib/inngest/client";
 import { prisma } from "@/lib/prisma";
@@ -464,7 +465,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   }
 
   const appSettings = await getAppSettings();
-  if (!appSettings.emailDeliveryEnabled) {
+  if (!appSettings.emailDeliveryEnabled || (await emailDeliveryEnabled()) === false) {
     return null;
   }
 

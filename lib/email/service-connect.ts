@@ -2,24 +2,30 @@
  * This file handles inbox connection URLs, OAuth callbacks, and provider webhooks.
  * It keeps the provider-specific auth and webhook entry points separate from thread viewing and sync internals.
  */
-import { resolveEmailAppBaseUrl, yahooScopes, hasProviderConfig } from "@/lib/email/config";
+import {
+  resolveEmailAppBaseUrl,
+  yahooScopes,
+  hasProviderConfig,
+  isProviderEnabled,
+  isYahooOAuthEnabled,
+} from "@/lib/email/config";
 import { encryptSecret } from "@/lib/email/crypto";
 import { parseOAuthState } from "@/lib/email/oauth-state";
 import {
   buildGoogleAuthUrl,
   exchangeGoogleCode,
-  getGoogleProfile
+  getGoogleProfile,
 } from "@/lib/email/providers/gmail";
 import {
   buildOutlookAuthUrl,
   exchangeOutlookCode,
-  getOutlookProfile
+  getOutlookProfile,
 } from "@/lib/email/providers/outlook";
 import {
   buildYahooAuthUrl,
   exchangeYahooCode,
   getYahooProfile,
-  verifyYahooMailboxAccess
+  verifyYahooMailboxAccess,
 } from "@/lib/email/providers/yahoo";
 import {
   findConnectedEmailAccountByProviderAddress,
@@ -27,7 +33,7 @@ import {
   getEmailSyncState,
   listExistingEmailMessageProviderIdsForAccount,
   saveConnectedEmailAccount,
-  upsertEmailSyncState
+  upsertEmailSyncState,
 } from "@/lib/email/repository";
 import {
   assertEmailConnectionsAccess,
@@ -35,15 +41,15 @@ import {
   isRecentIso,
   OUTLOOK_WEBHOOK_DEDUPE_WINDOW_MS,
   redirectTarget,
-  tokenExpiresAt
+  tokenExpiresAt,
 } from "@/lib/email/service-shared";
 import { enqueueEmailEvent } from "@/lib/email/service-sync";
 import type { Viewer } from "@/lib/types";
 
 export async function createGoogleConnectUrlForViewer(viewer: Viewer) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("gmail")) {
-    throw new Error("Google email is not configured.");
+  if (!hasProviderConfig("gmail") || !(await isProviderEnabled("gmail"))) {
+    throw new Error("Google email is not available.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
@@ -55,22 +61,22 @@ export async function createGoogleConnectUrlForViewerWithReturnBaseUrl(
   returnBaseUrl: string | null | undefined
 ) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("gmail")) {
-    throw new Error("Google email is not configured.");
+  if (!hasProviderConfig("gmail") || !(await isProviderEnabled("gmail"))) {
+    throw new Error("Google email is not available.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
   return buildGoogleAuthUrl(
     createOAuthState(viewer.id, "gmail", {
-      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl),
     })
   );
 }
 
 export async function createOutlookConnectUrlForViewer(viewer: Viewer) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("outlook")) {
-    throw new Error("Outlook email is not configured.");
+  if (!hasProviderConfig("outlook") || !(await isProviderEnabled("outlook"))) {
+    throw new Error("Outlook email is not available.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
@@ -82,22 +88,25 @@ export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
   returnBaseUrl: string | null | undefined
 ) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("outlook")) {
-    throw new Error("Outlook email is not configured.");
+  if (!hasProviderConfig("outlook") || !(await isProviderEnabled("outlook"))) {
+    throw new Error("Outlook email is not available.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
   return buildOutlookAuthUrl(
     createOAuthState(viewer.id, "outlook", {
-      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+      returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl),
     })
   );
 }
 
 export async function createYahooConnectUrlForViewer(viewer: Viewer) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("yahoo")) {
-    throw new Error("Yahoo email is not configured.");
+  if (!hasProviderConfig("yahoo") || !(await isProviderEnabled("yahoo"))) {
+    throw new Error("Yahoo email is not available.");
+  }
+  if (!(await isYahooOAuthEnabled())) {
+    throw new Error("Yahoo OAuth is currently disabled.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
@@ -110,13 +119,16 @@ export async function createYahooConnectUrlForViewerWithReturnBaseUrl(
   returnBaseUrl: string | null | undefined
 ) {
   await assertEmailConnectionsAccess(viewer);
-  if (!hasProviderConfig("yahoo")) {
-    throw new Error("Yahoo email is not configured.");
+  if (!hasProviderConfig("yahoo") || !(await isProviderEnabled("yahoo"))) {
+    throw new Error("Yahoo email is not available.");
+  }
+  if (!(await isYahooOAuthEnabled())) {
+    throw new Error("Yahoo OAuth is currently disabled.");
   }
 
   const { createOAuthState } = await import("@/lib/email/oauth-state");
   const state = createOAuthState(viewer.id, "yahoo", {
-    returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl)
+    returnBaseUrl: resolveEmailAppBaseUrl(returnBaseUrl),
   });
   return buildYahooAuthUrl(state, parseOAuthState(state).nonce);
 }
@@ -142,19 +154,19 @@ export async function handleGoogleCallbackForViewer(
     accessTokenEncrypted: encryptSecret(tokens.access_token),
     refreshTokenEncrypted: encryptSecret(tokens.refresh_token ?? null),
     tokenExpiresAt: tokenExpiresAt(tokens.expires_in),
-    status: "connected"
+    status: "connected",
   });
 
   await upsertEmailSyncState(account.id, {
-    lastHistoryId: profile.historyId
+    lastHistoryId: profile.historyId,
   });
   await enqueueEmailEvent("email/account.initial_sync.requested", {
-    accountId: account.id
+    accountId: account.id,
   });
 
   return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
-    email_provider: "gmail"
+    email_provider: "gmail",
   })}`;
 }
 
@@ -179,16 +191,16 @@ export async function handleOutlookCallbackForViewer(
     accessTokenEncrypted: encryptSecret(tokens.access_token),
     refreshTokenEncrypted: encryptSecret(tokens.refresh_token ?? null),
     tokenExpiresAt: tokenExpiresAt(tokens.expires_in),
-    status: "connected"
+    status: "connected",
   });
 
   await enqueueEmailEvent("email/account.initial_sync.requested", {
-    accountId: account.id
+    accountId: account.id,
   });
 
   return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
-    email_provider: "outlook"
+    email_provider: "outlook",
   })}`;
 }
 
@@ -219,7 +231,7 @@ export async function handleYahooCallbackForViewer(
     accessTokenEncrypted: encryptSecret(tokens.access_token),
     refreshTokenEncrypted: encryptSecret(tokens.refresh_token),
     tokenExpiresAt: tokenExpiresAt(tokens.expires_in),
-    status: "syncing"
+    status: "syncing",
   });
 
   await upsertEmailSyncState(account.id, {
@@ -229,16 +241,16 @@ export async function handleYahooCallbackForViewer(
     lastHistoryId: null,
     lastErrorAt: null,
     lastErrorCode: null,
-    lastErrorMessage: null
+    lastErrorMessage: null,
   });
   await enqueueEmailEvent("email/account.initial_sync.requested", {
     accountId: account.id,
-    recentLimit: 100
+    recentLimit: 100,
   });
 
   return `${resolveEmailAppBaseUrl(state.returnBaseUrl)}${redirectTarget("/app/settings", {
     email_status: "connected",
-    email_provider: "yahoo"
+    email_provider: "yahoo",
   })}`;
 }
 
@@ -258,7 +270,7 @@ export async function connectYahooAppPasswordForViewer(
     accessTokenEncrypted: null,
     refreshTokenEncrypted: encryptSecret(input.appPassword.trim()),
     tokenExpiresAt: null,
-    status: "syncing"
+    status: "syncing",
   });
 
   await upsertEmailSyncState(account.id, {
@@ -268,11 +280,11 @@ export async function connectYahooAppPasswordForViewer(
     lastHistoryId: null,
     lastErrorAt: null,
     lastErrorCode: null,
-    lastErrorMessage: null
+    lastErrorMessage: null,
   });
   await enqueueEmailEvent("email/account.initial_sync.requested", {
     accountId: account.id,
-    recentLimit: 100
+    recentLimit: 100,
   });
 
   return account;
@@ -297,7 +309,7 @@ export async function handleGmailWebhookNotification(payload: {
 
   await enqueueEmailEvent("email/account.incremental_sync.requested", {
     accountId: account.id,
-    gmailHistoryId: payload.historyId
+    gmailHistoryId: payload.historyId,
   });
   return true;
 }
@@ -322,9 +334,7 @@ export async function handleOutlookWebhookNotifications(
     }
 
     const messageId =
-      notification.resourceData?.id ||
-      notification.resource?.split("/").pop() ||
-      null;
+      notification.resourceData?.id || notification.resource?.split("/").pop() || null;
 
     if (!messageId) {
       continue;
@@ -344,7 +354,9 @@ export async function handleOutlookWebhookNotifications(
       const existingMessageIds = new Set(
         await listExistingEmailMessageProviderIdsForAccount(accountId, uniqueMessageIds)
       );
-      pendingMessageIds = uniqueMessageIds.filter((messageId) => !existingMessageIds.has(messageId));
+      pendingMessageIds = uniqueMessageIds.filter(
+        (messageId) => !existingMessageIds.has(messageId)
+      );
     }
 
     if (pendingMessageIds.length === 0) {
@@ -353,7 +365,7 @@ export async function handleOutlookWebhookNotifications(
 
     await enqueueEmailEvent("email/account.incremental_sync.requested", {
       accountId,
-      outlookMessageIds: pendingMessageIds
+      outlookMessageIds: pendingMessageIds,
     });
   }
 

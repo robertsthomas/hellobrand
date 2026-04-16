@@ -1,18 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import type { IconType } from "react-icons";
-import {
-  FaFacebookF,
-  FaInstagram,
-  FaLinkedinIn,
-  FaPodcast,
-  FaTiktok,
-  FaTwitch,
-  FaXTwitter,
-  FaYoutube
-} from "react-icons/fa6";
-import { HiAtSymbol, HiOutlineGlobeAlt, HiOutlineEnvelope } from "react-icons/hi2";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -20,34 +8,48 @@ import type { ProfilePlatform } from "@/lib/profile-metadata";
 import {
   POPULAR_PLATFORMS,
   EXTENDED_PLATFORMS,
-  PLATFORM_DISPLAY
+  PLATFORM_DISPLAY,
 } from "@/lib/onboarding-platforms";
+import {
+  InstagramIcon,
+  TikTokIcon,
+  YouTubeIcon,
+  FacebookIcon,
+  LinkedInIcon,
+  TwitchIcon,
+  XTwitterIcon,
+  AtSymbolIcon,
+  EnvelopeIcon,
+  PodcastIcon,
+  GlobeIcon,
+  type SvgIcon,
+} from "@/lib/platform-icons";
 
-const PLATFORM_ICONS: Record<string, IconType> = {
-  instagram: FaInstagram,
-  tiktok: FaTiktok,
-  youtube: FaYoutube,
-  facebook: FaFacebookF,
-  linkedin: FaLinkedinIn,
-  twitch: FaTwitch,
-  twitter: FaXTwitter,
-  threads: HiAtSymbol,
-  newsletter: HiOutlineEnvelope,
-  podcast: FaPodcast,
-  other: HiOutlineGlobeAlt
+const PLATFORM_ICONS: Record<string, SvgIcon> = {
+  instagram: InstagramIcon,
+  tiktok: TikTokIcon,
+  youtube: YouTubeIcon,
+  facebook: FacebookIcon,
+  linkedin: LinkedInIcon,
+  twitch: TwitchIcon,
+  twitter: XTwitterIcon,
+  threads: AtSymbolIcon,
+  newsletter: EnvelopeIcon,
+  podcast: PodcastIcon,
+  other: GlobeIcon,
 };
 
 function PlatformCard({
   platform,
   selected,
-  onToggle
+  onToggle,
 }: {
   platform: ProfilePlatform;
   selected: boolean;
   onToggle: () => void;
 }) {
   const display = PLATFORM_DISPLAY[platform];
-  const Icon = PLATFORM_ICONS[platform] ?? HiOutlineGlobeAlt;
+  const Icon = PLATFORM_ICONS[platform] ?? GlobeIcon;
 
   return (
     <button
@@ -73,7 +75,7 @@ export function OnboardingStepPlatforms({
   platformHandles,
   setPlatformHandles,
   onBack,
-  onContinue
+  onContinue,
 }: {
   primaryHandle: string;
   selectedPlatforms: ProfilePlatform[];
@@ -96,7 +98,7 @@ export function OnboardingStepPlatforms({
       setSelectedPlatforms([...selectedPlatforms, platform]);
       setPlatformHandles({
         ...platformHandles,
-        [platform]: primaryHandle
+        [platform]: primaryHandle,
       });
     }
   };
@@ -117,8 +119,8 @@ export function OnboardingStepPlatforms({
         Where do you create?
       </h1>
       <p className="mt-2 text-[15px] leading-relaxed text-black/55 dark:text-white/60">
-        Select the platforms you&apos;re active on. We&apos;ll use this to
-        customize your workspace experience.
+        Select the platforms you&apos;re active on. We&apos;ll use this to customize your workspace
+        experience.
       </p>
 
       <div className="mt-8">
@@ -166,7 +168,7 @@ export function OnboardingStepPlatforms({
             </p>
             {selectedPlatforms.map((platform) => {
               const display = PLATFORM_DISPLAY[platform];
-              const Icon = PLATFORM_ICONS[platform] ?? HiOutlineGlobeAlt;
+              const Icon = PLATFORM_ICONS[platform] ?? GlobeIcon;
               return (
                 <label
                   key={platform}
@@ -193,10 +195,7 @@ export function OnboardingStepPlatforms({
         <button
           type="button"
           onClick={onBack}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            "h-12 flex-1"
-          )}
+          className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-12 flex-1")}
         >
           Back
         </button>

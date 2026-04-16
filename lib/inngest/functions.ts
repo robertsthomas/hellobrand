@@ -72,6 +72,11 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
   { id: "invoice-reminder-sweep" },
   { cron: "0 9 * * *" },
   async () => {
+    const { invoiceRemindersEnabled } = await import("@/flags");
+    if ((await invoiceRemindersEnabled()) !== true) {
+      return { ok: true, processedDeals: 0, notified: 0 };
+    }
+
     const { runInvoiceReminderSweep } = await import("@/lib/invoices");
     const result = await runInvoiceReminderSweep();
 

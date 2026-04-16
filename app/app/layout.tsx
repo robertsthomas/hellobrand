@@ -13,17 +13,14 @@ import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
   getCachedDealAggregates,
   getCachedOnboardingState,
-  getCachedProfile
+  getCachedProfile,
 } from "@/lib/cached-data";
+import { getAppFeatureFlags } from "@/lib/feature-flags";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 import { listNotificationsForViewer } from "@/lib/notification-service";
 import { buildSidebarMilestones } from "@/lib/sidebar-milestones";
 
-export default async function WorkspaceLayout({
-  children
-}: {
-  children: ReactNode;
-}) {
+export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
   const viewer = await requireViewer();
   const appSettings = await getAppSettings();
 
@@ -37,33 +34,36 @@ export default async function WorkspaceLayout({
     );
   }
 
-  const [profile, onboardingState, dealAggregates, notificationFeed, entitlements] = await Promise.all([
-    getCachedProfile(viewer),
-    getCachedOnboardingState(viewer),
-    getCachedDealAggregates(viewer),
-    listNotificationsForViewer(viewer, {
-      limit: 20,
-      syncComputed: false
-    }),
-    getViewerEntitlements(viewer)
-  ]);
+  const [profile, onboardingState, dealAggregates, notificationFeed, entitlements, featureFlags] =
+    await Promise.all([
+      getCachedProfile(viewer),
+      getCachedOnboardingState(viewer),
+      getCachedDealAggregates(viewer),
+      listNotificationsForViewer(viewer, {
+        limit: 20,
+        syncComputed: false,
+      }),
+      getViewerEntitlements(viewer),
+      getAppFeatureFlags(),
+    ]);
   const emailAccounts = entitlements.features.email_connections
     ? await listEmailAccountsForViewer(viewer)
     : [];
 
-  const isOnboardingComplete =
-    !!onboardingState.profileOnboardingCompletedAt;
+  const isOnboardingComplete = !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;
   const hasEverCreatedWorkspace =
     hasActiveWorkspace || onboardingState.productGuideStateJson.hasEverCreatedWorkspace;
   const notifications = notificationFeed.notifications;
-  const sidebarMilestones = buildSidebarMilestones({
-    hasActiveWorkspace,
-    hasEverCreatedWorkspace,
-    profile,
-    entitlements,
-    emailAccounts
-  });
+  const sidebarMilestones = featureFlags.sidebarMilestones
+    ? buildSidebarMilestones({
+        hasActiveWorkspace,
+        hasEverCreatedWorkspace,
+        profile,
+        entitlements,
+        emailAccounts,
+      })
+    : undefined;
 
   return (
     <>
@@ -82,13 +82,14 @@ export default async function WorkspaceLayout({
           notifications={notifications}
           onboardingComplete={isOnboardingComplete}
           sidebarMilestones={sidebarMilestones}
+          featureFlags={featureFlags}
           workspaceNavItems={dealAggregates.map((aggregate) => {
             const labels = getDisplayDealLabels(aggregate.deal);
 
             return {
               dealId: aggregate.deal.id,
               label: labels.campaignName ?? aggregate.deal.campaignName,
-              brandName: labels.brandName ?? aggregate.deal.brandName
+              brandName: labels.brandName ?? aggregate.deal.brandName,
             };
           })}
         >
