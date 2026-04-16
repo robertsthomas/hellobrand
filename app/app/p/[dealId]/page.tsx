@@ -287,10 +287,10 @@ async function DealDetailContent({
               />
             ) : (
               <FeatureUpgradeCard
-                eyebrow="Standard briefs"
-                title="AI brief generation unlocks on Standard"
-                description="Basic keeps the extracted brief overview, but generated campaign briefs and regenerations are part of the Standard and Premium workflow."
-                requiredTier={PlanTier.standard}
+                eyebrow="Basic briefs"
+                title="AI brief generation unlocks on Basic"
+                description="Free keeps the extracted brief overview, but generated campaign briefs and regenerations are part of the Basic and Premium workflow."
+                requiredTier={PlanTier.basic}
                 currentTier={entitlements.effectiveTier}
                 hasActiveSubscription={entitlements.hasActiveSubscription}
                 actionLabel="Upgrade for brief generation"

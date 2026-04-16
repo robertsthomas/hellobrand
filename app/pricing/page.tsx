@@ -33,8 +33,8 @@ export default async function PricingPage() {
               Pricing for creators
             </h1>
             <p className="mt-5 text-lg text-black/60 dark:text-white/65">
-              AI-powered partnership management from contract to payment. Start with the essentials
-              and upgrade as your workflow grows.
+              AI-powered partnership management from contract to payment. Start free with one
+              partnership and upgrade as your workspace grows.
             </p>
           </div>
 
@@ -119,11 +119,11 @@ export default async function PricingPage() {
       <section className="border-t border-black/5 px-5 py-12 sm:px-8 lg:px-10 dark:border-white/5">
         <div className="mx-auto max-w-3xl text-center">
           <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-black/40 dark:text-white/30">
-            <span>14-day free trial on all plans</span>
+            <span>Free plan available</span>
             <span className="hidden sm:inline" aria-hidden="true">
               &middot;
             </span>
-            <span>No credit card required to start</span>
+            <span>Basic includes a 14-day trial. Premium includes a 7-day trial.</span>
             <span className="hidden sm:inline" aria-hidden="true">
               &middot;
             </span>

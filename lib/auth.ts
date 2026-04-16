@@ -125,6 +125,27 @@ async function ensureViewerRecord(viewer: Viewer): Promise<Viewer> {
   }
 }
 
+async function ensureViewerBillingAccount(viewer: {
+  id: string;
+  email: string;
+}) {
+  if (!process.env.DATABASE_URL) {
+    return;
+  }
+
+  await prisma.billingAccount.upsert({
+    where: { userId: viewer.id },
+    update: {
+      billingEmail: viewer.email,
+    },
+    create: {
+      userId: viewer.id,
+      billingEmail: viewer.email,
+      currentPlanTier: "free",
+    },
+  });
+}
+
 async function upsertViewerFromSession() {
   const session = await auth();
   if (!session.userId) {
@@ -205,6 +226,11 @@ async function upsertViewerFromSession() {
       throw error;
     }
   }
+
+  await ensureViewerBillingAccount({
+    id: user.id,
+    email: realEmail ?? user.email,
+  });
 
   return {
     id: user.id,

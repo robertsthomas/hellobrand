@@ -17,21 +17,31 @@ describe("resolveEffectiveEntitlementTier", () => {
   test("uses the current paid tier outside of trial status", () => {
     expect(
       resolveEffectiveEntitlementTier({
-        currentPlanTier: PlanTier.standard,
+        currentPlanTier: PlanTier.basic,
         currentTrialPlanTier: PlanTier.premium,
         currentSubscriptionStatus: BillingSubscriptionStatus.active
       })
-    ).toBe(PlanTier.standard);
+    ).toBe(PlanTier.basic);
   });
 
   test("keeps dev overrides highest priority", () => {
     expect(
       resolveEffectiveEntitlementTier({
         overrideTier: PlanTier.premium,
-        currentPlanTier: PlanTier.basic,
-        currentTrialPlanTier: PlanTier.standard,
+        currentPlanTier: PlanTier.free,
+        currentTrialPlanTier: PlanTier.basic,
         currentSubscriptionStatus: BillingSubscriptionStatus.active
       })
     ).toBe(PlanTier.premium);
+  });
+
+  test("falls back to free when no paid plan or trial is active", () => {
+    expect(
+      resolveEffectiveEntitlementTier({
+        currentPlanTier: null,
+        currentTrialPlanTier: null,
+        currentSubscriptionStatus: null
+      })
+    ).toBe(PlanTier.free);
   });
 });

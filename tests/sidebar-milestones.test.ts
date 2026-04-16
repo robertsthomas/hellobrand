@@ -30,7 +30,7 @@ function makeMilestones(
 }
 
 describe("buildSidebarMilestones", () => {
-  test("new basic or standard users only see workspace and profile steps", () => {
+  test("new free or basic users only see workspace and profile steps", () => {
     const milestones = makeMilestones();
 
     expect(milestones.visible).toBe(true);

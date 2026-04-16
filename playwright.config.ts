@@ -41,7 +41,7 @@ export default defineConfig({
         process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ??
         "pk_test_ZXhhbXBsZS5hY2NvdW50cy5kZXYk",
       CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? "sk_test_ZXhhbXBsZQ",
-      HELLOBRAND_DEV_PLAN: "basic",
+      HELLOBRAND_DEV_PLAN: "free",
       HELLOBRAND_E2E_ENABLED: "1",
       HELLOBRAND_E2E_AUTH_SECRET: E2E_LOCAL_AUTH_SECRET
     }

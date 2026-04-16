@@ -18,7 +18,7 @@ function makePayment(overrides: Partial<BillingInsightPayment> = {}): BillingIns
 describe("computeBillingInsights", () => {
   it("computes paid, outstanding, and net comparisons for a USD monthly plan", () => {
     const insights = computeBillingInsights({
-      currentPlanTier: PlanTier.standard,
+      currentPlanTier: PlanTier.basic,
       currentPlanInterval: BillingInterval.month,
       planCatalog: buildPlanAvailability(),
       payments: [
@@ -35,10 +35,10 @@ describe("computeBillingInsights", () => {
     expect(insights.outstandingTotal).toBe(250);
     expect(insights.currentMonthPaidTotal).toBe(900);
     expect(insights.yearToDatePaidTotal).toBe(1500);
-    expect(insights.monthlyPlanCostUsd).toBe(49);
-    expect(insights.yearlyPlanCostUsd).toBe(588);
-    expect(insights.currentMonthNetAfterPlanCostUsd).toBe(851);
-    expect(insights.yearToDateNetAfterPlanCostUsd).toBe(912);
+    expect(insights.monthlyPlanCostUsd).toBe(29);
+    expect(insights.yearlyPlanCostUsd).toBe(348);
+    expect(insights.currentMonthNetAfterPlanCostUsd).toBe(871);
+    expect(insights.yearToDateNetAfterPlanCostUsd).toBe(1152);
     expect(insights.comparisonNotice).toBeNull();
   });
 

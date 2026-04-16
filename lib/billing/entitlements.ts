@@ -23,7 +23,6 @@ export const FEATURE_KEYS = [
 export const USAGE_LIMIT_KEYS = [
   "active_workspaces",
   "assistant_messages_monthly",
-  "deal_drafts_monthly",
   "brief_generations_monthly",
 ] as const;
 
@@ -55,17 +54,17 @@ export type ViewerEntitlements = {
 };
 
 const FEATURE_MATRIX: FeatureMatrix = {
-  basic: {
+  free: {
     workspace_creation: true,
     assistant_chat: true,
     deal_draft_generation: true,
     brief_generation: false,
-    analytics: true,
+    analytics: false,
     analytics_advanced: false,
     premium_inbox: false,
     email_connections: false,
   },
-  standard: {
+  basic: {
     workspace_creation: true,
     assistant_chat: true,
     deal_draft_generation: true,
@@ -88,22 +87,19 @@ const FEATURE_MATRIX: FeatureMatrix = {
 };
 
 const USAGE_LIMIT_MATRIX: UsageLimitMatrix = {
-  basic: {
-    active_workspaces: 3,
-    assistant_messages_monthly: 25,
-    deal_drafts_monthly: 10,
-    brief_generations_monthly: 3,
+  free: {
+    active_workspaces: 1,
+    assistant_messages_monthly: 10,
+    brief_generations_monthly: 0,
   },
-  standard: {
-    active_workspaces: null,
+  basic: {
+    active_workspaces: 8,
     assistant_messages_monthly: 250,
-    deal_drafts_monthly: 100,
-    brief_generations_monthly: 30,
+    brief_generations_monthly: 20,
   },
   premium: {
     active_workspaces: null,
     assistant_messages_monthly: null,
-    deal_drafts_monthly: null,
     brief_generations_monthly: null,
   },
 };
@@ -141,6 +137,7 @@ async function ensureBillingAccountForUsage(viewer: Viewer) {
     create: {
       userId: viewer.id,
       billingEmail: viewer.email,
+      currentPlanTier: PlanTier.free,
     },
   });
 }
@@ -152,11 +149,11 @@ function featureErrorMessage(feature: FeatureKey, effectiveTier: PlanTier) {
     case "email_connections":
       return "Email connections are available on Premium.";
     case "analytics":
-      return "Analytics is available on Basic, Standard, and Premium.";
+      return "Analytics is available on Basic and Premium.";
     case "analytics_advanced":
       return "Advanced reporting is available on Premium.";
     case "brief_generation":
-      return "AI brief generation is available on Standard and Premium.";
+      return "AI brief generation is available on Basic and Premium.";
     default:
       return `This feature is not available on the ${effectiveTier} plan.`;
   }
@@ -168,8 +165,6 @@ function usageErrorMessage(key: UsageLimitKey, limit: number, effectiveTier: Pla
       return `The ${effectiveTier} plan supports ${limit} active workspaces. Upgrade to add more.`;
     case "assistant_messages_monthly":
       return `You have used all ${limit} assistant messages included in your ${effectiveTier} plan this month.`;
-    case "deal_drafts_monthly":
-      return `You have used all ${limit} AI draft generations included in your ${effectiveTier} plan this month.`;
     case "brief_generations_monthly":
       return `You have used all ${limit} AI brief generations included in your ${effectiveTier} plan this month.`;
     default:
@@ -182,7 +177,7 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
   const workspaceCount = await getActiveWorkspaceCount(viewer);
 
   if (!process.env.DATABASE_URL) {
-    const effectiveTier = overrideTier ?? PlanTier.basic;
+    const effectiveTier = overrideTier ?? PlanTier.free;
     const usage = Object.fromEntries(
       USAGE_LIMIT_KEYS.map((key) => {
         const current = key === "active_workspaces" ? workspaceCount : 0;

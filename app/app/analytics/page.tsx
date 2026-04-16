@@ -154,7 +154,7 @@ function AnalyticsPreviewLocked() {
                   href="/app/settings/billing"
                   className="group inline-flex items-center gap-2 rounded-lg bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-all hover:opacity-90"
                 >
-                  Upgrade to Standard
+                  Upgrade to Basic
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
               </div>
@@ -353,7 +353,7 @@ async function AnalyticsContent() {
               <FeatureUpgradeCard
                 eyebrow="Premium reporting"
                 title="Advanced reporting is reserved for Premium"
-                description="Standard includes the core partnership analytics view. Premium adds deeper reporting, connected inbox intelligence overlays, and future performance tracking."
+                description="Basic includes the core partnership analytics view. Premium adds deeper reporting, connected inbox intelligence overlays, and future performance tracking."
                 requiredTier={PlanTier.premium}
                 currentTier={entitlements.effectiveTier}
                 hasActiveSubscription={entitlements.hasActiveSubscription}

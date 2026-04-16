@@ -23,7 +23,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:server": "HELLOBRAND_E2E_ENABLED=1 HELLOBRAND_E2E_AUTH_SECRET=hellobrand-playwright-local HELLOBRAND_DEV_PLAN=basic next dev --turbopack --port 4011"
+    "test:e2e:server": "HELLOBRAND_E2E_ENABLED=1 HELLOBRAND_E2E_AUTH_SECRET=hellobrand-playwright-local HELLOBRAND_DEV_PLAN=free next dev --turbopack --port 4011"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",

@@ -67,10 +67,11 @@ doppler secrets upload .env --project hellobrand --config dev
    - `STRIPE_SECRET_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `STRIPE_PRICE_BASIC_MONTHLY`
-   - `STRIPE_PRICE_STANDARD_MONTHLY`
    - `STRIPE_PRICE_PREMIUM_MONTHLY`
-   - optional yearly price IDs if annual billing is enabled later
-10. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=basic|standard|premium` in a non-production environment to override the effective tier.
+   - optional `STRIPE_PRICE_BASIC_YEARLY`
+   - optional `STRIPE_PRICE_PREMIUM_YEARLY`
+   - Free has no Stripe product or price ID
+10. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=free|basic|premium` in a non-production environment to override the effective tier.
 11. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
 12. Install dependencies:
 
@@ -145,7 +146,7 @@ The included tests cover fallback extraction, document parsing behavior, email d
 
 ## Playwright E2E
 
-The repo includes a local-first Playwright matrix for `basic`, `standard`, and `premium` entitlement coverage. It uses a single Next.js dev server with per-tier cookies instead of three separate servers. Tier switching happens via an `hb_e2e_tier` cookie set during global setup, so one server handles all three tiers.
+The repo includes a local-first Playwright matrix for `free`, `basic`, and `premium` entitlement coverage. It uses a single Next.js dev server with per-tier cookies instead of three separate servers. Tier switching happens via an `hb_e2e_tier` cookie set during global setup, so one server handles all three tiers.
 
 Install browser binaries first:
 
@@ -180,7 +181,7 @@ doppler run -- pnpm test:e2e:headed
 
 ### How tier switching works
 
-The `test:e2e:server` script starts a single dev server with `HELLOBRAND_E2E_ENABLED=1`. During Playwright global setup, each tier project (basic, standard, premium) gets a storage state file with an `hb_e2e_tier` cookie. The server reads this cookie via `getDevPlanOverrideAsync()` to determine which plan tier to simulate for that request.
+The `test:e2e:server` script starts a single dev server with `HELLOBRAND_E2E_ENABLED=1`. During Playwright global setup, each tier project (free, basic, premium) gets a storage state file with an `hb_e2e_tier` cookie. The server reads this cookie via `getDevPlanOverrideAsync()` to determine which plan tier to simulate for that request.
 
 ### E2E test coverage
 
@@ -231,8 +232,13 @@ Recommended repository settings:
 
 Use Stripe sandbox/test mode first.
 
-1. Create the `Basic`, `Standard`, and `Premium` products with monthly recurring prices in Stripe.
-2. Put the Stripe secret, webhook secret, and price IDs into Doppler or your local env.
+1. Create the paid Stripe catalog only:
+   - `Basic` monthly: `$29/mo`
+   - optional `Basic` yearly: `$288/yr`
+   - `Premium` monthly: `$79/mo`
+   - optional `Premium` yearly: `$768/yr`
+   - `Free` has no Stripe product
+2. Put the Stripe secret, webhook secret, and paid price IDs into Doppler or your local env.
 3. Apply Prisma migrations before testing billing:
 
 ```bash

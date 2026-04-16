@@ -36,7 +36,7 @@ test.describe("tier matrix", () => {
       currentPlanSection.getByRole("heading", { name: contract.currentPlanHeading })
     ).toBeVisible();
 
-    for (const usageLabel of ["Workspaces", "Assistant", "AI drafts", "Briefs"]) {
+    for (const usageLabel of ["Workspaces", "Assistant", "Briefs"]) {
       await expect(
         currentPlanSection.getByText(usageLabel, { exact: true })
       ).toBeVisible();
@@ -50,7 +50,7 @@ test.describe("tier matrix", () => {
     const planCards = comparePlansSection.locator("article");
     await expect(planCards).toHaveCount(3);
 
-    for (const [index, plan] of ["Basic", "Standard", "Premium"].entries()) {
+    for (const [index, plan] of ["Free", "Basic", "Premium"].entries()) {
       await expect(planCards.nth(index)).toContainText(plan);
     }
 
@@ -77,7 +77,7 @@ test.describe("tier matrix", () => {
     await gotoAuthed(page, "/app/analytics");
     if (await isRateLimited(page)) return;
 
-    if (tier === "basic") {
+    if (tier === "free") {
       await expect(
         page.getByRole("heading", { name: "Unlock analytics" })
       ).toBeVisible({ timeout: 10000 });

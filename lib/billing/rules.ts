@@ -39,28 +39,28 @@ export function resolveEffectiveEntitlementTier(input: {
   }
 
   if (input.currentSubscriptionStatus === BillingSubscriptionStatus.trialing) {
-    return input.currentTrialPlanTier ?? input.currentPlanTier ?? PlanTier.basic;
+    return input.currentTrialPlanTier ?? input.currentPlanTier ?? PlanTier.free;
   }
 
-  return input.currentPlanTier ?? input.currentTrialPlanTier ?? PlanTier.basic;
+  return input.currentPlanTier ?? input.currentTrialPlanTier ?? PlanTier.free;
 }
 
 export function recommendedUpgradeForCurrentPlan(planTier: PlanTier | null) {
   if (!planTier) {
     return {
-      tier: PlanTier.standard,
-      label: "Start with Standard for the full solo-creator workflow."
+      tier: PlanTier.basic,
+      label: "Start with Basic for the full creator workflow."
+    };
+  }
+
+  if (planTier === PlanTier.free) {
+    return {
+      tier: PlanTier.basic,
+      label: "Upgrade to Basic for more workspaces, briefs, analytics, and invoicing."
     };
   }
 
   if (planTier === PlanTier.basic) {
-    return {
-      tier: PlanTier.standard,
-      label: "Upgrade to Standard for full AI drafting and broader workflow coverage."
-    };
-  }
-
-  if (planTier === PlanTier.standard) {
     return {
       tier: PlanTier.premium,
       label: "Upgrade to Premium for inbox intelligence, synced email, and advanced reporting."
@@ -91,14 +91,17 @@ export function getTrialOffer(
   const isPremiumUpsell =
     planTier === PlanTier.premium &&
     billingAccount?.currentSubscriptionStatus === BillingSubscriptionStatus.active &&
-    (billingAccount.currentPlanTier === PlanTier.basic ||
-      billingAccount.currentPlanTier === PlanTier.standard);
+    billingAccount.currentPlanTier === PlanTier.basic;
 
   if (isPremiumUpsell) {
     return {
       days: 14,
       source: "premium_paid_upsell"
     };
+  }
+
+  if (planTier === PlanTier.free) {
+    return null;
   }
 
   return {
