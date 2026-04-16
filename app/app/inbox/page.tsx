@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import dynamic from "next/dynamic";
 
 import { InboxPreviewLocked } from "@/components/inbox-preview-locked";
+import { InboxWorkspace } from "@/components/inbox-workspace";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedDealForViewer, getCachedProfile } from "@/lib/cached-data";
@@ -13,11 +13,6 @@ import {
 } from "@/lib/email/service";
 import { normalizeInboxSort, sortInboxThreadItems } from "@/lib/email/inbox-sort";
 import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
-
-const InboxWorkspace = dynamic(
-  () => import("@/components/inbox-workspace").then((m) => ({ default: m.InboxWorkspace })),
-  { ssr: false }
-);
 
 export default function InboxPage({
   searchParams,
