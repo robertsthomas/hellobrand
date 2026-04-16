@@ -4,10 +4,11 @@
  * This file renders the signed-in app shell.
  * It connects navigation, shell-level interactions, and shared frame UI for the authenticated product experience.
  */
-import { SignOutButton } from "@clerk/nextjs";
+import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePanelRef } from "react-resizable-panels";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bot, ChevronRight, Hand, Menu, MessageSquareMore, Search } from "lucide-react";
 
@@ -26,15 +27,16 @@ import {
   SheetContent,
   SheetDescription,
   SheetHeader,
-  SheetTitle
+  SheetTitle,
 } from "@/components/ui/sheet";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { FeedbackWidget } from "@/components/feedback-widget";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
   getAppRouteMeta,
   isAppNavItemActive,
   primaryAppNavItems,
-  secondaryAppNavItems
+  secondaryAppNavItems,
 } from "@/lib/app-shell";
 import type { SidebarMilestones } from "@/lib/sidebar-milestones";
 
@@ -79,7 +81,7 @@ export function AppFrame({
   notifications,
   onboardingComplete,
   sidebarMilestones,
-  workspaceNavItems = []
+  workspaceNavItems = [],
 }: {
   children: ReactNode;
   viewerId: string;
@@ -100,12 +102,28 @@ export function AppFrame({
   const router = useRouter();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLDivElement | null>(null);
+  const sidebarPanelRef = usePanelRef();
+  const { signOut } = useClerk();
 
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar_collapsed") === "true";
+  });
   const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
   const [feedbackOpenRequestKey, setFeedbackOpenRequestKey] = useState(0);
+
+  const toggleSidebar = useCallback(() => {
+    const panel = sidebarPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) {
+      panel.expand();
+    } else {
+      panel.collapse();
+    }
+  }, []);
   const isInboxRoute = pathname === "/app/inbox";
   const hasVisibleSidebarMilestones = sidebarMilestones?.visible === true;
   const hasWorkspaceNotification = (notifications ?? []).some(
@@ -124,7 +142,7 @@ export function AppFrame({
         ? {
             parentHref: "/app/payments",
             href: `/app/payments/${workspace.dealId}`,
-            label: workspace.label
+            label: workspace.label,
           }
         : null;
     }
@@ -137,7 +155,7 @@ export function AppFrame({
         ? {
             parentHref: "/app/p/history",
             href: `/app/p/${workspace.dealId}`,
-            label: workspace.label
+            label: workspace.label,
           }
         : null;
     }
@@ -150,7 +168,7 @@ export function AppFrame({
         ? {
             parentHref: "/app/p/history",
             href: `/app/p/${workspace.dealId}`,
-            label: workspace.label
+            label: workspace.label,
           }
         : null;
     }
@@ -235,38 +253,44 @@ export function AppFrame({
     return true;
   }, []);
 
-  const handleGuideActiveStepChange = useCallback((step: GuideStep | null) => {
-    if (!guideOpenedMobileMenu) {
-      return;
-    }
+  const handleGuideActiveStepChange = useCallback(
+    (step: GuideStep | null) => {
+      if (!guideOpenedMobileMenu) {
+        return;
+      }
 
-    if (!step) {
-      return;
-    }
+      if (!step) {
+        return;
+      }
 
-    if (isSidebarGuideStep(step)) {
-      return;
-    }
+      if (isSidebarGuideStep(step)) {
+        return;
+      }
 
-    setGuideOpenedMobileMenu(false);
-    setMobileMenuOpen(false);
-  }, [guideOpenedMobileMenu]);
-
-  const handleMobileMenuOpenChange = useCallback((nextOpen: boolean) => {
-    if (!nextOpen && guideOpenedMobileMenu) {
-      return;
-    }
-
-    setMobileMenuOpen(nextOpen);
-
-    if (!nextOpen) {
       setGuideOpenedMobileMenu(false);
-    }
-  }, [guideOpenedMobileMenu]);
+      setMobileMenuOpen(false);
+    },
+    [guideOpenedMobileMenu]
+  );
+
+  const handleMobileMenuOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && guideOpenedMobileMenu) {
+        return;
+      }
+
+      setMobileMenuOpen(nextOpen);
+
+      if (!nextOpen) {
+        setGuideOpenedMobileMenu(false);
+      }
+    },
+    [guideOpenedMobileMenu]
+  );
 
   const renderNavItem = (
     item: (typeof primaryAppNavItems)[number],
-    options?: { onClick?: () => void }
+    options?: { onClick?: () => void; collapsed?: boolean }
   ) => {
     const Icon = item.icon;
     const active = isAppNavItemActive(pathname, item.href);
@@ -279,9 +303,11 @@ export function AppFrame({
           href={item.href}
           prefetch={false}
           data-guide={guideId}
+          title={options?.collapsed ? item.label : undefined}
           onClick={options?.onClick}
           className={cn(
-            "group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+            "group flex h-10 w-full items-center gap-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+            options?.collapsed ? "justify-center px-0" : "px-3",
             active
               ? "bg-secondary/55 text-foreground"
               : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
@@ -289,13 +315,14 @@ export function AppFrame({
         >
           <Icon
             className={cn(
-              "h-4.5 w-4.5 shrink-0",
+              options?.collapsed ? "h-5.5 w-5.5" : "h-6.5 w-6.5",
+              "shrink-0",
               active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
             )}
           />
-          <span className="truncate">{item.label}</span>
+          {options?.collapsed ? null : <span className="truncate">{item.label}</span>}
         </Link>
-        {active && sidebarSubItem?.parentHref === item.href ? (
+        {!options?.collapsed && active && sidebarSubItem?.parentHref === item.href ? (
           <Link
             href={sidebarSubItem.href}
             prefetch={false}
@@ -309,28 +336,33 @@ export function AppFrame({
     );
   };
 
-  const renderFeedbackItem = (options?: { onClick?: () => void }) => (
+  const renderFeedbackItem = (options?: { onClick?: () => void; collapsed?: boolean }) =>
     hasVisibleSidebarMilestones ? null : (
-    <button
-      type="button"
-      onClick={() => {
-        setFeedbackOpenRequestKey((current) => current + 1);
-        options?.onClick?.();
-      }}
-      className="group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-secondary/35 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]"
-    >
-      <MessageSquareMore className="h-4.5 w-4.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
-      <span className="truncate">App feedback</span>
-    </button>
-    )
-  );
+      <button
+        type="button"
+        title={options?.collapsed ? "App feedback" : undefined}
+        onClick={() => {
+          setFeedbackOpenRequestKey((current) => current + 1);
+          options?.onClick?.();
+        }}
+        className={cn(
+          "group flex h-10 w-full items-center gap-3 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-secondary/35 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+          options?.collapsed ? "justify-center px-0" : "px-3"
+        )}
+      >
+        <MessageSquareMore
+          className={cn(
+            options?.collapsed ? "h-4 w-4" : "h-4.5 w-4.5",
+            "shrink-0 text-muted-foreground group-hover:text-foreground"
+          )}
+        />
+        {options?.collapsed ? null : <span className="truncate">App feedback</span>}
+      </button>
+    );
 
   const renderSidebarMilestones = (options?: { onNavigate?: () => void }) =>
     sidebarMilestones ? (
-      <SidebarMilestonesCard
-        milestones={sidebarMilestones}
-        onNavigate={options?.onNavigate}
-      />
+      <SidebarMilestonesCard milestones={sidebarMilestones} onNavigate={options?.onNavigate} />
     ) : null;
 
   const guideWrapper = guideState
@@ -339,9 +371,7 @@ export function AppFrame({
           initialGuideState={guideState}
           hasActiveWorkspace={hasActiveWorkspace ?? false}
           hasWorkspaceNotification={hasWorkspaceNotification}
-          hasEverCreatedWorkspace={
-            hasEverCreatedWorkspace ?? guideState.hasEverCreatedWorkspace
-          }
+          hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? guideState.hasEverCreatedWorkspace}
           visibilityKey={mobileMenuOpen}
           onUnavailableStep={requestGuideStepVisibility}
           onActiveStepChange={handleGuideActiveStepChange}
@@ -353,67 +383,255 @@ export function AppFrame({
       )
     : (content: ReactNode) => content;
 
-  return (
-    <AssistantProvider>
-      {guideWrapper(
-      <div className="h-dvh min-h-dvh overflow-hidden bg-white dark:bg-[#0f1115]">
-      <div className="flex h-full min-h-0 overflow-hidden dark:bg-[#0f1115]">
-        <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-border bg-white lg:flex dark:border-white/10 dark:bg-[#121419]">
-          <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-            <Link href="/app" prefetch={false} className="group flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-                <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
-              </div>
-              <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
-                HelloBrand
-              </div>
-            </Link>
-          </div>
-
-          <div className="border-b border-border px-5 py-5 dark:border-white/8">
-            <form
-              onSubmit={handleSidebarSearch}
-              className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
-            >
-              <Search className="h-4 w-4 shrink-0" />
-              <input
-                type="search"
-                value={sidebarQuery}
-                onChange={(event) => setSidebarQuery(event.target.value)}
-                placeholder="Search partnerships"
-                aria-label="Search partnerships"
-                className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
-              />
-            </form>
-          </div>
-
-          <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
-            <div>
-              <div className="mb-4 px-2 pt-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Workspace
-                </p>
-              </div>
-              <nav className="space-y-1">{primaryAppNavItems.map((item) => renderNavItem(item))}</nav>
-
-              <div className="mb-4 mt-8 px-2">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Preferences
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                {secondaryAppNavItems.map((item) => renderNavItem(item))}
-              </div>
-
-              {renderSidebarMilestones()}
+  const renderSheet = () => (
+    <Sheet open={mobileMenuOpen} onOpenChange={handleMobileMenuOpenChange}>
+      <SheetContent
+        side="left"
+        className="w-64 p-0 pt-[env(safe-area-inset-top)] dark:bg-[#121419]"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Navigation menu</SheetTitle>
+          <SheetDescription>App navigation and account actions.</SheetDescription>
+        </SheetHeader>
+        <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
+          <Link
+            href="/app"
+            prefetch={false}
+            className="group flex items-center gap-3"
+            onClick={() => handleMobileMenuOpenChange(false)}
+          >
+            <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
+              <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
             </div>
-
-            <div className="mt-auto pt-4">{renderFeedbackItem()}</div>
+            <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
+              HelloBrand
+            </div>
+          </Link>
+        </div>
+        <div className="border-b border-border px-5 py-5 dark:border-white/8">
+          <form
+            onSubmit={(e) => {
+              handleSidebarSearch(e);
+              handleMobileMenuOpenChange(false);
+            }}
+            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            <input
+              type="search"
+              value={sidebarQuery}
+              onChange={(event) => setSidebarQuery(event.target.value)}
+              placeholder="Search partnerships"
+              aria-label="Search partnerships"
+              className="min-w-0 flex-1 self-center appearance-none border-0 bg-transparent p-0 leading-none text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
+            />
+          </form>
+        </div>
+        <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
+          <div>
+            <div className="mb-4 px-2 pt-5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Workspace
+              </p>
+            </div>
+            <nav className="space-y-1">
+              {primaryAppNavItems.map((item) =>
+                renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
+              )}
+            </nav>
+            <div className="mb-4 mt-8 px-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Preferences
+              </p>
+            </div>
+            <div className="space-y-1">
+              {secondaryAppNavItems.map((item) =>
+                renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
+              )}
+              <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
+            </div>
+            {renderSidebarMilestones({ onNavigate: () => handleMobileMenuOpenChange(false) })}
           </div>
+          <div className="mt-auto pt-4">
+            {renderFeedbackItem({ onClick: () => handleMobileMenuOpenChange(false) })}
+          </div>
+        </div>
+        <div className="border-t border-border px-5 py-5 dark:border-white/8">
+          <div className="space-y-3">
+            <PostHogActionLink
+              href="/app/intake/new"
+              prefetch={false}
+              eventName="workspace_entry_cta_clicked"
+              payload={{ source: "sidebar_mobile" }}
+              data-guide="sidebar-new-workspace"
+              onClick={() => handleMobileMenuOpenChange(false)}
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "h-11 w-full justify-between rounded-none px-4"
+              )}
+            >
+              <span>New workspace</span>
+            </PostHogActionLink>
+            <button
+              type="button"
+              onClick={() => {
+                handleMobileMenuOpenChange(false);
+                signOut({ redirectUrl: "/login" });
+              }}
+              className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+            >
+              Log out
+            </button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 
-          <div className="border-t border-border px-5 py-5 dark:border-white/8">
-            <div className="space-y-3">
+  const renderHeader = () => (
+    <header className="fixed inset-x-0 top-0 z-30 border-b border-border bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/90 lg:absolute dark:border-white/8 dark:bg-[#111318]/95 dark:supports-[backdrop-filter]:bg-[#111318]/90">
+      <div className="flex h-16 items-center justify-between px-6 lg:h-[72px] lg:px-8">
+        <div className="flex min-w-0 items-center">
+          <button
+            type="button"
+            className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <div className="truncate text-sm text-foreground lg:hidden">{meta.title}</div>
+            <div className="hidden min-w-0 items-center gap-2 text-sm text-muted-foreground lg:flex">
+              <span className="truncate">{meta.section}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" />
+              <span className="truncate text-foreground">{meta.title}</span>
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <NotificationsCenter
+            notifications={notifications ?? []}
+            hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? false}
+          />
+          <ThemeSwitch iconOnly />
+        </div>
+      </div>
+    </header>
+  );
+
+  const renderMain = (content: ReactNode) => (
+    <>
+      <main
+        className={cn(
+          "workspace-dot-grid flex min-h-0 flex-1 flex-col overflow-hidden bg-white pt-[calc(64px+env(safe-area-inset-top))] lg:pt-[72px] dark:bg-[#111318]"
+        )}
+      >
+        {banner ? <div className="shrink-0">{banner}</div> : null}
+        <div
+          ref={mainRef}
+          data-workspace-scroll-container
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-x-hidden",
+            isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"
+          )}
+        >
+          <div className="flex min-h-full min-w-0 flex-col">{content}</div>
+        </div>
+      </main>
+      <FeedbackWidget
+        viewerId={viewerId}
+        pagePath={pathname}
+        pageTitle={meta.title}
+        dealId={feedbackDealId}
+        openRequestKey={feedbackOpenRequestKey}
+      />
+    </>
+  );
+
+  const renderDesktopSidebar = () => (
+    <>
+      <div
+        className={cn(
+          "flex h-[72px] items-center",
+          sidebarCollapsed ? "justify-center px-0" : "justify-between px-7"
+        )}
+      >
+        <Link href="/app" prefetch={false} className="group flex items-center gap-3">
+          <div
+            className={cn(
+              "flex items-center justify-center bg-primary text-primary-foreground",
+              sidebarCollapsed ? "h-8 w-8" : "h-10 w-10"
+            )}
+          >
+            <Hand
+              className={cn(
+                "hello-hand-wave rotate-[18deg]",
+                sidebarCollapsed ? "h-4 w-4" : "h-5 w-5"
+              )}
+              strokeWidth={2.15}
+            />
+          </div>
+          {sidebarCollapsed ? null : (
+            <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
+              HelloBrand
+            </div>
+          )}
+        </Link>
+      </div>
+      {sidebarCollapsed ? null : (
+        <div className="border-b border-border px-5 py-5 dark:border-white/8">
+          <form
+            onSubmit={handleSidebarSearch}
+            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            <input
+              type="search"
+              value={sidebarQuery}
+              onChange={(event) => setSidebarQuery(event.target.value)}
+              placeholder="Search partnerships"
+              aria-label="Search partnerships"
+              className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
+            />
+          </form>
+        </div>
+      )}
+      <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
+        <div>
+          {sidebarCollapsed ? null : (
+            <div className="mb-4 px-2 pt-5">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Workspace
+              </p>
+            </div>
+          )}
+          <nav className={cn("space-y-1", sidebarCollapsed ? "pt-5" : "")}>
+            {primaryAppNavItems.map((item) => renderNavItem(item, { collapsed: sidebarCollapsed }))}
+          </nav>
+          {sidebarCollapsed ? null : (
+            <div className="mb-4 mt-8 px-2">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Preferences
+              </p>
+            </div>
+          )}
+          <div className={cn("space-y-1", sidebarCollapsed ? "mt-4" : "")}>
+            {secondaryAppNavItems.map((item) =>
+              renderNavItem(item, { collapsed: sidebarCollapsed })
+            )}
+          </div>
+          {sidebarCollapsed ? null : renderSidebarMilestones()}
+        </div>
+        <div className="mt-auto pt-4">{renderFeedbackItem({ collapsed: sidebarCollapsed })}</div>
+      </div>
+      <div className="border-t border-border px-5 py-5 dark:border-white/8">
+        <div className="space-y-3">
+          {sidebarCollapsed ? null : (
+            <>
               <PostHogActionLink
                 href="/app/intake/new"
                 prefetch={false}
@@ -427,189 +645,71 @@ export function AppFrame({
               >
                 <span>New workspace</span>
               </PostHogActionLink>
-              <SignOutButton redirectUrl="/login">
-                <button
-                  type="button"
-                  className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
-                >
-                  Log out
-                </button>
-              </SignOutButton>
-            </div>
-          </div>
-        </aside>
-
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
-          <Sheet open={mobileMenuOpen} onOpenChange={handleMobileMenuOpenChange}>
-            <SheetContent
-              side="left"
-              className="w-64 p-0 pt-[env(safe-area-inset-top)] dark:bg-[#121419]"
-              onOpenAutoFocus={(event) => {
-                event.preventDefault();
-              }}
-            >
-              <SheetHeader className="sr-only">
-                <SheetTitle>Navigation menu</SheetTitle>
-                <SheetDescription>App navigation and account actions.</SheetDescription>
-              </SheetHeader>
-              <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-                <Link href="/app" prefetch={false} className="group flex items-center gap-3" onClick={() => handleMobileMenuOpenChange(false)}>
-                  <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-                    <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
-                  </div>
-                  <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
-                    HelloBrand
-                  </div>
-                </Link>
-              </div>
-
-              <div className="border-b border-border px-5 py-5 dark:border-white/8">
-                <form
-                  onSubmit={(e) => {
-                    handleSidebarSearch(e);
-                    handleMobileMenuOpenChange(false);
-                  }}
-                  className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 dark:border-white/10 dark:bg-white/[0.04]"
-                >
-                  <Search className="h-4 w-4 shrink-0" />
-                  <input
-                    type="search"
-                    value={sidebarQuery}
-                    onChange={(event) => setSidebarQuery(event.target.value)}
-                    placeholder="Search partnerships"
-                    aria-label="Search partnerships"
-                    className="min-w-0 flex-1 self-center appearance-none border-0 bg-transparent p-0 leading-none text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
-                  />
-                </form>
-              </div>
-
-              <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
-                <div>
-                  <div className="mb-4 px-2 pt-5">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Workspace
-                    </p>
-                  </div>
-                  <nav className="space-y-1">
-                    {primaryAppNavItems.map((item) =>
-                      renderNavItem(item, {
-                        onClick: () => handleMobileMenuOpenChange(false)
-                      })
-                    )}
-                  </nav>
-
-                  <div className="mb-4 mt-8 px-2">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                      Preferences
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    {secondaryAppNavItems.map((item) =>
-                      renderNavItem(item, {
-                        onClick: () => handleMobileMenuOpenChange(false)
-                      })
-                    )}
-                    <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
-                  </div>
-
-                  {renderSidebarMilestones({
-                    onNavigate: () => handleMobileMenuOpenChange(false)
-                  })}
-                </div>
-
-                <div className="mt-auto pt-4">
-                  {renderFeedbackItem({
-                    onClick: () => handleMobileMenuOpenChange(false)
-                  })}
-                </div>
-              </div>
-
-              <div className="border-t border-border px-5 py-5 dark:border-white/8">
-                <div className="space-y-3">
-                  <PostHogActionLink
-                    href="/app/intake/new"
-                    prefetch={false}
-                    eventName="workspace_entry_cta_clicked"
-                    payload={{ source: "sidebar_mobile" }}
-                    data-guide="sidebar-new-workspace"
-                    onClick={() => handleMobileMenuOpenChange(false)}
-                    className={cn(buttonVariants({ size: "sm" }), "h-11 w-full justify-between rounded-none px-4")}
-                  >
-                    <span>New workspace</span>
-                  </PostHogActionLink>
-                  <SignOutButton redirectUrl="/login">
-                    <button
-                      type="button"
-                      onClick={() => handleMobileMenuOpenChange(false)}
-                      className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
-                    >
-                      Log out
-                    </button>
-                  </SignOutButton>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <header className="fixed inset-x-0 top-0 z-30 border-b border-border bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/90 lg:absolute dark:border-white/8 dark:bg-[#111318]/95 dark:supports-[backdrop-filter]:bg-[#111318]/90">
-            <div className="flex h-16 items-center justify-between px-6 lg:h-[72px] lg:px-8">
-              <div className="flex min-w-0 items-center">
-                <button
-                  type="button"
-                  className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
-                  onClick={() => setMobileMenuOpen(true)}
-                  aria-label="Open menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-foreground lg:hidden">{meta.title}</div>
-                  <div className="hidden min-w-0 items-center gap-2 text-sm text-muted-foreground lg:flex">
-                    <span className="truncate">{meta.section}</span>
-                    <ChevronRight className="h-4 w-4 shrink-0" />
-                    <span className="truncate text-foreground">{meta.title}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-3">
-                <NotificationsCenter
-                  notifications={notifications ?? []}
-                  hasEverCreatedWorkspace={hasEverCreatedWorkspace ?? false}
-                />
-                <ThemeSwitch iconOnly />
-              </div>
-            </div>
-          </header>
-
-          <main
-            className={cn(
-              "workspace-dot-grid flex min-h-0 flex-1 flex-col overflow-hidden bg-white pt-[calc(64px+env(safe-area-inset-top))] lg:pt-[72px] dark:bg-[#111318]"
-            )}
-          >
-            {banner ? <div className="shrink-0">{banner}</div> : null}
-            <div
-              ref={mainRef}
-              data-workspace-scroll-container
-              className={cn(
-                "flex min-h-0 flex-1 flex-col overflow-x-hidden",
-                isInboxRoute ? "overflow-hidden" : "overflow-y-auto overscroll-y-contain"
-              )}
-            >
-              <div className="flex min-h-full min-w-0 flex-col">{children}</div>
-            </div>
-          </main>
-          <FeedbackWidget
-            viewerId={viewerId}
-            pagePath={pathname}
-            pageTitle={meta.title}
-            dealId={feedbackDealId}
-            openRequestKey={feedbackOpenRequestKey}
-          />
-
+              <button
+                type="button"
+                onClick={() => signOut({ redirectUrl: "/login" })}
+                className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+              >
+                Log out
+              </button>
+            </>
+          )}
         </div>
       </div>
-      </div>
+    </>
+  );
+
+  return (
+    <AssistantProvider>
+      {guideWrapper(
+        <div className="h-dvh min-h-dvh overflow-hidden bg-white dark:bg-[#0f1115]">
+          <div className="flex h-full min-h-0 flex-col overflow-hidden lg:hidden dark:bg-[#0f1115]">
+            {renderSheet()}
+            {renderHeader()}
+            {renderMain(children)}
+          </div>
+          <ResizablePanelGroup
+            orientation="horizontal"
+            onLayoutChanged={(layout) => {
+              const sidebarSize = layout["sidebar"];
+              if (sidebarSize == null) return;
+              if (sidebarSize < 10) {
+                sidebarPanelRef.current?.collapse();
+              } else if (!sidebarCollapsed) {
+                sidebarPanelRef.current?.resize("14%");
+              }
+            }}
+            className="hidden h-full min-h-0 overflow-hidden lg:flex dark:bg-[#0f1115]"
+          >
+            <ResizablePanel
+              panelRef={sidebarPanelRef}
+              id="sidebar"
+              defaultSize={sidebarCollapsed ? "6%" : "14%"}
+              minSize="6%"
+              maxSize="14%"
+              collapsible
+              collapsedSize="6%"
+              onResize={(size) => {
+                const isNowCollapsed = sidebarPanelRef.current?.isCollapsed?.() ?? false;
+                if (isNowCollapsed !== sidebarCollapsed) {
+                  setSidebarCollapsed(isNowCollapsed);
+                  try {
+                    localStorage.setItem("sidebar_collapsed", String(isNowCollapsed));
+                  } catch {}
+                }
+              }}
+              className="flex h-full flex-col border-r border-border bg-white dark:border-white/10 dark:bg-[#121419]"
+            >
+              {renderDesktopSidebar()}
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel className="relative flex min-h-0 min-w-0 flex-col bg-white dark:bg-[#111318]">
+              {renderSheet()}
+              {renderHeader()}
+              {renderMain(children)}
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       )}
     </AssistantProvider>
   );

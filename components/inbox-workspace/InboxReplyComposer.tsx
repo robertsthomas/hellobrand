@@ -7,14 +7,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
-import {
-  ChevronDown,
-  LoaderCircle,
-  Paperclip,
-  Send,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { ChevronDown, LoaderCircle, Paperclip, Send, Sparkles, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -38,10 +31,7 @@ import {
   INBOX_SIGNATURE_BANNER_DISMISS_KEY,
   THREAD_ACTION_BUTTON_CLASS,
 } from "./helpers";
-import type {
-  DraftPromptSuggestion,
-  ThreadInvoiceAttachment,
-} from "./helpers";
+import type { DraftPromptSuggestion, ThreadInvoiceAttachment } from "./helpers";
 
 type InboxReplyComposerProps = {
   replyBody: string;
@@ -76,7 +66,6 @@ type InboxReplyComposerProps = {
   onClearDraftComposer: () => void;
   onRefineGeneratedDraft: (instruction: string) => void;
   onSaveDraft: (status: string) => void;
-  onMarkDraftReady: () => void;
   onSendReply: () => void;
   onSetInvoiceAttached: (value: boolean) => void;
   onSetOpenRefinementPopover: (value: "length" | "tone" | "focus" | null) => void;
@@ -121,7 +110,6 @@ export function InboxReplyComposer({
   onClearDraftComposer,
   onRefineGeneratedDraft,
   onSaveDraft,
-  onMarkDraftReady,
   onSendReply,
   onSetInvoiceAttached,
   onSetOpenRefinementPopover,
@@ -134,7 +122,7 @@ export function InboxReplyComposer({
 }: InboxReplyComposerProps) {
   return (
     <>
-      <div className="border-t border-black/8 bg-white px-5 py-4">
+      <div className="shrink-0 border-t border-black/8 bg-white px-6 pb-4 pt-4 xl:mr-28">
         <div className="space-y-3">
           {replyJourney === "ai_generated" &&
           replySignatureMissingFields.length > 0 &&
@@ -177,7 +165,7 @@ export function InboxReplyComposer({
                     ? 'Refine your prompt, then click "Generate"...'
                     : 'Type a reply or click "AI Reply" to generate one...'
                 }
-                className="h-6 min-h-0 overflow-hidden rounded-none border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
+                className="min-h-6 resize-none overflow-hidden rounded-none border-0 bg-transparent px-0 py-0 text-[12px] leading-6 text-foreground shadow-none focus-visible:border-0 focus-visible:ring-0 disabled:opacity-100"
               />
               {isDrafting ? (
                 <span className="mt-2 flex items-center gap-2 text-[11px] text-primary">
@@ -187,8 +175,8 @@ export function InboxReplyComposer({
               ) : null}
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
               <div ref={aiReplyControlRef} className="flex items-stretch">
                 <button
                   type="button"
@@ -223,11 +211,7 @@ export function InboxReplyComposer({
                     align="end"
                     side="top"
                     sideOffset={4}
-                    style={
-                      aiReplyMenuWidth
-                        ? { width: `${aiReplyMenuWidth}px` }
-                        : undefined
-                    }
+                    style={aiReplyMenuWidth ? { width: `${aiReplyMenuWidth}px` } : undefined}
                     className="rounded-none border-black/10 p-0"
                   >
                     <DropdownMenuItem
@@ -259,9 +243,7 @@ export function InboxReplyComposer({
                 <>
                   <Popover
                     open={openRefinementPopover === "length"}
-                    onOpenChange={(open) =>
-                      onSetOpenRefinementPopover(open ? "length" : null)
-                    }
+                    onOpenChange={(open) => onSetOpenRefinementPopover(open ? "length" : null)}
                   >
                     <PopoverTrigger asChild>
                       <button
@@ -293,9 +275,7 @@ export function InboxReplyComposer({
                   </Popover>
                   <Popover
                     open={openRefinementPopover === "tone"}
-                    onOpenChange={(open) =>
-                      onSetOpenRefinementPopover(open ? "tone" : null)
-                    }
+                    onOpenChange={(open) => onSetOpenRefinementPopover(open ? "tone" : null)}
                   >
                     <PopoverTrigger asChild>
                       <button
@@ -327,9 +307,7 @@ export function InboxReplyComposer({
                   </Popover>
                   <Popover
                     open={openRefinementPopover === "focus"}
-                    onOpenChange={(open) =>
-                      onSetOpenRefinementPopover(open ? "focus" : null)
-                    }
+                    onOpenChange={(open) => onSetOpenRefinementPopover(open ? "focus" : null)}
                   >
                     <PopoverTrigger asChild>
                       <button
@@ -362,7 +340,7 @@ export function InboxReplyComposer({
                 </>
               ) : null}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => onSaveDraft("in_progress")}
@@ -370,14 +348,6 @@ export function InboxReplyComposer({
                 className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
               >
                 {isSavingDraft ? "Saving..." : "Save draft"}
-              </button>
-              <button
-                type="button"
-                onClick={() => onMarkDraftReady()}
-                disabled={isSavingDraft || !replyBody.trim()}
-                className="inline-flex h-9 items-center border border-black/10 px-3 text-[12px] font-medium text-foreground transition hover:bg-black/[0.03] disabled:opacity-40"
-              >
-                Mark ready
               </button>
               {canAttachInvoice ? (
                 <button
@@ -412,9 +382,7 @@ export function InboxReplyComposer({
                 </p>
                 <p>{selectedThreadInvoiceAttachment.fileName}</p>
                 {!canAttachInvoice ? (
-                  <p className="mt-1">
-                    This invoice has been voided and will not be attached.
-                  </p>
+                  <p className="mt-1">This invoice has been voided and will not be attached.</p>
                 ) : null}
               </div>
               <Link
@@ -467,9 +435,7 @@ export function InboxReplyComposer({
           </CommandGroup>
         </CommandList>
         <div className="flex items-center justify-between border-t border-black/8 px-4 py-3 dark:border-white/10">
-          <p className="text-[12px] text-muted-foreground">
-            Applies to the next draft only.
-          </p>
+          <p className="text-[12px] text-muted-foreground">Applies to the next draft only.</p>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -503,9 +469,7 @@ export function InboxReplyComposer({
                   side="top"
                   sideOffset={4}
                   style={
-                    promptActionMenuWidth
-                      ? { width: `${promptActionMenuWidth}px` }
-                      : undefined
+                    promptActionMenuWidth ? { width: `${promptActionMenuWidth}px` } : undefined
                   }
                   className="rounded-none border-black/10 p-0"
                 >

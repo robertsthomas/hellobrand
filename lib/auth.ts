@@ -58,13 +58,39 @@ async function ensureViewerRecord(viewer: Viewer): Promise<Viewer> {
   }
 
   try {
-    const user = await prisma.user.upsert({
+    const existing = await prisma.user.findUnique({
       where: { id: viewer.id },
-      update: {
-        email: viewer.email,
-        displayName: viewer.displayName
-      },
-      create: {
+      select: { id: true, email: true, displayName: true }
+    });
+
+    if (existing) {
+      if (existing.email !== viewer.email || existing.displayName !== viewer.displayName) {
+        const updated = await prisma.user.update({
+          where: { id: viewer.id },
+          data: {
+            email: viewer.email,
+            displayName: viewer.displayName
+          }
+        });
+
+        return {
+          id: updated.id,
+          email: updated.email,
+          displayName: updated.displayName,
+          mode: viewer.mode
+        };
+      }
+
+      return {
+        id: existing.id,
+        email: existing.email,
+        displayName: existing.displayName,
+        mode: viewer.mode
+      };
+    }
+
+    const created = await prisma.user.create({
+      data: {
         id: viewer.id,
         email: viewer.email,
         displayName: viewer.displayName
@@ -72,27 +98,14 @@ async function ensureViewerRecord(viewer: Viewer): Promise<Viewer> {
     });
 
     return {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
+      id: created.id,
+      email: created.email,
+      displayName: created.displayName,
       mode: viewer.mode
     };
   } catch (error) {
     if (!isUniqueConstraintError(error)) {
       throw error;
-    }
-
-    const existing = await prisma.user.findUnique({
-      where: { id: viewer.id }
-    });
-
-    if (existing) {
-      return {
-        id: existing.id,
-        email: existing.email,
-        displayName: existing.displayName,
-        mode: viewer.mode
-      };
     }
 
     const reassigned = await prisma.user.update({

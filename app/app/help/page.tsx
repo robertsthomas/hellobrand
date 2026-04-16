@@ -1,21 +1,12 @@
-import {
-  AlertTriangle,
-  DollarSign,
-  FileText,
-  Search,
-  Shield
-} from "lucide-react";
+import { AlertTriangle, DollarSign, FileText, Search, Shield } from "lucide-react";
 
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
-  AccordionTrigger
+  AccordionTrigger,
 } from "@/components/ui/accordion";
-import {
-  HelpQuickLinks,
-  HelpSupportOptions,
-} from "@/components/patterns/help";
+import { HelpQuickLinks, HelpSupportOptions } from "@/components/patterns/help";
 import { SectionIntro } from "@/components/patterns/section-intro";
 import { Input } from "@/components/ui/input";
 
@@ -24,61 +15,69 @@ const quickLinks = [
     icon: FileText,
     label: "Upload workspaces",
     description: "Start a workspace with contracts, briefs, or pasted emails.",
-    accent: "text-[#1E6A4E]"
+    accent: "text-[#1E6A4E]",
   },
   {
     icon: AlertTriangle,
     label: "Conflict warnings",
     description: "Understand category overlap, timing conflicts, and restrictions.",
-    accent: "text-[#D76742]"
+    accent: "text-[#D76742]",
   },
   {
     icon: DollarSign,
     label: "Payment tracking",
     description: "Review payout terms, invoice status, and follow-up timing.",
-    accent: "text-[#1E6A4E]"
+    accent: "text-[#1E6A4E]",
   },
   {
     icon: Shield,
     label: "Privacy & security",
     description: "Review how uploaded partnership materials are stored and handled.",
-    accent: "text-[#A56A2A]"
-  }
+    accent: "text-[#A56A2A]",
+  },
 ];
 
 const faqs = [
   {
-    q: "What file formats do you support?",
-    a: "You can upload PDFs, DOCX files, RTF, TXT, EML, MSG, PPT, PPTX, XLS, and XLSX files. You can also paste raw email threads, contract text, and brief content directly into a workspace."
+    q: "What file formats can I upload?",
+    a: "You can upload PDF, DOC, DOCX, RTF, TXT, EML, MSG, PPT, PPTX, XLS, and XLSX files. You can also paste raw email threads or contract text directly into a workspace instead of uploading a file.",
   },
   {
-    q: "Can I combine uploaded files and pasted text in one workspace?",
-    a: "Yes. A workspace can include contracts, briefs, invoices, decks, and pasted email context together before analysis starts. The analysis queue then processes each workspace one at a time."
+    q: "What is a workspace?",
+    a: "A workspace represents a single brand partnership. You create one by uploading or pasting partnership documents through the intake flow. Each workspace holds the extracted contract terms, deliverables, risk flags, payment details, and any supporting documents you've attached.",
   },
   {
-    q: "Does HelloBrand provide legal advice?",
-    a: "No. HelloBrand helps you understand creator partnership terms, spot risks, and draft better responses, but it is not a law firm and does not replace legal counsel."
+    q: "What happens after I upload documents?",
+    a: "HelloBrand extracts text, classifies the document type, pulls out structured fields like payment terms and deliverables, runs risk analysis, checks for conflicts with your other partnerships, and builds a plain-language summary. You then review and confirm the extracted data before the workspace is created.",
   },
   {
     q: "How do conflict warnings work?",
-    a: "HelloBrand compares active partnerships across category, exclusivity language, timing windows, and competitor restrictions. Warnings appear on the dashboard, during intake review, and inside each partnership workspace."
+    a: "HelloBrand compares your active partnerships across four dimensions: brand category overlap, competitor restrictions, exclusivity timing, and deliverable schedule collisions. Warnings appear on the dashboard, during intake review, and inside each partnership workspace.",
   },
   {
-    q: "What happens if contract processing fails?",
-    a: "You can retry the intake, upload a cleaner source, or continue editing the normalized intake manually. The review screen keeps the extracted structure visible so you can recover without restarting everything."
+    q: "What does the AI assistant do?",
+    a: "The assistant answers questions about your partnerships, drafts email replies for negotiations and follow-ups, and helps you navigate the app. It has context about the workspace you're viewing, including terms, risk flags, and deliverables. Usage limits depend on your plan.",
   },
   {
-    q: "How do payment reminders work?",
-    a: "Each workspace tracks one primary payout in the current version. HelloBrand shows invoice state, due timing, and late payment status so you can follow up with the right context."
+    q: "Can I add more documents to an existing workspace?",
+    a: "Yes. You can upload additional documents to any existing partnership workspace. The app will re-analyze them and update context, summaries, and risk flags without creating a new workspace.",
   },
   {
-    q: "Can I update a workspace after it has been created?",
-    a: "Yes. You can upload more supporting documents to an existing partnership workspace, and the app will use them to improve context, summaries, and warnings without requiring a new workspace."
+    q: "How does payment tracking work?",
+    a: "Each workspace tracks payment status, amount, due date, and currency. The Payments page shows all outstanding and completed payouts across your portfolio. You can also generate invoices from workspace deliverables and download them as PDFs.",
   },
   {
-    q: "Can I delete a partnership or intake?",
-    a: "Yes. Draft intakes can be deleted before confirmation, and confirmed partnerships can be deleted from the workspace or partnership list. Deletion removes uploaded materials and related derived data for that partnership."
-  }
+    q: "What does search cover?",
+    a: "Global search looks across all your partnerships, matching brand names, campaign names, contract terms, document content, risk flags, summaries, and individual document sections. Results are ranked by relevance.",
+  },
+  {
+    q: "Can I delete a partnership?",
+    a: "Yes. Draft intakes can be deleted before confirmation. Confirmed partnerships can be deleted from the workspace or partnership list. Deletion removes uploaded materials and all derived data for that partnership.",
+  },
+  {
+    q: "Does HelloBrand provide legal advice?",
+    a: "No. HelloBrand helps you understand partnership terms, spot risks, and draft better responses, but it is not a law firm and does not replace legal counsel.",
+  },
 ];
 
 export default function HelpPage() {
@@ -122,9 +121,7 @@ export default function HelpPage() {
                     {faq.q}
                   </AccordionTrigger>
                   <AccordionContent className="pb-5">
-                    <p className="max-w-3xl text-sm leading-7 text-muted-foreground">
-                      {faq.a}
-                    </p>
+                    <p className="max-w-3xl text-sm leading-7 text-muted-foreground">{faq.a}</p>
                   </AccordionContent>
                 </AccordionItem>
               ))}

@@ -19,38 +19,26 @@ function isLocalPoolExhaustionError(error: unknown) {
   );
 }
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>
-) {
-  const results: R[] = [];
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < items.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker())
-  );
-
-  return results;
-}
-
 async function loadRawAggregates(viewerId: string) {
   try {
     const repository = getRepository();
     const deals = await repository.listDeals(viewerId);
-    const aggregates = await mapWithConcurrency(deals, 4, async (deal) =>
-      repository.getDealAggregate(viewerId, deal.id)
+    const results: (DealAggregate | null)[] = [];
+    let nextIndex = 0;
+
+    async function worker() {
+      while (nextIndex < deals.length) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        results[currentIndex] = await repository.getDealAggregate(viewerId, deals[currentIndex].id);
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(3, deals.length) }, () => worker())
     );
 
-    return aggregates.filter((aggregate): aggregate is DealAggregate => aggregate !== null);
+    return results.filter((aggregate): aggregate is DealAggregate => aggregate !== null);
   } catch (error) {
     if (isLocalPoolExhaustionError(error)) {
       return [];
@@ -83,22 +71,8 @@ export async function getCachedIntakeDrafts(viewer: Viewer) {
 }
 
 export async function getCachedDealForViewer(viewer: Viewer, dealId: string) {
-  "use cache";
-  cacheLife("seconds");
-  cacheTag(`user-${viewer.id}-deals`, `deal-${dealId}`);
-
-  const target = await getRepository().getDealAggregate(viewer.id, dealId);
-  if (!target) return null;
-
-  const aggregates = await loadRawAggregates(viewer.id);
-  const comparisonSet = aggregates.some((a) => a.deal.id === dealId)
-    ? aggregates
-    : [target, ...aggregates];
-
-  return {
-    ...target,
-    conflictResults: buildConflictResults(target, comparisonSet)
-  };
+  const allAggregates = await getCachedDealAggregates(viewer);
+  return allAggregates.find((a) => a.deal.id === dealId) ?? null;
 }
 
 export async function getCachedPayments(viewer: Viewer) {

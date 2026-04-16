@@ -83,6 +83,7 @@ export const gmailScopes = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
 ];
 
 export const outlookScopes = [

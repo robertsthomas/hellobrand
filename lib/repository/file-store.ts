@@ -44,9 +44,7 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
                 : deal.paymentStatus === "paid"
                   ? "paid"
                   : "not_invoiced",
-      legalDisclaimer:
-        deal.legalDisclaimer ||
-        "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice.",
+      legalDisclaimer: deal.legalDisclaimer || "",
     })),
     documents: (store.documents ?? []).map((document) => {
       const legacyDocument = document as DocumentRecord & {

@@ -15,6 +15,7 @@ type EmailEligibleEventType =
   | "workspace.missing_payment"
   | "workspace.missing_deliverables"
   | "workspace.missing_usage_rights"
+  | "workspace.no_documents_uploaded"
   | "email.resync_required"
   | "invoice.generate_prompt"
   | "invoice.send_prompt";
@@ -83,7 +84,7 @@ function getZonedDateParts(date: Date, timeZone: string) {
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    hourCycle: "h23"
+    hourCycle: "h23",
   });
 
   const values = Object.fromEntries(
@@ -99,7 +100,7 @@ function getZonedDateParts(date: Date, timeZone: string) {
     day: Number(values.day),
     hour: Number(values.hour),
     minute: Number(values.minute),
-    second: Number(values.second)
+    second: Number(values.second),
   };
 }
 
@@ -152,7 +153,7 @@ export function getNotificationEmailConfig() {
     apiKey,
     fromEmail,
     testToEmail,
-    testMode
+    testMode,
   };
 }
 
@@ -229,6 +230,11 @@ function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string):
       const truncated = truncateEntityName(entity, 22);
       return `Usage rights missing from ${truncated}`;
     }
+    case "workspace.no_documents_uploaded": {
+      const entity = title.replace(/ has no documents yet$/i, "") || "Your workspace";
+      const truncated = truncateEntityName(entity, 22);
+      return `${truncated} needs documents uploaded`;
+    }
     case "email.resync_required": {
       const entity = title.replace(/ inbox needs resync$/i, "") || "Your";
       return `Your ${entity} inbox needs to reconnect`;
@@ -256,6 +262,8 @@ function resolveCtaLabel(eventType: EmailEligibleEventType): string {
       return "Add deliverables";
     case "workspace.missing_usage_rights":
       return "Add usage rights";
+    case "workspace.no_documents_uploaded":
+      return "Upload documents";
     case "email.resync_required":
       return "Reconnect inbox";
     case "invoice.generate_prompt":
@@ -272,9 +280,10 @@ const EMAIL_ELIGIBLE_EVENT_TYPES = new Set<string>([
   "workspace.missing_payment",
   "workspace.missing_deliverables",
   "workspace.missing_usage_rights",
+  "workspace.no_documents_uploaded",
   "email.resync_required",
   "invoice.generate_prompt",
-  "invoice.send_prompt"
+  "invoice.send_prompt",
 ]);
 
 function isEmailEligibleEventType(eventType: string): eventType is EmailEligibleEventType {
@@ -309,7 +318,7 @@ export function resolveNotificationEmailCopy(input: {
       subject: buildSubjectForEvent(input.eventType, input.title),
       headline: input.title,
       body: input.body,
-      ctaLabel: resolveCtaLabel(input.eventType)
+      ctaLabel: resolveCtaLabel(input.eventType),
     };
   }
 
@@ -317,7 +326,7 @@ export function resolveNotificationEmailCopy(input: {
     subject: input.title,
     headline: input.title,
     body: input.body,
-    ctaLabel: "Open in HelloBrand"
+    ctaLabel: "Open in HelloBrand",
   };
 }
 
@@ -330,7 +339,7 @@ export function buildNotificationEmailPayload(input: {
   const copy = resolveNotificationEmailCopy({
     eventType: input.eventType,
     title: input.title,
-    body: input.body
+    body: input.body,
   });
   const absoluteHref = toAbsoluteHref(input.href);
   const escapedHeadline = escapeHtml(copy.headline);
@@ -355,7 +364,7 @@ export function buildNotificationEmailPayload(input: {
         </div>
       </div>
     `.trim(),
-    text: `${copy.headline}\n\n${copy.body}\n\n${copy.ctaLabel}: ${absoluteHref}\n\nYou're receiving this because you have email notifications enabled in HelloBrand.`
+    text: `${copy.headline}\n\n${copy.body}\n\n${copy.ctaLabel}: ${absoluteHref}\n\nYou're receiving this because you have email notifications enabled in HelloBrand.`,
   };
 }
 
@@ -380,20 +389,17 @@ async function loadNotificationWithEmailContext(appNotificationId: string) {
               contactEmail: true,
               timeZone: true,
               emailNotificationsEnabled: true,
-              createdAt: true
-            }
-          }
-        }
-      }
-    }
+              createdAt: true,
+            },
+          },
+        },
+      },
+    },
   }) as Promise<NotificationWithEmailContext | null>;
 }
 
 function shouldSendNotificationEmail(notification: NotificationWithEmailContext) {
-  if (
-    notification.category === "workspace" &&
-    notification.eventType.startsWith("workspace.")
-  ) {
+  if (notification.category === "workspace" && notification.eventType.startsWith("workspace.")) {
     return (
       notification.eventType === "workspace.ready_for_review" ||
       notification.eventType === "workspace.failed" ||
@@ -447,8 +453,8 @@ async function markDeliveryStatus(
       status,
       errorMessage: input?.errorMessage ?? null,
       providerMessageId: input?.providerMessageId ?? null,
-      sentAt: input?.sentAt ?? null
-    }
+      sentAt: input?.sentAt ?? null,
+    },
   });
 }
 
@@ -487,10 +493,14 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   }
 
   const existing = await prisma.notificationEmailDelivery.findUnique({
-    where: { appNotificationId }
+    where: { appNotificationId },
   });
 
-  if (existing?.status === "sent" || existing?.status === "skipped" || existing?.status === "pending") {
+  if (
+    existing?.status === "sent" ||
+    existing?.status === "skipped" ||
+    existing?.status === "pending"
+  ) {
     return existing;
   }
 
@@ -503,8 +513,8 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
           status: "pending",
           errorMessage: null,
           providerMessageId: null,
-          sentAt: null
-        }
+          sentAt: null,
+        },
       })
     : await prisma.notificationEmailDelivery.create({
         data: {
@@ -512,21 +522,21 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
           userId: notification.userId,
           recipientEmail,
           provider: "resend",
-          status: "pending"
-        }
+          status: "pending",
+        },
       });
 
   if (hasInngestEventKey()) {
     await inngest.send({
       name: "notification/email.send.requested",
-      data: { appNotificationId, eventType: notification.eventType }
+      data: { appNotificationId, eventType: notification.eventType },
     });
     return delivery;
   }
 
   await sendNotificationEmailDelivery(appNotificationId);
   return prisma.notificationEmailDelivery.findUnique({
-    where: { id: delivery.id }
+    where: { id: delivery.id },
   });
 }
 
@@ -546,10 +556,10 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
           status: true,
           title: true,
           body: true,
-          href: true
-        }
-      }
-    }
+          href: true,
+        },
+      },
+    },
   });
 
   if (!delivery) {
@@ -568,13 +578,13 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
       userId: delivery.userId,
       user: {
         email: "",
-        profile: null
-      }
+        profile: null,
+      },
     }) ||
     notification.status !== "active"
   ) {
     return markDeliveryStatus(delivery.id, "skipped", {
-      errorMessage: "Notification is no longer eligible for email delivery."
+      errorMessage: "Notification is no longer eligible for email delivery.",
     });
   }
 
@@ -583,16 +593,18 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     throw new Error("Missing RESEND_API_KEY.");
   }
 
-  if (!canSendNotificationEmailInCurrentMode({
-    fromEmail: config.fromEmail,
-    testToEmail: config.testToEmail,
-    recipientEmail: delivery.recipientEmail
-  })) {
+  if (
+    !canSendNotificationEmailInCurrentMode({
+      fromEmail: config.fromEmail,
+      testToEmail: config.testToEmail,
+      recipientEmail: delivery.recipientEmail,
+    })
+  ) {
     return markDeliveryStatus(delivery.id, "skipped", {
       errorMessage:
         config.testMode && !config.testToEmail
           ? "Missing RESEND_TEST_TO_EMAIL for resend.dev test mode."
-          : "Recipient is not allowed while resend.dev test mode is enabled."
+          : "Recipient is not allowed while resend.dev test mode is enabled.",
     });
   }
 
@@ -609,7 +621,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     eventType: notification.eventType,
     title: notification.title,
     body: notification.body,
-    href: notification.href
+    href: notification.href,
   });
 
   const response = await resend.emails.send({
@@ -617,12 +629,12 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     to: [delivery.recipientEmail],
     subject: email.subject,
     html: email.html,
-    text: email.text
+    text: email.text,
   });
 
   if (response.error) {
     const failed = await markDeliveryStatus(delivery.id, "failed", {
-      errorMessage: response.error.message
+      errorMessage: response.error.message,
     });
 
     if (isTerminalResendError(response.error)) {
@@ -634,7 +646,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
 
   return markDeliveryStatus(delivery.id, "sent", {
     providerMessageId: response.data?.id ?? null,
-    sentAt: new Date()
+    sentAt: new Date(),
   });
 }
 
@@ -652,12 +664,12 @@ export async function sendPendingWorkspaceReminders() {
   const pendingNotifications = await prisma.appNotification.findMany({
     where: {
       eventType: "workspace.ready_for_review",
-      status: "active"
+      status: "active",
     },
     select: {
       id: true,
-      userId: true
-    }
+      userId: true,
+    },
   });
 
   let sent = 0;
@@ -667,7 +679,7 @@ export async function sendPendingWorkspaceReminders() {
   for (const notification of pendingNotifications) {
     const existingDelivery = await prisma.notificationEmailDelivery.findUnique({
       where: { appNotificationId: notification.id },
-      select: { status: true, sentAt: true }
+      select: { status: true, sentAt: true },
     });
 
     // Skip if we already sent an email less than 20 hours ago
@@ -684,7 +696,7 @@ export async function sendPendingWorkspaceReminders() {
     if (existingDelivery) {
       await prisma.notificationEmailDelivery.update({
         where: { appNotificationId: notification.id },
-        data: { status: "pending", errorMessage: null, sentAt: null }
+        data: { status: "pending", errorMessage: null, sentAt: null },
       });
     }
 

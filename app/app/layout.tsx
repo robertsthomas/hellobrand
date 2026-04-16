@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 
 import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
@@ -72,26 +73,28 @@ export default async function WorkspaceLayout({
         email={viewer.email}
         displayName={viewer.displayName}
       />
-      <AppFrame
-        viewerId={viewer.id}
-        guideState={onboardingState.productGuideStateJson}
-        hasActiveWorkspace={hasActiveWorkspace}
-        hasEverCreatedWorkspace={hasEverCreatedWorkspace}
-        notifications={notifications}
-        onboardingComplete={isOnboardingComplete}
-        sidebarMilestones={sidebarMilestones}
-        workspaceNavItems={dealAggregates.map((aggregate) => {
-          const labels = getDisplayDealLabels(aggregate.deal);
+      <Suspense>
+        <AppFrame
+          viewerId={viewer.id}
+          guideState={onboardingState.productGuideStateJson}
+          hasActiveWorkspace={hasActiveWorkspace}
+          hasEverCreatedWorkspace={hasEverCreatedWorkspace}
+          notifications={notifications}
+          onboardingComplete={isOnboardingComplete}
+          sidebarMilestones={sidebarMilestones}
+          workspaceNavItems={dealAggregates.map((aggregate) => {
+            const labels = getDisplayDealLabels(aggregate.deal);
 
-          return {
-            dealId: aggregate.deal.id,
-            label: labels.campaignName ?? aggregate.deal.campaignName,
-            brandName: labels.brandName ?? aggregate.deal.brandName
-          };
-        })}
-      >
-        {children}
-      </AppFrame>
+            return {
+              dealId: aggregate.deal.id,
+              label: labels.campaignName ?? aggregate.deal.campaignName,
+              brandName: labels.brandName ?? aggregate.deal.brandName
+            };
+          })}
+        >
+          {children}
+        </AppFrame>
+      </Suspense>
     </>
   );
 }

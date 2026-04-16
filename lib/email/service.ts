@@ -14,7 +14,7 @@ import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { detectPromiseDiscrepancies } from "@/lib/email/smart-inbox";
 import { fetchGmailAttachment, sendGmailThreadReply } from "@/lib/email/providers/gmail";
 import { fetchOutlookAttachment, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
-import { fetchYahooAttachment, sendYahooThreadReply } from "@/lib/email/providers/yahoo";
+import { fetchYahooAttachment, isYahooAppPasswordAccount, sendYahooThreadReply } from "@/lib/email/providers/yahoo";
 import { getRepository } from "@/lib/repository";
 import {
   createEmailThreadNoteForUser,
@@ -148,6 +148,13 @@ export async function handleYahooCallbackForViewer(
   return module.handleYahooCallbackForViewer(...args);
 }
 
+export async function connectYahooAppPasswordForViewer(
+  ...args: Parameters<typeof import("./service-connect").connectYahooAppPasswordForViewer>
+) {
+  const module = await import("./service-connect");
+  return module.connectYahooAppPasswordForViewer(...args);
+}
+
 export async function handleGmailWebhookNotification(
   ...args: Parameters<typeof import("./service-connect").handleGmailWebhookNotification>
 ) {
@@ -224,8 +231,8 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
     return detail;
   }
 
-  const { listDealAggregatesForViewer } = await import("@/lib/deals");
-  const allAggregates = await listDealAggregatesForViewer(viewer);
+  const { getCachedDealAggregates } = await import("@/lib/cached-data");
+  const allAggregates = await getCachedDealAggregates(viewer);
   const aggregate = allAggregates.find((item) => item.deal.id === primaryLink.dealId);
   if (!aggregate) {
     return detail;
@@ -273,6 +280,8 @@ export async function sendEmailThreadReplyForViewer(
   const account = detail.account;
   const credentials = await ensureActiveEmailCredentials(account);
   const accessToken = credentials.accessToken ?? "";
+  const yahooAppPassword = isYahooAppPasswordAccount(account.scopes);
+  const yahooCredential = yahooAppPassword ? credentials.mailPassword ?? "" : accessToken;
   const normalizedSubject = input.subject.trim() || detail.thread.subject;
   const normalizedBody = input.body.trim();
 
@@ -343,7 +352,7 @@ export async function sendEmailThreadReplyForViewer(
               bytes,
             })),
           })
-        : await sendYahooThreadReply(account.emailAddress, accessToken, {
+        : await sendYahooThreadReply(account.emailAddress, yahooCredential, {
             threadId: detail.thread.providerThreadId,
             subject: normalizedSubject,
             body: normalizedBody,
@@ -360,7 +369,7 @@ export async function sendEmailThreadReplyForViewer(
               mimeType: document.mimeType,
               bytes,
             })),
-          });
+          }, yahooAppPassword);
 
   const sentAt = new Date().toISOString();
   const savedMessage = await saveOutboundEmailMessage({
@@ -439,12 +448,16 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
 
   const credentials = await ensureActiveEmailCredentials(attachment.account);
   const accessToken = credentials.accessToken;
+  const yahooAttachmentAppPassword = isYahooAppPasswordAccount(attachment.account.scopes);
+  const yahooAttachmentCredential = yahooAttachmentAppPassword
+    ? credentials.mailPassword ?? ""
+    : accessToken ?? "";
 
   if (
     !accessToken &&
     (attachment.account.provider === "gmail" ||
       attachment.account.provider === "outlook" ||
-      attachment.account.provider === "yahoo")
+      (attachment.account.provider === "yahoo" && !yahooAttachmentAppPassword))
   ) {
     throw new Error("Could not access the connected inbox.");
   }
@@ -467,9 +480,10 @@ export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: 
         : attachment.account.provider === "yahoo"
           ? await fetchYahooAttachment(
               attachment.account.emailAddress,
-              providerAccessToken,
+              yahooAttachmentCredential,
               attachment.providerMessageId,
-              attachment.providerAttachmentId
+              attachment.providerAttachmentId,
+              yahooAttachmentAppPassword
             )
           : null;
 
@@ -671,9 +685,17 @@ export async function syncConnectedInboxAccountsForViewer(
     (r): r is PromiseFulfilledResult<SyncResult> => r.status === "fulfilled"
   );
 
+  const latestSyncAt = accounts.reduce<string | null>((acc, account) => {
+    const iso = typeof account.lastSyncAt === "string" ? account.lastSyncAt : null;
+    if (!iso) return acc;
+    if (!acc || iso > acc) return iso;
+    return acc;
+  }, null);
+
   return {
     accountsProcessed: synced.length,
     accountsSkipped: synced.filter((r) => r.value.status === "skipped").length,
+    lastSyncAt: latestSyncAt,
   };
 }
 

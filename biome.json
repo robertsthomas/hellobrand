@@ -36,7 +36,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": false
+      "recommended": false,
+      "correctness": {
+        "noUnusedImports": "error"
+      }
     }
   },
   "overrides": [

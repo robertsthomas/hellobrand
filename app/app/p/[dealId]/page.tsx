@@ -37,12 +37,12 @@ import {
   buildWorkspaceDisplayState,
   loadWorkspaceRouteData,
   nextActionToneClass,
-  resolveWorkspaceTab
+  resolveWorkspaceTab,
 } from "./page-helpers";
 
 export default function WorkspaceDealDetailPage({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ dealId: string }>;
   searchParams?: Promise<{ tab?: string }>;
@@ -56,7 +56,7 @@ export default function WorkspaceDealDetailPage({
 
 async function DealDetailContent({
   params,
-  searchParams
+  searchParams,
 }: {
   params: Promise<{ dealId: string }>;
   searchParams?: Promise<{ tab?: string }>;
@@ -87,7 +87,7 @@ async function DealDetailContent({
     documentReviewItems,
     extractionEvidence,
     documentSections,
-    extractionResults
+    extractionResults,
   } = aggregate;
   const { normalized, displayCampaignName, displayBrandName, nextDeliverableValue } =
     buildWorkspaceDisplayState(aggregate);
@@ -100,7 +100,7 @@ async function DealDetailContent({
   const currentTab = resolveWorkspaceTab({
     hasInvoice,
     rawTab,
-    hasPendingExtraction
+    hasPendingExtraction,
   });
 
   const nextAction = buildNextAction({
@@ -108,7 +108,7 @@ async function DealDetailContent({
     paymentStatus: deal.paymentStatus,
     nextDeliverableDate: deal.nextDeliverableDate,
     riskFlags,
-    pendingExtraction: !!terms?.pendingExtraction
+    pendingExtraction: !!terms?.pendingExtraction,
   });
   const attentionItems = buildWorkspaceAttentionItems(aggregate);
 
@@ -132,11 +132,21 @@ async function DealDetailContent({
         {/* Tabs: 5 instead of 9 */}
         <WorkspaceTabs defaultTab={currentTab}>
           <ScrollableTabsList>
-            <TabsList data-guide="workspace-tabs" className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent">
-              <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+            <TabsList
+              data-guide="workspace-tabs"
+              className="inline-flex h-auto w-max flex-nowrap gap-1 border-0 bg-transparent p-1 shadow-none dark:bg-transparent"
+            >
+              <TabsTrigger
+                value="overview"
+                className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+              >
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="terms" data-guide="tab-terms" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger
+                value="terms"
+                data-guide="tab-terms"
+                className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+              >
                 Terms
                 {riskCount > 0 ? (
                   <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center bg-clay/10 px-1 text-[11px] font-semibold text-clay transition-colors group-data-[state=active]:bg-white/10 group-data-[state=active]:text-white dark:group-data-[state=active]:bg-black/10 dark:group-data-[state=active]:text-[#111827]">
@@ -144,18 +154,31 @@ async function DealDetailContent({
                   </span>
                 ) : null}
               </TabsTrigger>
-              <TabsTrigger value="deliverables" data-guide="tab-deliverables" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger
+                value="deliverables"
+                data-guide="tab-deliverables"
+                className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+              >
                 Deliverables
               </TabsTrigger>
               {hasInvoice ? (
-                <TabsTrigger value="invoices" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+                <TabsTrigger
+                  value="invoices"
+                  className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+                >
                   Invoices
                 </TabsTrigger>
               ) : null}
-              <TabsTrigger value="emails" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger
+                value="emails"
+                className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+              >
                 Emails
               </TabsTrigger>
-              <TabsTrigger value="documents" className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm">
+              <TabsTrigger
+                value="documents"
+                className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+              >
                 Documents
               </TabsTrigger>
             </TabsList>
@@ -164,9 +187,13 @@ async function DealDetailContent({
           {/* ── Overview: "Today" view ── */}
           <TabsContent value="overview" id="tab-overview" className="mt-0 space-y-6">
             {/* Next action */}
-            <div className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}>
+            <div
+              className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Next step</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">
+                  Next step
+                </p>
                 <p className="mt-1 text-sm font-medium text-foreground">{nextAction.label}</p>
               </div>
               {nextAction.tab !== "overview" ? (
@@ -184,7 +211,9 @@ async function DealDetailContent({
               <div className="border border-clay/15 bg-clay/[0.04] p-4 dark:border-clay/20">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
-                  <p className="text-sm font-semibold text-ink">Needs attention ({attentionItems.length})</p>
+                  <p className="text-sm font-semibold text-ink">
+                    Needs attention ({attentionItems.length})
+                  </p>
                 </div>
                 <div className="mt-3 grid gap-2">
                   {attentionItems.map((item) => (
@@ -219,10 +248,6 @@ async function DealDetailContent({
                 description="Overlapping category, exclusivity, or timing signals across active workspaces."
               />
             ) : null}
-
-            <p className="text-xs uppercase tracking-[0.2em] text-black/40 dark:text-white/40">
-              {deal.legalDisclaimer}
-            </p>
           </TabsContent>
 
           {/* ── Terms (includes risks) ── */}
@@ -230,9 +255,7 @@ async function DealDetailContent({
             {terms?.pendingExtraction ? (
               <PendingChangesBanner dealId={deal.id} terms={terms} />
             ) : null}
-            {riskCount > 0 ? (
-              <RiskFlags dealId={deal.id} flags={riskFlags} />
-            ) : null}
+            {riskCount > 0 ? <RiskFlags dealId={deal.id} flags={riskFlags} /> : null}
             <TermsEditor
               dealId={deal.id}
               terms={terms}
@@ -257,7 +280,11 @@ async function DealDetailContent({
               hasPremiumInbox={hasPremiumInbox}
             />
             {hasBriefGeneration ? (
-              <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} documents={documents} />
+              <BriefGenerator
+                dealId={deal.id}
+                briefData={terms?.briefData ?? null}
+                documents={documents}
+              />
             ) : (
               <FeatureUpgradeCard
                 eyebrow="Standard briefs"
@@ -295,18 +322,26 @@ async function DealDetailContent({
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-semibold text-foreground">{aggregate.invoiceRecord!.invoiceNumber}</h2>
+                      <h2 className="text-xl font-semibold text-foreground">
+                        {aggregate.invoiceRecord!.invoiceNumber}
+                      </h2>
                       <span className="bg-black/5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground dark:bg-white/10">
                         {humanizeToken(aggregate.invoiceRecord!.status)}
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Due {formatDate(aggregate.invoiceRecord!.dueDate)} · {formatCurrency(aggregate.invoiceRecord!.subtotal, aggregate.invoiceRecord!.currency ?? "USD")}
+                      Due {formatDate(aggregate.invoiceRecord!.dueDate)} ·{" "}
+                      {formatCurrency(
+                        aggregate.invoiceRecord!.subtotal,
+                        aggregate.invoiceRecord!.currency ?? "USD"
+                      )}
                     </p>
                     {aggregate.invoiceRecord!.sentAt ? (
                       <p className="mt-1 text-sm text-muted-foreground">
                         Sent {formatDate(aggregate.invoiceRecord!.sentAt)}
-                        {aggregate.invoiceRecord!.lastSentToEmail ? ` to ${aggregate.invoiceRecord!.lastSentToEmail}` : ""}
+                        {aggregate.invoiceRecord!.lastSentToEmail
+                          ? ` to ${aggregate.invoiceRecord!.lastSentToEmail}`
+                          : ""}
                       </p>
                     ) : null}
                   </div>

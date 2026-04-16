@@ -97,8 +97,7 @@ export class FileRepository {
       paymentStatus: "not_invoiced",
       countersignStatus: "unknown",
       summary: null,
-      legalDisclaimer:
-        "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice.",
+      legalDisclaimer: "",
       nextDeliverableDate: null,
       createdAt: now,
       updatedAt: now,

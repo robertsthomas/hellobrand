@@ -29,6 +29,7 @@ import {
   refreshOutlookAccessToken
 } from "@/lib/email/providers/outlook";
 import {
+  isYahooAppPasswordAccount,
   refreshYahooAccessToken
 } from "@/lib/email/providers/yahoo";
 import type { ProviderThreadPayload } from "@/lib/email/providers/types";
@@ -353,6 +354,23 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
   const accessToken = decryptSecret(account.accessTokenEncrypted);
   const refreshToken = decryptSecret(account.refreshTokenEncrypted);
 
+  if (account.provider === "yahoo" && isYahooAppPasswordAccount(account.scopes)) {
+    if (!refreshToken) {
+      await updateConnectedEmailAccount(account.id, {
+        status: "reconnect_required",
+        lastErrorCode: "missing_yahoo_app_password",
+        lastErrorMessage: "Reconnect Yahoo with a fresh app password."
+      });
+      throw new Error("Reconnect required.");
+    }
+
+    return {
+      accessToken: null as string | null,
+      refreshToken,
+      mailPassword: refreshToken
+    };
+  }
+
   if (account.provider === "yahoo" && account.scopes.length === 0) {
     await updateConnectedEmailAccount(account.id, {
       status: "reconnect_required",
@@ -423,7 +441,7 @@ export async function refreshEmailDealSuggestionsForViewer(
     listEmailThreadsForUser(viewer.id, {
       limit: options?.limit ?? 250
     }),
-    import("@/lib/deals").then(({ listDealAggregatesForViewer }) => listDealAggregatesForViewer(viewer))
+    import("@/lib/cached-data").then(({ getCachedDealAggregates }) => getCachedDealAggregates(viewer))
   ]);
 
   const threadIds = new Set(options?.threadIds ?? []);
@@ -552,8 +570,8 @@ export async function processLinkedThreadUpdates(
   viewer: Viewer,
   threadIds: string[]
 ) {
-  const { listDealAggregatesForViewer } = await import("@/lib/deals");
-  const allAggregates = await listDealAggregatesForViewer(viewer);
+  const { getCachedDealAggregates } = await import("@/lib/cached-data");
+  const allAggregates = await getCachedDealAggregates(viewer);
 
   for (const threadId of threadIds) {
     const thread = await getEmailThreadDetailForUser(viewer.id, threadId);

@@ -23,6 +23,7 @@ export type NotificationEventType =
   | "workspace.missing_payment"
   | "workspace.missing_deliverables"
   | "workspace.missing_usage_rights"
+  | "workspace.no_documents_uploaded"
   | "payment.overdue"
   | "payment.received"
   | "invoice.generate_prompt"
@@ -114,38 +115,35 @@ export interface WorkspaceNotificationClientPayload {
   >;
 }
 
-const WORKSPACE_SUPERSESSION_MAP: Partial<
-  Record<NotificationEventType, NotificationEventType[]>
-> = {
-  "workspace.processing_started": ["workspace.queued", "workspace.failed"],
-  "workspace.ready_for_review": [
-    "workspace.queued",
-    "workspace.processing_started",
-    "workspace.failed"
-  ],
-  "workspace.failed": ["workspace.queued", "workspace.processing_started"],
-  "workspace.duplicates_found": ["workspace.duplicate_checking"],
-  "workspace.cancelled": [
-    "workspace.queued",
-    "workspace.processing_started",
-    "workspace.ready_for_review",
-    "workspace.failed",
-    "workspace.duplicate_checking",
-    "workspace.duplicates_found"
-  ],
-  "workspace.confirmed": [
-    "workspace.queued",
-    "workspace.processing_started",
-    "workspace.ready_for_review",
-    "workspace.failed",
-    "workspace.duplicate_checking",
-    "workspace.duplicates_found"
-  ]
-};
+const WORKSPACE_SUPERSESSION_MAP: Partial<Record<NotificationEventType, NotificationEventType[]>> =
+  {
+    "workspace.processing_started": ["workspace.queued", "workspace.failed"],
+    "workspace.ready_for_review": [
+      "workspace.queued",
+      "workspace.processing_started",
+      "workspace.failed",
+    ],
+    "workspace.failed": ["workspace.queued", "workspace.processing_started"],
+    "workspace.duplicates_found": ["workspace.duplicate_checking"],
+    "workspace.cancelled": [
+      "workspace.queued",
+      "workspace.processing_started",
+      "workspace.ready_for_review",
+      "workspace.failed",
+      "workspace.duplicate_checking",
+      "workspace.duplicates_found",
+    ],
+    "workspace.confirmed": [
+      "workspace.queued",
+      "workspace.processing_started",
+      "workspace.ready_for_review",
+      "workspace.failed",
+      "workspace.duplicate_checking",
+      "workspace.duplicates_found",
+    ],
+  };
 
-export function notificationTypeForEventType(
-  eventType: NotificationEventType
-): NotificationType {
+export function notificationTypeForEventType(eventType: NotificationEventType): NotificationType {
   switch (eventType) {
     case "payment.overdue":
       return "payment_overdue";
@@ -185,6 +183,8 @@ export function notificationTypeForEventType(
     case "workspace.missing_deliverables":
     case "workspace.missing_usage_rights":
       return "workspace_missing_data";
+    case "workspace.no_documents_uploaded":
+      return "workspace_missing_data";
   }
 }
 
@@ -195,11 +195,7 @@ export function buildEmailResyncRequiredNotificationSeed(input: {
   createdAt?: Date | string;
 }): NotificationSeed {
   const providerLabel =
-    input.provider === "gmail"
-      ? "Gmail"
-      : input.provider === "outlook"
-        ? "Outlook"
-        : "Yahoo";
+    input.provider === "gmail" ? "Gmail" : input.provider === "outlook" ? "Outlook" : "Yahoo";
 
   return {
     category: "inbox",
@@ -210,28 +206,38 @@ export function buildEmailResyncRequiredNotificationSeed(input: {
     description: `We couldn't continue syncing ${input.emailAddress}. Reconnect this inbox to start a fresh sync.`,
     href: "/app/settings",
     dedupeKey: `email.resync_required:${input.accountId}`,
-    createdAt: input.createdAt
+    createdAt: input.createdAt,
   };
 }
 
 export function buildWorkspaceNudgeSeed(input: {
   dealId: string;
   campaignName: string;
-  eventType: "workspace.missing_payment" | "workspace.missing_deliverables" | "workspace.missing_usage_rights";
+  eventType:
+    | "workspace.missing_payment"
+    | "workspace.missing_deliverables"
+    | "workspace.missing_usage_rights"
+    | "workspace.no_documents_uploaded";
 }): NotificationSeed {
   const labels: Record<typeof input.eventType, { title: string; description: string }> = {
     "workspace.missing_payment": {
       title: `Payment amount missing from ${input.campaignName}`,
-      description: "Add a payment amount to track your earnings, or upload documents that include payment details."
+      description:
+        "Add a payment amount to track your earnings, or upload documents that include payment details.",
     },
     "workspace.missing_deliverables": {
       title: `No deliverables found in ${input.campaignName}`,
-      description: "Add deliverables so HelloBrand can track due dates and send reminders."
+      description: "Add deliverables so HelloBrand can track due dates and send reminders.",
     },
     "workspace.missing_usage_rights": {
       title: `Usage rights not specified in ${input.campaignName}`,
-      description: "Add usage rights to understand what the brand can do with your content."
-    }
+      description: "Add usage rights to understand what the brand can do with your content.",
+    },
+    "workspace.no_documents_uploaded": {
+      title: `${input.campaignName} has no documents yet`,
+      description:
+        "You created a workspace from an email but haven't uploaded any documents. Upload contracts or briefs to get the most out of HelloBrand.",
+    },
   };
 
   const label = labels[input.eventType];
@@ -245,7 +251,7 @@ export function buildWorkspaceNudgeSeed(input: {
     title: label.title,
     description: label.description,
     href: `/app/p/${input.dealId}?tab=terms`,
-    dedupeKey: `${input.eventType}:${input.dealId}`
+    dedupeKey: `${input.eventType}:${input.dealId}`,
   };
 }
 
@@ -283,7 +289,7 @@ function workspaceLabel(input: {
     input.draftBrandName,
     input.brandName,
     input.draftCampaignName,
-    input.campaignName
+    input.campaignName,
   ];
 
   for (const value of candidates) {
@@ -296,9 +302,7 @@ function workspaceLabel(input: {
   return "Your";
 }
 
-export function getWorkspaceSupersededEventTypes(
-  eventType: NotificationEventType
-) {
+export function getWorkspaceSupersededEventTypes(eventType: NotificationEventType) {
   return [...(WORKSPACE_SUPERSESSION_MAP[eventType] ?? [])];
 }
 
@@ -318,7 +322,7 @@ export function buildWorkspaceNotificationSeed(input: {
   const href = workspaceNotificationHref({
     eventType: input.eventType,
     sessionId: input.sessionId,
-    dealId: input.dealId
+    dealId: input.dealId,
   });
 
   switch (input.eventType) {
@@ -335,7 +339,7 @@ export function buildWorkspaceNotificationSeed(input: {
           "Your workspace is queued for analysis. We'll notify you when processing begins and when it's ready.",
         href,
         dedupeKey: `workspace.queued:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.processing_started":
       return {
@@ -349,7 +353,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "Your workspace is being analyzed. We'll notify you when it's ready.",
         href,
         dedupeKey: `workspace.processing_started:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.ready_for_review":
       return {
@@ -363,7 +367,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "Your workspace has been analyzed and is ready for review.",
         href,
         dedupeKey: `workspace.ready_for_review:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.failed":
       return {
@@ -378,7 +382,7 @@ export function buildWorkspaceNotificationSeed(input: {
           input.errorMessage?.trim() || "Something went wrong processing your documents.",
         href,
         dedupeKey: `workspace.failed:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.duplicate_checking":
       return {
@@ -392,7 +396,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "We're checking if this workspace overlaps with any existing ones.",
         href,
         dedupeKey: `workspace.duplicate_checking:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.duplicates_found": {
       const matches = Array.isArray(input.duplicateMatchJson)
@@ -410,7 +414,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: `This workspace may overlap with ${matchBrand}. Review to merge or keep separate.`,
         href,
         dedupeKey: `workspace.duplicates_found:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     }
     case "workspace.confirmed":
@@ -425,7 +429,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "This workspace has been reviewed and moved into your active partnerships.",
         href,
         dedupeKey: `workspace.confirmed:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.cancelled":
       return {
@@ -439,7 +443,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "This workspace was cancelled and removed.",
         href: "/app",
         dedupeKey: `workspace.cancelled:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     case "workspace.deleted":
       return {
@@ -453,7 +457,7 @@ export function buildWorkspaceNotificationSeed(input: {
         description: "This workspace was deleted and cannot be recovered.",
         href: "/app",
         dedupeKey: `workspace.deleted:${input.sessionId}`,
-        createdAt: input.createdAt
+        createdAt: input.createdAt,
       };
     default:
       throw new Error(`Unsupported workspace notification event: ${input.eventType}`);
@@ -496,7 +500,7 @@ export function buildWorkspaceNotificationItem(
     readAt: input.readAt ?? null,
     clearedAt: input.clearedAt ?? null,
     supersededAt: input.supersededAt ?? null,
-    read: input.read ?? false
+    read: input.read ?? false,
   };
 }
 
@@ -515,6 +519,6 @@ export function formatNotificationRelativeTime(dateString: string) {
 
   return new Date(dateString).toLocaleDateString("en-US", {
     month: "short",
-    day: "numeric"
+    day: "numeric",
   });
 }

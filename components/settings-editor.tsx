@@ -3,6 +3,7 @@
 import type { FormEvent, InputHTMLAttributes } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { SettingsSection } from "@/components/patterns/settings";
 import {
@@ -110,8 +111,6 @@ export function SettingsEditor({
     )
   );
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   function updateFormField<Key extends keyof ProfileSettingsDraft>(
     key: Key,
@@ -126,8 +125,6 @@ export function SettingsEditor({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
 
     try {
       const response = await fetch("/api/profile", {
@@ -146,10 +143,10 @@ export function SettingsEditor({
         throw new Error(payload.error ?? "Could not save settings.");
       }
 
-      setSuccessMessage(payload.message ?? "Settings saved.");
+      toast.success(payload.message ?? "Settings saved.");
       router.refresh();
     } catch (error) {
-      setErrorMessage(
+      toast.error(
         error instanceof Error ? error.message : "Could not save settings."
       );
     } finally {
@@ -168,17 +165,6 @@ export function SettingsEditor({
           review preferences.
         </p>
       </div>
-
-      {successMessage ? (
-        <div className="border-b border-border py-4 text-sm text-primary">
-          {successMessage}
-        </div>
-      ) : null}
-      {errorMessage ? (
-        <div className="border-b border-border py-4 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      ) : null}
 
       <SettingsSection
         title="Workflow Defaults"

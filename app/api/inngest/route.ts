@@ -5,21 +5,20 @@
 import { serve } from "inngest/next";
 
 import { inngest } from "@/lib/inngest/client";
-import {
-  documentProcessingFunction
-} from "@/lib/inngest/document-functions";
+import { documentProcessingFunction } from "@/lib/inngest/document-functions";
 import {
   emailActionItemDeadlineCheckFunction,
   emailIncrementalSyncFunction,
   emailInitialSyncFunction,
   emailPaymentOverdueCheckFunction,
-  emailRenewalSweepFunction
+  emailRenewalSweepFunction,
 } from "@/lib/inngest/email-functions";
 import {
   invoiceReminderSweepFunction,
+  noDocumentsUploadedSweepFunction,
   notificationEmailSendFunction,
   workspaceNudgeSweepFunction,
-  workspaceReminderSweepFunction
+  workspaceReminderSweepFunction,
 } from "@/lib/inngest/functions";
 
 export const { GET, POST, PUT } = serve({
@@ -30,10 +29,11 @@ export const { GET, POST, PUT } = serve({
     invoiceReminderSweepFunction,
     workspaceReminderSweepFunction,
     workspaceNudgeSweepFunction,
+    noDocumentsUploadedSweepFunction,
     emailInitialSyncFunction,
     emailIncrementalSyncFunction,
     emailRenewalSweepFunction,
     emailActionItemDeadlineCheckFunction,
-    emailPaymentOverdueCheckFunction
-  ]
+    emailPaymentOverdueCheckFunction,
+  ],
 });

@@ -4,12 +4,7 @@
  */
 import Link from "next/link";
 import { Suspense } from "react";
-import {
-  ArrowRight,
-  Clock3,
-  DollarSign,
-  Receipt
-} from "lucide-react";
+import { ArrowRight, Clock3, DollarSign, Receipt } from "lucide-react";
 
 import {
   ConflictWarnings,
@@ -23,17 +18,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { requireViewer } from "@/lib/auth";
-import {
-  getCachedDealAggregates,
-  getCachedIntakeDrafts
-} from "@/lib/cached-data";
+import { getCachedDealAggregates, getCachedIntakeDrafts } from "@/lib/cached-data";
 import { cn, formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 import {
   buildDashboardViewModel,
   buildDealNextStep,
   dueLabel,
   nextStepTextClass,
-  paymentBadgeClass
+  paymentBadgeClass,
 } from "./page-helpers";
 
 export default function WorkspaceDashboardPage() {
@@ -48,7 +40,7 @@ async function DashboardContent() {
   const viewer = await requireViewer();
   const [aggregates, intakeDrafts] = await Promise.all([
     getCachedDealAggregates(viewer),
-    getCachedIntakeDrafts(viewer)
+    getCachedIntakeDrafts(viewer),
   ]);
   const {
     activePartnershipItems,
@@ -58,11 +50,11 @@ async function DashboardContent() {
     hasDueSoon,
     hasPendingPayouts,
     secondarySections,
-    todaySummary
+    todaySummary,
   } = buildDashboardViewModel({
     aggregates,
     intakeDrafts,
-    viewer
+    viewer,
   });
 
   return (
@@ -81,7 +73,10 @@ async function DashboardContent() {
         <QuickActionsPanel items={attentionItems} />
 
         {/* Active partnerships (full-width) */}
-        <section data-guide="active-partnerships" className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6">
+        <section
+          data-guide="active-partnerships"
+          className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6"
+        >
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-[28px] font-semibold tracking-[-0.05em] text-foreground">
               Active partnerships
@@ -99,7 +94,8 @@ async function DashboardContent() {
             <div className="mt-6 border border-dashed border-black/10 bg-[#fafafb] p-6 dark:border-white/10 dark:bg-white/[0.03]">
               <p className="text-base font-semibold text-foreground">No active partnerships yet.</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Start with one workspace and this dashboard will begin surfacing due dates, payment follow-ups, and risk review.
+                Start with one workspace and this dashboard will begin surfacing due dates, payment
+                follow-ups, and risk review.
               </p>
               <div className="mt-5">
                 <Link
@@ -204,7 +200,7 @@ async function DashboardContent() {
                     Deliverables
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    Upcoming this week
+                    Upcoming deliverables
                   </h2>
                 </div>
                 <Clock3 className="h-5 w-5 text-[#98a2b3] dark:text-[#8f98a6]" />
@@ -220,7 +216,9 @@ async function DashboardContent() {
                     <p className="font-semibold text-foreground">{item.title}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{item.campaignName}</p>
                     <div className="mt-3 flex items-center justify-between gap-4 text-sm">
-                      <span className="font-medium text-foreground">{formatDate(item.dueDate)}</span>
+                      <span className="font-medium text-foreground">
+                        {formatDate(item.dueDate)}
+                      </span>
                       <span className="text-muted-foreground">{dueLabel(item.dueDate)}</span>
                     </div>
                   </Link>
@@ -231,8 +229,8 @@ async function DashboardContent() {
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
               <Clock3 className="h-4 w-4 shrink-0 text-[#98a2b3] dark:text-[#8f98a6]" />
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Deliverables</span>
-                {" "}· Nothing due this week
+                <span className="font-medium text-foreground">Deliverables</span> · Nothing due this
+                week
               </p>
             </div>
           )}
@@ -261,7 +259,9 @@ async function DashboardContent() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-foreground">{deal.campaignName}</p>
+                        <p className="truncate font-semibold text-foreground">
+                          {deal.campaignName}
+                        </p>
                         <p className="mt-1 text-sm text-muted-foreground">{deal.brandName}</p>
                       </div>
                       <Badge className={paymentBadgeClass(deal.paymentStatus)}>
@@ -279,8 +279,8 @@ async function DashboardContent() {
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
               <Receipt className="h-4 w-4 shrink-0 text-[#98a2b3] dark:text-[#8f98a6]" />
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Payments</span>
-                {" "}· No outstanding payouts
+                <span className="font-medium text-foreground">Payments</span> · No outstanding
+                payouts
               </p>
             </div>
           )}

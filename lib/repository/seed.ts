@@ -102,8 +102,7 @@ export function createSeedStore(): AppStore {
         countersignStatus: "pending",
         summary:
           "You are being paid $2,000 for one Instagram Reel and two Story frames. The biggest watchouts are Net 45 payment terms and six months of paid ad usage.",
-        legalDisclaimer:
-          "HelloBrand provides plain-English contract understanding and negotiation prep. It is not legal advice.",
+        legalDisclaimer: "",
         nextDeliverableDate: "2026-03-30",
         createdAt: now,
         updatedAt: now,

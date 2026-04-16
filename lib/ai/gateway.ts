@@ -108,34 +108,46 @@ const APPROVED_PRODUCTION_MODELS = new Set([
   "google/gemini-3-flash-preview",
   "google/gemini-2.5-flash",
   "openai/gpt-5-mini",
-  "openai/gpt-5.4-mini"
+  "openai/gpt-5.4-mini",
 ]);
 
 const MODEL_PRICING: Record<string, Pricing> = {
   "google/gemini-3-flash-preview": {
     inputUsdPerMillion: 0.5,
-    outputUsdPerMillion: 3
+    outputUsdPerMillion: 3,
   },
   "google/gemini-2.5-flash": {
     inputUsdPerMillion: 0.15,
-    outputUsdPerMillion: 0.6
+    outputUsdPerMillion: 0.6,
   },
   "openai/gpt-5-mini": {
     inputUsdPerMillion: 0.25,
-    outputUsdPerMillion: 2
+    outputUsdPerMillion: 2,
   },
   "openai/gpt-5.4-mini": {
     inputUsdPerMillion: 0.75,
-    outputUsdPerMillion: 4.5
+    outputUsdPerMillion: 4.5,
   },
   "anthropic/claude-3.5-sonnet": {
     inputUsdPerMillion: 3,
-    outputUsdPerMillion: 15
+    outputUsdPerMillion: 15,
   },
   "anthropic/claude-3.5-haiku": {
     inputUsdPerMillion: 0.8,
-    outputUsdPerMillion: 4
-  }
+    outputUsdPerMillion: 4,
+  },
+  "qwen/qwen3-next-80b-a3b-instruct:free": {
+    inputUsdPerMillion: 0,
+    outputUsdPerMillion: 0,
+  },
+  "openai/gpt-oss-120b:free": {
+    inputUsdPerMillion: 0,
+    outputUsdPerMillion: 0,
+  },
+  "qwen/qwen3.6-plus:free": {
+    inputUsdPerMillion: 0,
+    outputUsdPerMillion: 0,
+  },
 };
 
 const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
@@ -149,7 +161,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: null,
     cachePromptVersion: "assistant.v2",
     routeVersion: "assistant.route.v2",
-    throttle: true
+    throttle: true,
   },
   extract_section: {
     taskKey: "extract_section",
@@ -161,7 +173,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "extract.v3",
     routeVersion: "extract.route.v3",
-    throttle: true
+    throttle: true,
   },
   analyze_risks: {
     taskKey: "analyze_risks",
@@ -173,7 +185,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "risks.v3",
     routeVersion: "risks.route.v3",
-    throttle: true
+    throttle: true,
   },
   generate_summary: {
     taskKey: "generate_summary",
@@ -185,7 +197,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "summary.v3",
     routeVersion: "summary.route.v3",
-    throttle: true
+    throttle: true,
   },
   generate_brief: {
     taskKey: "generate_brief",
@@ -197,7 +209,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "brief.v3",
     routeVersion: "brief.route.v3",
-    throttle: true
+    throttle: true,
   },
   consolidate_clauses: {
     taskKey: "consolidate_clauses",
@@ -209,7 +221,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "clause-consolidation.v1",
     routeVersion: "clause-consolidation.route.v1",
-    throttle: true
+    throttle: true,
   },
   email_summary: {
     taskKey: "email_summary",
@@ -221,7 +233,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 7,
     cachePromptVersion: "email.summary.v2",
     routeVersion: "email.summary.route.v1",
-    throttle: true
+    throttle: true,
   },
   email_draft: {
     taskKey: "email_draft",
@@ -233,7 +245,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24,
     cachePromptVersion: "email.draft.v2",
     routeVersion: "email.draft.route.v3",
-    throttle: true
+    throttle: true,
   },
   email_suggestions: {
     taskKey: "email_suggestions",
@@ -245,7 +257,7 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 7,
     cachePromptVersion: "email.suggestions.v2",
     routeVersion: "email.suggestions.route.v1",
-    throttle: true
+    throttle: true,
   },
   email_action_items: {
     taskKey: "email_action_items",
@@ -255,10 +267,10 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     fallbacks: ["openai/gpt-5-mini"],
     maxTokens: 4096,
     cacheTtlSeconds: 60 * 60 * 24 * 7,
-    cachePromptVersion: "email.action-items.v2",
+    cachePromptVersion: "email.action-items.v3",
     routeVersion: "email.action-items.route.v1",
-    throttle: true
-  }
+    throttle: true,
+  },
 };
 
 function providerConfig() {
@@ -275,8 +287,8 @@ function providerConfig() {
         process.env.INTEGRATIONS_APP_URL ||
         process.env.NEXT_PUBLIC_APP_URL ||
         "http://localhost:3011",
-      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand"
-    }
+      "X-Title": process.env.OPENROUTER_APP_NAME || "HelloBrand",
+    },
   };
 }
 
@@ -313,7 +325,7 @@ function getBudgets() {
     globalMonthlyCapUsd: parsePositiveNumber(process.env.AI_GLOBAL_MONTHLY_CAP_USD, 500),
     globalDailyCapUsd: parsePositiveNumber(process.env.AI_GLOBAL_DAILY_CAP_USD, 50),
     rpmPremium: parsePositiveNumber(process.env.AI_RPM_PREMIUM, 15),
-    tpm10mPremium: parsePositiveNumber(process.env.AI_TPM_10M_PREMIUM, 20000)
+    tpm10mPremium: parsePositiveNumber(process.env.AI_TPM_10M_PREMIUM, 20000),
   };
 }
 
@@ -363,6 +375,8 @@ function taskEnvPrimary(taskKey: AiTaskKey) {
 
 function getTaskSpecificEnvVar(taskKey: AiTaskKey): string | null {
   switch (taskKey) {
+    case "assistant_chat":
+      return "OPENROUTER_MODEL_CHAT";
     case "extract_section":
       return "OPENROUTER_MODEL_EXTRACT";
     case "analyze_risks":
@@ -383,33 +397,36 @@ function getTaskSpecificEnvVar(taskKey: AiTaskKey): string | null {
 
 function taskEnvFallbacks(taskKey: AiTaskKey) {
   switch (taskKey) {
+    case "assistant_chat":
+      return uniqueModels([
+        ...parseModelList(process.env.OPENROUTER_MODEL_CHAT_FALLBACKS),
+        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS),
+      ]);
     case "extract_section":
       return uniqueModels([
         ...parseModelList(process.env.OPENROUTER_MODEL_EXTRACT_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
+        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS),
       ]);
     case "analyze_risks":
       return uniqueModels([
         ...parseModelList(process.env.OPENROUTER_MODEL_RISKS_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
+        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS),
       ]);
     case "generate_summary":
     case "generate_brief":
     case "consolidate_clauses":
       return uniqueModels([
         ...parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
+        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS),
       ]);
     case "email_summary":
     case "email_draft":
       return uniqueModels([
         ...parseModelList(process.env.OPENROUTER_MODEL_EMAIL_FALLBACKS),
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
+        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS),
       ]);
     default:
-      return uniqueModels([
-        ...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)
-      ]);
+      return uniqueModels([...parseModelList(process.env.OPENROUTER_MODEL_FALLBACKS)]);
   }
 }
 
@@ -417,7 +434,12 @@ function cheapestApprovedModel() {
   return "google/gemini-2.5-flash";
 }
 
-function routeVersion(taskKey: AiTaskKey, requestedModel: string, fallbacks: string[], decision: AiBudgetDecision) {
+function routeVersion(
+  taskKey: AiTaskKey,
+  requestedModel: string,
+  fallbacks: string[],
+  decision: AiBudgetDecision
+) {
   return `${TASK_POLICIES[taskKey].routeVersion}:${decision}:${requestedModel}:${fallbacks.join(",") || "none"}`;
 }
 
@@ -430,7 +452,7 @@ function usageFromCompletion(response: OpenAI.Chat.Completions.ChatCompletion) {
   return {
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
-    totalTokens: usage?.total_tokens ?? 0
+    totalTokens: usage?.total_tokens ?? 0,
   };
 }
 
@@ -483,9 +505,9 @@ async function aggregateCost(where: Record<string, unknown>) {
 
   const result = await prisma.aiUsageEvent.aggregate({
     _sum: {
-      estimatedCostUsd: true
+      estimatedCostUsd: true,
     },
-    where: where as never
+    where: where as never,
   });
 
   return result._sum.estimatedCostUsd ?? 0;
@@ -494,7 +516,10 @@ async function aggregateCost(where: Record<string, unknown>) {
 async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPreparedExecution> {
   const basePolicy = TASK_POLICIES[context.taskKey];
   const requestedModel = approvedModel(taskEnvPrimary(context.taskKey)) ?? basePolicy.primary;
-  const fallbacks = uniqueModels([...taskEnvFallbacks(context.taskKey), ...basePolicy.fallbacks]).filter((model) => model !== requestedModel);
+  const fallbacks = uniqueModels([
+    ...taskEnvFallbacks(context.taskKey),
+    ...basePolicy.fallbacks,
+  ]).filter((model) => model !== requestedModel);
   const budgets = getBudgets();
 
   if (!hasDatabase()) {
@@ -507,7 +532,7 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
       maxTokens: basePolicy.maxTokens,
       budgetDecision: "normal",
       cachePromptVersion: basePolicy.cachePromptVersion,
-      routeVersion: routeVersion(context.taskKey, requestedModel, fallbacks, "normal")
+      routeVersion: routeVersion(context.taskKey, requestedModel, fallbacks, "normal"),
     };
   }
 
@@ -515,20 +540,26 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
   const monthStart = currentMonthStart(now);
   const dayStart = currentDayStart(now);
 
-  const [globalDailyCost, globalMonthlyCost, userMonthlyCost, recentRequestCount, recentTokenTotal] = await Promise.all([
+  const [
+    globalDailyCost,
+    globalMonthlyCost,
+    userMonthlyCost,
+    recentRequestCount,
+    recentTokenTotal,
+  ] = await Promise.all([
     aggregateCost({
       createdAt: { gte: dayStart },
-      cacheStatus: { not: "hit" }
+      cacheStatus: { not: "hit" },
     }),
     aggregateCost({
       createdAt: { gte: monthStart },
-      cacheStatus: { not: "hit" }
+      cacheStatus: { not: "hit" },
     }),
     context.userId
       ? aggregateCost({
           userId: context.userId,
           createdAt: { gte: monthStart },
-          cacheStatus: { not: "hit" }
+          cacheStatus: { not: "hit" },
         })
       : Promise.resolve(0),
     basePolicy.throttle && context.userId
@@ -536,24 +567,26 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
           where: {
             userId: context.userId,
             createdAt: {
-              gte: new Date(now.getTime() - 60_000)
+              gte: new Date(now.getTime() - 60_000),
             },
-            cacheStatus: { not: "hit" }
-          }
+            cacheStatus: { not: "hit" },
+          },
         })
       : Promise.resolve(0),
     basePolicy.throttle && context.userId
-      ? prisma.aiUsageEvent.aggregate({
-          _sum: { totalTokens: true },
-          where: {
-            userId: context.userId,
-            createdAt: {
-              gte: new Date(now.getTime() - 10 * 60_000)
+      ? prisma.aiUsageEvent
+          .aggregate({
+            _sum: { totalTokens: true },
+            where: {
+              userId: context.userId,
+              createdAt: {
+                gte: new Date(now.getTime() - 10 * 60_000),
+              },
+              cacheStatus: { not: "hit" },
             },
-            cacheStatus: { not: "hit" }
-          }
-        }).then((result) => result._sum.totalTokens ?? 0)
-      : Promise.resolve(0)
+          })
+          .then((result) => result._sum.totalTokens ?? 0)
+      : Promise.resolve(0),
   ]);
 
   if (
@@ -572,7 +605,7 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
       maxTokens: Math.max(120, Math.floor(basePolicy.maxTokens * 0.7)),
       budgetDecision: "blocked",
       cachePromptVersion: basePolicy.cachePromptVersion,
-      routeVersion: routeVersion(context.taskKey, requestedModel, [], "blocked")
+      routeVersion: routeVersion(context.taskKey, requestedModel, [], "blocked"),
     };
   }
 
@@ -587,7 +620,7 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
       maxTokens: Math.max(120, Math.floor(basePolicy.maxTokens * 0.7)),
       budgetDecision: "degraded",
       cachePromptVersion: basePolicy.cachePromptVersion,
-      routeVersion: routeVersion(context.taskKey, degradedModel, [], "degraded")
+      routeVersion: routeVersion(context.taskKey, degradedModel, [], "degraded"),
     };
   }
 
@@ -600,7 +633,7 @@ async function evaluateAiExecution(context: AiExecutionContext): Promise<AiPrepa
     maxTokens: basePolicy.maxTokens,
     budgetDecision: "normal",
     cachePromptVersion: basePolicy.cachePromptVersion,
-    routeVersion: routeVersion(context.taskKey, requestedModel, fallbacks, "normal")
+    routeVersion: routeVersion(context.taskKey, requestedModel, fallbacks, "normal"),
   };
 }
 
@@ -617,9 +650,9 @@ async function getAiCacheEntry(cache: AiCachePolicy, taskKey: AiTaskKey, feature
         scopeKey: cache.scopeKey,
         inputHash: cache.inputHash,
         promptVersion: cache.promptVersion,
-        routeVersion: cache.routeVersion
-      }
-    }
+        routeVersion: cache.routeVersion,
+      },
+    },
   });
 }
 
@@ -645,8 +678,8 @@ async function upsertAiCacheEntry(input: {
         scopeKey: input.cache.scopeKey,
         inputHash: input.cache.inputHash,
         promptVersion: input.cache.promptVersion,
-        routeVersion: input.cache.routeVersion
-      }
+        routeVersion: input.cache.routeVersion,
+      },
     },
     update: {
       userId: input.cache.userId ?? null,
@@ -655,7 +688,7 @@ async function upsertAiCacheEntry(input: {
       payloadJson: input.payload as never,
       usageJson: input.usage as never,
       estimatedCostUsd: input.estimatedCostUsd,
-      expiresAt: new Date(Date.now() + input.cache.ttlSeconds * 1000)
+      expiresAt: new Date(Date.now() + input.cache.ttlSeconds * 1000),
     },
     create: {
       userId: input.cache.userId ?? null,
@@ -670,8 +703,8 @@ async function upsertAiCacheEntry(input: {
       payloadJson: input.payload as never,
       usageJson: input.usage as never,
       estimatedCostUsd: input.estimatedCostUsd,
-      expiresAt: new Date(Date.now() + input.cache.ttlSeconds * 1000)
-    }
+      expiresAt: new Date(Date.now() + input.cache.ttlSeconds * 1000),
+    },
   });
 }
 
@@ -697,8 +730,8 @@ export async function recordAiUsageEvent(input: AiUsageEventInput) {
       estimatedCostUsd: estimateCostUsd(input.resolvedModel, input.usage),
       requestKey: input.requestKey,
       inputHash: input.inputHash,
-      metadataJson: toJsonValue(input.metadata ?? {})
-    }
+      metadataJson: toJsonValue(input.metadata ?? {}),
+    },
   });
 }
 
@@ -722,7 +755,7 @@ export async function finalizeAiStreamExecution(input: {
     cacheStatus: "miss",
     usage: input.usage,
     inputHash: input.inputHash,
-    requestKey: input.requestKey ?? randomUUID()
+    requestKey: input.requestKey ?? randomUUID(),
   });
 }
 
@@ -744,7 +777,7 @@ export function aiCachePolicy(input: {
     inputHash: hashValue(input.input),
     ttlSeconds: policy.cacheTtlSeconds,
     promptVersion: policy.cachePromptVersion,
-    routeVersion: policy.routeVersion
+    routeVersion: policy.routeVersion,
   } satisfies AiCachePolicy;
 }
 
@@ -760,7 +793,9 @@ export function hasAiClient() {
   return Boolean(client());
 }
 
-export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Promise<AiGatewayResult<T> | null> {
+export async function runOpenRouterTask<T>(
+  input: RunOpenRouterTaskInput<T>
+): Promise<AiGatewayResult<T> | null> {
   const api = client();
   if (!api) {
     return null;
@@ -773,7 +808,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
     taskKey: input.context.taskKey,
     routeVersion: prepared.routeVersion,
     promptVersion: prepared.cachePromptVersion,
-    requestedModel: prepared.requestedModel
+    requestedModel: prepared.requestedModel,
   };
   const inputHash = buildAiInputHash(requestPayload);
 
@@ -782,7 +817,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       {
         ...input.cache,
         promptVersion: prepared.cachePromptVersion,
-        routeVersion: prepared.routeVersion
+        routeVersion: prepared.routeVersion,
       },
       input.context.taskKey,
       input.context.featureKey
@@ -792,7 +827,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       const usage = (cached.usageJson as AiUsageMetrics | null) ?? {
         promptTokens: 0,
         completionTokens: 0,
-        totalTokens: 0
+        totalTokens: 0,
       };
       await recordAiUsageEvent({
         ...input.context,
@@ -802,7 +837,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
         cacheStatus: "hit",
         usage,
         inputHash,
-        requestKey: randomUUID()
+        requestKey: randomUUID(),
       });
 
       return {
@@ -811,7 +846,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
         resolvedModel: cached.resolvedModel,
         requestedModel: cached.requestedModel,
         cacheHit: true,
-        budgetDecision: prepared.budgetDecision
+        budgetDecision: prepared.budgetDecision,
       };
     }
   }
@@ -826,7 +861,12 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       return null;
     }
 
-    console.warn("[ai-gateway] Budget blocked for", prepared.requestedModel, ", attempting fallback:", cheapFallback);
+    console.warn(
+      "[ai-gateway] Budget blocked for",
+      prepared.requestedModel,
+      ", attempting fallback:",
+      cheapFallback
+    );
 
     try {
       const fallbackResponse = await api.chat.completions.create({
@@ -835,9 +875,9 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
         max_completion_tokens: prepared.maxTokens,
         messages: [
           { role: "system", content: input.systemPrompt },
-          { role: "user", content: input.userPrompt }
+          { role: "user", content: input.userPrompt },
         ],
-        ...(input.responseFormat ? { response_format: input.responseFormat } : {})
+        ...(input.responseFormat ? { response_format: input.responseFormat } : {}),
       } as never);
 
       const fallbackContent = extractTextContent(fallbackResponse.choices?.[0]?.message?.content);
@@ -854,7 +894,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
           cacheStatus: "miss",
           usage,
           inputHash,
-          requestKey: randomUUID()
+          requestKey: randomUUID(),
         });
 
         return {
@@ -863,7 +903,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
           resolvedModel,
           requestedModel: cheapFallback,
           cacheHit: false,
-          budgetDecision: "blocked"
+          budgetDecision: "blocked",
         };
       }
     } catch {
@@ -879,16 +919,16 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
     max_completion_tokens: prepared.maxTokens,
     messages: [
       { role: "system", content: input.systemPrompt },
-      { role: "user", content: input.userPrompt }
+      { role: "user", content: input.userPrompt },
     ],
     ...(input.responseFormat ? { response_format: input.responseFormat } : {}),
     ...(prepared.fallbacks.length > 0
       ? {
           extra_body: {
-            models: prepared.fallbacks
-          }
+            models: prepared.fallbacks,
+          },
         }
-      : {})
+      : {}),
   } as never);
 
   let content = extractTextContent(response.choices?.[0]?.message?.content);
@@ -897,12 +937,19 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
   if (!content) {
     // If the model hit the token limit, retry with 50% more tokens.
     // If it failed for any other reason, retry once with the same params.
-    const hitTokenLimit = finishReason === "length" || (finishReason as string) === "max_output_tokens";
-    const retryTokens = hitTokenLimit
-      ? Math.floor(prepared.maxTokens * 1.5)
-      : prepared.maxTokens;
+    const hitTokenLimit =
+      finishReason === "length" || (finishReason as string) === "max_output_tokens";
+    const retryTokens = hitTokenLimit ? Math.floor(prepared.maxTokens * 1.5) : prepared.maxTokens;
 
-    console.error("[ai-gateway] Empty response from model:", prepared.requestedModel, "finish_reason:", finishReason, hitTokenLimit ? `(bumping tokens from ${prepared.maxTokens} to ${retryTokens})` : "(retrying with same params)");
+    console.error(
+      "[ai-gateway] Empty response from model:",
+      prepared.requestedModel,
+      "finish_reason:",
+      finishReason,
+      hitTokenLimit
+        ? `(bumping tokens from ${prepared.maxTokens} to ${retryTokens})`
+        : "(retrying with same params)"
+    );
 
     const retry = await api.chat.completions.create({
       model: prepared.requestedModel,
@@ -910,16 +957,19 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       max_completion_tokens: retryTokens,
       messages: [
         { role: "system", content: input.systemPrompt },
-        { role: "user", content: input.userPrompt }
+        { role: "user", content: input.userPrompt },
       ],
       ...(input.responseFormat ? { response_format: input.responseFormat } : {}),
-      ...(prepared.fallbacks.length > 0
-        ? { extra_body: { models: prepared.fallbacks } }
-        : {})
+      ...(prepared.fallbacks.length > 0 ? { extra_body: { models: prepared.fallbacks } } : {}),
     } as never);
     content = extractTextContent(retry.choices?.[0]?.message?.content);
     if (!content) {
-      console.error("[ai-gateway] Retry also returned empty response:", prepared.requestedModel, "finish_reason:", retry.choices?.[0]?.finish_reason);
+      console.error(
+        "[ai-gateway] Retry also returned empty response:",
+        prepared.requestedModel,
+        "finish_reason:",
+        retry.choices?.[0]?.finish_reason
+      );
       return null;
     }
   }
@@ -938,7 +988,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
     cacheStatus: "miss",
     usage,
     inputHash,
-    requestKey
+    requestKey,
   });
 
   if (input.cache?.enabled) {
@@ -946,7 +996,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       cache: {
         ...input.cache,
         promptVersion: prepared.cachePromptVersion,
-        routeVersion: prepared.routeVersion
+        routeVersion: prepared.routeVersion,
       },
       taskKey: input.context.taskKey,
       featureKey: input.context.featureKey,
@@ -954,7 +1004,7 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
       resolvedModel,
       payload: input.serialize(data),
       usage,
-      estimatedCostUsd
+      estimatedCostUsd,
     });
   }
 
@@ -964,6 +1014,6 @@ export async function runOpenRouterTask<T>(input: RunOpenRouterTaskInput<T>): Pr
     resolvedModel,
     requestedModel: prepared.requestedModel,
     cacheHit: false,
-    budgetDecision: prepared.budgetDecision
+    budgetDecision: prepared.budgetDecision,
   };
 }

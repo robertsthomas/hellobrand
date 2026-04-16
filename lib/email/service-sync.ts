@@ -21,6 +21,7 @@ import {
   renewOutlookSubscription
 } from "@/lib/email/providers/outlook";
 import {
+  isYahooAppPasswordAccount,
   listRecentYahooThreads,
   listYahooThreadsSinceCursor
 } from "@/lib/email/providers/yahoo";
@@ -481,21 +482,25 @@ async function syncYahooAccount(
 
   try {
     const credentials = await ensureActiveEmailCredentials(account);
-    const yahooAccessToken = credentials.accessToken;
+    const appPassword = isYahooAppPasswordAccount(account.scopes);
+    const yahooCredential = appPassword
+      ? credentials.mailPassword
+      : credentials.accessToken;
 
-    if (!yahooAccessToken) {
-      throw new Error("Missing Yahoo access token.");
+    if (!yahooCredential) {
+      throw new Error(appPassword ? "Missing Yahoo app password." : "Missing Yahoo access token.");
     }
 
     const syncState = await getSharedEmailSyncState(account.id);
     const result =
       mode === "initial" || !syncState?.providerCursor
-        ? await listRecentYahooThreads(account.emailAddress, yahooAccessToken, recentLimit)
+        ? await listRecentYahooThreads(account.emailAddress, yahooCredential, recentLimit, appPassword)
         : await listYahooThreadsSinceCursor(
             account.emailAddress,
-            yahooAccessToken,
+            yahooCredential,
             syncState.providerCursor,
-            Math.max(250, recentLimit)
+            Math.max(250, recentLimit),
+            appPassword
           );
 
     const savedThreadIds: string[] = [];

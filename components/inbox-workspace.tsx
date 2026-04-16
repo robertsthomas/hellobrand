@@ -25,10 +25,13 @@ import { InboxSelect } from "@/components/inbox-select";
 import { InboxSortDialog } from "@/components/inbox-sort-dialog";
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import { captureAppEvent } from "@/lib/posthog/events";
+import { useInboxAiSuggestions } from "@/components/use-inbox-ai-suggestions";
 import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
+import { useInboxManualAdd } from "@/components/use-inbox-manual-add";
 import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
 import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
 import { useInboxThreadSelection } from "@/components/use-inbox-thread-selection";
+import { useElementWidth } from "@/components/use-element-width";
 import {
   Dialog,
   DialogContent,
@@ -54,23 +57,16 @@ import type {
 
 import { inboxSortLabel, providerLabel } from "./inbox-workspace/formatters";
 import {
-  type DraftPromptSuggestion,
-  type DraftPromptSuggestionCacheEntry,
   type PreviewUpdateEntry,
-  type RiskSuggestion,
-  type DocumentSuggestion,
   type ThreadInvoiceAttachment,
   buildActionItemReplyPrompt,
   cleanWorkspaceText,
   combineEventUpdateTitles,
-  DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY,
   hasUnseenPreviewSection,
   INBOX_SIGNATURE_BANNER_DISMISS_KEY,
-  inferWorkspaceDraftFromThread,
   isLegacyThreadSummary,
   isPreviewSectionCleared,
   latestUpdatedAt,
-  loadDraftPromptSuggestionCache,
   missingReplySignatureFields,
   normalizePreviewUpdateBody,
   THREAD_ACTION_BUTTON_CLASS,
@@ -79,6 +75,7 @@ import {
 import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
 import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
 import { InboxReplyComposer } from "./inbox-workspace/InboxReplyComposer";
+import { ThreadAttachments } from "./inbox-workspace/ThreadAttachments";
 
 export function InboxWorkspace({
   threads,
@@ -113,8 +110,6 @@ export function InboxWorkspace({
   const router = useRouter();
   const posthog = usePostHog();
   const actionMenuRef = useRef<HTMLDivElement | null>(null);
-  const aiReplyControlRef = useRef<HTMLDivElement | null>(null);
-  const promptActionControlRef = useRef<HTMLDivElement | null>(null);
 
   const [query, setQuery] = useState(selectedFilters.q);
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
@@ -123,14 +118,6 @@ export function InboxWorkspace({
   const [draftDealFilter, setDraftDealFilter] = useState(selectedFilters.dealId);
   const [draftWorkflowFilter, setDraftWorkflowFilter] = useState(selectedFilters.workflowState);
   const [draftSort, setDraftSort] = useState<InboxSortOption>(selectedFilters.sort);
-  const [isManualAddModalOpen, setIsManualAddModalOpen] = useState(false);
-  const [manualAddDealId, setManualAddDealId] = useState(selectedFilters.dealId);
-  const [manualAddQuery, setManualAddQuery] = useState("");
-  const [manualAddThreads, setManualAddThreads] = useState<EmailThreadListItem[]>([]);
-  const [manualAddSelectedThreadIds, setManualAddSelectedThreadIds] = useState<string[]>([]);
-  const [isManualAddLoading, setIsManualAddLoading] = useState(false);
-  const [isManualAddSubmitting, setIsManualAddSubmitting] = useState(false);
-  const [isManualAddCreatingWorkspace, setIsManualAddCreatingWorkspace] = useState(false);
   const [isReplySignatureBannerVisible, setIsReplySignatureBannerVisible] = useState(false);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false);
@@ -139,22 +126,8 @@ export function InboxWorkspace({
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [importingAttachmentId, setImportingAttachmentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [aiSuggestionCache, setAiSuggestionCache] = useState<
-    Record<string, DraftPromptSuggestionCacheEntry>
-  >(loadDraftPromptSuggestionCache);
-  const [threadCopilotInsightCache, setThreadCopilotInsightCache] = useState<
-    Record<string, { risks: RiskSuggestion[]; documents: DocumentSuggestion[] }>
-  >({});
-  const [loadingSuggestionThreadIds, setLoadingSuggestionThreadIds] = useState<
-    Record<string, true>
-  >({});
-  const [aiReplyMenuWidth, setAiReplyMenuWidth] = useState<number | null>(null);
-  const [promptActionMenuWidth, setPromptActionMenuWidth] = useState<number | null>(null);
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [isInvoiceAttached, setIsInvoiceAttached] = useState(false);
-  const aiSuggestionCacheRef = useRef(aiSuggestionCache);
-  const suggestionRequestVersionsRef = useRef<Record<string, string>>({});
-  const manualAddSyncedRef = useRef(false);
   const {
     candidateGroups,
     cancelDiscovery,
@@ -188,10 +161,6 @@ export function InboxWorkspace({
   const linkedDealIds = useMemo(
     () => new Set(selectedThread?.links.map((link) => link.dealId) ?? []),
     [selectedThread]
-  );
-  const linkableDeals = useMemo(
-    () => deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid"),
-    [deals]
   );
   const {
     areActionItemsOpen,
@@ -260,6 +229,63 @@ export function InboxWorkspace({
     setErrorMessage,
   });
 
+  const selectedThreadSuggestionVersion = useMemo(
+    () => (selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null),
+    [
+      selectedThread?.thread.updatedAt,
+      selectedThread?.thread.lastMessageAt,
+      selectedThread?.thread.messageCount,
+    ]
+  );
+
+  const {
+    prefetch: prefetchThreadSuggestions,
+    currentSuggestions: currentAiSuggestions,
+    currentCopilotInsights,
+    isLoading: isLoadingSuggestions,
+  } = useInboxAiSuggestions({
+    selectedThread,
+    selectedThreadSuggestionVersion,
+    isPromptCommandOpen,
+  });
+
+  const {
+    isOpen: isManualAddModalOpen,
+    open: openManualAddModal,
+    close: closeManualAddModal,
+    dealId: manualAddDealId,
+    setDealId: setManualAddDealId,
+    query: manualAddQuery,
+    setQuery: setManualAddQuery,
+    providerFilter: manualAddProviderFilter,
+    setProviderFilter: setManualAddProviderFilter,
+    threads: manualAddThreads,
+    filteredThreads: manualAddFilteredThreads,
+    selectedThreadIdSet: selectedManualThreadIdSet,
+    selectedThreadIds: manualAddSelectedThreadIds,
+    selectedThreads: selectedManualThreads,
+    toggleThread: toggleManualAddThread,
+    isLoading: isManualAddLoading,
+    isSubmitting: isManualAddSubmitting,
+    isCreatingWorkspace: isManualAddCreatingWorkspace,
+    submit: submitManualAddThreads,
+    createWorkspace: createWorkspaceFromSelectedThreads,
+    linkableDeals,
+  } = useInboxManualAdd({
+    deals,
+    onErrorMessage: setErrorMessage,
+    selectedFilterDealId: selectedFilters.dealId,
+  });
+
+  const [aiReplyControlRef, aiReplyMenuWidth] = useElementWidth<HTMLDivElement>([
+    replyJourney,
+    isDrafting,
+  ]);
+  const [promptActionControlRef, promptActionMenuWidth] = useElementWidth<HTMLDivElement>([
+    draftInstructions,
+    isDrafting,
+  ]);
+
   useEffect(() => {
     setErrorMessage(null);
     setIsActionMenuOpen(false);
@@ -291,73 +317,6 @@ export function InboxWorkspace({
   }, [isSortDialogOpen, selectedFilters.sort]);
 
   useEffect(() => {
-    if (!isManualAddModalOpen) {
-      return;
-    }
-
-    if (selectedFilters.dealId) {
-      setManualAddDealId(selectedFilters.dealId);
-      return;
-    }
-
-    setManualAddDealId((current) => current || linkableDeals[0]?.id || "");
-  }, [isManualAddModalOpen, linkableDeals, selectedFilters.dealId]);
-
-  useEffect(() => {
-    const control = aiReplyControlRef.current;
-    if (!control) {
-      return;
-    }
-
-    const updateWidth = () => {
-      setAiReplyMenuWidth(control.getBoundingClientRect().width);
-    };
-
-    updateWidth();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-
-    observer.observe(control);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [replyJourney, isDrafting]);
-
-  useEffect(() => {
-    const control = promptActionControlRef.current;
-    if (!control) {
-      return;
-    }
-
-    const updateWidth = () => {
-      setPromptActionMenuWidth(control.getBoundingClientRect().width);
-    };
-
-    updateWidth();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      updateWidth();
-    });
-
-    observer.observe(control);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [draftInstructions, isDrafting]);
-
-  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
         setIsActionMenuOpen(false);
@@ -367,19 +326,6 @@ export function InboxWorkspace({
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, []);
-
-  useEffect(() => {
-    aiSuggestionCacheRef.current = aiSuggestionCache;
-
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.sessionStorage.setItem(
-      DRAFT_PROMPT_SUGGESTIONS_CACHE_KEY,
-      JSON.stringify(aiSuggestionCache)
-    );
-  }, [aiSuggestionCache]);
 
   const selectedMessages = selectedThread?.messages ?? [];
   const latestMessage = selectedMessages[selectedMessages.length - 1] ?? null;
@@ -429,14 +375,6 @@ export function InboxWorkspace({
 
     return null;
   }, [invoiceAttachmentsByDealId, selectedDealId, selectedThread]);
-  const selectedThreadSuggestionVersion = useMemo(
-    () => (selectedThread ? buildReplySuggestionThreadVersion(selectedThread.thread) : null),
-    [
-      selectedThread?.thread.updatedAt,
-      selectedThread?.thread.lastMessageAt,
-      selectedThread?.thread.messageCount,
-    ]
-  );
   const selectedThreadPreviewState = selectedThread
     ? (threadPreviewStates[selectedThread.thread.id] ?? null)
     : null;
@@ -601,11 +539,6 @@ export function InboxWorkspace({
     selectedThreadInvoiceAttachment,
   ]);
 
-  const markDraftReady = useCallback(async () => {
-    await saveDraft("ready");
-    router.refresh();
-  }, [router, saveDraft]);
-
   const generateReplyFromActionItem = useCallback(
     async (item: EmailActionItemRecord) => {
       await runPromptForDraft(buildActionItemReplyPrompt(item));
@@ -676,386 +609,6 @@ export function InboxWorkspace({
       }
     },
     [router, selectedThread]
-  );
-
-  const prefetchThreadSuggestions = useCallback(
-    async (
-      thread: Pick<
-        EmailThreadDetail["thread"],
-        "id" | "updatedAt" | "lastMessageAt" | "messageCount"
-      >
-    ) => {
-      const version = buildReplySuggestionThreadVersion(thread);
-      const cached = aiSuggestionCacheRef.current[thread.id];
-
-      if (cached?.version === version && cached.suggestions.length > 0) {
-        return;
-      }
-
-      if (suggestionRequestVersionsRef.current[thread.id] === version) {
-        return;
-      }
-
-      suggestionRequestVersionsRef.current[thread.id] = version;
-      setLoadingSuggestionThreadIds((current) => ({
-        ...current,
-        [thread.id]: true,
-      }));
-
-      try {
-        const response = await fetch(`/api/email/threads/${thread.id}/suggestions`);
-        const payload = await response.json();
-
-        if (!response.ok || !Array.isArray(payload.suggestions)) {
-          return;
-        }
-
-        setAiSuggestionCache((current) => {
-          const existing = current[thread.id];
-          if (existing?.version === version && existing.suggestions.length > 0) {
-            return current;
-          }
-
-          return {
-            ...current,
-            [thread.id]: {
-              version,
-              suggestions: payload.suggestions as DraftPromptSuggestion[],
-            },
-          };
-        });
-        setThreadCopilotInsightCache((current) => ({
-          ...current,
-          [thread.id]: {
-            risks: Array.isArray(payload.riskSuggestions)
-              ? (payload.riskSuggestions as RiskSuggestion[])
-              : [],
-            documents: Array.isArray(payload.documentSuggestions)
-              ? (payload.documentSuggestions as DocumentSuggestion[])
-              : [],
-          },
-        }));
-      } catch {
-        // Keep fallback suggestions when prefetch fails.
-      } finally {
-        if (suggestionRequestVersionsRef.current[thread.id] === version) {
-          delete suggestionRequestVersionsRef.current[thread.id];
-        }
-
-        setLoadingSuggestionThreadIds((current) => {
-          if (!current[thread.id]) {
-            return current;
-          }
-
-          const next = { ...current };
-          delete next[thread.id];
-          return next;
-        });
-      }
-    },
-    []
-  );
-
-  useEffect(() => {
-    if (!selectedThread || !selectedThreadSuggestionVersion) {
-      return;
-    }
-
-    const cached = aiSuggestionCacheRef.current[selectedThread.thread.id];
-    if (!cached || cached.version === selectedThreadSuggestionVersion) {
-      return;
-    }
-
-    setAiSuggestionCache((current) => {
-      const existing = current[selectedThread.thread.id];
-      if (!existing || existing.version === selectedThreadSuggestionVersion) {
-        return current;
-      }
-
-      const next = { ...current };
-      delete next[selectedThread.thread.id];
-      return next;
-    });
-  }, [selectedThread, selectedThreadSuggestionVersion]);
-
-  useEffect(() => {
-    if (!selectedThread) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void prefetchThreadSuggestions(selectedThread.thread);
-    }, 2000);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    prefetchThreadSuggestions,
-    selectedThread?.thread.id,
-    selectedThread?.thread.updatedAt,
-    selectedThread?.thread.lastMessageAt,
-    selectedThread?.thread.messageCount,
-  ]);
-
-  useEffect(() => {
-    if (!isPromptCommandOpen || !selectedThread) {
-      return;
-    }
-
-    void prefetchThreadSuggestions(selectedThread.thread);
-  }, [isPromptCommandOpen, prefetchThreadSuggestions, selectedThread]);
-
-  const currentAiSuggestions = useMemo(() => {
-    if (!selectedThread || !selectedThreadSuggestionVersion) {
-      return [];
-    }
-
-    const cached = aiSuggestionCache[selectedThread.thread.id];
-    if (!cached || cached.version !== selectedThreadSuggestionVersion) {
-      return [];
-    }
-
-    return cached.suggestions;
-  }, [aiSuggestionCache, selectedThread, selectedThreadSuggestionVersion]);
-
-  const currentCopilotInsights = useMemo(() => {
-    if (!selectedThread) {
-      return {
-        risks: [] as RiskSuggestion[],
-        documents: [] as DocumentSuggestion[],
-      };
-    }
-
-    return (
-      threadCopilotInsightCache[selectedThread.thread.id] ?? {
-        risks: [],
-        documents: [],
-      }
-    );
-  }, [selectedThread, threadCopilotInsightCache]);
-
-  const selectedManualThreadIdSet = useMemo(
-    () => new Set(manualAddSelectedThreadIds),
-    [manualAddSelectedThreadIds]
-  );
-  const selectedManualThreads = useMemo(
-    () =>
-      manualAddSelectedThreadIds
-        .map((threadId) => manualAddThreads.find((entry) => entry.thread.id === threadId) ?? null)
-        .filter((entry): entry is EmailThreadListItem => entry !== null),
-    [manualAddSelectedThreadIds, manualAddThreads]
-  );
-
-  const fetchManualAddThreads = useCallback(
-    async (nextQuery: string) => {
-      if (!isManualAddModalOpen) {
-        return;
-      }
-
-      setIsManualAddLoading(true);
-      setErrorMessage(null);
-      try {
-        if (!manualAddSyncedRef.current) {
-          manualAddSyncedRef.current = true;
-          try {
-            const syncRes = await fetch("/api/email/sync?force=1", { method: "POST" });
-            if (!syncRes.ok) {
-              const syncPayload = await syncRes.json().catch(() => null);
-              const syncMsg = syncPayload?.error ?? "Could not sync latest emails.";
-              setErrorMessage(typeof syncMsg === "string" ? syncMsg : String(syncMsg));
-            }
-          } catch (_syncError) {
-            setErrorMessage("Could not sync latest emails. Please try again.");
-          }
-        }
-
-        const params = new URLSearchParams();
-        const trimmed = nextQuery.trim();
-        if (trimmed) {
-          params.set("q", trimmed);
-          params.set("limit", "1000");
-        } else {
-          params.set("limit", "20");
-        }
-
-        const response = await fetch(`/api/email/threads?${params.toString()}`);
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Could not load inbox threads.");
-        }
-
-        const nextThreads = (payload.threads ?? []) as EmailThreadListItem[];
-        setManualAddThreads(nextThreads);
-        setManualAddSelectedThreadIds((current) =>
-          current.filter((threadId) => nextThreads.some((thread) => thread.thread.id === threadId))
-        );
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Could not load inbox threads.");
-      } finally {
-        setIsManualAddLoading(false);
-      }
-    },
-    [isManualAddModalOpen]
-  );
-
-  useEffect(() => {
-    if (!isManualAddModalOpen) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(
-      () => {
-        void fetchManualAddThreads(manualAddQuery);
-      },
-      manualAddQuery.trim() ? 250 : 0
-    );
-
-    return () => window.clearTimeout(timeoutId);
-  }, [fetchManualAddThreads, isManualAddModalOpen, manualAddQuery]);
-
-  const toggleManualAddThread = useCallback((threadId: string) => {
-    setManualAddSelectedThreadIds((current) =>
-      current.includes(threadId) ? current.filter((id) => id !== threadId) : [...current, threadId]
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!manualAddDealId) {
-      return;
-    }
-
-    setManualAddSelectedThreadIds((current) =>
-      current.filter((threadId) => {
-        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
-        return !thread?.links.some((link) => link.dealId === manualAddDealId);
-      })
-    );
-  }, [manualAddDealId, manualAddThreads]);
-
-  const submitManualAddThreads = useCallback(async () => {
-    if (!manualAddDealId || manualAddSelectedThreadIds.length === 0) {
-      return;
-    }
-
-    setIsManualAddSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      const threadIdsToLink = manualAddSelectedThreadIds.filter((threadId) => {
-        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
-        return !thread?.links.some((link) => link.dealId === manualAddDealId);
-      });
-
-      if (threadIdsToLink.length === 0) {
-        setIsManualAddModalOpen(false);
-        setManualAddQuery("");
-        setManualAddSelectedThreadIds([]);
-        return;
-      }
-
-      const responses = await Promise.all(
-        threadIdsToLink.map(async (threadId) => {
-          const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
-          const response = await fetch(`/api/email/threads/${threadId}/link`, {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              dealId: manualAddDealId,
-              role: thread?.primaryLink ? "reference" : "primary",
-            }),
-          });
-
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(payload.error ?? "Could not link email thread.");
-          }
-
-          return payload;
-        })
-      );
-
-      if (responses.length > 0) {
-        setIsManualAddModalOpen(false);
-        setManualAddQuery("");
-        setManualAddSelectedThreadIds([]);
-        router.refresh();
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not link email threads.");
-    } finally {
-      setIsManualAddSubmitting(false);
-    }
-  }, [manualAddDealId, manualAddSelectedThreadIds, manualAddThreads, router]);
-
-  const createWorkspaceFromSelectedThreads = useCallback(async () => {
-    const seedThread = selectedManualThreads[0];
-    if (!seedThread) {
-      return;
-    }
-
-    setIsManualAddCreatingWorkspace(true);
-    setErrorMessage(null);
-
-    try {
-      const createResponse = await fetch("/api/p", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(inferWorkspaceDraftFromThread(seedThread)),
-      });
-      const createPayload = await createResponse.json().catch(() => ({}));
-
-      if (!createResponse.ok || !createPayload.deal?.id) {
-        throw new Error(createPayload.error ?? "Could not create workspace.");
-      }
-
-      const nextDealId = createPayload.deal.id as string;
-      const threadIdsToLink = manualAddSelectedThreadIds.filter((threadId) => {
-        const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
-        return !thread?.links.some((link) => link.dealId === nextDealId);
-      });
-
-      const responses = await Promise.all(
-        threadIdsToLink.map(async (threadId) => {
-          const thread = manualAddThreads.find((entry) => entry.thread.id === threadId);
-          const response = await fetch(`/api/email/threads/${threadId}/link`, {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify({
-              dealId: nextDealId,
-              role: thread?.primaryLink ? "reference" : "primary",
-            }),
-          });
-
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(payload.error ?? "Could not link email thread.");
-          }
-
-          return payload;
-        })
-      );
-
-      if (responses.length > 0 || threadIdsToLink.length === 0) {
-        setManualAddDealId(nextDealId);
-        setIsManualAddModalOpen(false);
-        setManualAddQuery("");
-        setManualAddSelectedThreadIds([]);
-        router.refresh();
-      }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Could not create workspace.");
-    } finally {
-      setIsManualAddCreatingWorkspace(false);
-    }
-  }, [manualAddSelectedThreadIds, manualAddThreads, router, selectedManualThreads]);
-
-  const isLoadingSuggestions = Boolean(
-    selectedThread && loadingSuggestionThreadIds[selectedThread.thread.id]
   );
 
   const promptSuggestions = useMemo(() => {
@@ -1210,7 +763,7 @@ export function InboxWorkspace({
                     </AppTooltip>
                     <button
                       type="button"
-                      onClick={() => setIsManualAddModalOpen(true)}
+                      onClick={() => openManualAddModal()}
                       className={`${THREAD_ACTION_BUTTON_CLASS} min-w-[8.75rem] shrink-0`}
                     >
                       <Plus className="h-4 w-4 shrink-0" />
@@ -1262,7 +815,7 @@ export function InboxWorkspace({
                       </AppTooltip>
                       <button
                         type="button"
-                        onClick={() => setIsManualAddModalOpen(true)}
+                        onClick={() => openManualAddModal()}
                         className={`${THREAD_ACTION_BUTTON_CLASS} min-w-[10rem]`}
                       >
                         <Plus className="h-4 w-4 shrink-0" />
@@ -1341,13 +894,6 @@ export function InboxWorkspace({
                         state as import("@/lib/types").EmailThreadWorkflowState
                       )
                     }
-                    arePreviewUpdatesOpen={arePreviewUpdatesOpen}
-                    onPreviewUpdatesOpenChange={handlePreviewUpdatesOpenChange}
-                    shouldShowPreviewUpdates={shouldShowPreviewUpdates}
-                    selectedThreadUpdates={selectedThreadUpdates}
-                    hasUnseenPreviewUpdates={hasUnseenPreviewUpdates}
-                    latestPreviewUpdateAt={latestPreviewUpdateAt}
-                    onClearPreviewUpdates={(at) => void clearPreviewUpdates(at)}
                     areActionItemsOpen={areActionItemsOpen}
                     onActionItemsOpenChange={handleActionItemsOpenChange}
                     hasUnseenActionItems={hasUnseenActionItems}
@@ -1357,9 +903,14 @@ export function InboxWorkspace({
                     currentCopilotInsights={currentCopilotInsights}
                     earlierMessages={earlierMessages}
                     latestMessage={latestMessage}
+                    onPrefetchThread={(threadId) => void prefetchThread(threadId)}
+                  />
+
+                  <ThreadAttachments
+                    messages={selectedMessages}
+                    primaryLinkId={selectedThread?.primaryLink?.dealId || null}
                     importingAttachmentId={importingAttachmentId}
                     onImportAttachment={(id) => void importAttachmentToWorkspace(id)}
-                    onPrefetchThread={(threadId) => void prefetchThread(threadId)}
                   />
 
                   <InboxReplyComposer
@@ -1395,7 +946,6 @@ export function InboxWorkspace({
                     onClearDraftComposer={clearDraftComposer}
                     onRefineGeneratedDraft={(instruction) => void refineGeneratedDraft(instruction)}
                     onSaveDraft={(status) => void saveDraft(status as "in_progress" | "ready")}
-                    onMarkDraftReady={() => void markDraftReady()}
                     onSendReply={() => void sendReply()}
                     onSetInvoiceAttached={(v) => setIsInvoiceAttached(v)}
                     onSetOpenRefinementPopover={setOpenRefinementPopover}
@@ -1729,30 +1279,28 @@ export function InboxWorkspace({
       <Dialog
         open={isManualAddModalOpen}
         onOpenChange={(open) => {
-          setIsManualAddModalOpen(open);
-          if (!open) {
-            setManualAddQuery("");
-            setManualAddSelectedThreadIds([]);
-            setManualAddThreads([]);
-            manualAddSyncedRef.current = false;
+          if (open) {
+            openManualAddModal();
+          } else {
+            closeManualAddModal();
           }
         }}
       >
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-[920px] overflow-hidden rounded-none p-0 sm:max-w-[920px] [&>button]:rounded-none">
-          <DialogHeader className="gap-3 border-b border-black/8 px-6 py-5 pr-12">
+        <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-[920px] flex-col overflow-hidden rounded-none p-0 sm:max-w-[920px] [&>button]:rounded-none">
+          <DialogHeader className="shrink-0 gap-3 border-b border-black/8 px-6 py-5 pr-12">
             <DialogTitle>Add threads manually</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="line-clamp-2">
               Browse the latest 20 synced emails by default. Search scans up to the first 1000
               synced emails and lets you link the threads you want to a workspace.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 px-6 py-5">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
               <InboxSelect
                 value={manualAddDealId}
                 onChange={setManualAddDealId}
-                className="w-full min-w-0"
+                className="w-full shrink-0 sm:w-[240px]"
               >
                 <option value="">Select a workspace</option>
                 {linkableDeals.map((deal) => {
@@ -1766,93 +1314,120 @@ export function InboxWorkspace({
                 })}
               </InboxSelect>
 
+              <InboxSelect
+                value={manualAddProviderFilter}
+                onChange={setManualAddProviderFilter}
+                className="w-full shrink-0 sm:w-[140px]"
+              >
+                <option value="">All providers</option>
+                <option value="gmail">Gmail</option>
+                <option value="outlook">Outlook</option>
+                <option value="yahoo">Yahoo</option>
+              </InboxSelect>
+
               <Input
                 value={manualAddQuery}
                 onChange={(event) => setManualAddQuery(event.currentTarget.value)}
                 placeholder="Search synced emails"
                 aria-label="Search synced emails"
-                className="h-9 w-full min-w-0 rounded-none border-black/10 bg-white text-[12px] shadow-none"
+                className="h-9 min-w-0 flex-1 rounded-none border-black/10 bg-white text-[12px] shadow-none"
               />
             </div>
 
-            <div className="border border-black/8 rounded-none">
-              <div className="flex items-center justify-between border-b border-black/8 px-4 py-3 text-[12px] text-muted-foreground">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/8 rounded-none">
+              <div className="flex shrink-0 items-center justify-between border-b border-black/8 px-4 py-3 text-[12px] text-muted-foreground">
                 <span>
                   {manualAddQuery.trim()
                     ? `Search results from up to 1000 synced emails`
                     : "Latest 20 synced emails"}
                 </span>
-                <span>{manualAddThreads.length}</span>
+                <span>
+                  {manualAddProviderFilter
+                    ? manualAddThreads.filter(
+                        (item) => item.account.provider === manualAddProviderFilter
+                      ).length
+                    : manualAddThreads.length}
+                </span>
               </div>
 
-              <div className="max-h-[440px] min-h-[320px] overflow-y-auto">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 {isManualAddLoading ? (
                   <div className="px-4 py-8 text-sm text-muted-foreground">Loading emails...</div>
-                ) : manualAddThreads.length === 0 ? (
+                ) : manualAddThreads.filter(
+                    (item) =>
+                      !manualAddProviderFilter || item.account.provider === manualAddProviderFilter
+                  ).length === 0 ? (
                   <div className="px-4 py-8 text-sm text-muted-foreground">
                     No synced emails match this search.
                   </div>
                 ) : (
-                  manualAddThreads.map((item) => {
-                    const alreadyLinkedToSelectedDeal = Boolean(
-                      manualAddDealId && item.links.some((link) => link.dealId === manualAddDealId)
-                    );
+                  manualAddThreads
+                    .filter(
+                      (item) =>
+                        !manualAddProviderFilter ||
+                        item.account.provider === manualAddProviderFilter
+                    )
+                    .map((item) => {
+                      const alreadyLinkedToSelectedDeal = Boolean(
+                        manualAddDealId &&
+                          item.links.some((link) => link.dealId === manualAddDealId)
+                      );
 
-                    return (
-                      <label
-                        key={item.thread.id}
-                        className="flex cursor-pointer items-start gap-3 border-b border-black/6 px-4 py-3 last:border-b-0"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedManualThreadIdSet.has(item.thread.id)}
-                          disabled={alreadyLinkedToSelectedDeal}
-                          onChange={() => toggleManualAddThread(item.thread.id)}
-                          className="mt-1 h-4 w-4 rounded border-border"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] font-semibold text-foreground">
-                                {item.thread.participants[0]?.name?.trim() ||
-                                  item.thread.participants[0]?.email ||
-                                  "Unknown"}
-                              </p>
-                              <p className="truncate text-[12px] text-foreground/90">
-                                {item.thread.subject}
+                      return (
+                        <label
+                          key={item.thread.id}
+                          className="flex cursor-pointer items-start gap-3 border-b border-black/6 px-4 py-3 last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedManualThreadIdSet.has(item.thread.id)}
+                            disabled={alreadyLinkedToSelectedDeal}
+                            onChange={() => toggleManualAddThread(item.thread.id)}
+                            className="mt-1 h-4 w-4 rounded border-border"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-[13px] font-semibold text-foreground">
+                                  {item.thread.participants[0]?.name?.trim() ||
+                                    item.thread.participants[0]?.email ||
+                                    "Unknown"}
+                                </p>
+                                <p className="truncate text-[12px] text-foreground/90">
+                                  {item.thread.subject}
+                                </p>
+                              </div>
+                              <p className="shrink-0 text-[11px] text-muted-foreground">
+                                {new Date(item.thread.lastMessageAt).toLocaleDateString()}
                               </p>
                             </div>
-                            <p className="shrink-0 text-[11px] text-muted-foreground">
-                              {new Date(item.thread.lastMessageAt).toLocaleDateString()}
+                            <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
+                              {item.thread.snippet || "No preview available."}
                             </p>
-                          </div>
-                          <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
-                            {item.thread.snippet || "No preview available."}
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
-                              {providerLabel(item.account.provider)}
-                            </span>
-                            {alreadyLinkedToSelectedDeal ? (
-                              <span className="bg-secondary/60 px-2.5 py-1 text-[10px] font-medium text-foreground">
-                                Already linked
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                                {providerLabel(item.account.provider)}
                               </span>
-                            ) : null}
-                            {item.links.length > 0 ? (
-                              <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                                {item.links.length} workspace{item.links.length === 1 ? "" : "s"}
-                              </span>
-                            ) : null}
+                              {alreadyLinkedToSelectedDeal ? (
+                                <span className="bg-secondary/60 px-2.5 py-1 text-[10px] font-medium text-foreground">
+                                  Already linked
+                                </span>
+                              ) : null}
+                              {item.links.length > 0 ? (
+                                <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                  {item.links.length} workspace{item.links.length === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                    );
-                  })
+                        </label>
+                      );
+                    })
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 border-t border-black/8 pt-4 md:flex-row md:items-end md:justify-between">
+            <div className="flex shrink-0 flex-col gap-4 border-t border-black/8 pt-4 md:flex-row md:items-end md:justify-between">
               <div className="space-y-1">
                 <p className="text-[12px] text-muted-foreground">
                   {manualAddSelectedThreadIds.length} thread
@@ -1860,14 +1435,15 @@ export function InboxWorkspace({
                 </p>
                 {selectedManualThreads.length > 0 ? (
                   <p className="text-[12px] text-muted-foreground">
-                    Or create a new workspace from the first selected email.
+                    Create a new workspace from {selectedManualThreads.length} selected thread
+                    {selectedManualThreads.length === 1 ? "" : "s"}.
                   </p>
                 ) : null}
               </div>
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:justify-end">
                 <button
                   type="button"
-                  onClick={() => setIsManualAddModalOpen(false)}
+                  onClick={() => closeManualAddModal()}
                   className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[8.75rem] md:w-auto`}
                 >
                   Cancel

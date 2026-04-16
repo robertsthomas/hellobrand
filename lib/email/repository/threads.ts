@@ -116,7 +116,8 @@ export async function saveSyncedEmailThread(
     }>;
   }
 ) {
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(
+    async (tx) => {
     const existingThread = await tx.emailThread.findUnique({
       where: {
         accountId_providerThreadId: {
@@ -293,6 +294,8 @@ export async function listEmailThreadsForUser(
   }
 ) {
   const recentEventThreshold = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const query = filters?.query?.trim().toLowerCase() || null;
+
   const rows = await prisma.emailThread.findMany({
     where: {
       account: {
@@ -310,7 +313,24 @@ export async function listEmailThreadsForUser(
               }
             }
           }
-        : undefined
+        : undefined,
+      ...(filters?.linkedDealId
+        ? {
+            dealLinks: {
+              some: {
+                dealId: filters.linkedDealId
+              }
+            }
+          }
+        : {}),
+      ...(query
+        ? {
+            OR: [
+              { subject: { contains: query, mode: "insensitive" } },
+              { snippet: { contains: query, mode: "insensitive" } }
+            ]
+          }
+        : {})
     },
     include: {
       account: true,
@@ -383,57 +403,32 @@ export async function listEmailThreadsForUser(
     take: Math.max(filters?.limit ?? 100, 1)
   });
 
-  const query = filters?.query?.trim().toLowerCase() || null;
+  return rows.map((row) => {
+    const links = row.dealLinks.map(toLinkView);
+    const { primaryLink, referenceLinks } = splitThreadLinks(links);
 
-  return rows
-    .map((row) => {
-      const links = row.dealLinks.map(toLinkView);
-      const { primaryLink, referenceLinks } = splitThreadLinks(links);
-
-      return {
-        thread: toThreadRecord(row),
-        account: toAccountRecord(row.account),
-        links,
-        primaryLink,
-        referenceLinks,
-        importantEventCount: row.dealEvents.length + row.termSuggestions.length,
-        latestImportantEventAt:
-          [...row.dealEvents, ...row.termSuggestions]
-            .map((event) => iso(event.updatedAt))
-            .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
-            .find((value): value is string => Boolean(value)) ?? null,
-        pendingTermSuggestionCount: row.termSuggestions.length,
-        pendingActionItemCount: row.actionItems.length,
-        latestPendingActionItemAt:
-          row.actionItems
-            .map((item) => iso(item.updatedAt))
-            .find((value): value is string => Boolean(value)) ?? null,
-        savedDraft: row.drafts[0] ? toDraftRecord(row.drafts[0]) : null,
-        noteCount: row._count.notes
-      };
-    })
-    .filter((row) => {
-      if (filters?.linkedDealId && !row.links.some((link) => link.dealId === filters.linkedDealId)) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
-
-      const haystack = [
-        row.thread.subject,
-        row.thread.snippet ?? "",
-        ...row.thread.participants.flatMap((participant) => [participant.name ?? "", participant.email]),
-        ...row.links.flatMap((link) => [link.brandName, link.campaignName, link.dealName]),
-        row.account.emailAddress,
-        row.account.displayName ?? ""
-      ]
-        .join("\n")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
+    return {
+      thread: toThreadRecord(row),
+      account: toAccountRecord(row.account),
+      links,
+      primaryLink,
+      referenceLinks,
+      importantEventCount: row.dealEvents.length + row.termSuggestions.length,
+      latestImportantEventAt:
+        [...row.dealEvents, ...row.termSuggestions]
+          .map((event) => iso(event.updatedAt))
+          .sort((left, right) => (right ?? "").localeCompare(left ?? ""))
+          .find((value): value is string => Boolean(value)) ?? null,
+      pendingTermSuggestionCount: row.termSuggestions.length,
+      pendingActionItemCount: row.actionItems.length,
+      latestPendingActionItemAt:
+        row.actionItems
+          .map((item) => iso(item.updatedAt))
+          .find((value): value is string => Boolean(value)) ?? null,
+      savedDraft: row.drafts[0] ? toDraftRecord(row.drafts[0]) : null,
+      noteCount: row._count.notes
+    };
+  });
 }
 
 export async function getEmailThreadDetailForUser(userId: string, threadId: string): Promise<EmailThreadDetail | null> {

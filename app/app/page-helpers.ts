@@ -5,12 +5,7 @@
 import type { QuickActionItem } from "@/components/dashboard";
 import { countConflictSeverity } from "@/lib/conflict-intelligence";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
-import type {
-  ConflictResult,
-  DealAggregate,
-  IntakeDraftListItem,
-  Viewer
-} from "@/lib/types";
+import type { ConflictResult, DealAggregate, IntakeDraftListItem, Viewer } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
 function daysUntil(date: string | null) {
@@ -117,41 +112,41 @@ export function buildDealNextStep(deal: {
   if (deal.paymentStatus === "late") {
     return {
       label: "Send payment follow-up",
-      tone: "warning" as const
+      tone: "warning" as const,
     };
   }
 
   if (hasHighRisk) {
     return {
       label: "Review high-risk clauses",
-      tone: "warning" as const
+      tone: "warning" as const,
     };
   }
 
   if (nextDueDays !== null && nextDueDays >= 0 && nextDueDays <= 7) {
     return {
       label: "Prepare the next deliverable",
-      tone: "accent" as const
+      tone: "accent" as const,
     };
   }
 
   if (deal.status === "contract_received") {
     return {
       label: "Review contract and confirm terms",
-      tone: "accent" as const
+      tone: "accent" as const,
     };
   }
 
   if (deal.paymentStatus === "awaiting_payment") {
     return {
       label: "Track payout progress",
-      tone: "success" as const
+      tone: "success" as const,
     };
   }
 
   return {
     label: "Open workspace and review the next step",
-    tone: "neutral" as const
+    tone: "neutral" as const,
   };
 }
 
@@ -174,7 +169,7 @@ function dedupeDashboardConflicts(conflicts: ConflictResult[]) {
     new Map(
       conflicts.map((conflict) => [
         `${conflict.type}:${conflict.title}:${conflict.relatedDealIds.join(",")}`,
-        conflict
+        conflict,
       ])
     ).values()
   );
@@ -199,7 +194,7 @@ export function buildDashboardViewModel(input: {
       paymentAmount: aggregate.terms?.paymentAmount ?? null,
       currency: aggregate.terms?.currency ?? "USD",
       conflictResults: aggregate.conflictResults,
-      disclosureObligations: aggregate.terms?.disclosureObligations ?? []
+      disclosureObligations: aggregate.terms?.disclosureObligations ?? [],
     };
   });
 
@@ -229,7 +224,7 @@ export function buildDashboardViewModel(input: {
         ...deliverable,
         dealId: deal.id,
         campaignName: deal.campaignName,
-        brandName: deal.brandName
+        brandName: deal.brandName,
       }))
     )
     .sort((left, right) => {
@@ -273,7 +268,7 @@ export function buildDashboardViewModel(input: {
           title: "Overdue payout needs a follow-up",
           body: `${firstLateDeal.campaignName} is still overdue. Check the payment thread and nudge the brand.`,
           href: `/app/p/${firstLateDeal.id}`,
-          ctaLabel: "Open payment status"
+          ctaLabel: "Open payment status",
         }
       : null,
     firstHighRiskDeal
@@ -282,7 +277,7 @@ export function buildDashboardViewModel(input: {
           title: "Contract watchouts still need review",
           body: `${firstHighRiskDeal.campaignName} has high-severity issues that should be checked before work continues.`,
           href: `/app/p/${firstHighRiskDeal.id}`,
-          ctaLabel: "Review risks"
+          ctaLabel: "Review risks",
         }
       : null,
     nextActionDeliverable
@@ -291,7 +286,7 @@ export function buildDashboardViewModel(input: {
           title: "A deliverable is coming up soon",
           body: `${nextActionDeliverable.title} for ${nextActionDeliverable.campaignName} is due ${dueLabel(nextActionDeliverable.dueDate).toLowerCase()}.`,
           href: `/app/p/${nextActionDeliverable.dealId}`,
-          ctaLabel: "Open deliverable"
+          ctaLabel: "Open deliverable",
         }
       : null,
     firstDraft
@@ -301,7 +296,7 @@ export function buildDashboardViewModel(input: {
             title: "Workspace ready to confirm",
             body: `${firstDraft.deal.campaignName} has finished processing and is ready for your review.`,
             href: `/app/intake/${firstDraft.session.id}/review`,
-            ctaLabel: "Review and confirm"
+            ctaLabel: "Review and confirm",
           }
         : firstDraft.session.status === "draft"
           ? {
@@ -309,28 +304,28 @@ export function buildDashboardViewModel(input: {
               title: "Resume your draft",
               body: `${firstDraft.deal.campaignName} has a saved draft waiting for you.`,
               href: `/app/intake/new?draft=${firstDraft.session.id}`,
-              ctaLabel: "Resume draft"
+              ctaLabel: "Resume draft",
             }
           : {
               tone: "neutral",
               title: "Workspace is processing",
               body: `${firstDraft.deal.campaignName} is being analyzed. You'll be notified when it's ready.`,
               href: `/app/intake/${firstDraft.session.id}`,
-              ctaLabel: "View progress"
+              ctaLabel: "View progress",
             }
-      : null
+      : null,
   ].filter(Boolean) as QuickActionItem[];
 
   const snapshotMetrics = [
     {
       label: "Active partnerships",
       value: String(activePartnerships),
-      note: `${completedPartnerships} wrapped`
+      note: `${completedPartnerships} wrapped`,
     },
     {
       label: "Tracked revenue",
       value: formatCurrency(totalRevenue),
-      note: `${dealRows.length} total workspaces`
+      note: `${dealRows.length} total workspaces`,
     },
     {
       label: "Outstanding payouts",
@@ -338,7 +333,7 @@ export function buildDashboardViewModel(input: {
       note:
         overdueInvoices > 0
           ? `${overdueInvoices} overdue invoice${overdueInvoices === 1 ? "" : "s"}`
-          : "Nothing overdue"
+          : "Nothing overdue",
     },
     {
       label: "Risk alerts",
@@ -346,15 +341,20 @@ export function buildDashboardViewModel(input: {
       note:
         dashboardConflictCounts.total > 0
           ? `${dashboardConflictCounts.total} cross-partnership warning${dashboardConflictCounts.total === 1 ? "" : "s"}`
-          : "No active overlaps"
-    }
+          : "No active overlaps",
+    },
   ];
 
   const secondarySections = {
-    dueSoonDeliverables: dueSoonDeliverables.slice(0, 4),
+    dueSoonDeliverables: allDeliverables
+      .filter((item) => {
+        const days = daysUntil(item.dueDate);
+        return days !== null && days >= -7;
+      })
+      .slice(0, 4),
     pendingPayoutDeals: pendingPayoutDeals.slice(0, 4),
     snapshotMetrics,
-    disclosureObligations: dealRows.flatMap((deal) => deal.disclosureObligations ?? []).slice(0, 4)
+    disclosureObligations: dealRows.flatMap((deal) => deal.disclosureObligations ?? []).slice(0, 4),
   };
 
   return {
@@ -369,7 +369,7 @@ export function buildDashboardViewModel(input: {
       activePartnerships,
       dueSoonDeliverables: dueSoonDeliverables.length,
       overdueInvoices,
-      riskAlertCount
-    })
+      riskAlertCount,
+    }),
   };
 }

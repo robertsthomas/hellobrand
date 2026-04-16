@@ -4,7 +4,7 @@ import { InboxPreviewLocked } from "@/components/inbox-preview-locked";
 import { InboxWorkspace } from "@/components/inbox-workspace";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
-import { getCachedDealForViewer } from "@/lib/cached-data";
+import { getCachedDealForViewer, getCachedProfile } from "@/lib/cached-data";
 import { listDealsForViewer } from "@/lib/deals";
 import {
   getEmailThreadForViewer,
@@ -13,7 +13,6 @@ import {
 } from "@/lib/email/service";
 import { normalizeInboxSort, sortInboxThreadItems } from "@/lib/email/inbox-sort";
 import { listEmailThreadPreviewStatesForViewer } from "@/lib/email/preview-state";
-import { getProfileForViewer } from "@/lib/profile";
 
 export default function InboxPage({
   searchParams
@@ -50,7 +49,10 @@ async function InboxContent({
     attachInvoice?: string;
   }>;
 }) {
-  const viewer = await requireViewer();
+  const [viewer, resolved] = await Promise.all([
+    requireViewer(),
+    (searchParams ?? Promise.resolve({})) as Promise<Record<string, string | undefined>>
+  ]);
   const entitlements = await getViewerEntitlements(viewer);
   if (!entitlements.features.premium_inbox) {
     return (
@@ -61,7 +63,6 @@ async function InboxContent({
     );
   }
 
-  const resolved = searchParams ? await searchParams : {};
   const workflowState =
     resolved.workflowState === "unlinked" ? null : resolved.workflowState ?? null;
   const sort = normalizeInboxSort(resolved.sort);
@@ -83,7 +84,7 @@ async function InboxContent({
     }),
     listDealsForViewer(viewer),
     listEmailAccountsForViewer(viewer),
-    getProfileForViewer(viewer)
+    getCachedProfile(viewer)
   ]);
   const connectedProviders = [...new Set(emailAccounts.map((account) => account.provider))];
   const sortedThreads = sortInboxThreadItems(threads, sort);
@@ -95,24 +96,21 @@ async function InboxContent({
   const selectedThreadId = sortedThreads.some((item) => item.thread.id === resolved.thread)
     ? resolved.thread ?? null
     : sortedThreads[0]?.thread.id ?? null;
-  const [selectedThread, threadPreviewStates] = await Promise.all([
+  const threadIds = threads.map((item) => item.thread.id);
+  const [selectedThread, threadPreviewStates, linkedDealAggregates] = await Promise.all([
     selectedThreadId
       ? getEmailThreadForViewer(viewer, selectedThreadId)
       : Promise.resolve(null),
-    listEmailThreadPreviewStatesForViewer(
-      viewer,
-      threads.map((item) => item.thread.id)
+    listEmailThreadPreviewStatesForViewer(viewer, threadIds),
+    Promise.all(
+      Array.from(
+        new Set(threads.flatMap((item) => item.links.map((link) => link.dealId)))
+      ).map(async (dealId) => ({
+        dealId,
+        aggregate: await getCachedDealForViewer(viewer, dealId)
+      }))
     )
   ]);
-  const linkedDealIds = Array.from(
-    new Set(threads.flatMap((item) => item.links.map((link) => link.dealId)))
-  );
-  const linkedDealAggregates = await Promise.all(
-    linkedDealIds.map(async (dealId) => ({
-      dealId,
-      aggregate: await getCachedDealForViewer(viewer, dealId)
-    }))
-  );
   const invoiceAttachmentsByDealId = Object.fromEntries(
     linkedDealAggregates.flatMap(({ dealId, aggregate }) => {
       const invoice = aggregate?.invoiceRecord;

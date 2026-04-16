@@ -35,17 +35,22 @@ export async function listDealsForViewer(viewer: Viewer) {
 export async function loadRawDealAggregatesForViewer(viewer: Viewer) {
   const repository = getRepository();
   const deals = await repository.listDeals(viewer.id);
-  const aggregates: DealAggregate[] = [];
+  const results: (DealAggregate | null)[] = [];
+  let nextIndex = 0;
 
-  for (const deal of deals) {
-    const aggregate = await repository.getDealAggregate(viewer.id, deal.id);
-
-    if (aggregate) {
-      aggregates.push(aggregate);
+  async function worker() {
+    while (nextIndex < deals.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await repository.getDealAggregate(viewer.id, deals[currentIndex].id);
     }
   }
 
-  return aggregates;
+  await Promise.all(
+    Array.from({ length: Math.min(3, deals.length) }, () => worker())
+  );
+
+  return results.filter((aggregate): aggregate is DealAggregate => aggregate !== null);
 }
 
 export async function listDealAggregatesForViewer(viewer: Viewer) {

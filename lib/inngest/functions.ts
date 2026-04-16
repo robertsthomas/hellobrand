@@ -22,7 +22,7 @@ export const notificationEmailSendFunction = inngest.createFunction(
         const { prisma } = await import("@/lib/prisma");
         const notification = await prisma.appNotification.findUnique({
           where: { id: appNotificationId },
-          select: { status: true }
+          select: { status: true },
         });
         return { isStillActive: notification?.status === "active" };
       });
@@ -34,9 +34,7 @@ export const notificationEmailSendFunction = inngest.createFunction(
 
     if (eventType !== "workspace.ready_for_review") {
       const localSendDelayMs = await step.run("check-local-send-window", async () => {
-        const { getNotificationEmailSendDelayMs } = await import(
-          "@/lib/notification-email"
-        );
+        const { getNotificationEmailSendDelayMs } = await import("@/lib/notification-email");
         return getNotificationEmailSendDelayMs(appNotificationId);
       });
 
@@ -47,16 +45,14 @@ export const notificationEmailSendFunction = inngest.createFunction(
     }
 
     const delivery = await step.run("send-notification-email", async () => {
-      const { sendNotificationEmailDelivery } = await import(
-        "@/lib/notification-email"
-      );
+      const { sendNotificationEmailDelivery } = await import("@/lib/notification-email");
       return sendNotificationEmailDelivery(appNotificationId);
     });
 
     return {
       ok: true,
       appNotificationId,
-      status: delivery?.status ?? null
+      status: delivery?.status ?? null,
     };
   }
 );
@@ -65,9 +61,7 @@ export const workspaceReminderSweepFunction = inngest.createFunction(
   { id: "workspace-reminder-sweep" },
   { cron: "0 10 * * *" },
   async () => {
-    const { sendPendingWorkspaceReminders } = await import(
-      "@/lib/notification-email"
-    );
+    const { sendPendingWorkspaceReminders } = await import("@/lib/notification-email");
     const result = await sendPendingWorkspaceReminders();
 
     return { ok: true, ...result };
@@ -83,7 +77,7 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
 
     return {
       ok: true,
-      ...result
+      ...result,
     };
   }
 );
@@ -92,10 +86,19 @@ export const workspaceNudgeSweepFunction = inngest.createFunction(
   { id: "workspace-nudge-sweep" },
   { cron: "0 11 * * *" },
   async () => {
-    const { runWorkspaceNudgeSweep } = await import(
-      "@/lib/notification-service"
-    );
+    const { runWorkspaceNudgeSweep } = await import("@/lib/notification-service");
     const result = await runWorkspaceNudgeSweep();
+
+    return { ok: true, ...result };
+  }
+);
+
+export const noDocumentsUploadedSweepFunction = inngest.createFunction(
+  { id: "no-documents-uploaded-sweep" },
+  { cron: "*/15 * * * *" },
+  async () => {
+    const { runNoDocumentsUploadedSweep } = await import("@/lib/notification-service");
+    const result = await runNoDocumentsUploadedSweep();
 
     return { ok: true, ...result };
   }

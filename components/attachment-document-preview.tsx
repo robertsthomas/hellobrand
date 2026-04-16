@@ -239,9 +239,8 @@ function PdfPageCanvas({
   return (
     <div
       ref={wrapperRef}
-      className={`mx-auto w-full max-w-[860px] border bg-white p-3 sm:p-4 ${
-        isSearchMatch ? "border-amber-300 ring-1 ring-amber-200" : "border-black/8"
-      }`}
+      className={`mx-auto w-full max-w-[860px] border bg-white p-3 sm:p-4 ${isSearchMatch ? "border-amber-300 ring-1 ring-amber-200" : "border-black/8"
+        }`}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">

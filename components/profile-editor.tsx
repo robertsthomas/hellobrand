@@ -12,6 +12,7 @@ import type {
 } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { History, Plus, Trash2, Upload } from "lucide-react";
 
 import {
@@ -171,8 +172,6 @@ export function ProfileEditor({
   );
   const [audit, setAudit] = useState(initialAudit);
   const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const initials = useMemo(
     () =>
@@ -293,8 +292,6 @@ export function ProfileEditor({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
 
     try {
       const response = await fetch("/api/profile", {
@@ -313,13 +310,13 @@ export function ProfileEditor({
         throw new Error(payload.error ?? "Could not save profile.");
       }
 
-      setSuccessMessage(payload.message ?? "Profile saved.");
+      toast.success(payload.message ?? "Profile saved.");
       setAudit(
         Array.isArray(payload.recentChanges) ? payload.recentChanges : initialAudit
       );
       router.refresh();
     } catch (error) {
-      setErrorMessage(
+      toast.error(
         error instanceof Error ? error.message : "Could not save profile."
       );
     } finally {
@@ -383,17 +380,6 @@ export function ProfileEditor({
           </DialogContent>
         </Dialog>
       </div>
-
-      {successMessage ? (
-        <div className="border-b border-border py-4 text-sm text-primary">
-          {successMessage}
-        </div>
-      ) : null}
-      {errorMessage ? (
-        <div className="border-b border-border py-4 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      ) : null}
 
       <section className="border-b border-border py-10">
         <div className="flex flex-col gap-5 md:flex-row md:items-center">

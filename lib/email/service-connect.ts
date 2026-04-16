@@ -242,6 +242,42 @@ export async function handleYahooCallbackForViewer(
   })}`;
 }
 
+export async function connectYahooAppPasswordForViewer(
+  viewer: Viewer,
+  input: { emailAddress: string; appPassword: string }
+) {
+  await assertEmailConnectionsAccess(viewer);
+  await verifyYahooMailboxAccess(input.emailAddress, input.appPassword.trim(), true);
+  const account = await saveConnectedEmailAccount({
+    userId: viewer.id,
+    provider: "yahoo",
+    providerAccountId: input.emailAddress.trim().toLowerCase(),
+    emailAddress: input.emailAddress.trim().toLowerCase(),
+    displayName: input.emailAddress.split("@")[0] || input.emailAddress,
+    scopes: ["app_password"],
+    accessTokenEncrypted: null,
+    refreshTokenEncrypted: encryptSecret(input.appPassword.trim()),
+    tokenExpiresAt: null,
+    status: "syncing"
+  });
+
+  await upsertEmailSyncState(account.id, {
+    providerCursor: null,
+    providerSubscriptionId: null,
+    subscriptionExpiresAt: new Date().toISOString(),
+    lastHistoryId: null,
+    lastErrorAt: null,
+    lastErrorCode: null,
+    lastErrorMessage: null
+  });
+  await enqueueEmailEvent("email/account.initial_sync.requested", {
+    accountId: account.id,
+    recentLimit: 100
+  });
+
+  return account;
+}
+
 export async function handleGmailWebhookNotification(payload: {
   emailAddress: string;
   historyId: string;

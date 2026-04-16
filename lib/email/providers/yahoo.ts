@@ -23,6 +23,10 @@ const YAHOO_AUTH_BASE = "https://api.login.yahoo.com/oauth2/request_auth";
 const YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token";
 const YAHOO_USERINFO_URL = "https://api.login.yahoo.com/openid/v1/userinfo";
 
+export function isYahooAppPasswordAccount(scopes: string[]) {
+  return scopes.includes("app_password");
+}
+
 type YahooCursor = {
   lastUid: number;
   uidValidity: string | null;
@@ -264,15 +268,14 @@ async function streamToBuffer(stream: Readable) {
   return Buffer.concat(chunks);
 }
 
-function createYahooImapClient(emailAddress: string, accessToken: string) {
+function createYahooImapClient(emailAddress: string, credential: string, isAppPassword = false) {
   return new ImapFlow({
     host: YAHOO_IMAP_HOST,
     port: YAHOO_IMAP_PORT,
     secure: true,
-    auth: {
-      user: emailAddress,
-      accessToken
-    },
+    auth: isAppPassword
+      ? { user: emailAddress, pass: credential }
+      : { user: emailAddress, accessToken: credential },
     disableAutoIdle: true,
     connectionTimeout: 20_000,
     greetingTimeout: 10_000,
@@ -283,10 +286,11 @@ function createYahooImapClient(emailAddress: string, accessToken: string) {
 
 async function withYahooMailbox<T>(
   emailAddress: string,
-  accessToken: string,
-  handler: (client: ImapFlow) => Promise<T>
+  credential: string,
+  handler: (client: ImapFlow) => Promise<T>,
+  isAppPassword = false
 ) {
-  const client = createYahooImapClient(emailAddress, accessToken);
+  const client = createYahooImapClient(emailAddress, credential, isAppPassword);
   let lock: Awaited<ReturnType<ImapFlow["getMailboxLock"]>> | null = null;
 
   try {
@@ -544,26 +548,29 @@ export async function getYahooProfile(accessToken: string) {
   };
 }
 
-export async function verifyYahooMailboxAccess(emailAddress: string, accessToken: string) {
+export async function verifyYahooMailboxAccess(
+  emailAddress: string,
+  credential: string,
+  isAppPassword = false
+) {
   const normalizedEmail = normalizeYahooEmail(emailAddress);
-  const normalizedAccessToken = accessToken.trim();
+  const normalizedCredential = credential.trim();
 
   if (!normalizedEmail) {
     throw new Error("Enter a Yahoo email address.");
   }
 
-  if (!normalizedAccessToken) {
-    throw new Error("Missing Yahoo access token.");
+  if (!normalizedCredential) {
+    throw new Error(isAppPassword ? "Enter your Yahoo app password." : "Missing Yahoo access token.");
   }
 
   const imapClient = new ImapFlow({
     host: YAHOO_IMAP_HOST,
     port: YAHOO_IMAP_PORT,
     secure: true,
-    auth: {
-      user: normalizedEmail,
-      accessToken: normalizedAccessToken
-    },
+    auth: isAppPassword
+      ? { user: normalizedEmail, pass: normalizedCredential }
+      : { user: normalizedEmail, accessToken: normalizedCredential },
     verifyOnly: true,
     connectionTimeout: 20_000,
     greetingTimeout: 10_000,
@@ -585,11 +592,9 @@ export async function verifyYahooMailboxAccess(emailAddress: string, accessToken
     host: YAHOO_SMTP_HOST,
     port: YAHOO_SMTP_PORT,
     secure: true,
-    auth: {
-      user: normalizedEmail,
-      type: "OAuth2",
-      accessToken: normalizedAccessToken
-    },
+    auth: isAppPassword
+      ? { user: normalizedEmail, pass: normalizedCredential }
+      : { user: normalizedEmail, type: "OAuth2", accessToken: normalizedCredential },
     connectionTimeout: 20_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000
@@ -612,10 +617,11 @@ export async function verifyYahooMailboxAccess(emailAddress: string, accessToken
 
 export async function listRecentYahooThreads(
   emailAddress: string,
-  accessToken: string,
-  recentLimit = 20
+  credential: string,
+  recentLimit = 20,
+  isAppPassword = false
 ) {
-  return withYahooMailbox(emailAddress, accessToken, async (client) => {
+  return withYahooMailbox(emailAddress, credential, async (client) => {
     const allUids = ((await client.search({ all: true }, { uid: true })) || []) as number[];
     const windowUids = allUids.slice(-Math.max(1, recentLimit));
     const parsed = await parseYahooMessages(client, windowUids, emailAddress);
@@ -627,21 +633,22 @@ export async function listRecentYahooThreads(
           ? buildYahooProviderCursor(allUids[allUids.length - 1], parsed.uidValidity)
           : buildYahooProviderCursor(0, parsed.uidValidity)
     };
-  });
+  }, isAppPassword);
 }
 
 export async function listYahooThreadsSinceCursor(
   emailAddress: string,
-  accessToken: string,
+  credential: string,
   providerCursor: string | null | undefined,
-  windowLimit = 250
+  windowLimit = 250,
+  isAppPassword = false
 ) {
   const cursor = parseYahooProviderCursor(providerCursor);
   if (!cursor) {
-    return listRecentYahooThreads(emailAddress, accessToken, Math.max(20, Math.min(windowLimit, 100)));
+    return listRecentYahooThreads(emailAddress, credential, Math.max(20, Math.min(windowLimit, 100)), isAppPassword);
   }
 
-  return withYahooMailbox(emailAddress, accessToken, async (client) => {
+  return withYahooMailbox(emailAddress, credential, async (client) => {
     const allUids = ((await client.search({ all: true }, { uid: true })) || []) as number[];
     const uidValidity = client.mailbox ? String(client.mailbox.uidValidity) : null;
     const latestUid = allUids.length > 0 ? allUids[allUids.length - 1] : 0;
@@ -679,16 +686,17 @@ export async function listYahooThreadsSinceCursor(
       ),
       cursor: buildYahooProviderCursor(latestUid, uidValidity)
     };
-  });
+  }, isAppPassword);
 }
 
 export async function fetchYahooAttachment(
   emailAddress: string,
-  accessToken: string,
+  credential: string,
   providerMessageId: string,
-  providerAttachmentId: string
+  providerAttachmentId: string,
+  isAppPassword = false
 ) {
-  return withYahooMailbox(emailAddress, accessToken, async (client) => {
+  return withYahooMailbox(emailAddress, credential, async (client) => {
     const uid = parseProviderMessageUid(providerMessageId);
     const payload = await client.download(String(uid), providerAttachmentId, { uid: true });
     const bytes = await streamToBuffer(payload.content);
@@ -697,12 +705,12 @@ export async function fetchYahooAttachment(
       bytes,
       sizeBytes: bytes.length
     };
-  });
+  }, isAppPassword);
 }
 
 export async function sendYahooThreadReply(
   emailAddress: string,
-  accessToken: string,
+  credential: string,
   input: {
     threadId: string;
     subject: string;
@@ -713,17 +721,16 @@ export async function sendYahooThreadReply(
     inReplyTo?: string | null;
     references?: string[];
     attachments?: ProviderSendAttachmentInput[];
-  }
+  },
+  isAppPassword = false
 ): Promise<ProviderSendMessageResult> {
   const transporter = nodemailer.createTransport({
     host: YAHOO_SMTP_HOST,
     port: YAHOO_SMTP_PORT,
     secure: true,
-    auth: {
-      user: emailAddress,
-      type: "OAuth2",
-      accessToken
-    },
+    auth: isAppPassword
+      ? { user: emailAddress, pass: credential }
+      : { user: emailAddress, type: "OAuth2", accessToken: credential },
     connectionTimeout: 20_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000

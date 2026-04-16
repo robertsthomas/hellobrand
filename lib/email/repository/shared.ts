@@ -128,7 +128,11 @@ export function toAccountRecord(account: {
     refreshTokenEncrypted: account.refreshTokenEncrypted,
     mailAuthConfigured:
       account.provider === "yahoo"
-        ? Boolean(account.refreshTokenEncrypted && toStringArray(account.scopes).length > 0)
+        ? Boolean(
+            account.refreshTokenEncrypted &&
+              (toStringArray(account.scopes).includes("app_password") ||
+                toStringArray(account.scopes).length > 0)
+          )
         : true,
     tokenExpiresAt: iso(account.tokenExpiresAt),
     lastSyncAt: iso(account.lastSyncAt),

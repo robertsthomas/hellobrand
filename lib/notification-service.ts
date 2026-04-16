@@ -17,7 +17,7 @@ import {
   type NotificationEventType,
   type NotificationItem,
   type NotificationListResponse,
-  type NotificationStatus
+  type NotificationStatus,
 } from "@/lib/notifications";
 import type { DealAggregate, Viewer } from "@/lib/types";
 
@@ -54,7 +54,7 @@ const NON_WORKSPACE_CATEGORIES: NotificationCategory[] = [
   "deadlines",
   "risks",
   "contracts",
-  "approvals"
+  "approvals",
 ];
 
 function ensureDatabase() {
@@ -84,7 +84,7 @@ function toNotificationItem(row: AppNotificationRow): NotificationItem {
     readAt: iso(row.readAt),
     clearedAt: iso(row.clearedAt),
     supersededAt: iso(row.supersededAt),
-    read: row.readAt !== null
+    read: row.readAt !== null,
   };
 }
 
@@ -93,9 +93,9 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
     where: {
       userId_dedupeKey: {
         userId,
-        dedupeKey: seed.dedupeKey
-      }
-    }
+        dedupeKey: seed.dedupeKey,
+      },
+    },
   });
 
   const normalizedCreatedAt =
@@ -133,8 +133,8 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
         clearedAt: null,
         supersededAt: null,
         readAt: shouldResetRead ? null : existing.readAt,
-        createdAt: normalizedCreatedAt
-      }
+        createdAt: normalizedCreatedAt,
+      },
     });
   }
 
@@ -142,8 +142,8 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
     where: {
       userId_dedupeKey: {
         userId,
-        dedupeKey: seed.dedupeKey
-      }
+        dedupeKey: seed.dedupeKey,
+      },
     },
     update: {
       category: seed.category,
@@ -159,7 +159,7 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
       clearedAt: null,
       supersededAt: null,
       readAt: null,
-      createdAt: normalizedCreatedAt
+      createdAt: normalizedCreatedAt,
     },
     create: {
       userId,
@@ -173,8 +173,8 @@ async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
       body: seed.description,
       href: seed.href,
       dedupeKey: seed.dedupeKey,
-      createdAt: normalizedCreatedAt
-    }
+      createdAt: normalizedCreatedAt,
+    },
   });
 }
 
@@ -193,13 +193,13 @@ async function supersedeWorkspaceNotifications(
       sessionId,
       status: "active",
       eventType: {
-        in: eventTypes
-      }
+        in: eventTypes,
+      },
     },
     data: {
       status: "superseded",
-      supersededAt: new Date()
-    }
+      supersededAt: new Date(),
+    },
   });
 }
 
@@ -260,13 +260,13 @@ async function supersedeAccountNotifications(
       entityId: accountId,
       status: "active",
       eventType: {
-        in: eventTypes
-      }
+        in: eventTypes,
+      },
     },
     data: {
       status: "superseded",
-      supersededAt: new Date()
-    }
+      supersededAt: new Date(),
+    },
   });
 }
 
@@ -278,10 +278,10 @@ async function loadSessionNotificationContext(sessionId: string) {
         select: {
           id: true,
           brandName: true,
-          campaignName: true
-        }
-      }
-    }
+          campaignName: true,
+        },
+      },
+    },
   });
 }
 
@@ -315,7 +315,7 @@ function computeDealNotificationSeeds(input: {
           : "Payment is overdue and needs follow-up.",
         href: `/app/p/${deal.id}`,
         dedupeKey: `payment.overdue:${deal.id}`,
-        createdAt: deal.updatedAt
+        createdAt: deal.updatedAt,
       });
     }
 
@@ -332,7 +332,7 @@ function computeDealNotificationSeeds(input: {
           : `Payment has been received from ${brandName}.`,
         href: `/app/p/${deal.id}`,
         dedupeKey: `payment.received:${deal.id}`,
-        createdAt: deal.updatedAt
+        createdAt: deal.updatedAt,
       });
     }
 
@@ -354,7 +354,7 @@ function computeDealNotificationSeeds(input: {
             description: `${deliverable.title} for ${brandName} is coming up.`,
             href: `/app/p/${deal.id}`,
             dedupeKey: `deadline.upcoming:${deal.id}:${deliverable.id}`,
-            createdAt: deliverable.dueDate
+            createdAt: deliverable.dueDate,
           });
         }
       }
@@ -370,7 +370,7 @@ function computeDealNotificationSeeds(input: {
           description: `Your ${deliverable.title} ${deliverable.channel ? `on ${deliverable.channel} ` : ""}was approved by ${brandName}.`,
           href: `/app/p/${deal.id}`,
           dedupeKey: `deliverable.approved:${deal.id}:${deliverable.id}`,
-          createdAt: deal.updatedAt
+          createdAt: deal.updatedAt,
         });
       }
     }
@@ -387,7 +387,7 @@ function computeDealNotificationSeeds(input: {
         description: `Review ${highRisks.length} high-severity item${highRisks.length === 1 ? "" : "s"} before signing.`,
         href: `/app/p/${deal.id}`,
         dedupeKey: `risk.contract:${deal.id}`,
-        createdAt: highRisks[0]?.createdAt ?? deal.updatedAt
+        createdAt: highRisks[0]?.createdAt ?? deal.updatedAt,
       });
     }
 
@@ -403,7 +403,7 @@ function computeDealNotificationSeeds(input: {
         description: `${brandName} contract document is ready for review.`,
         href: `/app/p/${deal.id}`,
         dedupeKey: `document.ready:${doc.id}`,
-        createdAt: doc.updatedAt
+        createdAt: doc.updatedAt,
       });
     }
   }
@@ -430,7 +430,7 @@ export function computeWorkspaceNudgeSeeds(aggregates: DealAggregate[]): Notific
         buildWorkspaceNudgeSeed({
           dealId: deal.id,
           campaignName,
-          eventType: "workspace.missing_payment"
+          eventType: "workspace.missing_payment",
         })
       );
     }
@@ -441,7 +441,7 @@ export function computeWorkspaceNudgeSeeds(aggregates: DealAggregate[]): Notific
         buildWorkspaceNudgeSeed({
           dealId: deal.id,
           campaignName,
-          eventType: "workspace.missing_deliverables"
+          eventType: "workspace.missing_deliverables",
         })
       );
     }
@@ -451,7 +451,7 @@ export function computeWorkspaceNudgeSeeds(aggregates: DealAggregate[]): Notific
         buildWorkspaceNudgeSeed({
           dealId: deal.id,
           campaignName,
-          eventType: "workspace.missing_usage_rights"
+          eventType: "workspace.missing_usage_rights",
         })
       );
     }
@@ -471,10 +471,10 @@ export async function runWorkspaceNudgeSweep() {
     where: {
       confirmedAt: { not: null },
       updatedAt: { gte: sevenDaysAgo },
-      status: { notIn: ["archived", "completed", "paid"] }
+      status: { notIn: ["archived", "completed", "paid"] },
     },
     select: { userId: true },
-    distinct: ["userId"]
+    distinct: ["userId"],
   });
 
   let nudgesSent = 0;
@@ -520,13 +520,13 @@ export async function syncComputedNotificationsForViewer(viewer: Viewer) {
 
   const [aggregates, profile] = await Promise.all([
     loadConfirmedAggregatesForViewer(viewer.id),
-    getProfileForViewer(viewer).catch(() => null)
+    getProfileForViewer(viewer).catch(() => null),
   ]);
 
   const seeds = computeDealNotificationSeeds({
     aggregates,
     paymentRemindersEnabled: profile?.paymentRemindersEnabled ?? true,
-    conflictAlertsEnabled: profile?.conflictAlertsEnabled ?? true
+    conflictAlertsEnabled: profile?.conflictAlertsEnabled ?? true,
   });
 
   const nudgeSeeds = computeWorkspaceNudgeSeeds(aggregates);
@@ -539,9 +539,9 @@ export async function syncComputedNotificationsForViewer(viewer: Viewer) {
   const staleWhere = {
     userId: viewer.id,
     category: {
-      in: NON_WORKSPACE_CATEGORIES
+      in: NON_WORKSPACE_CATEGORIES,
     },
-    status: "active"
+    status: "active",
   } as const;
 
   if (activeDedupeKeys.length === 0) {
@@ -549,21 +549,21 @@ export async function syncComputedNotificationsForViewer(viewer: Viewer) {
       where: staleWhere,
       data: {
         status: "superseded",
-        supersededAt: new Date()
-      }
+        supersededAt: new Date(),
+      },
     });
   } else {
     await prisma.appNotification.updateMany({
       where: {
         ...staleWhere,
         dedupeKey: {
-          notIn: activeDedupeKeys
-        }
+          notIn: activeDedupeKeys,
+        },
       },
       data: {
         status: "superseded",
-        supersededAt: new Date()
-      }
+        supersededAt: new Date(),
+      },
     });
   }
 }
@@ -576,12 +576,11 @@ export async function listNotificationsForViewer(
     return {
       notifications: [],
       unreadCount: 0,
-      nextCursor: null
+      nextCursor: null,
     };
   }
 
-  const shouldSyncComputed =
-    options.syncComputed ?? process.env.NODE_ENV === "production";
+  const shouldSyncComputed = options.syncComputed ?? process.env.NODE_ENV === "production";
   if (shouldSyncComputed) {
     await syncComputedNotificationsForViewer(viewer);
   }
@@ -593,10 +592,10 @@ export async function listNotificationsForViewer(
       userId: viewer.id,
       ...(includeRead ? {} : { readAt: null }),
       ...(options.includeCleared ? {} : { clearedAt: null }),
-      ...(options.includeSuperseded ? {} : { status: "active" })
+      ...(options.includeSuperseded ? {} : { status: "active" }),
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: limit
+    take: limit,
   });
 
   const unreadCount = await prisma.appNotification.count({
@@ -604,14 +603,14 @@ export async function listNotificationsForViewer(
       userId: viewer.id,
       status: "active",
       clearedAt: null,
-      readAt: null
-    }
+      readAt: null,
+    },
   });
 
   return {
     notifications: rows.map((row) => toNotificationItem(row)),
     unreadCount,
-    nextCursor: null
+    nextCursor: null,
   };
 }
 
@@ -627,8 +626,8 @@ export async function markNotificationStateForViewer(
   const notification = await prisma.appNotification.findFirst({
     where: {
       id: notificationId,
-      userId: viewer.id
-    }
+      userId: viewer.id,
+    },
   });
 
   if (!notification) {
@@ -642,7 +641,7 @@ export async function markNotificationStateForViewer(
         ? { readAt: notification.readAt ?? new Date() }
         : action === "mark_unread"
           ? { readAt: null }
-          : { status: "cleared", clearedAt: new Date() }
+          : { status: "cleared", clearedAt: new Date() },
   });
 
   await refreshNotificationViews(viewer.id);
@@ -659,11 +658,11 @@ export async function markAllNotificationsReadForViewer(viewer: Viewer) {
       userId: viewer.id,
       status: "active",
       clearedAt: null,
-      readAt: null
+      readAt: null,
     },
     data: {
-      readAt: new Date()
-    }
+      readAt: new Date(),
+    },
   });
 
   await refreshNotificationViews(viewer.id);
@@ -678,12 +677,12 @@ export async function clearAllNotificationsForViewer(viewer: Viewer) {
     where: {
       userId: viewer.id,
       status: "active",
-      clearedAt: null
+      clearedAt: null,
     },
     data: {
       status: "cleared",
-      clearedAt: new Date()
-    }
+      clearedAt: new Date(),
+    },
   });
 
   await refreshNotificationViews(viewer.id);
@@ -722,7 +721,7 @@ export async function emitWorkspaceNotificationForSession(
     errorMessage: session.errorMessage,
     duplicateMatchJson: session.duplicateMatchJson ?? null,
     createdAt: session.updatedAt,
-    eventType
+    eventType,
   });
 
   return emitWorkspaceNotificationSeed(session.userId, seed);
@@ -770,7 +769,7 @@ export async function emitWorkspaceNotificationForCurrentState(sessionId: string
   }
 
   await supersedeWorkspaceNotifications(session.userId, session.id, [
-    "workspace.duplicate_checking"
+    "workspace.duplicate_checking",
   ]);
   await refreshNotificationViews(session.userId);
 }
@@ -803,7 +802,7 @@ export async function emitEmailResyncRequiredNotification(input: {
     accountId: input.accountId,
     provider: input.provider,
     emailAddress: input.emailAddress,
-    createdAt: input.createdAt
+    createdAt: input.createdAt,
   });
 
   const row = await upsertNotificationSeed(input.userId, seed);
@@ -818,14 +817,65 @@ export async function emitEmailResyncRequiredNotification(input: {
   return row;
 }
 
-export async function clearEmailResyncRequiredNotification(
-  userId: string,
-  accountId: string
-) {
+export async function clearEmailResyncRequiredNotification(userId: string, accountId: string) {
   if (!ensureDatabase()) {
     return;
   }
 
   await supersedeAccountNotifications(userId, accountId, ["email.resync_required"]);
   await refreshNotificationViews(userId);
+}
+
+export async function runNoDocumentsUploadedSweep() {
+  if (!ensureDatabase()) {
+    return { processed: 0, remindersSent: 0 };
+  }
+
+  const SIXTY_MINUTES_AGO = new Date(Date.now() - 60 * 60 * 1000);
+  const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const deals = await prisma.deal.findMany({
+    where: {
+      createdAt: { gte: SEVEN_DAYS_AGO, lte: SIXTY_MINUTES_AGO },
+      status: { notIn: ["archived", "completed", "paid"] },
+      documents: { none: {} },
+      emailLinks: { some: {} },
+    },
+    select: {
+      id: true,
+      campaignName: true,
+      userId: true,
+    },
+  });
+
+  let remindersSent = 0;
+
+  for (const deal of deals) {
+    const dedupeKey = `workspace.no_documents_uploaded:${deal.id}`;
+    const existing = await prisma.appNotification.findUnique({
+      where: { userId_dedupeKey: { userId: deal.userId, dedupeKey } },
+      select: { id: true },
+    });
+
+    if (existing) {
+      continue;
+    }
+
+    const seed = buildWorkspaceNudgeSeed({
+      dealId: deal.id,
+      campaignName: deal.campaignName || "Your workspace",
+      eventType: "workspace.no_documents_uploaded",
+    });
+
+    const row = await upsertNotificationSeed(deal.userId, seed);
+
+    try {
+      await enqueueNotificationEmailDelivery(row.id);
+      remindersSent++;
+    } catch {
+      // Email delivery failure is non-blocking
+    }
+  }
+
+  return { processed: deals.length, remindersSent };
 }
