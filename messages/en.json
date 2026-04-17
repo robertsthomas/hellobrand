@@ -98,5 +98,165 @@
       "trials": "Basic includes a 14-day trial. Premium includes a 7-day trial.",
       "cancel": "Cancel or downgrade anytime"
     }
+  },
+  "appShell": {
+    "aiAssistant": "AI Assistant",
+    "feedback": "App feedback",
+    "navigationMenuTitle": "Navigation menu",
+    "navigationMenuDescription": "App navigation and account actions.",
+    "searchPlaceholder": "Search partnerships",
+    "searchAriaLabel": "Search partnerships",
+    "openMenuAriaLabel": "Open menu",
+    "mobileNavigationAriaLabel": "Mobile navigation",
+    "mainNavigationAriaLabel": "Main navigation",
+    "newWorkspace": "New workspace",
+    "logOut": "Log out",
+    "sections": {
+      "workspace": "Workspace",
+      "preferences": "Preferences",
+      "partnerships": "Partnerships",
+      "operations": "Operations",
+      "settings": "Settings"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "allPartnerships": "Partnerships",
+      "inbox": "Inbox",
+      "payments": "Payments",
+      "analytics": "Analytics",
+      "help": "Help",
+      "profile": "Profile",
+      "settings": "Settings"
+    },
+    "routes": {
+      "dashboard": "Dashboard",
+      "allPartnerships": "Partnerships",
+      "inbox": "Inbox",
+      "payments": "Payments",
+      "analytics": "Analytics",
+      "help": "Help",
+      "profile": "Profile",
+      "settings": "Settings",
+      "billing": "Billing",
+      "notifications": "Notifications",
+      "search": "Search",
+      "newWorkspace": "New workspace",
+      "partnershipWorkspace": "Partnership workspace",
+      "helloBrand": "HelloBrand"
+    }
+  },
+  "appDashboard": {
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "welcomeBack": "Welcome back"
+    },
+    "quickActions": {
+      "eyebrow": "Next up",
+      "title": "What to work on next",
+      "body": "Start with the items most likely to unblock cash flow, approvals, or delivery.",
+      "open": "Open",
+      "eyebrows": {
+        "warning": "Time-sensitive",
+        "success": "On track",
+        "accent": "Coming up",
+        "neutral": "Recommended"
+      }
+    },
+    "sections": {
+      "activePartnerships": {
+        "title": "Active partnerships",
+        "viewAll": "View all",
+        "emptyTitle": "No active partnerships yet.",
+        "emptyBody": "Start with one workspace and this dashboard will begin surfacing due dates, payment follow-ups, and risk review.",
+        "newWorkspace": "New workspace"
+      },
+      "deliverables": {
+        "eyebrow": "Deliverables",
+        "title": "Upcoming deliverables",
+        "empty": "Nothing due this week"
+      },
+      "payments": {
+        "eyebrow": "Payments",
+        "title": "Outstanding payouts",
+        "empty": "No outstanding payouts"
+      },
+      "snapshot": {
+        "eyebrow": "Portfolio snapshot",
+        "title": "At a glance"
+      },
+      "disclosure": {
+        "title": "Disclosure reminders across active partnerships"
+      }
+    },
+    "columns": {
+      "campaign": "Campaign",
+      "stage": "Stage",
+      "amount": "Amount",
+      "due": "Due",
+      "nextStep": "Next step"
+    },
+    "conflicts": {
+      "title": "Cross-partnership conflicts",
+      "description": "HelloBrand found overlapping category, exclusivity, or timing signals across active workspaces."
+    },
+    "dates": {
+      "notSet": "Date not set",
+      "daysOverdue": "{count, plural, one {# day overdue} other {# days overdue}}",
+      "dueToday": "Due today",
+      "inDays": "{count, plural, one {In # day} other {In # days}}"
+    },
+    "summary": {
+      "noActivePartnerships": "No active partnerships yet",
+      "activePartnerships": "{count, plural, one {# active partnership} other {# active partnerships}}",
+      "nothingDueThisWeek": "nothing due this week",
+      "deliverablesDueThisWeek": "{count, plural, one {# deliverable due this week} other {# deliverables due this week}}",
+      "noOverdueInvoices": "no overdue invoices",
+      "overdueInvoices": "{count, plural, one {# overdue invoice} other {# overdue invoices}}",
+      "noHighRiskContracts": "no high-risk contracts",
+      "highRiskContracts": "{count, plural, one {# high-risk contract to review} other {# high-risk contracts to review}}",
+      "full": "{partnerships}. Right now you have {due}, {invoices}, and {risk}."
+    },
+    "nextSteps": {
+      "sendPaymentFollowUp": "Send payment follow-up",
+      "reviewHighRiskClauses": "Review high-risk clauses",
+      "prepareNextDeliverable": "Prepare the next deliverable",
+      "reviewContractAndConfirmTerms": "Review contract and confirm terms",
+      "trackPayoutProgress": "Track payout progress",
+      "openWorkspaceAndReview": "Open workspace and review the next step"
+    },
+    "actions": {
+      "overduePayoutTitle": "Overdue payout needs a follow-up",
+      "overduePayoutBody": "{campaignName} is still overdue. Check the payment thread and nudge the brand.",
+      "openPaymentStatus": "Open payment status",
+      "contractWatchoutsTitle": "Contract watchouts still need review",
+      "contractWatchoutsBody": "{campaignName} has high-severity issues that should be checked before work continues.",
+      "reviewRisks": "Review risks",
+      "deliverableComingUpTitle": "A deliverable is coming up soon",
+      "deliverableComingUpBody": "{deliverableTitle} for {campaignName} is due {dueLabel}.",
+      "openDeliverable": "Open deliverable",
+      "workspaceReadyTitle": "Workspace ready to confirm",
+      "workspaceReadyBody": "{campaignName} has finished processing and is ready for your review.",
+      "reviewAndConfirm": "Review and confirm",
+      "resumeDraftTitle": "Resume your draft",
+      "resumeDraftBody": "{campaignName} has a saved draft waiting for you.",
+      "resumeDraft": "Resume draft",
+      "workspaceProcessingTitle": "Workspace is processing",
+      "workspaceProcessingBody": "{campaignName} is being analyzed. You'll be notified when it's ready.",
+      "viewProgress": "View progress"
+    },
+    "snapshot": {
+      "activePartnerships": "Active partnerships",
+      "activePartnershipsNote": "{count, plural, one {# wrapped} other {# wrapped}}",
+      "trackedRevenue": "Tracked revenue",
+      "trackedRevenueNote": "{count, plural, one {# total workspace} other {# total workspaces}}",
+      "outstandingPayouts": "Outstanding payouts",
+      "outstandingPayoutsOverdue": "{count, plural, one {# overdue invoice} other {# overdue invoices}}",
+      "outstandingPayoutsClear": "Nothing overdue",
+      "riskAlerts": "Risk alerts",
+      "riskAlertsWarnings": "{count, plural, one {# cross-partnership warning} other {# cross-partnership warnings}}",
+      "riskAlertsClear": "No active overlaps"
+    }
   }
 }

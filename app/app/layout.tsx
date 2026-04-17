@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Suspense } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 
 import { AccentColorProvider } from "@/components/accent-color-provider";
 import { AppFrame } from "@/components/app-frame";
@@ -49,6 +51,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
   const emailAccounts = entitlements.features.email_connections
     ? await listEmailAccountsForViewer(viewer)
     : [];
+  const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
 
   const isOnboardingComplete = !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;
@@ -73,29 +76,31 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
         email={viewer.email}
         displayName={viewer.displayName}
       />
-      <Suspense>
-        <AppFrame
-          viewerId={viewer.id}
-          guideState={onboardingState.productGuideStateJson}
-          hasActiveWorkspace={hasActiveWorkspace}
-          hasEverCreatedWorkspace={hasEverCreatedWorkspace}
-          notifications={notifications}
-          onboardingComplete={isOnboardingComplete}
-          sidebarMilestones={sidebarMilestones}
-          featureFlags={featureFlags}
-          workspaceNavItems={dealAggregates.map((aggregate) => {
-            const labels = getDisplayDealLabels(aggregate.deal);
+      <NextIntlClientProvider locale={locale} messages={messages}>
+        <Suspense>
+          <AppFrame
+            viewerId={viewer.id}
+            guideState={onboardingState.productGuideStateJson}
+            hasActiveWorkspace={hasActiveWorkspace}
+            hasEverCreatedWorkspace={hasEverCreatedWorkspace}
+            notifications={notifications}
+            onboardingComplete={isOnboardingComplete}
+            sidebarMilestones={sidebarMilestones}
+            featureFlags={featureFlags}
+            workspaceNavItems={dealAggregates.map((aggregate) => {
+              const labels = getDisplayDealLabels(aggregate.deal);
 
-            return {
-              dealId: aggregate.deal.id,
-              label: labels.campaignName ?? aggregate.deal.campaignName,
-              brandName: labels.brandName ?? aggregate.deal.brandName,
-            };
-          })}
-        >
-          {children}
-        </AppFrame>
-      </Suspense>
+              return {
+                dealId: aggregate.deal.id,
+                label: labels.campaignName ?? aggregate.deal.campaignName,
+                brandName: labels.brandName ?? aggregate.deal.brandName,
+              };
+            })}
+          >
+            {children}
+          </AppFrame>
+        </Suspense>
+      </NextIntlClientProvider>
     </>
   );
 }

@@ -8,6 +8,9 @@ import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import type { ConflictResult, DealAggregate, IntakeDraftListItem, Viewer } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
+type DashboardTranslationValues = Record<string, string | number | Date>;
+type DashboardTranslator = (key: string, values?: DashboardTranslationValues) => string;
+
 function daysUntil(date: string | null) {
   if (!date) {
     return null;
@@ -17,26 +20,26 @@ function daysUntil(date: string | null) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-export function dueLabel(date: string | null) {
+export function dueLabel(date: string | null, t: DashboardTranslator) {
   const days = daysUntil(date);
 
   if (days === null) {
-    return "Date not set";
+    return t("dates.notSet");
   }
 
   if (days < 0) {
-    return `${Math.abs(days)} days overdue`;
+    return t("dates.daysOverdue", { count: Math.abs(days) });
   }
 
   if (days === 0) {
-    return "Due today";
+    return t("dates.dueToday");
   }
 
   if (days === 1) {
-    return "In 1 day";
+    return t("dates.inDays", { count: 1 });
   }
 
-  return `In ${days} days`;
+  return t("dates.inDays", { count: days });
 }
 
 export function paymentBadgeClass(status: string) {
@@ -71,33 +74,41 @@ export function nextStepTextClass(tone: "warning" | "success" | "accent" | "neut
   return "text-[#667085] dark:text-[#a3acb9]";
 }
 
-function buildTodaySummary(input: {
+function buildTodaySummary(
+  input: {
   activePartnerships: number;
   dueSoonDeliverables: number;
   overdueInvoices: number;
   riskAlertCount: number;
-}) {
+  },
+  t: DashboardTranslator
+) {
   const partnershipCopy =
     input.activePartnerships === 0
-      ? "No active partnerships yet"
-      : `${input.activePartnerships} active partnership${input.activePartnerships === 1 ? "" : "s"}`;
+      ? t("summary.noActivePartnerships")
+      : t("summary.activePartnerships", { count: input.activePartnerships });
 
   const dueCopy =
     input.dueSoonDeliverables === 0
-      ? "nothing due this week"
-      : `${input.dueSoonDeliverables} deliverable${input.dueSoonDeliverables === 1 ? "" : "s"} due this week`;
+      ? t("summary.nothingDueThisWeek")
+      : t("summary.deliverablesDueThisWeek", { count: input.dueSoonDeliverables });
 
   const invoiceCopy =
     input.overdueInvoices === 0
-      ? "no overdue invoices"
-      : `${input.overdueInvoices} overdue invoice${input.overdueInvoices === 1 ? "" : "s"}`;
+      ? t("summary.noOverdueInvoices")
+      : t("summary.overdueInvoices", { count: input.overdueInvoices });
 
   const riskCopy =
     input.riskAlertCount === 0
-      ? "no high-risk contracts"
-      : `${input.riskAlertCount} high-risk contract${input.riskAlertCount === 1 ? "" : "s"} to review`;
+      ? t("summary.noHighRiskContracts")
+      : t("summary.highRiskContracts", { count: input.riskAlertCount });
 
-  return `${partnershipCopy}. Right now you have ${dueCopy}, ${invoiceCopy}, and ${riskCopy}.`;
+  return t("summary.full", {
+    partnerships: partnershipCopy,
+    due: dueCopy,
+    invoices: invoiceCopy,
+    risk: riskCopy,
+  });
 }
 
 export function buildDealNextStep(deal: {
@@ -105,47 +116,47 @@ export function buildDealNextStep(deal: {
   paymentStatus: string;
   nextDeliverableDate: string | null;
   riskFlags: Array<{ severity: string }>;
-}) {
+}, t: DashboardTranslator) {
   const hasHighRisk = deal.riskFlags.some((flag) => flag.severity === "high");
   const nextDueDays = daysUntil(deal.nextDeliverableDate);
 
   if (deal.paymentStatus === "late") {
     return {
-      label: "Send payment follow-up",
+      label: t("nextSteps.sendPaymentFollowUp"),
       tone: "warning" as const,
     };
   }
 
   if (hasHighRisk) {
     return {
-      label: "Review high-risk clauses",
+      label: t("nextSteps.reviewHighRiskClauses"),
       tone: "warning" as const,
     };
   }
 
   if (nextDueDays !== null && nextDueDays >= 0 && nextDueDays <= 7) {
     return {
-      label: "Prepare the next deliverable",
+      label: t("nextSteps.prepareNextDeliverable"),
       tone: "accent" as const,
     };
   }
 
   if (deal.status === "contract_received") {
     return {
-      label: "Review contract and confirm terms",
+      label: t("nextSteps.reviewContractAndConfirmTerms"),
       tone: "accent" as const,
     };
   }
 
   if (deal.paymentStatus === "awaiting_payment") {
     return {
-      label: "Track payout progress",
+      label: t("nextSteps.trackPayoutProgress"),
       tone: "success" as const,
     };
   }
 
   return {
-    label: "Open workspace and review the next step",
+    label: t("nextSteps.openWorkspaceAndReview"),
     tone: "neutral" as const,
   };
 }
@@ -179,8 +190,9 @@ export function buildDashboardViewModel(input: {
   aggregates: DealAggregate[];
   intakeDrafts: IntakeDraftListItem[];
   viewer: Viewer;
+  t: DashboardTranslator;
 }) {
-  const { aggregates, intakeDrafts, viewer } = input;
+  const { aggregates, intakeDrafts, viewer, t } = input;
 
   const dealRows = aggregates.map((aggregate) => {
     const normalized = buildNormalizedIntakeRecord(aggregate);
@@ -265,83 +277,91 @@ export function buildDashboardViewModel(input: {
     firstLateDeal
       ? {
           tone: "warning",
-          title: "Overdue payout needs a follow-up",
-          body: `${firstLateDeal.campaignName} is still overdue. Check the payment thread and nudge the brand.`,
+          title: t("actions.overduePayoutTitle"),
+          body: t("actions.overduePayoutBody", { campaignName: firstLateDeal.campaignName }),
           href: `/app/p/${firstLateDeal.id}`,
-          ctaLabel: "Open payment status",
+          ctaLabel: t("actions.openPaymentStatus"),
         }
       : null,
     firstHighRiskDeal
       ? {
           tone: "warning",
-          title: "Contract watchouts still need review",
-          body: `${firstHighRiskDeal.campaignName} has high-severity issues that should be checked before work continues.`,
+          title: t("actions.contractWatchoutsTitle"),
+          body: t("actions.contractWatchoutsBody", {
+            campaignName: firstHighRiskDeal.campaignName,
+          }),
           href: `/app/p/${firstHighRiskDeal.id}`,
-          ctaLabel: "Review risks",
+          ctaLabel: t("actions.reviewRisks"),
         }
       : null,
     nextActionDeliverable
       ? {
           tone: "accent",
-          title: "A deliverable is coming up soon",
-          body: `${nextActionDeliverable.title} for ${nextActionDeliverable.campaignName} is due ${dueLabel(nextActionDeliverable.dueDate).toLowerCase()}.`,
+          title: t("actions.deliverableComingUpTitle"),
+          body: t("actions.deliverableComingUpBody", {
+            deliverableTitle: nextActionDeliverable.title,
+            campaignName: nextActionDeliverable.campaignName,
+            dueLabel: dueLabel(nextActionDeliverable.dueDate, t).toLowerCase(),
+          }),
           href: `/app/p/${nextActionDeliverable.dealId}`,
-          ctaLabel: "Open deliverable",
+          ctaLabel: t("actions.openDeliverable"),
         }
       : null,
     firstDraft
       ? firstDraft.session.status === "ready_for_confirmation"
         ? {
             tone: "accent",
-            title: "Workspace ready to confirm",
-            body: `${firstDraft.deal.campaignName} has finished processing and is ready for your review.`,
+            title: t("actions.workspaceReadyTitle"),
+            body: t("actions.workspaceReadyBody", { campaignName: firstDraft.deal.campaignName }),
             href: `/app/intake/${firstDraft.session.id}/review`,
-            ctaLabel: "Review and confirm",
+            ctaLabel: t("actions.reviewAndConfirm"),
           }
         : firstDraft.session.status === "draft"
           ? {
               tone: "neutral",
-              title: "Resume your draft",
-              body: `${firstDraft.deal.campaignName} has a saved draft waiting for you.`,
+              title: t("actions.resumeDraftTitle"),
+              body: t("actions.resumeDraftBody", { campaignName: firstDraft.deal.campaignName }),
               href: `/app/intake/new?draft=${firstDraft.session.id}`,
-              ctaLabel: "Resume draft",
+              ctaLabel: t("actions.resumeDraft"),
             }
           : {
               tone: "neutral",
-              title: "Workspace is processing",
-              body: `${firstDraft.deal.campaignName} is being analyzed. You'll be notified when it's ready.`,
+              title: t("actions.workspaceProcessingTitle"),
+              body: t("actions.workspaceProcessingBody", {
+                campaignName: firstDraft.deal.campaignName,
+              }),
               href: `/app/intake/${firstDraft.session.id}`,
-              ctaLabel: "View progress",
+              ctaLabel: t("actions.viewProgress"),
             }
       : null,
   ].filter(Boolean) as QuickActionItem[];
 
   const snapshotMetrics = [
-    {
-      label: "Active partnerships",
+      {
+      label: t("snapshot.activePartnerships"),
       value: String(activePartnerships),
-      note: `${completedPartnerships} wrapped`,
+      note: t("snapshot.activePartnershipsNote", { count: completedPartnerships }),
     },
     {
-      label: "Tracked revenue",
+      label: t("snapshot.trackedRevenue"),
       value: formatCurrency(totalRevenue),
-      note: `${dealRows.length} total workspaces`,
+      note: t("snapshot.trackedRevenueNote", { count: dealRows.length }),
     },
     {
-      label: "Outstanding payouts",
+      label: t("snapshot.outstandingPayouts"),
       value: formatCurrency(pendingPaymentsAmount),
       note:
         overdueInvoices > 0
-          ? `${overdueInvoices} overdue invoice${overdueInvoices === 1 ? "" : "s"}`
-          : "Nothing overdue",
+          ? t("snapshot.outstandingPayoutsOverdue", { count: overdueInvoices })
+          : t("snapshot.outstandingPayoutsClear"),
     },
     {
-      label: "Risk alerts",
+      label: t("snapshot.riskAlerts"),
       value: String(riskAlertCount),
       note:
         dashboardConflictCounts.total > 0
-          ? `${dashboardConflictCounts.total} cross-partnership warning${dashboardConflictCounts.total === 1 ? "" : "s"}`
-          : "No active overlaps",
+          ? t("snapshot.riskAlertsWarnings", { count: dashboardConflictCounts.total })
+          : t("snapshot.riskAlertsClear"),
     },
   ];
 
@@ -370,6 +390,6 @@ export function buildDashboardViewModel(input: {
       dueSoonDeliverables: dueSoonDeliverables.length,
       overdueInvoices,
       riskAlertCount,
-    }),
+    }, t),
   };
 }

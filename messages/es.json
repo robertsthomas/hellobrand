@@ -98,5 +98,165 @@
       "trials": "Basic incluye 14 días de prueba. Premium incluye 7 días de prueba.",
       "cancel": "Cancela o baja de plan en cualquier momento"
     }
+  },
+  "appShell": {
+    "aiAssistant": "Asistente IA",
+    "feedback": "Comentarios sobre la app",
+    "navigationMenuTitle": "Menú de navegación",
+    "navigationMenuDescription": "Navegación de la aplicación y acciones de la cuenta.",
+    "searchPlaceholder": "Buscar colaboraciones",
+    "searchAriaLabel": "Buscar colaboraciones",
+    "openMenuAriaLabel": "Abrir menú",
+    "mobileNavigationAriaLabel": "Navegación móvil",
+    "mainNavigationAriaLabel": "Navegación principal",
+    "newWorkspace": "Nuevo espacio",
+    "logOut": "Cerrar sesión",
+    "sections": {
+      "workspace": "Espacio",
+      "preferences": "Preferencias",
+      "partnerships": "Colaboraciones",
+      "operations": "Operaciones",
+      "settings": "Configuración"
+    },
+    "nav": {
+      "dashboard": "Panel",
+      "allPartnerships": "Colaboraciones",
+      "inbox": "Bandeja de entrada",
+      "payments": "Pagos",
+      "analytics": "Analítica",
+      "help": "Ayuda",
+      "profile": "Perfil",
+      "settings": "Configuración"
+    },
+    "routes": {
+      "dashboard": "Panel",
+      "allPartnerships": "Colaboraciones",
+      "inbox": "Bandeja de entrada",
+      "payments": "Pagos",
+      "analytics": "Analítica",
+      "help": "Ayuda",
+      "profile": "Perfil",
+      "settings": "Configuración",
+      "billing": "Facturación",
+      "notifications": "Notificaciones",
+      "search": "Buscar",
+      "newWorkspace": "Nuevo espacio",
+      "partnershipWorkspace": "Espacio de colaboración",
+      "helloBrand": "HelloBrand"
+    }
+  },
+  "appDashboard": {
+    "greeting": {
+      "morning": "Buenos días",
+      "afternoon": "Buenas tardes",
+      "evening": "Buenas noches",
+      "welcomeBack": "Bienvenido de nuevo"
+    },
+    "quickActions": {
+      "eyebrow": "Siguiente",
+      "title": "En qué trabajar ahora",
+      "body": "Empieza por los elementos con más probabilidades de desbloquear flujo de caja, aprobaciones o entregas.",
+      "open": "Abrir",
+      "eyebrows": {
+        "warning": "Urgente",
+        "success": "En marcha",
+        "accent": "Próximamente",
+        "neutral": "Recomendado"
+      }
+    },
+    "sections": {
+      "activePartnerships": {
+        "title": "Colaboraciones activas",
+        "viewAll": "Ver todo",
+        "emptyTitle": "Todavía no hay colaboraciones activas.",
+        "emptyBody": "Empieza con un espacio y este panel comenzará a mostrar fechas límite, seguimientos de pago y revisión de riesgos.",
+        "newWorkspace": "Nuevo espacio"
+      },
+      "deliverables": {
+        "eyebrow": "Entregables",
+        "title": "Entregables próximos",
+        "empty": "Nada vence esta semana"
+      },
+      "payments": {
+        "eyebrow": "Pagos",
+        "title": "Pagos pendientes",
+        "empty": "No hay pagos pendientes"
+      },
+      "snapshot": {
+        "eyebrow": "Resumen del portafolio",
+        "title": "De un vistazo"
+      },
+      "disclosure": {
+        "title": "Recordatorios de divulgación en colaboraciones activas"
+      }
+    },
+    "columns": {
+      "campaign": "Campaña",
+      "stage": "Etapa",
+      "amount": "Importe",
+      "due": "Vence",
+      "nextStep": "Siguiente paso"
+    },
+    "conflicts": {
+      "title": "Conflictos entre colaboraciones",
+      "description": "HelloBrand encontró señales de solapamiento de categoría, exclusividad o calendario entre espacios activos."
+    },
+    "dates": {
+      "notSet": "Fecha no definida",
+      "daysOverdue": "{count, plural, one {# día de retraso} other {# días de retraso}}",
+      "dueToday": "Vence hoy",
+      "inDays": "{count, plural, one {En # día} other {En # días}}"
+    },
+    "summary": {
+      "noActivePartnerships": "Todavía no hay colaboraciones activas",
+      "activePartnerships": "{count, plural, one {# colaboración activa} other {# colaboraciones activas}}",
+      "nothingDueThisWeek": "nada vence esta semana",
+      "deliverablesDueThisWeek": "{count, plural, one {# entregable vence esta semana} other {# entregables vencen esta semana}}",
+      "noOverdueInvoices": "ninguna factura vencida",
+      "overdueInvoices": "{count, plural, one {# factura vencida} other {# facturas vencidas}}",
+      "noHighRiskContracts": "ningún contrato de alto riesgo",
+      "highRiskContracts": "{count, plural, one {# contrato de alto riesgo por revisar} other {# contratos de alto riesgo por revisar}}",
+      "full": "{partnerships}. Ahora mismo tienes {due}, {invoices} y {risk}."
+    },
+    "nextSteps": {
+      "sendPaymentFollowUp": "Enviar seguimiento de pago",
+      "reviewHighRiskClauses": "Revisar cláusulas de alto riesgo",
+      "prepareNextDeliverable": "Preparar el siguiente entregable",
+      "reviewContractAndConfirmTerms": "Revisar contrato y confirmar condiciones",
+      "trackPayoutProgress": "Seguir el progreso del pago",
+      "openWorkspaceAndReview": "Abrir espacio y revisar el siguiente paso"
+    },
+    "actions": {
+      "overduePayoutTitle": "Un pago atrasado necesita seguimiento",
+      "overduePayoutBody": "{campaignName} sigue atrasado. Revisa el hilo de pago y contacta a la marca.",
+      "openPaymentStatus": "Abrir estado del pago",
+      "contractWatchoutsTitle": "Todavía hay advertencias del contrato por revisar",
+      "contractWatchoutsBody": "{campaignName} tiene problemas graves que deben revisarse antes de continuar el trabajo.",
+      "reviewRisks": "Revisar riesgos",
+      "deliverableComingUpTitle": "Se acerca un entregable",
+      "deliverableComingUpBody": "{deliverableTitle} para {campaignName} vence {dueLabel}.",
+      "openDeliverable": "Abrir entregable",
+      "workspaceReadyTitle": "Espacio listo para confirmar",
+      "workspaceReadyBody": "{campaignName} terminó de procesarse y está listo para tu revisión.",
+      "reviewAndConfirm": "Revisar y confirmar",
+      "resumeDraftTitle": "Retoma tu borrador",
+      "resumeDraftBody": "{campaignName} tiene un borrador guardado esperándote.",
+      "resumeDraft": "Retomar borrador",
+      "workspaceProcessingTitle": "El espacio se está procesando",
+      "workspaceProcessingBody": "{campaignName} se está analizando. Te avisaremos cuando esté listo.",
+      "viewProgress": "Ver progreso"
+    },
+    "snapshot": {
+      "activePartnerships": "Colaboraciones activas",
+      "activePartnershipsNote": "{count, plural, one {# cerrada} other {# cerradas}}",
+      "trackedRevenue": "Ingresos rastreados",
+      "trackedRevenueNote": "{count, plural, one {# espacio total} other {# espacios totales}}",
+      "outstandingPayouts": "Pagos pendientes",
+      "outstandingPayoutsOverdue": "{count, plural, one {# factura vencida} other {# facturas vencidas}}",
+      "outstandingPayoutsClear": "Nada vencido",
+      "riskAlerts": "Alertas de riesgo",
+      "riskAlertsWarnings": "{count, plural, one {# alerta cruzada} other {# alertas cruzadas}}",
+      "riskAlertsClear": "Sin solapamientos activos"
+    }
   }
 }

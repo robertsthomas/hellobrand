@@ -5,6 +5,7 @@
 
 import { ArrowRight, Clock3, DollarSign, Receipt } from "lucide-react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 
 import {
@@ -37,6 +38,7 @@ export default function WorkspaceDashboardPage() {
 }
 
 async function DashboardContent() {
+  const t = await getTranslations("appDashboard");
   const viewer = await requireViewer();
   const [aggregates, intakeDrafts] = await Promise.all([
     getCachedDealAggregates(viewer),
@@ -55,6 +57,7 @@ async function DashboardContent() {
     aggregates,
     intakeDrafts,
     viewer,
+    t,
   });
 
   return (
@@ -79,23 +82,24 @@ async function DashboardContent() {
         >
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-[22px] font-semibold tracking-[-0.05em] text-foreground sm:text-[28px]">
-              Active partnerships
+              {t("sections.activePartnerships.title")}
             </h2>
 
             <Link
               href="/app/p/history"
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
-              View all
+              {t("sections.activePartnerships.viewAll")}
             </Link>
           </div>
 
           {activePartnershipItems.length === 0 ? (
             <div className="mt-6 border border-dashed border-black/10 bg-[#fafafb] p-6 dark:border-white/10 dark:bg-white/[0.03]">
-              <p className="text-base font-semibold text-foreground">No active partnerships yet.</p>
+              <p className="text-base font-semibold text-foreground">
+                {t("sections.activePartnerships.emptyTitle")}
+              </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Start with one workspace and this dashboard will begin surfacing due dates, payment
-                follow-ups, and risk review.
+                {t("sections.activePartnerships.emptyBody")}
               </p>
               <div className="mt-5">
                 <Link
@@ -103,7 +107,7 @@ async function DashboardContent() {
                   data-guide="add-documents"
                   className={cn(buttonVariants({ size: "sm" }), "gap-2")}
                 >
-                  New workspace
+                  {t("sections.activePartnerships.newWorkspace")}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
@@ -112,16 +116,16 @@ async function DashboardContent() {
             <div className="mt-6 overflow-hidden border border-black/8 dark:border-white/10">
               {/* Column headers (desktop only) */}
               <div className="hidden md:grid md:grid-cols-[minmax(0,1.4fr)_120px_140px_130px_minmax(0,1fr)_40px] border-b border-black/8 bg-secondary px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground dark:border-white/10 dark:bg-secondary dark:text-muted-foreground">
-                <span>Campaign</span>
-                <span>Stage</span>
-                <span>Amount</span>
-                <span>Due</span>
-                <span>Next step</span>
+                <span>{t("columns.campaign")}</span>
+                <span>{t("columns.stage")}</span>
+                <span>{t("columns.amount")}</span>
+                <span>{t("columns.due")}</span>
+                <span>{t("columns.nextStep")}</span>
                 <span />
               </div>
 
               {activePartnershipItems.slice(0, 5).map((deal) => {
-                const nextStep = buildDealNextStep(deal);
+                const nextStep = buildDealNextStep(deal, t);
 
                 return (
                   <div
@@ -138,21 +142,25 @@ async function DashboardContent() {
                     </Link>
 
                     <div className="flex items-center justify-between md:block">
-                      <span className="text-xs text-muted-foreground md:hidden">Stage</span>
+                      <span className="text-xs text-muted-foreground md:hidden">
+                        {t("columns.stage")}
+                      </span>
                       <span className="text-sm text-muted-foreground">
                         {humanizeToken(deal.status)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between md:block">
-                      <span className="text-xs text-muted-foreground md:hidden">Amount</span>
+                      <span className="text-xs text-muted-foreground md:hidden">
+                        {t("columns.amount")}
+                      </span>
                       <span className="text-sm font-medium text-foreground">
                         {formatCurrency(deal.paymentAmount, deal.currency)}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between md:block">
-                      <span className="text-xs text-muted-foreground md:hidden">Due</span>
+                      <span className="text-xs text-muted-foreground md:hidden">{t("columns.due")}</span>
                       <span className="text-sm text-muted-foreground">
                         {formatDate(deal.nextDeliverableDate)}
                       </span>
@@ -162,7 +170,9 @@ async function DashboardContent() {
                       href={`/app/p/${deal.id}`}
                       className="flex items-center justify-between gap-2 md:justify-start"
                     >
-                      <span className="text-xs text-muted-foreground md:hidden">Next step</span>
+                      <span className="text-xs text-muted-foreground md:hidden">
+                        {t("columns.nextStep")}
+                      </span>
                       <span className={cn("text-sm font-medium", nextStepTextClass(nextStep.tone))}>
                         {nextStep.label}
                       </span>
@@ -184,8 +194,8 @@ async function DashboardContent() {
           <ConflictWarnings
             conflicts={dashboardConflicts}
             compact
-            title="Cross-partnership conflicts"
-            description="HelloBrand found overlapping category, exclusivity, or timing signals across active workspaces."
+            title={t("conflicts.title")}
+            description={t("conflicts.description")}
           />
         ) : null}
 
@@ -197,10 +207,10 @@ async function DashboardContent() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
-                    Deliverables
+                    {t("sections.deliverables.eyebrow")}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    Upcoming deliverables
+                    {t("sections.deliverables.title")}
                   </h2>
                 </div>
                 <Clock3 className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
@@ -219,7 +229,7 @@ async function DashboardContent() {
                       <span className="font-medium text-foreground">
                         {formatDate(item.dueDate)}
                       </span>
-                      <span className="text-muted-foreground">{dueLabel(item.dueDate)}</span>
+                      <span className="text-muted-foreground">{dueLabel(item.dueDate, t)}</span>
                     </div>
                   </Link>
                 ))}
@@ -229,8 +239,10 @@ async function DashboardContent() {
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
               <Clock3 className="h-4 w-4 shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Deliverables</span> · Nothing due this
-                week
+                <span className="font-medium text-foreground">
+                  {t("sections.deliverables.eyebrow")}
+                </span>{" "}
+                · {t("sections.deliverables.empty")}
               </p>
             </div>
           )}
@@ -241,10 +253,10 @@ async function DashboardContent() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
-                    Payments
+                    {t("sections.payments.eyebrow")}
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                    Outstanding payouts
+                    {t("sections.payments.title")}
                   </h2>
                 </div>
                 <Receipt className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
@@ -279,8 +291,8 @@ async function DashboardContent() {
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
               <Receipt className="h-4 w-4 shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Payments</span> · No outstanding
-                payouts
+                <span className="font-medium text-foreground">{t("sections.payments.eyebrow")}</span>{" "}
+                · {t("sections.payments.empty")}
               </p>
             </div>
           )}
@@ -290,10 +302,10 @@ async function DashboardContent() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
-                  Portfolio snapshot
+                  {t("sections.snapshot.eyebrow")}
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground">
-                  At a glance
+                  {t("sections.snapshot.title")}
                 </h2>
               </div>
               <DollarSign className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
@@ -320,7 +332,7 @@ async function DashboardContent() {
         {secondarySections.disclosureObligations.length > 0 ? (
           <DisclosureObligations
             obligations={secondarySections.disclosureObligations}
-            title="Disclosure reminders across active partnerships"
+            title={t("sections.disclosure.title")}
           />
         ) : null}
       </div>

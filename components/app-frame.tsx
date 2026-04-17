@@ -6,6 +6,7 @@
  */
 import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePanelRef } from "react-resizable-panels";
@@ -38,6 +39,8 @@ import { ThemeSwitch } from "@/components/theme-switch";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
   getAppRouteMeta,
+  localizeAppHref,
+  normalizeAppPathname,
   isAppNavItemActive,
   primaryAppNavItems,
   secondaryAppNavItems,
@@ -54,6 +57,7 @@ const FeedbackWidget = lazy(() =>
 
 function MobileAssistantButton({ onClick }: { onClick?: () => void }) {
   const { openAssistant } = useAssistant();
+  const t = useTranslations("appShell");
 
   return (
     <button
@@ -66,7 +70,7 @@ function MobileAssistantButton({ onClick }: { onClick?: () => void }) {
     >
       <span className="assistant-shimmer inline-flex shrink-0 items-center gap-3 bg-gradient-to-r from-[#1a4d3e] via-[#81b29a] to-[#1a4d3e] bg-[length:200%_100%] bg-clip-text text-transparent dark:from-[#81b29a] dark:via-[#d4e7dc] dark:to-[#81b29a]">
         <Bot className="h-4.5 w-4.5 shrink-0 stroke-[#1a4d3e] dark:stroke-[#81b29a]" />
-        AI Assistant
+        {t("aiAssistant")}
       </span>
     </button>
   );
@@ -114,15 +118,19 @@ export function AppFrame({
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLDivElement | null>(null);
   const sidebarPanelRef = usePanelRef();
+  const desktopSidebarHeaderRef = useRef<HTMLDivElement | null>(null);
   const { signOut } = useClerk();
+  const t = useTranslations("appShell");
 
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
+  const normalizedPathname = useMemo(() => normalizeAppPathname(pathname), [pathname]);
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("sidebar_collapsed") === "true";
   });
+  const [hideDesktopWordmark, setHideDesktopWordmark] = useState(false);
   const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
   const [feedbackOpenRequestKey, setFeedbackOpenRequestKey] = useState(0);
 
@@ -135,17 +143,17 @@ export function AppFrame({
       panel.collapse();
     }
   }, []);
-  const isInboxRoute = pathname === "/app/inbox";
+  const isInboxRoute = normalizedPathname === "/app/inbox";
   const hasVisibleSidebarMilestones = sidebarMilestones?.visible === true;
   const hasWorkspaceNotification = (notifications ?? []).some(
     (notification) => notification.category === "workspace" && notification.status === "active"
   );
   const feedbackDealId =
-    pathname.match(/^\/app\/p\/([^/]+)/)?.[1] ??
-    pathname.match(/^\/app\/payments\/([^/]+)/)?.[1] ??
+    normalizedPathname.match(/^\/app\/p\/([^/]+)/)?.[1] ??
+    normalizedPathname.match(/^\/app\/payments\/([^/]+)/)?.[1] ??
     null;
   const sidebarSubItem = useMemo(() => {
-    const paymentsMatch = pathname.match(/^\/app\/payments\/([^/]+)$/);
+    const paymentsMatch = normalizedPathname.match(/^\/app\/payments\/([^/]+)$/);
 
     if (paymentsMatch) {
       const workspace = workspaceNavItems.find((item) => item.dealId === paymentsMatch[1]);
@@ -158,7 +166,7 @@ export function AppFrame({
         : null;
     }
 
-    const historyMatch = pathname.match(/^\/app\/p\/history\/([^/]+)$/);
+    const historyMatch = normalizedPathname.match(/^\/app\/p\/history\/([^/]+)$/);
 
     if (historyMatch) {
       const workspace = workspaceNavItems.find((item) => item.dealId === historyMatch[1]);
@@ -171,7 +179,7 @@ export function AppFrame({
         : null;
     }
 
-    const workspaceMatch = pathname.match(/^\/app\/p\/([^/]+)$/);
+    const workspaceMatch = normalizedPathname.match(/^\/app\/p\/([^/]+)$/);
 
     if (workspaceMatch && workspaceMatch[1] !== "history") {
       const workspace = workspaceNavItems.find((item) => item.dealId === workspaceMatch[1]);
@@ -185,7 +193,9 @@ export function AppFrame({
     }
 
     return null;
-  }, [pathname, workspaceNavItems]);
+  }, [normalizedPathname, workspaceNavItems]);
+
+  const localizeHref = useCallback((href: string) => localizeAppHref(href, pathname), [pathname]);
 
   useEffect(() => {
     if (!guideOpenedMobileMenu) {
@@ -239,19 +249,48 @@ export function AppFrame({
     };
   }, []);
 
+  useEffect(() => {
+    const element = desktopSidebarHeaderRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateWordmarkVisibility = (width: number) => {
+      setHideDesktopWordmark(width < 165);
+    };
+
+    updateWordmarkVisibility(element.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      updateWordmarkVisibility(entry.contentRect.width);
+    });
+
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [sidebarCollapsed]);
+
+  const compactDesktopBrand = sidebarCollapsed || hideDesktopWordmark;
+  const compactDesktopSidebar = sidebarCollapsed || hideDesktopWordmark;
+
   const handleSidebarSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const normalizedQuery = sidebarQuery.trim();
 
     if (normalizedQuery.length === 0) {
-      router.push("/app/search");
+      router.push(localizeHref("/app/search"));
       return;
     }
 
     const params = new URLSearchParams();
     params.set("q", normalizedQuery);
-    router.push(`/app/search?${params.toString()}`);
+    router.push(localizeHref(`/app/search?${params.toString()}`));
   };
 
   const requestGuideStepVisibility = useCallback((step: GuideStep) => {
@@ -305,16 +344,16 @@ export function AppFrame({
   ) => {
     const Icon = item.icon;
     const active = isAppNavItemActive(pathname, item.href);
-
-    const guideId = `sidebar-${item.label.toLowerCase().replace(/\s+/g, "-")}`;
+    const itemLabel = t(`nav.${item.labelKey}`);
+    const guideId = `sidebar-${item.labelKey.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`;
 
     return (
       <div key={item.href}>
         <Link
-          href={item.href}
+          href={localizeHref(item.href)}
           prefetch={false}
           data-guide={guideId}
-          title={options?.collapsed ? item.label : undefined}
+          title={options?.collapsed ? itemLabel : undefined}
           onClick={options?.onClick}
           className={cn(
             "group flex h-10 w-full items-center gap-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
@@ -331,11 +370,11 @@ export function AppFrame({
               active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
             )}
           />
-          {options?.collapsed ? null : <span className="truncate">{item.label}</span>}
+          {options?.collapsed ? null : <span className="truncate">{itemLabel}</span>}
         </Link>
         {!options?.collapsed && active && sidebarSubItem?.parentHref === item.href ? (
           <Link
-            href={sidebarSubItem.href}
+            href={localizeHref(sidebarSubItem.href)}
             prefetch={false}
             onClick={options?.onClick}
             className="ml-9 mt-1 flex h-9 items-center border-l border-black/10 pl-3 text-[13px] font-medium text-foreground dark:border-white/10"
@@ -351,7 +390,7 @@ export function AppFrame({
     hasVisibleSidebarMilestones ? null : (
       <button
         type="button"
-        title={options?.collapsed ? "App feedback" : undefined}
+        title={options?.collapsed ? t("feedback") : undefined}
         onClick={() => {
           setFeedbackOpenRequestKey((current) => current + 1);
           options?.onClick?.();
@@ -367,7 +406,7 @@ export function AppFrame({
             "shrink-0 text-muted-foreground group-hover:text-foreground"
           )}
         />
-        {options?.collapsed ? null : <span className="truncate">App feedback</span>}
+        {options?.collapsed ? null : <span className="truncate">{t("feedback")}</span>}
       </button>
     );
 
@@ -404,12 +443,12 @@ export function AppFrame({
         }}
       >
         <SheetHeader className="sr-only">
-          <SheetTitle>Navigation menu</SheetTitle>
-          <SheetDescription>App navigation and account actions.</SheetDescription>
+          <SheetTitle>{t("navigationMenuTitle")}</SheetTitle>
+          <SheetDescription>{t("navigationMenuDescription")}</SheetDescription>
         </SheetHeader>
         <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
           <Link
-            href="/app"
+            href={localizeHref("/app")}
             prefetch={false}
             className="group flex items-center gap-3"
             onClick={() => handleMobileMenuOpenChange(false)}
@@ -435,8 +474,8 @@ export function AppFrame({
               type="search"
               value={sidebarQuery}
               onChange={(event) => setSidebarQuery(event.target.value)}
-              placeholder="Search partnerships"
-              aria-label="Search partnerships"
+              placeholder={t("searchPlaceholder")}
+              aria-label={t("searchAriaLabel")}
               className="min-w-0 flex-1 self-center appearance-none border-0 bg-transparent p-0 leading-none text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
             />
           </form>
@@ -445,17 +484,17 @@ export function AppFrame({
           <div>
             <div className="mb-4 px-2 pt-5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Workspace
+                {t("sections.workspace")}
               </p>
             </div>
-            <nav aria-label="Mobile navigation" className="space-y-1">
+            <nav aria-label={t("mobileNavigationAriaLabel")} className="space-y-1">
               {primaryAppNavItems.map((item) =>
                 renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
               )}
             </nav>
             <div className="mb-4 mt-8 px-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Preferences
+                {t("sections.preferences")}
               </p>
             </div>
             <div className="space-y-1">
@@ -473,7 +512,7 @@ export function AppFrame({
         <div className="border-t border-border px-5 py-5 dark:border-white/8">
           <div className="space-y-3">
             <PostHogActionLink
-              href="/app/intake/new"
+              href={localizeHref("/app/intake/new")}
               prefetch={false}
               eventName="workspace_entry_cta_clicked"
               payload={{ source: "sidebar_mobile" }}
@@ -484,7 +523,7 @@ export function AppFrame({
                 "h-11 w-full justify-between rounded-none px-4"
               )}
             >
-              <span>New workspace</span>
+              <span>{t("newWorkspace")}</span>
             </PostHogActionLink>
             <button
               type="button"
@@ -494,7 +533,7 @@ export function AppFrame({
               }}
               className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
             >
-              Log out
+              {t("logOut")}
             </button>
           </div>
         </div>
@@ -510,16 +549,18 @@ export function AppFrame({
             type="button"
             className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
             onClick={() => setMobileMenuOpen(true)}
-            aria-label="Open menu"
+            aria-label={t("openMenuAriaLabel")}
           >
             <Menu className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <div className="truncate text-sm text-foreground lg:hidden">{meta.title}</div>
+            <div className="truncate text-sm text-foreground lg:hidden">
+              {t(`routes.${meta.titleKey}`)}
+            </div>
             <div className="hidden min-w-0 items-center gap-2 text-sm text-muted-foreground lg:flex">
-              <span className="truncate">{meta.section}</span>
+              <span className="truncate">{t(`sections.${meta.sectionKey}`)}</span>
               <ChevronRight className="h-4 w-4 shrink-0" />
-              <span className="truncate text-foreground">{meta.title}</span>
+              <span className="truncate text-foreground">{t(`routes.${meta.titleKey}`)}</span>
             </div>
           </div>
         </div>
@@ -559,7 +600,7 @@ export function AppFrame({
         <FeedbackWidget
           viewerId={viewerId}
           pagePath={pathname}
-          pageTitle={meta.title}
+          pageTitle={t(`routes.${meta.titleKey}`)}
           dealId={feedbackDealId}
           openRequestKey={feedbackOpenRequestKey}
         />
@@ -570,27 +611,32 @@ export function AppFrame({
   const renderDesktopSidebar = () => (
     <>
       <div
+        ref={desktopSidebarHeaderRef}
         className={cn(
           "flex h-[72px] items-center",
-          sidebarCollapsed ? "justify-center px-0" : "justify-between px-7"
+          compactDesktopBrand ? "justify-center px-0" : "justify-between px-7"
         )}
       >
-        <Link href="/app" prefetch={false} className="group flex items-center gap-3">
+        <Link
+          href={localizeHref("/app")}
+          prefetch={false}
+          className={cn("group flex items-center", compactDesktopBrand ? "gap-0" : "gap-3")}
+        >
           <div
             className={cn(
               "flex items-center justify-center bg-primary text-primary-foreground",
-              sidebarCollapsed ? "h-8 w-8" : "h-10 w-10"
+              compactDesktopBrand ? "h-8 w-8" : "h-10 w-10"
             )}
           >
             <Hand
               className={cn(
                 "hello-hand-wave rotate-[18deg]",
-                sidebarCollapsed ? "h-4 w-4" : "h-5 w-5"
+                compactDesktopBrand ? "h-4 w-4" : "h-5 w-5"
               )}
               strokeWidth={2.15}
             />
           </div>
-          {sidebarCollapsed ? null : (
+          {compactDesktopBrand ? null : (
             <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
               HelloBrand
             </div>
@@ -608,8 +654,8 @@ export function AppFrame({
               type="search"
               value={sidebarQuery}
               onChange={(event) => setSidebarQuery(event.target.value)}
-              placeholder="Search partnerships"
-              aria-label="Search partnerships"
+              placeholder={compactDesktopSidebar ? "" : t("searchPlaceholder")}
+              aria-label={t("searchAriaLabel")}
               className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
             />
           </form>
@@ -617,41 +663,45 @@ export function AppFrame({
       )}
       <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
         <div>
-          {sidebarCollapsed ? null : (
+          {compactDesktopSidebar ? null : (
             <div className="mb-4 px-2 pt-5">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Workspace
+                {t("sections.workspace")}
               </p>
             </div>
           )}
           <nav
-            aria-label="Main navigation"
-            className={cn("space-y-1", sidebarCollapsed ? "pt-5" : "")}
+            aria-label={t("mainNavigationAriaLabel")}
+            className={cn("space-y-1", compactDesktopSidebar ? "pt-5" : "")}
           >
-            {primaryAppNavItems.map((item) => renderNavItem(item, { collapsed: sidebarCollapsed }))}
+            {primaryAppNavItems.map((item) =>
+              renderNavItem(item, { collapsed: compactDesktopSidebar })
+            )}
           </nav>
-          {sidebarCollapsed ? null : (
+          {compactDesktopSidebar ? null : (
             <div className="mb-4 mt-8 px-2">
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                Preferences
+                {t("sections.preferences")}
               </p>
             </div>
           )}
-          <div className={cn("space-y-1", sidebarCollapsed ? "mt-4" : "")}>
+          <div className={cn("space-y-1", compactDesktopSidebar ? "mt-4" : "")}>
             {secondaryAppNavItems.map((item) =>
-              renderNavItem(item, { collapsed: sidebarCollapsed })
+              renderNavItem(item, { collapsed: compactDesktopSidebar })
             )}
           </div>
-          {sidebarCollapsed ? null : renderSidebarMilestones()}
+          {compactDesktopSidebar ? null : renderSidebarMilestones()}
         </div>
-        <div className="mt-auto pt-4">{renderFeedbackItem({ collapsed: sidebarCollapsed })}</div>
+        <div className="mt-auto pt-4">
+          {renderFeedbackItem({ collapsed: compactDesktopSidebar })}
+        </div>
       </div>
       <div className="border-t border-border px-5 py-5 dark:border-white/8">
         <div className="space-y-3">
           {sidebarCollapsed ? null : (
             <>
               <PostHogActionLink
-                href="/app/intake/new"
+                href={localizeHref("/app/intake/new")}
                 prefetch={false}
                 eventName="workspace_entry_cta_clicked"
                 payload={{ source: "sidebar_desktop" }}
@@ -661,14 +711,14 @@ export function AppFrame({
                   "h-11 w-full justify-between rounded-none px-4"
                 )}
               >
-                <span>New workspace</span>
+                <span>{t("newWorkspace")}</span>
               </PostHogActionLink>
               <button
                 type="button"
                 onClick={() => signOut({ redirectUrl: "/login" })}
                 className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
               >
-                Log out
+                {t("logOut")}
               </button>
             </>
           )}

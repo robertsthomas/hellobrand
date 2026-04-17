@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowUpRight, CheckCircle2, CircleDot } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,8 @@ export interface QuickActionItem {
   href: string;
   ctaLabel?: string;
 }
+
+type QuickActionEyebrowTranslator = (key: "warning" | "success" | "accent" | "neutral") => string;
 
 function toneClasses(tone: QuickActionItem["tone"]) {
   if (tone === "warning") {
@@ -43,24 +46,29 @@ function toneClasses(tone: QuickActionItem["tone"]) {
   };
 }
 
-function toneEyebrow(tone: QuickActionItem["tone"]) {
+function toneEyebrow(
+  tone: QuickActionItem["tone"],
+  t: QuickActionEyebrowTranslator
+) {
   if (tone === "warning") {
-    return "Time-sensitive";
+    return t("warning");
   }
 
   if (tone === "success") {
-    return "On track";
+    return t("success");
   }
 
   if (tone === "accent") {
-    return "Coming up";
+    return t("accent");
   }
 
-  return "Recommended";
+  return t("neutral");
 }
 
 function QuickActionRow({ item }: { item: QuickActionItem }) {
   const tone = toneClasses(item.tone);
+  const t = useTranslations("appDashboard.quickActions");
+  const eyebrowT = useTranslations("appDashboard.quickActions.eyebrows");
 
   return (
     <Link
@@ -86,7 +94,7 @@ function QuickActionRow({ item }: { item: QuickActionItem }) {
 
           <div className="min-w-0">
             <p className={cn("text-xs font-semibold uppercase tracking-[0.16em]", tone.label)}>
-              {toneEyebrow(item.tone)}
+              {toneEyebrow(item.tone, eyebrowT)}
             </p>
             <p className="mt-2 text-base font-semibold tracking-[-0.03em] text-foreground">
               {item.title}
@@ -100,12 +108,14 @@ function QuickActionRow({ item }: { item: QuickActionItem }) {
         </div>
       </div>
 
-      <div className="mt-4 text-sm font-medium text-foreground">{item.ctaLabel ?? "Open"}</div>
+      <div className="mt-4 text-sm font-medium text-foreground">{item.ctaLabel ?? t("open")}</div>
     </Link>
   );
 }
 
 export function QuickActionsPanel({ items }: { items: QuickActionItem[] }) {
+  const t = useTranslations("appDashboard.quickActions");
+
   if (items.length === 0) {
     return null;
   }
@@ -114,13 +124,13 @@ export function QuickActionsPanel({ items }: { items: QuickActionItem[] }) {
     <section className="border border-black/8 bg-white p-5 shadow-[0_20px_50px_rgba(15,23,42,0.05)] dark:border-white/10 dark:bg-[#15191f] dark:shadow-none sm:p-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground dark:text-muted-foreground">
-          Next up
+          {t("eyebrow")}
         </p>
         <h2 className="mt-2 text-[28px] font-semibold tracking-[-0.05em] text-foreground">
-          What to work on next
+          {t("title")}
         </h2>
         <p className="mt-2 max-w-[48ch] text-sm leading-6 text-muted-foreground">
-          Start with the items most likely to unblock cash flow, approvals, or delivery.
+          {t("body")}
         </p>
       </div>
 

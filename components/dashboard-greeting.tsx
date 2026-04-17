@@ -1,21 +1,26 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
-function greetingForHour(hour: number) {
+type GreetingTranslator = (key: "morning" | "afternoon" | "evening" | "welcomeBack") => string;
+
+function greetingForHour(hour: number, t: GreetingTranslator) {
   if (hour < 12) {
-    return "Good morning";
+    return t("morning");
   }
 
   if (hour < 18) {
-    return "Good afternoon";
+    return t("afternoon");
   }
 
-  return "Good evening";
+  return t("evening");
 }
 
 export function DashboardGreeting({ firstName }: { firstName: string }) {
   const [now, setNow] = useState<Date | null>(null);
+  const locale = useLocale();
+  const t = useTranslations("appDashboard.greeting");
 
   useEffect(() => {
     const updateNow = () => setNow(new Date());
@@ -26,9 +31,9 @@ export function DashboardGreeting({ firstName }: { firstName: string }) {
     return () => window.clearInterval(interval);
   }, []);
 
-  const greeting = now ? greetingForHour(now.getHours()) : "Welcome back";
+  const greeting = now ? greetingForHour(now.getHours(), t) : t("welcomeBack");
   const dashboardDate = now
-    ? new Intl.DateTimeFormat("en-US", {
+    ? new Intl.DateTimeFormat(locale, {
         weekday: "long",
         month: "long",
         day: "2-digit"

@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 
 import "@/app/globals.css";
 import { PostHogProvider } from "@/app/providers";
+import { HtmlLangSync } from "@/components/html-lang-sync";
 import { PostHogPageView } from "@/components/posthog-pageview";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -55,9 +55,7 @@ export const viewport: Viewport = {
   ],
 };
 
-async function AppProviders({ children }: { children: ReactNode }) {
-  await cookies();
-
+function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider
       waitlistUrl="/waitlist"
@@ -80,21 +78,15 @@ async function AppProviders({ children }: { children: ReactNode }) {
   );
 }
 
-async function getLocaleFromCookies(): Promise<string> {
-  const cookieStore = await cookies();
-  return cookieStore.get("NEXT_LOCALE")?.value || "en";
-}
-
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
-  const locale = await getLocaleFromCookies();
-
   return (
-    <html lang={locale} suppressHydrationWarning className="h-full">
+    <html lang="en" suppressHydrationWarning className="h-full">
       <body className={`${inter.variable} min-h-dvh bg-background`}>
+        <HtmlLangSync />
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>
