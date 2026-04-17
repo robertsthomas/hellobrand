@@ -1,0 +1,102 @@
+{
+  "site": {
+    "name": "HelloBrand",
+    "description": "Upload any brand deal contract and get a plain-English breakdown with risk flags, deliverables, and payment terms. Free to start, no signup required."
+  },
+  "homepage": {
+    "hero": {
+      "headline": "Don't sign another brand deal blindly.",
+      "subheadline": "Upload a contract and get the plain-English breakdown: risks, deliverables, and payment terms, all for free. No signup required.",
+      "cta_upload": "Upload a Contract",
+      "cta_sample": "Try a Sample Contract",
+      "trust_line": "No signup. No legal jargon. 100% private."
+    },
+    "features": {
+      "eyebrow": "Your first upload",
+      "headline": "Every contract broken down into what actually matters.",
+      "body": "See the summary, risks, and money terms without reading every line.",
+      "summary_title": "Plain-English summary",
+      "summary_body": "Know what the contract is really asking for, in words you understand.",
+      "risks_title": "Risk watchouts",
+      "risks_body": "Catch usage rights traps, payment gaps, and terms that deserve a second look.",
+      "payment_title": "Deliverables and payment",
+      "payment_body": "See what you owe, what the brand owes you, and when it's all due."
+    },
+    "sample": {
+      "eyebrow": "See it in action",
+      "headline": "Try a sample contract before you upload your own.",
+      "body": "Get the summary, risk flags, and payment details from a real example. No account needed.",
+      "bullets": {
+        "summary": "Plain-language summary of what the deal actually says",
+        "risks": "Risk flags explained in simple terms",
+        "payment": "Deliverables and payment timing at a glance"
+      },
+      "cta": "Try the sample contract"
+    },
+    "save": {
+      "eyebrow": "Save and track",
+      "headline": "When the deal looks good, save it to a free workspace.",
+      "body": "Create your free account after the breakdown, not before. Keep the contract, brand emails, and follow-ups in one place.",
+      "bullets": {
+        "email": "Link brand emails to the deal",
+        "store": "Store the full contract breakdown",
+        "return": "Come back anytime without starting over"
+      }
+    },
+    "track": {
+      "eyebrow": "After you sign",
+      "headline": "Track deliverables and chase payments without the spreadsheet.",
+      "body": "Your saved workspace keeps every due date, outstanding balance, and payment status right next to the contract terms.",
+      "bullets": {
+        "dates": "Track due dates and outstanding balances",
+        "status": "Keep payment status beside the contract terms",
+        "organized": "Stay organized across all your active deals"
+      }
+    },
+    "howItWorks": {
+      "headline": "Three steps. Ten seconds. Free.",
+      "steps": {
+        "step1_title": "Drop in a contract",
+        "step1_body": "Upload a PDF, DOCX, or TXT file. No account needed to see the full breakdown.",
+        "step2_title": "See the breakdown",
+        "step2_body": "Plain-English summary, risk flags, deliverables, and payment terms in one pass.",
+        "step3_title": "Save it free",
+        "step3_body": "Create a workspace to track the deal, follow up with the brand, and get paid."
+      }
+    },
+    "finalCta": {
+      "badge": "The first upload takes less than 10 seconds",
+      "headline": "Your next contract shouldn't be a guessing game.",
+      "body": "Upload one contract, see the full breakdown, and decide if the deal is worth your time.",
+      "cta_upload": "Upload Your First Contract",
+      "cta_sample": "Try a Sample Contract"
+    },
+    "footer": {
+      "copyright": "© 2026 HelloBrand",
+      "disclaimer": "HelloBrand is not a law firm. This is not legal advice."
+    }
+  },
+  "pricing": {
+    "headline": "Start free. Upgrade when the deals stack up.",
+    "subheadline": "From your first brand contract to a full roster of partnerships. Upload and analyze free, then upgrade as your workspace grows.",
+    "trust_line": "Cancel anytime. No lock-in. One organized partnership can cover multiple months of HelloBrand.",
+    "social_proof_headline": "Built for creators who manage their own deals",
+    "social_proof_body": "From solo creators to multi-roster managers, HelloBrand keeps the business side of influence organized.",
+    "testimonials": {
+      "jamie_quote": "I used to lose track of deliverables and payment terms across five brand deals. HelloBrand caught a discrepancy in a contract that would have cost me $2,000.",
+      "jamie_name": "Jamie T.",
+      "jamie_role": "Lifestyle creator, 120K followers",
+      "alex_quote": "Managing three creators used to mean spreadsheets and missed deadlines. Now everything is in one place and the AI flags conflicts before they become problems.",
+      "alex_name": "Alex R.",
+      "alex_role": "Creator manager, 4-person roster",
+      "morgan_quote": "The synced inbox changed everything. I can see brand emails next to contract terms and action items without switching tabs. Worth every penny.",
+      "morgan_name": "Morgan K.",
+      "morgan_role": "Tech reviewer, 85K subscribers"
+    },
+    "footer": {
+      "free": "Free plan available",
+      "trials": "Basic includes a 14-day trial. Premium includes a 7-day trial.",
+      "cancel": "Cancel or downgrade anytime"
+    }
+  }
+}

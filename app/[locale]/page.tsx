@@ -1,10 +1,7 @@
-/**
- * This file renders the public homepage.
- * It pulls together the marketing-facing product story while the actual product rules stay in the domain modules.
- */
 import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import {
@@ -35,31 +32,37 @@ const DocumentScanShowcase = dynamic(() =>
   import("@/components/document-scan-showcase").then((m) => m.DocumentScanShowcase)
 );
 
-export const metadata: Metadata = {
-  title: "HelloBrand",
-  description: siteConfig.description,
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
+export function generateMetadata(): Metadata {
+  return {
     title: "HelloBrand",
     description: siteConfig.description,
-    url: absoluteUrl("/"),
-    siteName: siteConfig.name,
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "HelloBrand",
-    description: siteConfig.description,
-  },
-};
+    alternates: {
+      canonical: "/",
+    },
+    openGraph: {
+      title: "HelloBrand",
+      description: siteConfig.description,
+      url: absoluteUrl("/"),
+      siteName: siteConfig.name,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "HelloBrand",
+      description: siteConfig.description,
+    },
+  };
+}
 
 function isMaintenanceModeEnabled() {
   return process.env.MAINTENANCE_MODE?.trim().toLowerCase() === "true";
 }
 
-export default async function LandingPage() {
+export default async function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  setRequestLocale(locale);
+
+  const t = await getTranslations("homepage");
   const [session, appSettings] = await Promise.all([auth(), getAppSettings()]);
 
   if (session.userId) {
@@ -91,13 +94,12 @@ export default async function LandingPage() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.25),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.10),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.08),transparent)]" />
 
           <div className="relative mx-auto max-w-[1200px] px-5 pb-16 pt-12 text-center sm:px-6 md:pb-20 md:pt-16 lg:px-8 lg:pb-28 lg:pt-24">
-            <h1 className="mx-auto mt-5 max-w-[13ch] text-balance text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
-              Understand your brand deals in seconds.
+            <h1 className="mx-auto mt-5 max-w-[14ch] text-balance text-[2.4rem] font-bold leading-[0.95] tracking-[-0.05em] text-[#1a2634] sm:mt-6 sm:text-[3.2rem] md:text-[4rem] lg:text-[4.8rem] dark:text-[#eef2f5]">
+              {t("hero.headline")}
             </h1>
 
             <p className="mx-auto mt-5 max-w-[50ch] text-[1rem] leading-relaxed text-[#5d6876] sm:mt-6 sm:text-[1.1rem] dark:text-[#aab3bf]">
-              Upload your contract free. HelloBrand breaks it down into plain English, highlights risks,
-              and shows the deliverables and payment terms before you save your first workspace free.
+              {t("hero.subheadline")}
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
@@ -106,7 +108,7 @@ export default async function LandingPage() {
                 eventName="landing_upload_cta_clicked"
                 className="inline-flex h-12 items-center justify-center gap-2 bg-primary px-7 text-[15px] font-semibold text-white shadow-md transition hover:bg-primary/92 hover:shadow-lg"
               >
-                Upload a Contract
+                {t("hero.cta_upload")}
                 <ArrowRight className="h-4 w-4" />
               </PublicFunnelLink>
               <PublicFunnelLink
@@ -114,12 +116,12 @@ export default async function LandingPage() {
                 eventName="landing_sample_cta_clicked"
                 className="inline-flex h-12 items-center justify-center border border-black/8 bg-white px-7 text-[15px] font-semibold text-foreground shadow-sm transition hover:bg-secondary dark:border-white/12 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
               >
-                Try a Sample Contract
+                {t("hero.cta_sample")}
               </PublicFunnelLink>
             </div>
 
             <p className="mt-4 text-[13px] text-[#9ba5b0] sm:text-sm dark:text-[#78828e]">
-              Private and secure. No legal knowledge needed. Built for creators.
+              {t("hero.trust_line")}
             </p>
 
             <div className="relative mx-auto mt-10 max-w-[1080px] sm:mt-14">
@@ -135,13 +137,12 @@ export default async function LandingPage() {
         <section className="bg-white dark:bg-[#101318]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="mx-auto max-w-[620px] text-center">
-              <Eyebrow>What HelloBrand pulls out</Eyebrow>
+              <Eyebrow>{t("features.eyebrow")}</Eyebrow>
               <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
-                Enough value to know whether the deal needs a closer look.
+                {t("features.headline")}
               </h2>
               <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                The first upload should already answer the questions creators care about before
-                anything gets saved into a workspace.
+                {t("features.body")}
               </p>
             </div>
 
@@ -149,18 +150,18 @@ export default async function LandingPage() {
               {[
                 {
                   icon: FileText,
-                  title: "Plain-English summary",
-                  body: "See what the contract is asking for without reading every clause line by line.",
+                  title: t("features.summary_title"),
+                  body: t("features.summary_body"),
                 },
                 {
                   icon: AlertTriangle,
-                  title: "Risk watchouts",
-                  body: "Spot usage rights, payment gaps, and other terms that deserve a second look.",
+                  title: t("features.risks_title"),
+                  body: t("features.risks_body"),
                 },
                 {
                   icon: Receipt,
-                  title: "Deliverables and payment",
-                  body: "Pull out what you owe, what the brand owes, and when each part should happen.",
+                  title: t("features.payment_title"),
+                  body: t("features.payment_body"),
                 },
               ].map((card) => {
                 const Icon = card.icon;
@@ -189,19 +190,18 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 md:py-20 lg:px-8 lg:py-28">
             <div className="grid items-center gap-8 md:gap-12 lg:grid-cols-[1fr_1.15fr]">
               <div>
-                <Eyebrow>Sample breakdown</Eyebrow>
+                <Eyebrow>{t("sample.eyebrow")}</Eyebrow>
                 <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  See the kind of output you get before you upload your own deal.
+                  {t("sample.headline")}
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  HelloBrand surfaces the plain-English summary, the risky terms, and the core money
-                  and deliverable details in one pass.
+                  {t("sample.body")}
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
-                    "Plain-language summary of the contract",
-                    "Risk flags with simple explanations",
-                    "A clear list of deliverables and payment timing",
+                    t("sample.bullets.summary"),
+                    t("sample.bullets.risks"),
+                    t("sample.bullets.payment"),
                   ].map((item) => (
                     <li
                       key={item}
@@ -219,7 +219,7 @@ export default async function LandingPage() {
                     payload={{ location: "sample_section" }}
                     className="inline-flex h-11 items-center justify-center gap-2 bg-primary px-5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/92"
                   >
-                    Try the sample contract
+                    {t("sample.cta")}
                     <ArrowRight className="h-4 w-4" />
                   </PublicFunnelLink>
                 </div>
@@ -232,47 +232,43 @@ export default async function LandingPage() {
                 <InboxPreview />
               </div>
               <div className="order-1 lg:order-2">
-                <Eyebrow>Save and track after</Eyebrow>
+                <Eyebrow>{t("save.eyebrow")}</Eyebrow>
                 <h2 className="mt-4 text-balance text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  Once the contract looks real, turn it into a workspace.
+                  {t("save.headline")}
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  The account step should happen after the value moment, when the creator wants to
-                  save the deal in a free workspace, track follow-up, and manage the thread in context.
+                  {t("save.body")}
                 </p>
                 <ul className="mt-5 space-y-3">
-                  {[
-                    "Keep brand emails attached to the saved deal",
-                    "Store the contract breakdown in one place",
-                    "Come back to the workspace without starting over",
-                  ].map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground"
-                    >
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#8ec6b1]" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
+                  {[t("save.bullets.email"), t("save.bullets.store"), t("save.bullets.return")].map(
+                    (item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-2.5 text-[0.94rem] text-muted-foreground"
+                      >
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#8ec6b1]" />
+                        <span>{item}</span>
+                      </li>
+                    )
+                  )}
                 </ul>
               </div>
             </div>
 
             <div className="mt-16 grid items-center gap-8 md:mt-24 md:gap-12 lg:grid-cols-[1fr_1.15fr]">
               <div>
-                <Eyebrow>Follow-through</Eyebrow>
+                <Eyebrow>{t("track.eyebrow")}</Eyebrow>
                 <h2 className="mt-4 text-[1.8rem] font-bold leading-[1] tracking-[-0.045em] text-foreground sm:text-[2.2rem]">
-                  Keep deliverables and payments from slipping after signature.
+                  {t("track.headline")}
                 </h2>
                 <p className="mt-4 text-[0.95rem] leading-relaxed text-muted-foreground sm:text-[1.05rem]">
-                  The free preview gets the user engaged. The saved workspace keeps the deal useful
-                  by tracking what is due and what is still unpaid.
+                  {t("track.body")}
                 </p>
                 <ul className="mt-5 space-y-3">
                   {[
-                    "Track due dates and outstanding balances",
-                    "Keep payment status beside the contract terms",
-                    "Stay organized after the initial contract review",
+                    t("track.bullets.dates"),
+                    t("track.bullets.status"),
+                    t("track.bullets.organized"),
                   ].map((item) => (
                     <li
                       key={item}
@@ -294,7 +290,7 @@ export default async function LandingPage() {
             <div className="mx-auto max-w-[620px] text-center">
               <Eyebrow>How it works</Eyebrow>
               <h2 className="mt-4 text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[2.4rem] md:text-[3rem]">
-                Upload, understand, then save it if it matters.
+                {t("howItWorks.headline")}
               </h2>
             </div>
 
@@ -302,18 +298,18 @@ export default async function LandingPage() {
               {[
                 {
                   step: "01",
-                  title: "Drop in a contract",
-                  body: "Upload a PDF, DOCX, DOC, or TXT file. See the full preview before signup.",
+                  title: t("howItWorks.steps.step1_title"),
+                  body: t("howItWorks.steps.step1_body"),
                 },
                 {
                   step: "02",
-                  title: "See the breakdown",
-                  body: "Get the plain-English summary, risk watchouts, payment details, and deliverables.",
+                  title: t("howItWorks.steps.step2_title"),
+                  body: t("howItWorks.steps.step2_body"),
                 },
                 {
                   step: "03",
-                  title: "Create your free workspace",
-                  body: "Save the deal for free when you want to keep it, manage follow-up, and return later.",
+                  title: t("howItWorks.steps.step3_title"),
+                  body: t("howItWorks.steps.step3_body"),
                 },
               ].map((item) => (
                 <article key={item.step} className="app-surface p-6">
@@ -335,14 +331,13 @@ export default async function LandingPage() {
         <section className="bg-primary dark:bg-[#1a3d30]">
           <div className="mx-auto max-w-[1200px] px-5 py-16 text-center sm:px-6 md:py-20 lg:px-8 lg:py-24">
             <p className="mx-auto mb-8 inline-block rounded-full bg-white/10 px-5 py-2 text-sm font-medium text-white/90 sm:mb-10">
-              The first upload takes less than 10 seconds
+              {t("finalCta.badge")}
             </p>
             <h2 className="mx-auto max-w-[18ch] text-[1.8rem] font-bold leading-[0.98] tracking-[-0.045em] text-white sm:text-[2.4rem] md:text-[3rem]">
-              Don’t sign another contract blindly.
+              {t("finalCta.headline")}
             </h2>
             <p className="mx-auto mt-4 max-w-[50ch] text-[0.95rem] leading-relaxed text-white/75 sm:mt-5 sm:text-[1.05rem]">
-              Start with one upload, understand the terms quickly, and save the deal in your first
-              free workspace.
+              {t("finalCta.body")}
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:justify-center">
               <PublicFunnelLink
@@ -351,7 +346,7 @@ export default async function LandingPage() {
                 payload={{ location: "final_cta" }}
                 className="inline-flex h-12 items-center justify-center gap-2 bg-white px-7 text-[15px] font-semibold text-primary shadow-md transition hover:bg-white/92"
               >
-                Upload Your First Contract
+                {t("finalCta.cta_upload")}
                 <ArrowRight className="h-4 w-4" />
               </PublicFunnelLink>
               <PublicFunnelLink
@@ -360,7 +355,7 @@ export default async function LandingPage() {
                 payload={{ location: "final_cta" }}
                 className="inline-flex h-12 items-center justify-center border border-white/20 bg-white/[0.08] px-7 text-[15px] font-semibold text-white transition hover:bg-white/[0.14]"
               >
-                Try a Sample Contract
+                {t("finalCta.cta_sample")}
               </PublicFunnelLink>
             </div>
           </div>
@@ -368,8 +363,8 @@ export default async function LandingPage() {
 
         <footer className="border-t border-black/[0.04] bg-white dark:border-white/[0.06] dark:bg-[#101318]">
           <div className="mx-auto flex max-w-[1200px] flex-col gap-3 px-5 py-6 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-8 sm:text-sm lg:px-8">
-            <p>&copy; 2026 HelloBrand</p>
-            <p>HelloBrand is not a law firm. This is not legal advice.</p>
+            <p>{t("footer.copyright")}</p>
+            <p>{t("footer.disclaimer")}</p>
           </div>
         </footer>
       </main>

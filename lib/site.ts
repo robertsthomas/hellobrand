@@ -6,9 +6,7 @@ function normalizeUrl(value: string | undefined) {
 }
 
 export function getSiteUrl() {
-  return normalizeUrl(
-    process.env.NEXT_PUBLIC_APP_URL || process.env.INTEGRATIONS_APP_URL
-  );
+  return normalizeUrl(process.env.NEXT_PUBLIC_APP_URL || process.env.INTEGRATIONS_APP_URL);
 }
 
 export function absoluteUrl(path = "") {
@@ -19,5 +17,5 @@ export function absoluteUrl(path = "") {
 export const siteConfig = {
   name: "HelloBrand",
   description:
-    "HelloBrand helps creators manage contracts, brand emails, deliverables, and payments in one sunny workspace."
+    "Upload any brand deal contract and get a plain-English breakdown with risk flags, deliverables, and payment terms. Free to start, no signup required.",
 };

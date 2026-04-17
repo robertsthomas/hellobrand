@@ -1,0 +1,102 @@
+{
+  "site": {
+    "name": "HelloBrand",
+    "description": "Sube un contrato de marca y obtén un análisis en lenguaje sencillo con alertas de riesgo, entregables y condiciones de pago. Gratis para empezar, sin registro."
+  },
+  "homepage": {
+    "hero": {
+      "headline": "No firmes otro contrato de marca sin leerlo.",
+      "subheadline": "Sube un contrato y obtén el análisis en lenguaje sencillo: riesgos, entregables y condiciones de pago, todo gratis. Sin registro.",
+      "cta_upload": "Subir un contrato",
+      "cta_sample": "Probar con un ejemplo",
+      "trust_line": "Sin registro. Sin jerga legal. 100% privado."
+    },
+    "features": {
+      "eyebrow": "Tu primera subida",
+      "headline": "Cada contrato desglosado en lo que realmente importa.",
+      "body": "Ve el resumen, los riesgos y los términos financieros sin leer cada línea.",
+      "summary_title": "Resumen en lenguaje sencillo",
+      "summary_body": "Entiende qué pide realmente el contrato, en palabras que entiendas.",
+      "risks_title": "Alertas de riesgo",
+      "risks_body": "Detecta trampas de derechos de uso, lagunas de pago y cláusulas que merecen una segunda mirada.",
+      "payment_title": "Entregables y pago",
+      "payment_body": "Ve qué debes, qué te debe la marca y cuándo vence todo."
+    },
+    "sample": {
+      "eyebrow": "Ver en acción",
+      "headline": "Prueba con un contrato de ejemplo antes de subir el tuyo.",
+      "body": "Obtén el resumen, alertas de riesgo y detalles de pago de un ejemplo real. Sin cuenta necesaria.",
+      "bullets": {
+        "summary": "Resumen en lenguaje sencillo de lo que realmente dice el contrato",
+        "risks": "Alertas de riesgo explicadas de forma simple",
+        "payment": "Entregables y plazos de pago de un vistazo"
+      },
+      "cta": "Probar el contrato de ejemplo"
+    },
+    "save": {
+      "eyebrow": "Guardar y seguir",
+      "headline": "Cuando el contrato te convenza, guárdalo en un espacio gratuito.",
+      "body": "Crea tu cuenta gratuita después del análisis, no antes. Guarda el contrato, correos de marca y seguimientos en un solo lugar.",
+      "bullets": {
+        "email": "Vincula los correos de marca al contrato",
+        "store": "Guarda el análisis completo del contrato",
+        "return": "Vuelve cuando quieras sin empezar de cero"
+      }
+    },
+    "track": {
+      "eyebrow": "Después de firmar",
+      "headline": "Sigue entregables y cobra pagos sin hojas de cálculo.",
+      "body": "Tu espacio guardado mantiene cada fecha límite, saldo pendiente y estado de pago justo al lado de los términos del contrato.",
+      "bullets": {
+        "dates": "Sigue fechas límite y saldos pendientes",
+        "status": "Mantén el estado de pago junto a los términos del contrato",
+        "organized": "Mantente organizado en todos tus contratos activos"
+      }
+    },
+    "howItWorks": {
+      "headline": "Tres pasos. Diez segundos. Gratis.",
+      "steps": {
+        "step1_title": "Sube un contrato",
+        "step1_body": "Sube un archivo PDF, DOCX o TXT. No necesitas cuenta para ver el análisis completo.",
+        "step2_title": "Ve el análisis",
+        "step2_body": "Resumen en lenguaje sencillo, alertas de riesgo, entregables y condiciones de pago en un solo paso.",
+        "step3_title": "Guárdalo gratis",
+        "step3_body": "Crea un espacio para seguir el contrato, hacer seguimiento con la marca y cobrar."
+      }
+    },
+    "finalCta": {
+      "badge": "La primera subida toma menos de 10 segundos",
+      "headline": "Tu próximo contrato no debería ser un juego de adivinanzas.",
+      "body": "Sube un contrato, ve el análisis completo y decide si vale la pena.",
+      "cta_upload": "Subir tu primer contrato",
+      "cta_sample": "Probar con un ejemplo"
+    },
+    "footer": {
+      "copyright": "© 2026 HelloBrand",
+      "disclaimer": "HelloBrand no es un bufete de abogados. Esto no es asesoría legal."
+    }
+  },
+  "pricing": {
+    "headline": "Empieza gratis. Sube de plan cuando los contratos se acumulen.",
+    "subheadline": "Desde tu primer contrato de marca hasta un portafolio completo de colaboraciones. Analiza gratis y crece según tus necesidades.",
+    "trust_line": "Cancela en cualquier momento. Sin permanencia. Una sola colaboración organizada puede cubrir varios meses de HelloBrand.",
+    "social_proof_headline": "Hecho para creadores que gestionan sus propios contratos",
+    "social_proof_body": "Desde creadores independientes hasta managers con varios talentos, HelloBrand mantiene el lado business de la influencia organizado.",
+    "testimonials": {
+      "jamie_quote": "Perdía el rastro de entregables y condiciones de pago entre cinco contratos de marca. HelloBrand detectó un error en un contrato que me habría costado $2,000.",
+      "jamie_name": "Jamie T.",
+      "jamie_role": "Creador de lifestyle, 120K seguidores",
+      "alex_quote": "Gestionar tres creadores antes significaba hojas de cálculo y deadlines perdidos. Ahora todo está en un solo lugar y la IA detecta conflictos antes de que sean problemas.",
+      "alex_name": "Alex R.",
+      "alex_role": "Manager de creadores, roster de 4 personas",
+      "morgan_quote": "La bandeja sincronizada lo cambió todo. Puedo ver correos de marca junto a los términos del contrato y acciones pendientes sin cambiar de pestaña. Vale cada centavo.",
+      "morgan_name": "Morgan K.",
+      "morgan_role": "Reviewer de tech, 85K suscriptores"
+    },
+    "footer": {
+      "free": "Plan gratuito disponible",
+      "trials": "Basic incluye 14 días de prueba. Premium incluye 7 días de prueba.",
+      "cancel": "Cancela o baja de plan en cualquier momento"
+    }
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "site": {
+    "name": "HelloBrand",
+    "description": "Téléchargez un contrat de partenariat et obtenez une analyse en langage clair avec les risques, les livrables et les conditions de paiement. Gratuit pour commencer, sans inscription."
+  },
+  "homepage": {
+    "hero": {
+      "headline": "Ne signez plus aucun contrat sans l'avoir lu.",
+      "subheadline": "Téléchargez un contrat et obtenez l'analyse en langage clair : risques, livrables et conditions de paiement, le tout gratuitement. Sans inscription.",
+      "cta_upload": "Télécharger un contrat",
+      "cta_sample": "Essayer un exemple",
+      "trust_line": "Sans inscription. Sans jargon juridique. 100% privé."
+    },
+    "features": {
+      "eyebrow": "Votre premier téléchargement",
+      "headline": "Chaque contrat décortiqué pour vous montrer l'essentiel.",
+      "body": "Visualisez le résumé, les risques et les termes financiers sans lire chaque ligne.",
+      "summary_title": "Résumé en langage clair",
+      "summary_body": "Comprenez ce que le contrat demande réellement, dans un langage accessible.",
+      "risks_title": "Alertes de risque",
+      "risks_body": "Détectez les pièges de droits d'utilisation, les lacunes de paiement et les clauses à vérifier.",
+      "payment_title": "Livrables et paiement",
+      "payment_body": "Voyez ce que vous devez, ce que la marque vous doit, et quand tout est dû."
+    },
+    "sample": {
+      "eyebrow": "Voir en action",
+      "headline": "Essayez un exemple de contrat avant de télécharger le vôtre.",
+      "body": "Obtenez le résumé, les alertes de risque et les détails de paiement d'un vrai exemple. Sans compte nécessaire.",
+      "bullets": {
+        "summary": "Résumé en langage clair de ce que le contrat dit réellement",
+        "risks": "Alertes de risque expliquées simplement",
+        "payment": "Livrables et échéances de paiement en un coup d'œil"
+      },
+      "cta": "Essayer le contrat exemple"
+    },
+    "save": {
+      "eyebrow": "Sauvegarder et suivre",
+      "headline": "Quand le contrat vous convient, sauvegardez-le dans un espace gratuit.",
+      "body": "Créez votre compte gratuit après l'analyse, pas avant. Gardez le contrat, les e-mails de marque et les suivis au même endroit.",
+      "bullets": {
+        "email": "Liez les e-mails de marque au contrat",
+        "store": "Stockez l'analyse complète du contrat",
+        "return": "Revenez quand vous voulez sans recommencer"
+      }
+    },
+    "track": {
+      "eyebrow": "Après la signature",
+      "headline": "Suivez les livrables et les paiements sans tableur.",
+      "body": "Votre espace sauvegardé garde chaque date limite, solde impayé et statut de paiement juste à côté des termes du contrat.",
+      "bullets": {
+        "dates": "Suivez les dates limites et les soldes impayés",
+        "status": "Gardez le statut de paiement à côté des termes du contrat",
+        "organized": "Restez organisé sur tous vos contrats en cours"
+      }
+    },
+    "howItWorks": {
+      "headline": "Trois étapes. Dix secondes. Gratuit.",
+      "steps": {
+        "step1_title": "Déposez un contrat",
+        "step1_body": "Téléchargez un fichier PDF, DOCX ou TXT. Pas de compte nécessaire pour voir l'analyse complète.",
+        "step2_title": "Voyez l'analyse",
+        "step2_body": "Résumé en langage clair, alertes de risque, livrables et conditions de paiement en un seul passage.",
+        "step3_title": "Sauvegardez gratuitement",
+        "step3_body": "Créez un espace pour suivre le contrat, faire le suivi avec la marque et être payé."
+      }
+    },
+    "finalCta": {
+      "badge": "Le premier téléchargement prend moins de 10 secondes",
+      "headline": "Votre prochain contrat ne devrait pas être un jeu de devinettes.",
+      "body": "Téléchargez un contrat, voyez l'analyse complète et décidez si le contrat en vaut la peine.",
+      "cta_upload": "Télécharger votre premier contrat",
+      "cta_sample": "Essayer un exemple"
+    },
+    "footer": {
+      "copyright": "© 2026 HelloBrand",
+      "disclaimer": "HelloBrand n'est pas un cabinet d'avocats. Ceci n'est pas un conseil juridique."
+    }
+  },
+  "pricing": {
+    "headline": "Commencez gratuitement. Passez à la version supérieure quand les contrats s'accumulent.",
+    "subheadline": "De votre premier contrat de marque à un portefeuille complet de partenariats. Analysez gratuitement, puis évoluez selon vos besoins.",
+    "trust_line": "Annulez à tout moment. Sans engagement. Un seul partenariat organisé peut couvrir plusieurs mois de HelloBrand.",
+    "social_proof_headline": "Conçu pour les créateurs qui gèrent leurs propres contrats",
+    "social_proof_body": "Des créateurs en solo aux managers multi-talents, HelloBrand garde le côté business de l'influence organisé.",
+    "testimonials": {
+      "jamie_quote": "Je perdais le fil des livrables et des conditions de paiement sur cinq contrats de marque. HelloBrand a repéré une erreur dans un contrat qui m'aurait coûté 2 000 $.",
+      "jamie_name": "Jamie T.",
+      "jamie_role": "Créateur lifestyle, 120K abonnés",
+      "alex_quote": "Gérer trois créateurs signait tableurs et deadlines manquées. Maintenant tout est au même endroit et l'IA signale les conflits avant qu'ils ne deviennent des problèmes.",
+      "alex_name": "Alex R.",
+      "alex_role": "Manager de créateurs, roster de 4 personnes",
+      "morgan_quote": "La boîte de réception synchronisée a tout changé. Je vois les e-mails de marque à côté des termes du contrat et des actions à faire sans changer d'onglet. Ça vaut chaque centime.",
+      "morgan_name": "Morgan K.",
+      "morgan_role": "Testeur tech, 85K abonnés"
+    },
+    "footer": {
+      "free": "Plan gratuit disponible",
+      "trials": "Basic inclut un essai de 14 jours. Premium inclut un essai de 7 jours.",
+      "cancel": "Annulez ou rétrogradez à tout moment"
+    }
+  }
+}

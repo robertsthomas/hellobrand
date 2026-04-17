@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import {
-  ClerkProvider
-} from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
@@ -16,14 +14,14 @@ import { getSiteUrl, siteConfig } from "@/lib/site";
 
 const inter = Inter({
   variable: "--font-inter",
-  subsets: ["latin"]
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
     default: "HelloBrand",
-    template: "%s | HelloBrand"
+    template: "%s | HelloBrand",
   },
   applicationName: siteConfig.name,
   description: siteConfig.description,
@@ -33,28 +31,28 @@ export const metadata: Metadata = {
     "creator workflow",
     "deliverable tracking",
     "creator payments",
-    "influencer contract review"
+    "influencer contract review",
   ],
   openGraph: {
     type: "website",
     siteName: siteConfig.name,
     title: siteConfig.name,
     description: siteConfig.description,
-    url: getSiteUrl()
+    url: getSiteUrl(),
   },
   twitter: {
     card: "summary_large_image",
     title: siteConfig.name,
-    description: siteConfig.description
-  }
+    description: siteConfig.description,
+  },
 };
 
 export const viewport: Viewport = {
   colorScheme: "light dark",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#121518" }
-  ]
+    { media: "(prefers-color-scheme: dark)", color: "#121518" },
+  ],
 };
 
 async function AppProviders({ children }: { children: ReactNode }) {
@@ -65,8 +63,8 @@ async function AppProviders({ children }: { children: ReactNode }) {
       waitlistUrl="/waitlist"
       appearance={{
         layout: {
-          showOptionalFields: false
-        }
+          showOptionalFields: false,
+        },
       }}
     >
       <PostHogProvider>
@@ -82,13 +80,20 @@ async function AppProviders({ children }: { children: ReactNode }) {
   );
 }
 
-export default function RootLayout({
-  children
+async function getLocaleFromCookies(): Promise<string> {
+  const cookieStore = await cookies();
+  return cookieStore.get("NEXT_LOCALE")?.value || "en";
+}
+
+export default async function RootLayout({
+  children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const locale = await getLocaleFromCookies();
+
   return (
-    <html lang="en" suppressHydrationWarning className="h-full">
+    <html lang={locale} suppressHydrationWarning className="h-full">
       <body className={`${inter.variable} min-h-dvh bg-background`}>
         <a href="#main-content" className="skip-link">
           Skip to content
