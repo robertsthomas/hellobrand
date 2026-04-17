@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
-import { completeDirectDocumentsToIntakeSessionForViewer } from "@/lib/intake";
+import { completeDirectDocumentsToIntakeSessionForViewer } from "@/lib/intake/sessions";
 import { startServerDebug } from "@/lib/server-debug";
 
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
   const debug = startServerDebug("api_intake_documents_direct_complete", {
     method: request.method,
     path: `/api/intake/${sessionId}/documents/direct/complete`,
-    sessionId
+    sessionId,
   });
 
   try {
@@ -31,14 +31,14 @@ export async function POST(
     const session = await completeDirectDocumentsToIntakeSessionForViewer(viewer, sessionId, {
       succeededDocumentIds: body.succeededDocumentIds ?? [],
       failedUploads: body.failedUploads ?? [],
-      startProcessing: body.startProcessing
+      startProcessing: body.startProcessing,
     });
 
     debug.complete({
       viewerId: viewer.id,
       status: session.status,
       succeededCount: body.succeededDocumentIds?.length ?? 0,
-      failedCount: body.failedUploads?.length ?? 0
+      failedCount: body.failedUploads?.length ?? 0,
     });
 
     return ok({ session }, { status: 201 });

@@ -4,28 +4,26 @@ import { AlertTriangle, ArrowRight, Trash2 } from "lucide-react";
 import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
-import {
-  BriefGenerator,
-  BriefOverview,
-  ConflictWarnings,
-  DealEmailPanel,
-  DealNotesDrawer,
-  DealSummaryPanel,
-  DeleteDealDialog,
-  DeliverablesList,
-  DeliverableTracker,
-  DisclosureObligations,
-  DocumentsPanel,
-  FeatureUpgradeCard,
-  PendingChangesBanner,
-  RiskFlags,
-  ScrollableTabsList,
-  TermsEditor,
-  UploadContractForm,
-  WorkspaceDetailHeader,
-  WorkspaceTabs,
-} from "@/components/workspace";
+import { BriefGenerator } from "@/components/brief-generator";
+import { BriefOverview } from "@/components/brief-overview";
+import { ConflictWarnings } from "@/components/conflict-warnings";
+import { DealEmailPanel } from "@/components/deal-email-panel";
+import { DealNotesDrawer } from "@/components/deal-notes-drawer";
+import { DealSummaryPanel } from "@/components/deal-summary-panel";
+import { DeleteDealDialog } from "@/components/delete-deal-dialog";
+import { DeliverablesList } from "@/components/deliverables-list";
+import { DeliverableTracker } from "@/components/deliverable-tracker";
+import { DisclosureObligations } from "@/components/disclosure-obligations";
+import { DocumentsPanel } from "@/components/documents-panel";
+import { FeatureUpgradeCard } from "@/components/feature-locked-state";
+import { PendingChangesBanner } from "@/components/pending-changes-banner";
+import { RiskFlags } from "@/components/risk-flags";
+import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { DealDetailSkeleton } from "@/components/skeletons";
+import { TermsEditor } from "@/components/terms-editor";
+import { UploadContractForm } from "@/components/upload-contract-form";
+import { WorkspaceTabs } from "@/components/workspace-tabs";
+import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
@@ -61,9 +59,11 @@ async function DealDetailContent({
   params: Promise<{ dealId: string }>;
   searchParams?: Promise<{ tab?: string }>;
 }) {
-  const { dealId } = await params;
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const viewer = await requireViewer();
+  const [{ dealId }, resolvedSearchParams, viewer] = await Promise.all([
+    params,
+    searchParams ?? Promise.resolve(undefined),
+    requireViewer(),
+  ]);
   const entitlements = await getViewerEntitlements(viewer);
   const hasPremiumInbox = entitlements.features.premium_inbox;
   const { aggregate, linkedEmailThreads, emailAccounts } = await loadWorkspaceRouteData(

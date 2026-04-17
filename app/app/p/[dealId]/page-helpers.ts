@@ -5,7 +5,7 @@
 import { getDisplayDealLabels } from "@/lib/deal-labels";
 import {
   listEmailAccountsForViewer,
-  listLinkedEmailThreadsForViewerDeal
+  listLinkedEmailThreadsForViewerDeal,
 } from "@/lib/email/service";
 import { buildNormalizedIntakeRecord } from "@/lib/intake-normalization";
 import type { DealAggregate, Viewer } from "@/lib/types";
@@ -26,7 +26,11 @@ export function buildNextAction(deal: {
   pendingExtraction: boolean;
 }) {
   if (deal.pendingExtraction) {
-    return { label: "Review new changes from re-extraction", tone: "accent" as const, tab: "terms" };
+    return {
+      label: "Review new changes from re-extraction",
+      tone: "accent" as const,
+      tab: "terms",
+    };
   }
   if (deal.paymentStatus === "late") {
     return { label: "Send payment follow-up", tone: "warning" as const, tab: "deliverables" };
@@ -49,7 +53,8 @@ export function buildNextAction(deal: {
 
 export function nextActionToneClass(tone: "warning" | "accent" | "neutral") {
   if (tone === "warning") return "border-clay/20 bg-clay/[0.04] dark:border-clay/25";
-  if (tone === "accent") return "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]";
+  if (tone === "accent")
+    return "border-[#d7e7df] bg-[#f3f8f5] dark:border-[#294137] dark:bg-[#12201a]";
   return "border-black/8 bg-sand/35 dark:border-white/10 dark:bg-white/[0.04]";
 }
 
@@ -65,7 +70,7 @@ export function resolveWorkspaceTab(input: {
     ...(input.hasInvoice ? {} : { invoices: "deliverables" }),
     risks: "terms",
     brief: "deliverables",
-    notes: "overview"
+    notes: "overview",
   };
   const resolvedTab = tabRedirects[input.rawTab] ?? input.rawTab;
 
@@ -86,7 +91,7 @@ export function buildWorkspaceAttentionItems(aggregate: DealAggregate) {
   if (highRiskCount > 0) {
     attentionItems.push({
       id: "risks",
-      label: `${highRiskCount} high-risk clause${highRiskCount === 1 ? "" : "s"} flagged`
+      label: `${highRiskCount} high-risk clause${highRiskCount === 1 ? "" : "s"} flagged`,
     });
   }
   if (aggregate.deal.paymentStatus === "late") {
@@ -95,7 +100,7 @@ export function buildWorkspaceAttentionItems(aggregate: DealAggregate) {
   if ((aggregate.conflictResults?.length ?? 0) > 0) {
     attentionItems.push({
       id: "conflicts",
-      label: `${aggregate.conflictResults.length} cross-partnership conflict${aggregate.conflictResults.length === 1 ? "" : "s"}`
+      label: `${aggregate.conflictResults.length} cross-partnership conflict${aggregate.conflictResults.length === 1 ? "" : "s"}`,
     });
   }
 
@@ -106,7 +111,7 @@ export function buildWorkspaceDisplayState(aggregate: DealAggregate) {
   const normalized = buildNormalizedIntakeRecord(aggregate);
   const displayLabels = getDisplayDealLabels({
     brandName: normalized?.brandName ?? aggregate.deal.brandName,
-    campaignName: normalized?.contractTitle ?? aggregate.deal.campaignName
+    campaignName: normalized?.contractTitle ?? aggregate.deal.campaignName,
   });
 
   return {
@@ -114,12 +119,10 @@ export function buildWorkspaceDisplayState(aggregate: DealAggregate) {
     displayCampaignName:
       displayLabels.campaignName ??
       normalized?.contractTitle ??
-      deriveWorkspaceTitleFromFileNames(
-        aggregate.documents.map((document) => document.fileName)
-      ) ??
+      deriveWorkspaceTitleFromFileNames(aggregate.documents.map((document) => document.fileName)) ??
       aggregate.deal.campaignName,
     displayBrandName: displayLabels.brandName ?? aggregate.deal.brandName,
-    nextDeliverableValue: formatDate(aggregate.deal.nextDeliverableDate)
+    nextDeliverableValue: formatDate(aggregate.deal.nextDeliverableDate),
   };
 }
 
@@ -128,27 +131,23 @@ export async function loadWorkspaceRouteData(
   dealId: string,
   hasPremiumInbox: boolean
 ) {
-  const [{ getCachedDealForViewer }, routeEmails] = await Promise.all([
-    import("@/lib/cached-data"),
-    hasPremiumInbox
-      ? Promise.all([
-          listLinkedEmailThreadsForViewerDeal(viewer, dealId),
-          listEmailAccountsForViewer(viewer)
-        ])
-      : Promise.resolve([
-          [],
-          []
-        ] as [
-          Awaited<ReturnType<typeof listLinkedEmailThreadsForViewerDeal>>,
-          Awaited<ReturnType<typeof listEmailAccountsForViewer>>
-        ])
-  ]);
-
-  const aggregate = await getCachedDealForViewer(viewer, dealId);
+  const aggregatePromise = import("@/lib/cached-data").then(({ getCachedDealForViewer }) =>
+    getCachedDealForViewer(viewer, dealId)
+  );
+  const routeEmailsPromise = hasPremiumInbox
+    ? Promise.all([
+        listLinkedEmailThreadsForViewerDeal(viewer, dealId),
+        listEmailAccountsForViewer(viewer),
+      ])
+    : Promise.resolve([[], []] as [
+        Awaited<ReturnType<typeof listLinkedEmailThreadsForViewerDeal>>,
+        Awaited<ReturnType<typeof listEmailAccountsForViewer>>,
+      ]);
+  const [aggregate, routeEmails] = await Promise.all([aggregatePromise, routeEmailsPromise]);
 
   return {
     aggregate,
     linkedEmailThreads: routeEmails[0],
-    emailAccounts: routeEmails[1]
+    emailAccounts: routeEmails[1],
   };
 }

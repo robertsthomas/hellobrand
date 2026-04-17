@@ -6,8 +6,8 @@ import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { uploadDocumentsForViewer, deleteDealForViewer } from "@/lib/deals";
-import { getIntakeSessionForViewer } from "@/lib/intake";
 import { fail, ok } from "@/lib/http";
+import { getIntakeSessionForViewer } from "@/lib/intake/review";
 import { getRepository } from "@/lib/repository";
 
 export async function POST(
@@ -56,12 +56,14 @@ export async function POST(
 
     // Upload extracted text to target deal
     if (pastedTexts.length > 0) {
-      for (const text of pastedTexts) {
-        await uploadDocumentsForViewer(viewer, targetDealId, {
-          pastedText: text,
-          startProcessing: true
-        });
-      }
+      await Promise.all(
+        pastedTexts.map((text) =>
+          uploadDocumentsForViewer(viewer, targetDealId, {
+            pastedText: text,
+            startProcessing: true,
+          })
+        )
+      );
     }
 
     // Delete the source draft deal
@@ -70,11 +72,10 @@ export async function POST(
     return ok({
       merged: true,
       targetDealId,
-      documentsTransferred: sourceDocs.length
+      documentsTransferred: sourceDocs.length,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not merge workspaces.";
+    const message = error instanceof Error ? error.message : "Could not merge workspaces.";
     return fail(message, 500);
   }
 }

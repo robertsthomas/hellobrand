@@ -23,8 +23,9 @@ import { listNotificationsForViewer } from "@/lib/notification-service";
 import { buildSidebarMilestones } from "@/lib/sidebar-milestones";
 
 export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
-  const viewer = await requireViewer();
-  const appSettings = await getAppSettings();
+  const localePromise = getLocale();
+  const messagesPromise = getMessages();
+  const [viewer, appSettings] = await Promise.all([requireViewer(), getAppSettings()]);
 
   if (!appSettings.appAccessEnabled) {
     return (
@@ -36,22 +37,33 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
     );
   }
 
-  const [profile, onboardingState, dealAggregates, notificationFeed, entitlements, featureFlags] =
-    await Promise.all([
-      getCachedProfile(viewer),
-      getCachedOnboardingState(viewer),
-      getCachedDealAggregates(viewer),
-      listNotificationsForViewer(viewer, {
-        limit: 20,
-        syncComputed: false,
-      }),
-      getViewerEntitlements(viewer),
-      getAppFeatureFlags(),
-    ]);
-  const emailAccounts = entitlements.features.email_connections
-    ? await listEmailAccountsForViewer(viewer)
-    : [];
-  const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
+  const entitlementsPromise = getViewerEntitlements(viewer);
+  const [
+    profile,
+    onboardingState,
+    dealAggregates,
+    notificationFeed,
+    entitlements,
+    featureFlags,
+    emailAccounts,
+    locale,
+    messages,
+  ] = await Promise.all([
+    getCachedProfile(viewer),
+    getCachedOnboardingState(viewer),
+    getCachedDealAggregates(viewer),
+    listNotificationsForViewer(viewer, {
+      limit: 20,
+      syncComputed: false,
+    }),
+    entitlementsPromise,
+    getAppFeatureFlags(),
+    entitlementsPromise.then((resolvedEntitlements) =>
+      resolvedEntitlements.features.email_connections ? listEmailAccountsForViewer(viewer) : []
+    ),
+    localePromise,
+    messagesPromise,
+  ]);
 
   const isOnboardingComplete = !!onboardingState.profileOnboardingCompletedAt;
   const hasActiveWorkspace = dealAggregates.length > 0;

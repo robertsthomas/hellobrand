@@ -2,7 +2,9 @@ import { Suspense } from "react";
 
 import { PlanTier } from "@prisma/client";
 
-import { EmailConnectionsPanel, FeatureUpgradeCard, SettingsEditor } from "@/components/settings";
+import { EmailConnectionsPanel } from "@/components/email-connections-panel";
+import { FeatureUpgradeCard } from "@/components/feature-locked-state";
+import { SettingsEditor } from "@/components/settings-editor";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { getCachedProfile } from "@/lib/cached-data";
@@ -48,8 +50,10 @@ async function SettingsContent({
   searchParams?: Promise<{ email_status?: string; email_error?: string; email_provider?: string }>;
 }) {
   const viewer = await requireViewer();
-  const entitlements = await getViewerEntitlements(viewer);
-  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const [entitlements, resolvedSearchParams] = await Promise.all([
+    getViewerEntitlements(viewer),
+    searchParams ?? Promise.resolve(undefined),
+  ]);
   const [profile, emailAccounts, providerFlags] = await Promise.all([
     getCachedProfile(viewer),
     entitlements.features.email_connections

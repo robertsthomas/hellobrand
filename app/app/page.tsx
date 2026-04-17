@@ -8,14 +8,12 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 
-import {
-  ConflictWarnings,
-  DashboardGreeting,
-  DashboardSkeleton,
-  DisclosureObligations,
-  QuickActionsPanel,
-  RecentDealCardMenu,
-} from "@/components/dashboard";
+import { ConflictWarnings } from "@/components/conflict-warnings";
+import { DashboardGreeting } from "@/components/dashboard-greeting";
+import { QuickActionsPanel } from "@/components/quick-actions-panel";
+import { RecentDealCardMenu } from "@/components/recent-deal-card-menu";
+import { DashboardSkeleton } from "@/components/skeletons";
+import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { requireViewer } from "@/lib/auth";
@@ -38,8 +36,7 @@ export default function WorkspaceDashboardPage() {
 }
 
 async function DashboardContent() {
-  const t = await getTranslations("appDashboard");
-  const viewer = await requireViewer();
+  const [t, viewer] = await Promise.all([getTranslations("appDashboard"), requireViewer()]);
   const [aggregates, intakeDrafts] = await Promise.all([
     getCachedDealAggregates(viewer),
     getCachedIntakeDrafts(viewer),
@@ -160,7 +157,9 @@ async function DashboardContent() {
                     </div>
 
                     <div className="flex items-center justify-between md:block">
-                      <span className="text-xs text-muted-foreground md:hidden">{t("columns.due")}</span>
+                      <span className="text-xs text-muted-foreground md:hidden">
+                        {t("columns.due")}
+                      </span>
                       <span className="text-sm text-muted-foreground">
                         {formatDate(deal.nextDeliverableDate)}
                       </span>
@@ -291,7 +290,9 @@ async function DashboardContent() {
             <div className="flex items-start gap-3 border border-black/8 bg-white px-5 py-5 dark:border-white/10 dark:bg-[#15191f]">
               <Receipt className="h-4 w-4 shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">{t("sections.payments.eyebrow")}</span>{" "}
+                <span className="font-medium text-foreground">
+                  {t("sections.payments.eyebrow")}
+                </span>{" "}
                 · {t("sections.payments.empty")}
               </p>
             </div>

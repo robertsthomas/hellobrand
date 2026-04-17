@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 
 import { requireApiViewer } from "@/lib/auth";
 import { fail, ok } from "@/lib/http";
-import { registerDirectDocumentsToIntakeSessionForViewer } from "@/lib/intake";
+import { registerDirectDocumentsToIntakeSessionForViewer } from "@/lib/intake/sessions";
 import { startServerDebug } from "@/lib/server-debug";
 
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
   const debug = startServerDebug("api_intake_documents_direct_register", {
     method: request.method,
     path: `/api/intake/${sessionId}/documents/direct/register`,
-    sessionId
+    sessionId,
   });
 
   try {
@@ -34,14 +34,14 @@ export async function POST(
 
     const result = await registerDirectDocumentsToIntakeSessionForViewer(viewer, sessionId, {
       files: body.files,
-      pastedText: body.pastedText
+      pastedText: body.pastedText,
     });
 
     debug.complete({
       viewerId: viewer.id,
       mode: result.registration.mode,
       fileCount: body.files?.length ?? 0,
-      documentCount: result.registration.documents.length
+      documentCount: result.registration.documents.length,
     });
 
     return ok({ session: result.session, registration: result.registration }, { status: 201 });

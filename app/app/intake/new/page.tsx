@@ -10,22 +10,31 @@ import {
 } from "@/components/intake-flow";
 import { CardSkeleton } from "@/components/skeletons";
 import { requireViewer } from "@/lib/auth";
-import { getIntakeSessionForViewer, listIntakeDraftsForViewer } from "@/lib/intake";
+import { listIntakeDraftsForViewer } from "@/lib/intake/drafts";
+import { getIntakeSessionForViewer } from "@/lib/intake/review";
 
 export default function NewIntakePage({
-  searchParams
+  searchParams,
 }: {
   searchParams: Promise<{ mode?: string; draft?: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="p-4 sm:p-6 lg:p-8"><div className="mx-auto max-w-6xl"><CardSkeleton /></div></div>}>
+    <Suspense
+      fallback={
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto max-w-6xl">
+            <CardSkeleton />
+          </div>
+        </div>
+      }
+    >
       <NewIntakeContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
 async function NewIntakeContent({
-  searchParams
+  searchParams,
 }: {
   searchParams: Promise<{ mode?: string; draft?: string }>;
 }) {
@@ -44,20 +53,11 @@ async function NewIntakeContent({
 
     initialDraft = {
       sessionId: payload.session.id,
-      mode:
-        payload.session.inputSource === "paste"
-          ? "paste"
-          : initialMode,
-      brandName:
-        payload.session.draftBrandName ??
-        payload.aggregate?.deal.brandName ??
-        "",
-      campaignName:
-        payload.session.draftCampaignName ??
-        payload.aggregate?.deal.campaignName ??
-        "",
+      mode: payload.session.inputSource === "paste" ? "paste" : initialMode,
+      brandName: payload.session.draftBrandName ?? payload.aggregate?.deal.brandName ?? "",
+      campaignName: payload.session.draftCampaignName ?? payload.aggregate?.deal.campaignName ?? "",
       notes: payload.session.draftNotes ?? "",
-      pastedText: payload.session.draftPastedText ?? ""
+      pastedText: payload.session.draftPastedText ?? "",
     };
   }
 
@@ -77,9 +77,7 @@ async function NewIntakeContent({
             <form action={deleteIntakeDraftAction}>
               <input type="hidden" name="sessionId" value={initialDraft.sessionId} />
               <input type="hidden" name="redirectTo" value="/app" />
-              <DeleteDraftButton
-                className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60"
-              >
+              <DeleteDraftButton className="inline-flex items-center gap-2 rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-black/60 transition hover:border-clay/20 hover:text-clay dark:border-white/10 dark:text-white/60">
                 <Trash2 className="h-4 w-4" />
                 Delete draft
               </DeleteDraftButton>
