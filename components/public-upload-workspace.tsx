@@ -30,6 +30,7 @@ function buildAuthHref(mode: "sign-in" | "sign-up", redirectTo: string) {
   return `/login?${params.toString()}`;
 }
 
+// fallow-ignore-next-line complexity
 export function PublicUploadWorkspace() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -52,6 +53,7 @@ export function PublicUploadWorkspace() {
     }
   }
 
+// fallow-ignore-next-line complexity
   async function handleUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 

@@ -4,14 +4,11 @@
  */
 export {
   createIntakeSessionForViewer,
-  appendDocumentsToIntakeSessionForViewer,
-  registerDirectDocumentsToIntakeSessionForViewer,
-  completeDirectDocumentsToIntakeSessionForViewer
+  appendDocumentsToIntakeSessionForViewer
 } from "./sessions";
 
 export {
   createDraftIntakeSessionForViewer,
-  updateIntakeDraftForViewer,
   listIntakeDraftsForViewer,
   deleteIntakeDraftForViewer
 } from "./drafts";

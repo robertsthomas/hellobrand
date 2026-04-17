@@ -449,6 +449,7 @@ function fallbackSummary(thread: EmailThreadDetail) {
  * Includes: campaign/brand info, key payment/terms fields, summaries, risk flags,
  * documents, and extraction evidence.
  */
+// fallow-ignore-next-line complexity
 function workspaceContext(partnership: DealAggregate | null) {
   if (!partnership) {
     return "No linked workspace context.";
@@ -625,6 +626,7 @@ function fallbackDraft(
  * Gathers context from: thread brief, workspace terms, discrepancies between email and
  * contract, action items, private notes, existing draft, custom instructions, and signature.
  */
+// fallow-ignore-next-line complexity
 function buildEmailReplyDraftRequest(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null,

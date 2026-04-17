@@ -29,7 +29,7 @@ import {
 
 import { getUploadedFiles, redirectToCreatedBatch } from "./intake-shared";
 
-export async function startIntakeAction(formData: FormData) {
+async function startIntakeAction(formData: FormData) {
   const debug = startServerDebug("action_start_intake", {
     action: "startIntakeAction"
   });
@@ -90,7 +90,7 @@ export async function startIntakeAction(formData: FormData) {
   }
 }
 
-export async function retryIntakeSessionAction(formData: FormData) {
+async function retryIntakeSessionAction(formData: FormData) {
   const sessionId = String(formData.get("sessionId") ?? "");
   const debug = startServerDebug("action_retry_intake", {
     action: "retryIntakeSessionAction",

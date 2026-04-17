@@ -13,7 +13,7 @@ function normalizeBaseUrl(value: string | undefined) {
   return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
 }
 
-export function getAllowedEmailAppBaseUrls() {
+function getAllowedEmailAppBaseUrls() {
   return Array.from(
     new Set(
       [process.env.NEXT_PUBLIC_APP_URL, process.env.INTEGRATIONS_APP_URL, "http://localhost:3011"]
@@ -149,7 +149,7 @@ export const outlookScopes = [
 
 export const yahooScopes = ["openid", "profile", "email", "mail-r", "mail-w"];
 
-export function getEmailSummaryModel() {
+function getEmailSummaryModel() {
   return (
     process.env.OPENROUTER_MODEL_EMAIL || process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash"
   );

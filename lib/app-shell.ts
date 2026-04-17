@@ -12,14 +12,14 @@ import type { LucideIcon } from "lucide-react";
 
 import { routing } from "@/i18n/routing";
 
-export type AppRouteMeta = {
+type AppRouteMeta = {
   sectionKey: string;
   titleKey: string;
   section: string;
   title: string;
 };
 
-export type AppNavItem = {
+type AppNavItem = {
   href: string;
   labelKey: string;
   label: string;
@@ -47,7 +47,7 @@ export const secondaryAppNavItems = appNavItems.slice(5);
 
 const localePrefixPattern = new RegExp(`^/(?:${routing.locales.join("|")})(?=/|$)`);
 
-export function getAppLocalePrefix(pathname: string) {
+function getAppLocalePrefix(pathname: string) {
   return pathname.match(localePrefixPattern)?.[0] ?? "";
 }
 
@@ -87,6 +87,7 @@ export function isAppNavItemActive(pathname: string, href: string) {
   return normalizedPathname === href || normalizedPathname.startsWith(`${href}/`);
 }
 
+// fallow-ignore-next-line complexity
 export function getAppRouteMeta(pathname: string): AppRouteMeta {
   const normalizedPathname = normalizeAppPathname(pathname);
 

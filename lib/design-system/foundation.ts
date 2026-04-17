@@ -1,17 +1,17 @@
-export type DesignSystemColorToken = {
+type DesignSystemColorToken = {
   name: string;
   tailwindToken: string;
   cssVariable: string;
   usage: string;
 };
 
-export type DesignSystemTypeRole = {
+type DesignSystemTypeRole = {
   name: string;
   className: string;
   usage: string;
 };
 
-export type DesignSystemLayer = {
+type DesignSystemLayer = {
   name: string;
   path: string;
   purpose: string;

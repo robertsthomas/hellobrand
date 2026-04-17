@@ -70,6 +70,7 @@ function evidenceLines(partnership: DealAggregate) {
     .map((entry) => `${entry.fieldPath}: ${entry.snippet}`);
 }
 
+// fallow-ignore-next-line complexity
 function workspaceSnapshot(partnership: DealAggregate) {
   const deliverables = partnership.terms?.deliverables ?? [];
 

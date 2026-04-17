@@ -116,7 +116,7 @@ export function FeatureUpgradeCard({
 /**
  * Full-page centered upgrade state — for pages entirely locked behind a tier.
  */
-export function FeatureLockedState({
+function FeatureLockedState({
   icon,
   title,
   description,

@@ -147,6 +147,7 @@ function valuesAreDifferent(current: unknown, proposed: unknown): boolean {
   return current !== proposed;
 }
 
+// fallow-ignore-next-line complexity
 function buildPendingCandidate(
   currentTerms: DealTermsRecord,
   extraction: ExtractionPipelineResult

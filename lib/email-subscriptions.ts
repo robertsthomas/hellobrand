@@ -4,9 +4,9 @@ import { getAppBaseUrl } from "@/lib/email/config";
 import { decodeBase64Url, encodeBase64Url } from "@/lib/email/crypto";
 import { prisma } from "@/lib/prisma";
 
-export const EMAIL_SUBSCRIPTION_CATEGORIES = ["product_updates"] as const;
+const EMAIL_SUBSCRIPTION_CATEGORIES = ["product_updates"] as const;
 
-export type EmailSubscriptionCategory =
+type EmailSubscriptionCategory =
   (typeof EMAIL_SUBSCRIPTION_CATEGORIES)[number];
 
 let hasWarnedAboutMissingSubscriptionTable = false;

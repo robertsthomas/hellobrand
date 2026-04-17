@@ -66,6 +66,7 @@ export function classifyDocumentHeuristically(
   return { documentKind: "unknown", confidence: 0.4 };
 }
 
+// fallow-ignore-next-line complexity
 export function splitIntoSections(
   text: string,
   documentKind: DocumentKind

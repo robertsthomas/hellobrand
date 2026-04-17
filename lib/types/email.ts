@@ -6,16 +6,16 @@
 import type { EmailProvider } from "./common";
 import type { ConflictResult, DealRecord } from "./deals";
 
-export type EmailAccountStatus =
+type EmailAccountStatus =
   | "connected"
   | "syncing"
   | "reconnect_required"
   | "error"
   | "disconnected";
 export type EmailDirection = "inbound" | "outbound";
-export type EmailLinkSource = "manual" | "ai_suggested" | "rule_based";
+type EmailLinkSource = "manual" | "ai_suggested" | "rule_based";
 export type EmailLinkRole = "primary" | "reference";
-export type EmailCandidateStatus = "suggested" | "confirmed" | "rejected";
+type EmailCandidateStatus = "suggested" | "confirmed" | "rejected";
 export type EmailDealEventCategory =
   | "payment"
   | "timeline"
@@ -24,9 +24,9 @@ export type EmailDealEventCategory =
   | "rights"
   | "attachment"
   | "ask";
-export type EmailTermSuggestionStatus = "pending" | "applied" | "dismissed";
-export type EmailActionItemStatus = "pending" | "completed" | "dismissed";
-export type EmailActionItemUrgency = "low" | "medium" | "high";
+type EmailTermSuggestionStatus = "pending" | "applied" | "dismissed";
+type EmailActionItemStatus = "pending" | "completed" | "dismissed";
+type EmailActionItemUrgency = "low" | "medium" | "high";
 export type NegotiationStance = "firm" | "collaborative" | "exploratory";
 export type EmailThreadWorkflowState =
   | "unlinked"
@@ -35,8 +35,8 @@ export type EmailThreadWorkflowState =
   | "draft_ready"
   | "waiting_on_them"
   | "closed";
-export type EmailThreadDraftStatus = "in_progress" | "ready";
-export type EmailThreadDraftSource = "manual" | "ai";
+type EmailThreadDraftStatus = "in_progress" | "ready";
+type EmailThreadDraftSource = "manual" | "ai";
 
 export interface EmailParticipant {
   name: string | null;

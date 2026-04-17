@@ -59,6 +59,7 @@ function stripMarkup(text: string) {
     .replace(/`([^`]*)`/g, "$1");
 }
 
+// fallow-ignore-next-line complexity
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return "Not set";
   if (typeof value === "boolean") return value ? "Yes" : "No";

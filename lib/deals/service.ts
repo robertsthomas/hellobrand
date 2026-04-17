@@ -21,7 +21,7 @@ export async function listDealsForViewer(viewer: Viewer) {
   return getRepository().listDeals(viewer.id);
 }
 
-export async function loadRawDealAggregatesForViewer(viewer: Viewer) {
+async function loadRawDealAggregatesForViewer(viewer: Viewer) {
   const repository = getRepository();
   const deals = await repository.listDeals(viewer.id);
   const results: (DealAggregate | null)[] = [];

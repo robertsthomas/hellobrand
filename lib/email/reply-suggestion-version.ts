@@ -1,6 +1,6 @@
 import type { EmailThreadDetail } from "@/lib/types";
 
-export type ReplySuggestion = {
+type ReplySuggestion = {
   id: string;
   label: string;
   prompt: string;
@@ -29,7 +29,7 @@ export function buildEmailMessageVersion(
   ].join(":");
 }
 
-export function sanitizeReplySuggestions(value: unknown): ReplySuggestion[] {
+function sanitizeReplySuggestions(value: unknown): ReplySuggestion[] {
   if (!Array.isArray(value)) {
     return [];
   }

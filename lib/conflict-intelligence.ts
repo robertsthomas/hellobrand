@@ -16,10 +16,9 @@ import {
 } from "@/lib/conflict-categories";
 
 export {
+  // fallow-ignore-next-line unused-export
   dealCategoryLabel,
-  dealCategoryOptions,
   normalizeDealCategory,
-  inferDealCategoryFromLabels,
 } from "@/lib/conflict-categories";
 
 type TermsData = Omit<
@@ -188,6 +187,7 @@ function scoreCategory(text: string, category: DealCategory) {
   }, 0);
 }
 
+// fallow-ignore-next-line complexity
 function chooseBrandCategory(
   texts: string[],
   fallbacks: Array<string | null | undefined>
@@ -502,6 +502,7 @@ function categoryMatches(aggregate: DealAggregate, labels: string[]) {
   return labels.includes(label);
 }
 
+// fallow-ignore-next-line complexity
 export function buildConflictResults(
   target: DealAggregate,
   others: DealAggregate[]
@@ -696,7 +697,7 @@ export function mergeConflictIntelligence(
   };
 }
 
-export function sortConflictResults(results: ConflictResult[]) {
+function sortConflictResults(results: ConflictResult[]) {
   return [...results].sort((left, right) => {
     const severityOrder = { high: 3, medium: 2, low: 1 };
     return severityOrder[right.severity] - severityOrder[left.severity];
@@ -714,7 +715,7 @@ export function countConflictSeverity(results: ConflictResult[]) {
   );
 }
 
-export function dateWindowLabel(window: CampaignDateWindow | null | undefined) {
+function dateWindowLabel(window: CampaignDateWindow | null | undefined) {
   if (!window) {
     return "Not detected";
   }
@@ -727,6 +728,6 @@ export function dateWindowLabel(window: CampaignDateWindow | null | undefined) {
   );
 }
 
-export function compareDateWindow(a: CampaignDateWindow | null, b: CampaignDateWindow | null) {
+function compareDateWindow(a: CampaignDateWindow | null, b: CampaignDateWindow | null) {
   return compareDates(a?.startDate ?? null, b?.startDate ?? null);
 }

@@ -1,6 +1,6 @@
 type PromptAttributeValue = string | number | boolean | null | undefined;
 
-export type PromptSectionInput = {
+type PromptSectionInput = {
   tag: string;
   content: string | null | undefined;
   attributes?: Record<string, PromptAttributeValue>;
@@ -18,7 +18,7 @@ function renderAttributes(attributes?: Record<string, PromptAttributeValue>) {
   return pairs.length > 0 ? ` ${pairs.join(" ")}` : "";
 }
 
-export function xmlSection(input: PromptSectionInput) {
+function xmlSection(input: PromptSectionInput) {
   const content = input.content?.trim();
   if (!content) {
     return null;

@@ -76,7 +76,7 @@ export function inboxSortLabel(sort: InboxSortOption) {
   }
 }
 
-export function replyStyleLabel(stance: NegotiationStance) {
+function replyStyleLabel(stance: NegotiationStance) {
   switch (stance) {
     case "firm":
       return "Direct";
@@ -161,6 +161,6 @@ export function messagePreview(message: EmailMessageRecord) {
   return body.replace(/\s+/g, " ").slice(0, 140);
 }
 
-export function threadPreviewText(item: EmailThreadListItem) {
+function threadPreviewText(item: EmailThreadListItem) {
   return item.thread.snippet || "No preview available.";
 }

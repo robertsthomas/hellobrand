@@ -10,7 +10,7 @@ type PaymentRowLike = {
   payment: PaymentLike;
 };
 
-export type CurrencyBreakdown = {
+type CurrencyBreakdown = {
   currency: string;
   amount: number;
 };
@@ -22,7 +22,7 @@ export type PaymentSummaryAmount = {
   breakdown: CurrencyBreakdown[];
 };
 
-export type PaymentPageSummary = {
+type PaymentPageSummary = {
   tracked: PaymentSummaryAmount;
   outstanding: PaymentSummaryAmount;
   late: PaymentSummaryAmount;

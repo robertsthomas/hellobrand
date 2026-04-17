@@ -107,7 +107,7 @@ function userSnapshotSummary(aggregates: DealAggregate[]) {
   };
 }
 
-export function assistantSnapshotKey(scope: AssistantScope, dealId?: string | null) {
+function assistantSnapshotKey(scope: AssistantScope, dealId?: string | null) {
   return scope === "deal" && dealId ? `deal:${dealId}` : "user";
 }
 

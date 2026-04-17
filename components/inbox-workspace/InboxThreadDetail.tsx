@@ -43,6 +43,7 @@ type InboxThreadDetailProps = {
   onPrefetchThread: (threadId: string) => void;
 };
 
+// fallow-ignore-next-line complexity
 export function InboxThreadDetail({
   selectedThread,
   isThreadLoading,

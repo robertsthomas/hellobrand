@@ -5,7 +5,7 @@
 
 import type { DealTermsRecord, RiskFlagRecord } from "./deals";
 
-export type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
+type ProcessingStatus = "pending" | "processing" | "ready" | "failed";
 
 export type DocumentKind =
   | "contract"
@@ -37,7 +37,7 @@ export interface DocumentProcessingRunState {
   lastError: string | null;
 }
 
-export type DocumentRunStatus = "pending" | "processing" | "ready" | "failed" | "superseded";
+type DocumentRunStatus = "pending" | "processing" | "ready" | "failed" | "superseded";
 export type DocumentArtifactKind =
   | "text_extraction"
   | "classification"
@@ -48,7 +48,7 @@ export type DocumentArtifactKind =
   | "summary"
   | "observability";
 export type DocumentEvidenceSourceType = "document" | "section" | "vendor_entity";
-export type DocumentReviewItemStatus = "open" | "resolved" | "dismissed";
+type DocumentReviewItemStatus = "open" | "resolved" | "dismissed";
 export type DocumentReviewItemReason = "low_confidence" | "conflict";
 
 export interface DocumentRecord {

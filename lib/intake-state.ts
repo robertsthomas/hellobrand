@@ -198,7 +198,7 @@ export async function syncIntakeSessionForDealId(dealId: string) {
   return refreshed ? toIntakeSessionRecord(refreshed) : null;
 }
 
-export async function getIntakeSessionRecord(sessionId: string) {
+async function getIntakeSessionRecord(sessionId: string) {
   const session = await prisma.intakeSession.findUnique({
     where: { id: sessionId }
   });

@@ -23,7 +23,7 @@ export function isPostHogClientEnabled() {
   );
 }
 
-export function isPostHogServerEnabled() {
+function isPostHogServerEnabled() {
   return (
     process.env.NODE_ENV !== "development" &&
     !isLocalAppUrl(process.env.NEXT_PUBLIC_APP_URL) &&

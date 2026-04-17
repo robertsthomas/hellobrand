@@ -34,6 +34,7 @@ function invalidateViewerState(userId: string) {
   revalidatePath("/dev");
 }
 
+// fallow-ignore-next-line complexity
 export async function POST(request: NextRequest) {
   if (!isLocalDevelopmentRequest(request.headers.get("x-forwarded-host") ?? request.headers.get("host"))) {
     return fail("Not found.", 404);

@@ -101,6 +101,7 @@ async function loadDealsWithDocumentText(userId: string): Promise<DealWithDocTex
   return results;
 }
 
+// fallow-ignore-next-line complexity
 export async function findDuplicateDeals(
   userId: string,
   input: {

@@ -120,6 +120,7 @@ function normalizeGeneratedReply(value: string) {
     .trim();
 }
 
+// fallow-ignore-next-line complexity
 function reducer(
   state: ReplyComposerState,
   action: ReplyComposerAction

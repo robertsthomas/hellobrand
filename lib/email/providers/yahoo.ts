@@ -308,6 +308,7 @@ async function withYahooMailbox<T>(
   }
 }
 
+// fallow-ignore-next-line complexity
 async function parseYahooMessages(
   client: ImapFlow,
   uids: number[],

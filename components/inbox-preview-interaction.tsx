@@ -46,6 +46,7 @@ function TypewriterText({ text, onComplete }: { text: string; onComplete?: () =>
   );
 }
 
+// fallow-ignore-next-line complexity
 export function InboxPreviewInteraction({
   threads,
   upgradeHref

@@ -247,7 +247,7 @@ export async function getOnboardingStateForViewer(
   }
 }
 
-export function isProfileOnboardingComplete(
+function isProfileOnboardingComplete(
   state: OnboardingStateRecord
 ): boolean {
   return state.profileOnboardingCompletedAt !== null;

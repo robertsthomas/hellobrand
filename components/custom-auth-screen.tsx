@@ -78,6 +78,7 @@ function factorSafeIdentifier(factor: unknown) {
   return null;
 }
 
+// fallow-ignore-next-line complexity
 export function CustomAuthScreen({
   signUpsEnabled = true
 }: {

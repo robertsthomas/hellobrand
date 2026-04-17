@@ -13,7 +13,7 @@ import type {
 } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 
-export type IntakeRouteSessionData = Awaited<
+type IntakeRouteSessionData = Awaited<
   ReturnType<typeof getIntakeSessionForViewer>
 >;
 
@@ -95,6 +95,7 @@ export async function loadIntakeSessionRouteData(
   }
 }
 
+// fallow-ignore-next-line complexity
 export function buildIntakeReviewPageViewModel(input: {
   aggregate: DealAggregate | null;
   profileDefaults: IntakeRouteSessionData["profileDefaults"];

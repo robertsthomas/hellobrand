@@ -19,7 +19,7 @@ export type AssistantDealTab =
   | "invoices"
   | "notes";
 
-export type AssistantTriggerKind =
+type AssistantTriggerKind =
   | "risk_flag"
   | "payment"
   | "deliverable"
@@ -88,26 +88,26 @@ export interface AssistantContextSnapshotRecord {
   updatedAt: string;
 }
 
-export interface AssistantNavigationAction {
+interface AssistantNavigationAction {
   type: "navigation";
   label: string;
   href: string;
   description?: string | null;
 }
 
-export interface AssistantDraftArtifact {
+interface AssistantDraftArtifact {
   type: "draft";
   label: string;
   subject: string;
   body: string;
 }
 
-export interface AssistantCitation {
+interface AssistantCitation {
   label: string;
   detail: string;
 }
 
-export interface AssistantWorkspaceListItem {
+interface AssistantWorkspaceListItem {
   dealId: string;
   brandName: string;
   campaignName: string;
@@ -117,7 +117,7 @@ export interface AssistantWorkspaceListItem {
   prompt: string | null;
 }
 
-export interface AssistantWorkspaceListBlock {
+interface AssistantWorkspaceListBlock {
   type: "workspace-list";
   title: string;
   description: string;

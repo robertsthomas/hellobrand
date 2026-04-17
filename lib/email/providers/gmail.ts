@@ -149,6 +149,7 @@ function formatAddressList(participants: EmailParticipant[]) {
     .join(", ");
 }
 
+// fallow-ignore-next-line complexity
 function collectBodyParts(
   payload: GmailPayloadPart | null | undefined,
   output: {
@@ -568,6 +569,7 @@ export async function sendGmailThreadReply(
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function listGmailHistoryThreadIds(accessToken: string, startHistoryId: string) {
   const payload = await gmailRequest<{
     history?: Array<{

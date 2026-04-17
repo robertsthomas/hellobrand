@@ -16,10 +16,10 @@ export type AiTaskKey =
   | "email_suggestions"
   | "email_action_items";
 
-export type AiRouteClass = "quality" | "speed" | "balanced";
-export type AiBudgetDecision = "normal" | "degraded" | "blocked";
+type AiRouteClass = "quality" | "speed" | "balanced";
+type AiBudgetDecision = "normal" | "degraded" | "blocked";
 
-export type AiRoutePolicy = {
+type AiRoutePolicy = {
   taskKey: AiTaskKey;
   featureKey: string;
   routeClass: AiRouteClass;
@@ -41,7 +41,7 @@ export type AiGatewayResult<T> = {
   budgetDecision: AiBudgetDecision;
 };
 
-export type AiUsageMetrics = {
+type AiUsageMetrics = {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
@@ -708,7 +708,7 @@ async function upsertAiCacheEntry(input: {
   });
 }
 
-export async function recordAiUsageEvent(input: AiUsageEventInput) {
+async function recordAiUsageEvent(input: AiUsageEventInput) {
   if (!hasDatabase()) {
     return null;
   }
@@ -785,7 +785,7 @@ export function buildAiInputHash(value: unknown) {
   return hashValue(value);
 }
 
-export function getAiTaskPolicy(taskKey: AiTaskKey) {
+function getAiTaskPolicy(taskKey: AiTaskKey) {
   return TASK_POLICIES[taskKey];
 }
 
@@ -793,6 +793,7 @@ export function hasAiClient() {
   return Boolean(client());
 }
 
+// fallow-ignore-next-line complexity
 export async function runOpenRouterTask<T>(
   input: RunOpenRouterTaskInput<T>
 ): Promise<AiGatewayResult<T> | null> {

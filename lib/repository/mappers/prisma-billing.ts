@@ -39,7 +39,7 @@ export function toPaymentRecord(record: {
   };
 }
 
-export function toInvoiceParty(value: unknown): InvoiceParty {
+function toInvoiceParty(value: unknown): InvoiceParty {
   const record =
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
@@ -55,7 +55,7 @@ export function toInvoiceParty(value: unknown): InvoiceParty {
   };
 }
 
-export function toInvoiceLineItems(value: unknown): InvoiceLineItem[] {
+function toInvoiceLineItems(value: unknown): InvoiceLineItem[] {
   return Array.isArray(value)
     ? value
         .map((entry, index) => {

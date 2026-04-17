@@ -60,7 +60,7 @@ export const outlookProviderEnabled = flag({
   ],
 });
 
-export const emailProviderFlags = [
+const emailProviderFlags = [
   yahooProviderEnabled,
   yahooOAuthEnabled,
   yahooAppPasswordEnabled,

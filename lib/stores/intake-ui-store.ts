@@ -4,7 +4,7 @@ import { create, type UseBoundStore, type StoreApi } from "zustand";
 
 import type { DuplicateMatch } from "@/lib/duplicate-detection";
 
-export type IntakeUiMode = "upload" | "paste";
+type IntakeUiMode = "upload" | "paste";
 
 export interface SelectedFileMeta {
   name: string;

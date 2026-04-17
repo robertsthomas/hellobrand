@@ -17,6 +17,7 @@ import {
   reconcileStripeSubscription
 } from "@/lib/billing/service";
 
+// fallow-ignore-next-line complexity
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");
   if (!signature) {

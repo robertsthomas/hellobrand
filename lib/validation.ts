@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const dealStatusValues = [
+const dealStatusValues = [
   "contract_received",
   "negotiating",
   "signed",
@@ -11,7 +11,7 @@ export const dealStatusValues = [
   "completed",
 ] as const;
 
-export const paymentStatusValues = [
+const paymentStatusValues = [
   "not_invoiced",
   "invoiced",
   "awaiting_payment",
@@ -19,10 +19,10 @@ export const paymentStatusValues = [
   "late",
 ] as const;
 
-export const invoiceStatusValues = ["draft", "finalized", "sent", "voided"] as const;
+const invoiceStatusValues = ["draft", "finalized", "sent", "voided"] as const;
 
-export const countersignStatusValues = ["unknown", "pending", "signed"] as const;
-export const dealCategoryValues = [
+const countersignStatusValues = ["unknown", "pending", "signed"] as const;
+const dealCategoryValues = [
   "beauty_personal_care",
   "fashion_apparel",
   "food_beverage",
@@ -38,7 +38,7 @@ export const dealCategoryValues = [
   "other",
 ] as const;
 
-export const documentKindValues = [
+const documentKindValues = [
   "contract",
   "deliverables_brief",
   "campaign_brief",
@@ -138,7 +138,7 @@ export const dealTermsInputSchema = z.object({
 });
 
 export const assistantScopeValues = ["user", "deal"] as const;
-export const assistantDealTabValues = [
+const assistantDealTabValues = [
   "overview",
   "terms",
   "risks",
@@ -149,7 +149,7 @@ export const assistantDealTabValues = [
   "invoices",
   "notes",
 ] as const;
-export const assistantTriggerKindValues = [
+const assistantTriggerKindValues = [
   "risk_flag",
   "payment",
   "deliverable",
@@ -159,22 +159,22 @@ export const assistantTriggerKindValues = [
   "general",
 ] as const;
 
-export const assistantTriggerSchema = z.object({
+const assistantTriggerSchema = z.object({
   kind: z.enum(assistantTriggerKindValues),
   sourceId: z.string().nullable(),
   prompt: z.string().max(2000).nullable(),
   label: z.string().max(120).nullable(),
 });
 
-export const assistantToneValues = ["professional", "friendly", "direct", "warm"] as const;
+const assistantToneValues = ["professional", "friendly", "direct", "warm"] as const;
 
-export const assistantPageContextSchema = z.object({
+const assistantPageContextSchema = z.object({
   purpose: z.string().min(1).max(500),
   availableActions: z.array(z.string().max(200)).max(20),
   dataHints: z.array(z.string().max(300)).max(20),
 });
 
-export const assistantClientContextSchema = z.object({
+const assistantClientContextSchema = z.object({
   pathname: z.string().min(1).max(500),
   pageTitle: z.string().min(1).max(120),
   dealId: z.string().nullable(),
@@ -202,13 +202,13 @@ export const assistantChatRequestSchema = z.object({
   messageId: z.string().nullable().optional(),
 });
 
-export const documentUploadSchema = z.object({
+const documentUploadSchema = z.object({
   dealId: z.string().min(1),
   pastedText: z.string().nullable().optional(),
   documentKindHint: z.enum(documentKindValues).nullable().optional(),
 });
 
-export const intakeSessionStatusValues = [
+const intakeSessionStatusValues = [
   "draft",
   "queued",
   "uploading",
@@ -260,7 +260,7 @@ export const paymentRecordInputSchema = z.object({
   source: z.string().max(120).nullable().optional(),
 });
 
-export const invoicePartySchema = z.object({
+const invoicePartySchema = z.object({
   name: z.string().max(160),
   email: z.string().email().nullable(),
   companyName: z.string().max(160).nullable(),
@@ -269,7 +269,7 @@ export const invoicePartySchema = z.object({
   payoutDetails: z.string().max(1000).nullable(),
 });
 
-export const invoiceLineItemSchema = z.object({
+const invoiceLineItemSchema = z.object({
   id: z.string(),
   deliverableId: z.string().nullable(),
   title: z.string().min(1).max(160),

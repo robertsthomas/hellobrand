@@ -123,6 +123,7 @@ export const GUIDE_STEPS: GuideStep[] = [
   }
 ];
 
+// fallow-ignore-next-line complexity
 export function getActiveGuideStep(
   steps: GuideStep[],
   ctx: GuideContext

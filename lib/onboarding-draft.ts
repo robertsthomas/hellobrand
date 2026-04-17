@@ -1,6 +1,6 @@
 import { PROFILE_PLATFORM_OPTIONS, type ProfilePlatform } from "@/lib/profile-metadata";
 
-export type ProfileOnboardingDraft = {
+type ProfileOnboardingDraft = {
   displayName: string;
   contactEmail: string;
   timeZone?: string | null;
@@ -12,7 +12,7 @@ export type ProfileOnboardingDraft = {
   accentColor: string;
 };
 
-export function normalizeOnboardingHandle(value: string) {
+function normalizeOnboardingHandle(value: string) {
   const trimmed = value.trim();
 
   if (!trimmed) {
@@ -22,12 +22,12 @@ export function normalizeOnboardingHandle(value: string) {
   return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
 }
 
-export function stripOnboardingHandlePrefix(value: string) {
+function stripOnboardingHandlePrefix(value: string) {
   const normalized = normalizeOnboardingHandle(value);
   return normalized.startsWith("@") ? normalized.slice(1) : normalized;
 }
 
-export function isValidOnboardingPlatform(value: string): value is ProfilePlatform {
+function isValidOnboardingPlatform(value: string): value is ProfilePlatform {
   return PROFILE_PLATFORM_OPTIONS.includes(value as ProfilePlatform);
 }
 

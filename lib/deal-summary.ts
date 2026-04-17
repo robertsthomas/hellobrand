@@ -75,6 +75,7 @@ function prepareForSectionParsing(value: string) {
   return next;
 }
 
+// fallow-ignore-next-line complexity
 export function parseDealSummarySections(body: string | null | undefined) {
   const normalized = presentText(body);
   if (!normalized) {

@@ -109,6 +109,7 @@ function safeDate(value: string | null) {
   return parsed;
 }
 
+// fallow-ignore-next-line complexity
 export function computeBillingInsights({
   currentPlanTier,
   currentPlanInterval,

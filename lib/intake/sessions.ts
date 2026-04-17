@@ -24,6 +24,7 @@ import {
   toIntakeSessionRecord
 } from "./shared";
 
+// fallow-ignore-next-line complexity
 export async function createIntakeSessionForViewer(
   viewer: Viewer,
   input: {

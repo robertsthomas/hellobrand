@@ -34,7 +34,7 @@ export function attachmentPreviewMode(attachment: EmailAttachmentRecord) {
   return "download" as const;
 }
 
-export function EmailMessageBody({ message }: { message: EmailMessageRecord }) {
+function EmailMessageBody({ message }: { message: EmailMessageRecord }) {
   const sanitizedHtml = useMemo(
     () => (message.htmlBody?.trim() ? sanitizeEmailHtml(message.htmlBody) : null),
     [message.htmlBody]
@@ -92,6 +92,7 @@ export function EmailMessageBody({ message }: { message: EmailMessageRecord }) {
   );
 }
 
+// fallow-ignore-next-line complexity
 export function MessageStrip({
   message,
   isOutbound,

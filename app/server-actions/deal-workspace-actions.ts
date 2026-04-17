@@ -29,7 +29,7 @@ import {
 
 import { invalidateDeals, invalidateDealWorkspace } from "./deal-shared";
 
-export async function createDealAction(formData: FormData) {
+async function createDealAction(formData: FormData) {
   const viewer = await requireViewer();
   const input = createDealSchema.parse({
     brandName: String(formData.get("brandName") ?? "").trim(),
@@ -41,7 +41,7 @@ export async function createDealAction(formData: FormData) {
   redirect(`/app/p/${deal.id}`);
 }
 
-export async function uploadDocumentsAction(formData: FormData) {
+async function uploadDocumentsAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const debug = startServerDebug("action_upload_documents", {
     action: "uploadDocumentsAction",
@@ -85,7 +85,7 @@ export async function reprocessDocumentAction(formData: FormData) {
   invalidateDealWorkspace(viewer.id, dealId);
 }
 
-export async function saveDealMetaAction(formData: FormData) {
+async function saveDealMetaAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
   const input = updateDealSchema.parse({

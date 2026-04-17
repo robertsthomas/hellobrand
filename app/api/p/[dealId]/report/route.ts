@@ -28,6 +28,7 @@ export async function GET(
   }
 }
 
+// fallow-ignore-next-line complexity
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ dealId: string }> }

@@ -2,7 +2,7 @@ import { BillingInterval, BillingSubscriptionStatus, PlanTier } from "@prisma/cl
 
 import { hasStripePriceId } from "@/lib/billing/config";
 
-export type BillingPlanCatalogEntry = {
+type BillingPlanCatalogEntry = {
   tier: PlanTier;
   name: string;
   persona: string;
@@ -25,7 +25,7 @@ export type BillingPlanAvailability = BillingPlanCatalogEntry & {
   trialLabel: string;
 };
 
-export type MarketingPlanAvailability = BillingPlanAvailability & {
+type MarketingPlanAvailability = BillingPlanAvailability & {
   displayMonthlyPriceLabel: string;
   displayAnnualEquivalentLabel: string;
 };
@@ -170,7 +170,7 @@ function formatTrialLabel(tier: PlanTier) {
   return tier === PlanTier.premium ? "7-day trial" : "14-day trial";
 }
 
-export function getPlanCatalogFeatures(tier: PlanTier): string[] {
+function getPlanCatalogFeatures(tier: PlanTier): string[] {
   return BILLING_PLAN_CATALOG.find((p) => p.tier === tier)?.features ?? [];
 }
 

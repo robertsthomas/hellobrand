@@ -1,4 +1,4 @@
-export const WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY =
+const WORKSPACE_GENERATION_NOTIFICATION_HINT_KEY =
   "hb-workspace-generation-notification-hint";
 
 export const WORKSPACE_GENERATION_NOTIFICATION_EVENT =

@@ -184,6 +184,7 @@ function mergeDeliverables(
   );
 }
 
+// fallow-ignore-next-line complexity
 function mergeBriefData(base: BriefData | null, patch: BriefData | null): BriefData | null {
   if (!base) return patch;
   if (!patch) return base;

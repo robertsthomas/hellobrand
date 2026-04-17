@@ -8,7 +8,7 @@ export const ANONYMOUS_VISITOR_COOKIE_NAME = "hb_anon_visitor";
 export const ANONYMOUS_VISITOR_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 export const ANONYMOUS_UPLOAD_WINDOW_MS = 1000 * 60 * 60 * 24 * 30;
 export const ANONYMOUS_UPLOAD_MAX_COUNT = 1;
-export const ANONYMOUS_UPLOAD_REDIRECT_PATH = "/upload/claim";
+const ANONYMOUS_UPLOAD_REDIRECT_PATH = "/upload/claim";
 export const ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE = "ANONYMOUS_UPLOAD_LIMIT_REACHED";
 
 const SUPPORTED_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".txt"]);
@@ -30,7 +30,7 @@ function parseForwardedHeader(value: string | null | undefined) {
   return match?.[1] ?? null;
 }
 
-export function hashValue(value: string) {
+function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
@@ -50,7 +50,7 @@ export function getAnonymousUploadSignInHref() {
   )}`;
 }
 
-export function createAnonymousVisitorId() {
+function createAnonymousVisitorId() {
   return `anonv_${randomBytes(18).toString("hex")}`;
 }
 

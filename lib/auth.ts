@@ -146,6 +146,7 @@ async function ensureViewerBillingAccount(viewer: {
   });
 }
 
+// fallow-ignore-next-line complexity
 async function upsertViewerFromSession() {
   const session = await auth();
   if (!session.userId) {

@@ -16,7 +16,7 @@ import {
   resolveSafeWorkspaceRedirect
 } from "./deal-shared";
 
-export async function deleteWorkspaceAction(formData: FormData) {
+async function deleteWorkspaceAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
   const redirectTo = resolveSafeWorkspaceRedirect(String(formData.get("redirectTo") ?? "/app"));

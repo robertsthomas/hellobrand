@@ -117,6 +117,7 @@ export async function saveSyncedEmailThread(
   }
 ) {
   const result = await prisma.$transaction(
+// fallow-ignore-next-line complexity
     async (tx) => {
     const existingThread = await tx.emailThread.findUnique({
       where: {

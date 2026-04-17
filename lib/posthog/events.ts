@@ -2,7 +2,7 @@ import type { PostHog } from "posthog-js";
 
 import { isPostHogClientEnabled } from "@/lib/posthog/config";
 
-export const appActionEventNames = [
+const appActionEventNames = [
   "auth_mode_switched",
   "auth_sign_in_submitted",
   "auth_sign_up_submitted",

@@ -103,8 +103,8 @@ export interface IntakeDraftListItem {
   deal: Pick<DealRecord, "id" | "brandName" | "campaignName" | "updatedAt">;
 }
 
-export type IntakeBatchStatus = "clustering" | "review" | "confirmed" | "failed";
-export type IntakeBatchGroupStatus = "pending" | "confirmed" | "rejected";
+type IntakeBatchStatus = "clustering" | "review" | "confirmed" | "failed";
+type IntakeBatchGroupStatus = "pending" | "confirmed" | "rejected";
 
 export interface IntakeBatchRecord {
   id: string;

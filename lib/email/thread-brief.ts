@@ -5,7 +5,7 @@ import type {
   ProfileRecord,
 } from "@/lib/types";
 
-export type ThreadConversationMode =
+type ThreadConversationMode =
   | "initial_offer"
   | "rate_negotiation"
   | "decline_affiliate"
@@ -16,11 +16,11 @@ export type ThreadConversationMode =
   | "unsubscribe_or_ignore"
   | "low_signal_follow_up";
 
-export type CompensationType = "guaranteed_paid" | "affiliate" | "hybrid" | "gifted" | "unclear";
+type CompensationType = "guaranteed_paid" | "affiliate" | "hybrid" | "gifted" | "unclear";
 
-export type NextMoveOwner = "creator" | "brand" | "none";
+type NextMoveOwner = "creator" | "brand" | "none";
 
-export interface ActiveTerms {
+interface ActiveTerms {
   compensation: string | null;
   deliverables: string | null;
   deadlines: string | null;
@@ -29,7 +29,7 @@ export interface ActiveTerms {
   paymentTiming: string | null;
 }
 
-export interface ThreadBrief {
+interface ThreadBrief {
   mode: ThreadConversationMode;
   compensationType: CompensationType;
   latestInboundAsk: string | null;
@@ -238,6 +238,7 @@ function recentMessages(messages: EmailMessageRecord[], count: number) {
   return messages.slice(-count);
 }
 
+// fallow-ignore-next-line complexity
 function detectConversationMode(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null
@@ -505,6 +506,7 @@ function extractOpenQuestions(
   return [...new Set(questions)].slice(0, 5);
 }
 
+// fallow-ignore-next-line complexity
 function extractRisks(
   threadText: string,
   partnership: DealAggregate | null,
@@ -636,6 +638,7 @@ export function buildThreadBrief(
   };
 }
 
+// fallow-ignore-next-line complexity
 export function threadBriefForPrompt(brief: ThreadBrief): string {
   const lines: string[] = [
     `Conversation mode: ${brief.mode}`,

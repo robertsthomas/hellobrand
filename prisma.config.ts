@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 

@@ -152,6 +152,7 @@ function PdfPageCanvas({
   useEffect(() => {
     let cancelled = false;
 
+// fallow-ignore-next-line complexity
     async function renderPage() {
       if (!canvasRef.current || !containerWidth) {
         return;

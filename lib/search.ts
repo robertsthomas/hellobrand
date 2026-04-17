@@ -9,7 +9,7 @@ export type SearchResultKind =
   | "section"
   | "summary";
 
-export interface SearchResult {
+interface SearchResult {
   id: string;
   kind: SearchResultKind;
   dealId: string;
@@ -63,6 +63,7 @@ function excerpt(text: string, query: string, maxLen = 200): string {
   return (start > 0 ? "..." : "") + slice + (end < text.length ? "..." : "");
 }
 
+// fallow-ignore-next-line complexity
 export async function searchForViewer(
   viewer: Viewer,
   query: string

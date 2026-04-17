@@ -11,7 +11,7 @@ type StageMetrics = {
   failed: boolean;
 };
 
-export interface DocumentRunObservabilitySummary {
+interface DocumentRunObservabilitySummary {
   runId: string;
   status: DocumentRunRecord["status"];
   startedAt: string | null;

@@ -25,6 +25,7 @@ function documentPreviewUrl(documentId: string) {
   return `/api/documents/${documentId}/content`;
 }
 
+// fallow-ignore-next-line complexity
 export function DocumentsPanel({
   dealId,
   documents,

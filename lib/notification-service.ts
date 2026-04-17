@@ -88,6 +88,7 @@ function toNotificationItem(row: AppNotificationRow): NotificationItem {
   };
 }
 
+// fallow-ignore-next-line complexity
 async function upsertNotificationSeed(userId: string, seed: NotificationSeed) {
   const existing = await prisma.appNotification.findUnique({
     where: {
@@ -285,6 +286,7 @@ async function loadSessionNotificationContext(sessionId: string) {
   });
 }
 
+// fallow-ignore-next-line complexity
 function computeDealNotificationSeeds(input: {
   aggregates: DealAggregate[];
   paymentRemindersEnabled: boolean;
@@ -513,7 +515,7 @@ async function loadConfirmedAggregatesForViewer(viewerId: string) {
   return aggregates;
 }
 
-export async function syncComputedNotificationsForViewer(viewer: Viewer) {
+async function syncComputedNotificationsForViewer(viewer: Viewer) {
   if (!ensureDatabase()) {
     return;
   }

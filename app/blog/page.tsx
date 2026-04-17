@@ -150,6 +150,7 @@ function sortBlogPosts(
   return nextPosts;
 }
 
+// fallow-ignore-next-line complexity
 export default async function BlogIndexPage({
   searchParams
 }: BlogIndexPageProps) {

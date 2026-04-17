@@ -4,10 +4,7 @@
  */
 
 export {
-  createDealAction,
-  uploadDocumentsAction,
   reprocessDocumentAction,
-  saveDealMetaAction,
   saveTermsAction,
   saveDealNotesAction,
   confirmTermsReviewAction,
@@ -20,7 +17,6 @@ export {
   updateDeliverablesAction,
 } from "./deal-summary-actions";
 export {
-  deleteWorkspaceAction,
   deleteWorkspaceConfirmedAction,
   archiveDealAction,
   unarchiveDealAction,

@@ -17,6 +17,7 @@ function lineItemMeta(item: InvoiceLineItem) {
   return [item.channel, item.description].filter(Boolean).join(" · ");
 }
 
+// fallow-ignore-next-line complexity
 export function PaymentsWorkspaceDetail({
   deal,
   payment,

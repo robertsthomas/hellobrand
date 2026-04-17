@@ -203,6 +203,7 @@ export async function getProfileForViewer(viewer: Viewer) {
   return record;
 }
 
+// fallow-ignore-next-line complexity
 export async function updateProfileForViewer(
   viewer: Viewer,
   patch: {

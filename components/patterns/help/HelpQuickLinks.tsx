@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-export type HelpQuickLink = {
+type HelpQuickLink = {
   icon: LucideIcon;
   label: string;
   description: string;

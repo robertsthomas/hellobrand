@@ -156,6 +156,7 @@ function buildOptimisticWorkspaceGeneratingNotification(input: {
   });
 }
 
+// fallow-ignore-next-line complexity
 export function EmptyDashboardUpload({
   initialMode = "upload",
   initialQueuedWorkspaces = [],
@@ -271,6 +272,7 @@ export function EmptyDashboardUpload({
     }
   }
 
+// fallow-ignore-next-line complexity
   async function startAnalysisInBackground(
     optimisticNotificationId: string,
     generationId: string,

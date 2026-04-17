@@ -16,7 +16,7 @@ export type DealStatus =
   | "completed"
   | "archived";
 
-export type CountersignStatus = "unknown" | "pending" | "signed";
+type CountersignStatus = "unknown" | "pending" | "signed";
 
 export interface DeliverableItem {
   id: string;
@@ -57,13 +57,13 @@ export interface DisclosureObligation {
   source: string | null;
 }
 
-export type ConflictType =
+type ConflictType =
   | "category_conflict"
   | "competitor_restriction"
   | "exclusivity_overlap"
   | "schedule_collision";
 
-export type ConflictLevel = "hard_conflict" | "warning" | "informational";
+type ConflictLevel = "hard_conflict" | "warning" | "informational";
 
 export interface ConflictResult {
   type: ConflictType;
@@ -232,7 +232,7 @@ export interface PendingChangesSummary {
   entries: TermsDiffEntry[];
 }
 
-export type RiskFlagSourceType = "document" | "email";
+type RiskFlagSourceType = "document" | "email";
 
 export interface RiskFlagRecord {
   id: string;

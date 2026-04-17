@@ -350,6 +350,7 @@ function assertPlanSelection(
   }
 }
 
+// fallow-ignore-next-line complexity
 export async function getBillingOverviewForViewer(
   viewer: Viewer
 ): Promise<BillingOverview> {
@@ -765,6 +766,7 @@ function intervalFromSubscription(
   );
 }
 
+// fallow-ignore-next-line complexity
 async function syncTrialLedgerForSubscription(
   billingAccountId: string,
   billingSubscriptionId: string,
@@ -901,6 +903,7 @@ async function refreshBillingAccountSnapshot(billingAccountId: string) {
   });
 }
 
+// fallow-ignore-next-line complexity
 export async function reconcileStripeCheckoutSession(
   session: Stripe.Checkout.Session
 ) {
@@ -990,6 +993,7 @@ export async function reconcileStripeCheckoutSession(
   });
 }
 
+// fallow-ignore-next-line complexity
 export async function reconcileStripeSubscription(
   subscription: Stripe.Subscription
 ) {

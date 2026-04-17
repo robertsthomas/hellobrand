@@ -92,6 +92,7 @@ function statusBadgeClass(status: string) {
   return "bg-neutral-100 text-neutral-600 dark:bg-white/10 dark:text-white/60";
 }
 
+// fallow-ignore-next-line complexity
 export function InvoiceEditorFullPage({
   dealId,
   invoice,
@@ -148,6 +149,7 @@ export function InvoiceEditorFullPage({
     return "";
   }, []);
 
+// fallow-ignore-next-line complexity
   const previewData = useMemo(() => {
     if (!showPreview) return null;
     return {

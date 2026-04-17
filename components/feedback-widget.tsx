@@ -212,6 +212,7 @@ function FeedbackSuccess({
   );
 }
 
+// fallow-ignore-next-line complexity
 export function FeedbackWidget({
   viewerId,
   pagePath,

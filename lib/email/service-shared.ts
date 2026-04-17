@@ -83,7 +83,7 @@ export function redirectTarget(
   return params.size > 0 ? `${pathname}?${params.toString()}` : pathname;
 }
 
-export function normalizeMailboxAddress(value: string | null | undefined) {
+function normalizeMailboxAddress(value: string | null | undefined) {
   if (typeof value !== "string") {
     return null;
   }
@@ -290,6 +290,7 @@ export function groupCandidateMatches(
   });
 }
 
+// fallow-ignore-next-line complexity
 function emptyTermsPatch(
   aggregate: DealAggregate
 ): Omit<DealTermsRecord, "id" | "dealId" | "createdAt" | "updatedAt" | "pendingExtraction"> {
@@ -335,6 +336,7 @@ function emptyTermsPatch(
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function ensureActiveEmailCredentials(account: ConnectedEmailAccountRecord) {
   const accessToken = decryptSecret(account.accessTokenEncrypted);
   const refreshToken = decryptSecret(account.refreshTokenEncrypted);
@@ -410,6 +412,7 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function refreshEmailDealSuggestionsForViewer(
   viewer: Viewer,
   options?: {
@@ -543,6 +546,7 @@ function inferContactRole(message: { subject: string; textBody: string | null })
   return null;
 }
 
+// fallow-ignore-next-line complexity
 export async function processLinkedThreadUpdates(viewer: Viewer, threadIds: string[]) {
   const { getCachedDealAggregates } = await import("@/lib/cached-data");
   const allAggregates = await getCachedDealAggregates(viewer);
@@ -670,9 +674,6 @@ export async function loadLinkedDealAggregate(
 
 export {
   clearEmailResyncRequiredNotification,
-  createEmailThreadNoteForUser,
   emitEmailResyncRequiredNotification,
-  getConnectedEmailAccount,
   getEmailSyncState,
-  saveConnectedEmailAccount,
 };

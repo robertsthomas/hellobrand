@@ -5,6 +5,7 @@ import { createEmptyTerms } from "@/lib/analysis/extract/shared";
 import { mergeTerms } from "@/lib/deals";
 
 describe("brief data normalization", () => {
+// fallow-ignore-next-line complexity
   test("preserves nested briefData workflow fields from extraction output", () => {
     const fallback = createEmptyTerms();
 

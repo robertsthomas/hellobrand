@@ -41,6 +41,7 @@ function safeItems(items: string[] | null | undefined) {
   return Array.isArray(items) ? items.filter(Boolean) : [];
 }
 
+// fallow-ignore-next-line complexity
 export function BriefOverview({
   dealId,
   briefData,

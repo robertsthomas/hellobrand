@@ -91,7 +91,7 @@ export function readLocalWorkspaceManifest() {
   }
 }
 
-export function writeLocalWorkspaceManifest(items: LocalWorkspaceManifestItem[]) {
+function writeLocalWorkspaceManifest(items: LocalWorkspaceManifestItem[]) {
   if (!isBrowser()) {
     return;
   }

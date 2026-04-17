@@ -23,7 +23,7 @@ export interface ProfileRecord {
   updatedAt: string;
 }
 
-export interface NotificationEmailDeliveryRecord {
+interface NotificationEmailDeliveryRecord {
   id: string;
   appNotificationId: string;
   userId: string;

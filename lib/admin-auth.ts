@@ -11,7 +11,7 @@ export const ADMIN_SESSION_COOKIE_NAME = "hellobrand_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 const ADMIN_USERNAME = "admin";
 
-export type AdminViewer = {
+type AdminViewer = {
   credentialId: string;
   username: string;
   sessionId: string;
@@ -43,7 +43,7 @@ export function getAdminUsername() {
   return ADMIN_USERNAME;
 }
 
-export async function getAdminCredential() {
+async function getAdminCredential() {
   if (!process.env.DATABASE_URL) {
     return null;
   }

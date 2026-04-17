@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 import type { Viewer } from "@/lib/types";
 
-export const E2E_AUTH_COOKIE_NAME = "hellobrand_e2e_auth";
+const E2E_AUTH_COOKIE_NAME = "hellobrand_e2e_auth";
 
 export const DEFAULT_E2E_VIEWER = {
   id: "demo-user",
@@ -67,7 +67,7 @@ export function isE2EAuthEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.HELLOBRAND_E2E_ENABLED === "1";
 }
 
-export function buildE2EAuthCookieValue(input?: Partial<E2EViewerPayload>) {
+function buildE2EAuthCookieValue(input?: Partial<E2EViewerPayload>) {
   const secret = getE2EAuthSecret();
   if (!secret) {
     throw new Error("Missing HELLOBRAND_E2E_AUTH_SECRET.");

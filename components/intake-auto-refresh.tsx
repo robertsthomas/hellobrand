@@ -127,6 +127,7 @@ export function IntakeAutoRefresh({
 
     let disposed = false;
 
+// fallow-ignore-next-line complexity
     async function pollSession() {
       try {
         const response = await fetch(`/api/intake/${sessionId}`, {

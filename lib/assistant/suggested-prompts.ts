@@ -1,6 +1,6 @@
 import type { AssistantClientContext } from "@/lib/types";
 
-export interface AssistantSuggestedPrompt {
+interface AssistantSuggestedPrompt {
   id: string;
   label: string;
   description: string;

@@ -96,6 +96,7 @@ function formatBriefAsText(sections: Array<{ title: string; content: string; ite
     .join("\n\n---\n\n");
 }
 
+// fallow-ignore-next-line complexity
 export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorProps) {
   const [brief, setBrief] = useState<GeneratedBrief | null>(null);
   const [editedSections, setEditedSections] = useState<

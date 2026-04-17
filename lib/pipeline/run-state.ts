@@ -24,15 +24,15 @@ export class DocumentRunSupersededError extends Error {
   }
 }
 
-export function isSupersededError(error: unknown): error is DocumentRunSupersededError {
+function isSupersededError(error: unknown): error is DocumentRunSupersededError {
   return error instanceof DocumentRunSupersededError;
 }
 
-export function getErrorMessage(error: unknown) {
+function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document processing failed.";
 }
 
-export async function loadDocumentForRun(documentId: string, runId: string) {
+async function loadDocumentForRun(documentId: string, runId: string) {
   const document = await getRepository().getDocument(documentId);
 
   if (!document) {
@@ -50,7 +50,7 @@ export async function assertCurrentRun(documentId: string, runId: string) {
   return loadDocumentForRun(documentId, runId);
 }
 
-export async function updateCurrentRunState(
+async function updateCurrentRunState(
   documentId: string,
   runId: string,
   updater: (state: NonNullable<ReturnType<typeof getDocumentProcessingRunState>>) => NonNullable<ReturnType<typeof getDocumentProcessingRunState>>
@@ -67,7 +67,7 @@ export async function updateCurrentRunState(
   return updated;
 }
 
-export async function markStepComplete(documentId: string, runId: string, step: JobType) {
+async function markStepComplete(documentId: string, runId: string, step: JobType) {
   await updateCurrentRunState(documentId, runId, (state) =>
     markDocumentPipelineStepComplete(state, step)
   );

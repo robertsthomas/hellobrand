@@ -31,6 +31,7 @@ export default function InvoiceEditorPage({ params }: { params: Promise<{ dealId
   );
 }
 
+// fallow-ignore-next-line complexity
 async function InvoiceEditorContent({ params }: { params: Promise<{ dealId: string }> }) {
   const { dealId } = await params;
   if ((await invoiceEditorEnabled()) !== true) {

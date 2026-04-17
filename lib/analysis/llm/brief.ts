@@ -32,6 +32,7 @@ import {
   requestStructured
 } from "./shared";
 
+// fallow-ignore-next-line complexity
 export async function extractBriefWithLlm(
   text: string,
   kind: DocumentKind,

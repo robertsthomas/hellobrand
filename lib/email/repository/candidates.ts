@@ -206,7 +206,7 @@ export async function markEmailCandidateMatchForDealThread(
   return toCandidateMatchRecord(saved);
 }
 
-export async function saveEmailDealEvent(input: {
+async function saveEmailDealEvent(input: {
   userId: string;
   dealId: string;
   threadId: string;
@@ -299,7 +299,7 @@ export async function replaceEmailDealEventsForMessage(input: {
   );
 }
 
-export async function listEmailDealEventsForThread(userId: string, threadId: string) {
+async function listEmailDealEventsForThread(userId: string, threadId: string) {
   const rows = await prisma.emailDealEvent.findMany({
     where: {
       userId,
@@ -352,7 +352,7 @@ export async function saveEmailDealTermSuggestion(input: {
   return toTermSuggestionRecord(saved);
 }
 
-export async function listEmailDealTermSuggestionsForThread(userId: string, threadId: string) {
+async function listEmailDealTermSuggestionsForThread(userId: string, threadId: string) {
   const rows = await prisma.emailDealTermSuggestion.findMany({
     where: {
       userId,
@@ -365,7 +365,7 @@ export async function listEmailDealTermSuggestionsForThread(userId: string, thre
   return rows.map(toTermSuggestionRecord);
 }
 
-export async function updateEmailDealTermSuggestionStatus(
+async function updateEmailDealTermSuggestionStatus(
   userId: string,
   suggestionId: string,
   status: EmailDealTermSuggestionRecord["status"]
@@ -430,7 +430,7 @@ export async function saveEmailActionItem(input: {
   return toActionItemRecord(saved);
 }
 
-export async function listEmailActionItemsForDeal(userId: string, dealId: string, status?: string) {
+async function listEmailActionItemsForDeal(userId: string, dealId: string, status?: string) {
   const rows = await prisma.emailActionItem.findMany({
     where: {
       userId,
@@ -517,7 +517,7 @@ export async function upsertBrandContact(input: {
   return toBrandContactRecord(saved);
 }
 
-export async function listBrandContactsForDeal(userId: string, dealId: string) {
+async function listBrandContactsForDeal(userId: string, dealId: string) {
   const rows = await prisma.brandContact.findMany({
     where: { userId, dealId },
     orderBy: [{ messageCount: "desc" }, { lastSeenAt: "desc" }]

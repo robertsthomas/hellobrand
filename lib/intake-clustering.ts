@@ -8,7 +8,7 @@ export interface ClusterInput {
   brandHint: string | null;
 }
 
-export interface ClusterOutput {
+interface ClusterOutput {
   groups: Array<{
     label: string;
     confidence: number;
@@ -64,6 +64,7 @@ export function normalizeBrand(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
 }
 
+// fallow-ignore-next-line complexity
 export function clusterDocuments(inputs: ClusterInput[]): ClusterOutput {
   if (inputs.length === 0) {
     return { groups: [] };

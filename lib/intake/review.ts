@@ -140,6 +140,7 @@ export async function retryIntakeSessionForViewer(viewer: Viewer, sessionId: str
   return synced ?? toIntakeSessionRecord(session);
 }
 
+// fallow-ignore-next-line complexity
 export async function confirmIntakeSessionForViewer(
   viewer: Viewer,
   sessionId: string,

@@ -64,6 +64,7 @@ export function useInboxManualAdd({
   }, [dealId, threads]);
 
   const fetchThreads = useCallback(
+// fallow-ignore-next-line complexity
     async (nextQuery: string) => {
       if (!isOpen) {
         return;

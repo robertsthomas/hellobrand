@@ -12,9 +12,9 @@ export type PaymentStatus =
   | "paid"
   | "late";
 
-export type InvoiceStatus = "draft" | "finalized" | "sent" | "voided";
-export type InvoiceReminderTouchpointStatus = "pending" | "sent" | "cancelled";
-export type InvoiceDeliveryStatus = "sent" | "failed";
+type InvoiceStatus = "draft" | "finalized" | "sent" | "voided";
+type InvoiceReminderTouchpointStatus = "pending" | "sent" | "cancelled";
+type InvoiceDeliveryStatus = "sent" | "failed";
 
 export interface PaymentRecord {
   id: string;

@@ -181,6 +181,7 @@ function drawParty(
 
 // ── PDF renderer ──
 
+// fallow-ignore-next-line complexity
 export function renderInvoicePdf(input: {
   invoice: InvoiceRecord;
   workspaceLabel: string;

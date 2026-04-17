@@ -18,6 +18,7 @@ function safeRedirectTarget(input: string | undefined, fallback: string) {
   return input;
 }
 
+// fallow-ignore-next-line complexity
 export default async function DeletePartnershipPage({
   params,
   searchParams

@@ -260,7 +260,7 @@ export async function generateSimplifiedSummaryWithLlm(input: {
   };
 }
 
-export async function consolidateClausesWithLlm(
+async function consolidateClausesWithLlm(
   input: ClauseConsolidationInput
 ): Promise<ClauseConsolidationResult> {
   const payload = await requestStructured(

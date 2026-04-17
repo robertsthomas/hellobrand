@@ -15,7 +15,7 @@ declare global {
     | undefined;
 }
 
-export class UnreadableDocumentError extends Error {
+class UnreadableDocumentError extends Error {
   constructor(message = "We could not reliably parse this file.") {
     super(message);
     this.name = "UnreadableDocumentError";
@@ -120,6 +120,7 @@ async function ensurePdfJsMainThreadWorker() {
   await pdfJsMainThreadWorkerPromise;
 }
 
+// fallow-ignore-next-line complexity
 async function extractPdfTextWithPdfJs(buffer: Buffer) {
   await ensurePdfJsMainThreadWorker();
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -177,7 +178,7 @@ async function extractPdfTextWithPdfJs(buffer: Buffer) {
   return pages.join("\n\n");
 }
 
-export type ExtractionResult = {
+type ExtractionResult = {
   rawText: string;
   normalizedText: string;
   _debug?: {
@@ -194,7 +195,7 @@ export type ExtractionResult = {
   };
 };
 
-export type ExtractDocumentTextOptions = {};
+type ExtractDocumentTextOptions = {};
 
 async function extractTextWithAzureDocumentIntelligence(
   buffer: Buffer,
@@ -243,6 +244,7 @@ async function extractTextWithAzureDocumentIntelligence(
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function extractDocumentText(
   buffer: Buffer,
   mimeType: string,
@@ -321,7 +323,7 @@ export async function extractDocumentText(
   throw new UnreadableDocumentError("Only PDF, DOCX, and pasted text are supported in this beta.");
 }
 
-export async function persistExtractedText(dealId: string, fileName: string, text: string) {
+async function persistExtractedText(dealId: string, fileName: string, text: string) {
   const directory = getRuntimePath("extracted");
   await mkdir(directory, { recursive: true });
   const outputPath = path.join(directory, `${dealId}-${slugify(fileName || "document")}.txt`);

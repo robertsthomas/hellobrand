@@ -10,6 +10,7 @@ import { saveArtifact, saveObservabilityArtifact } from "@/lib/pipeline/artifact
 import { assertCurrentRun, executePipelineStep } from "@/lib/pipeline/run-state";
 
 export async function runExtractTextStep(documentId: string, runId: string) {
+// fallow-ignore-next-line complexity
   return executePipelineStep({ documentId, runId, step: "extract_text" }, async ({ document }) => {
     logDocumentPipeline("info", "pipeline_start", {
       dealId: document.dealId,

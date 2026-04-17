@@ -7,8 +7,8 @@ import {
   createBlogPostCoverImage
 } from "@/lib/blog-cover";
 
-export const contentType = BLOG_POST_COVER_CONTENT_TYPE;
-export const size = BLOG_POST_COVER_SIZE;
+const contentType = BLOG_POST_COVER_CONTENT_TYPE;
+const size = BLOG_POST_COVER_SIZE;
 
 type BlogPostCoverRouteProps = {
   params: Promise<{

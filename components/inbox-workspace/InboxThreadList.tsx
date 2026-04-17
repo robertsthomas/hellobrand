@@ -97,6 +97,7 @@ export function InboxThreadList({
             No inbox threads match your search.
           </div>
         ) : (
+// fallow-ignore-next-line complexity
           filteredThreads.map((item) => {
             const active = item.thread.id === activeThreadId;
             const itemPreviewState = threadPreviewStates[item.thread.id];

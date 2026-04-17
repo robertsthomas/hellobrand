@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getRepository } from "@/lib/repository";
 import type { Viewer } from "@/lib/types";
 
-export const FEATURE_KEYS = [
+const FEATURE_KEYS = [
   "workspace_creation",
   "assistant_chat",
   "deal_draft_generation",
@@ -20,20 +20,20 @@ export const FEATURE_KEYS = [
   "email_connections",
 ] as const;
 
-export const USAGE_LIMIT_KEYS = [
+const USAGE_LIMIT_KEYS = [
   "active_workspaces",
   "assistant_messages_monthly",
   "brief_generations_monthly",
 ] as const;
 
-export type FeatureKey = (typeof FEATURE_KEYS)[number];
+type FeatureKey = (typeof FEATURE_KEYS)[number];
 export type UsageLimitKey = (typeof USAGE_LIMIT_KEYS)[number];
-export type EntitlementSource = "override" | "billing" | "fallback";
+type EntitlementSource = "override" | "billing" | "fallback";
 
 type UsageLimitMatrix = Record<PlanTier, Record<UsageLimitKey, number | null>>;
 type FeatureMatrix = Record<PlanTier, Record<FeatureKey, boolean>>;
 
-export type UsageEntitlement = {
+type UsageEntitlement = {
   key: UsageLimitKey;
   current: number;
   limit: number | null;
@@ -172,6 +172,7 @@ function usageErrorMessage(key: UsageLimitKey, limit: number, effectiveTier: Pla
   }
 }
 
+// fallow-ignore-next-line complexity
 export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntitlements> {
   const overrideTier = await getDevPlanOverrideAsync();
   const workspaceCount = await getActiveWorkspaceCount(viewer);

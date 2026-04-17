@@ -4,7 +4,6 @@
  */
 export {
   classifyDocumentHeuristically,
-  createEmptyTerms,
   extractStructuredTerms,
   inferBriefBrandName,
   inferBriefCampaignName,

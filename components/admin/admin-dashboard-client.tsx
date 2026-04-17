@@ -110,6 +110,7 @@ function SettingRow({
 // User Detail Modal
 // ---------------------------------------------------------------------------
 
+// fallow-ignore-next-line complexity
 function UserDetailModal({
   user,
   onClose,

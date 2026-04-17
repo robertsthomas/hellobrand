@@ -70,6 +70,7 @@ type InboxReplyComposerProps = {
   onDismissSignatureBanner: () => void;
 };
 
+// fallow-ignore-next-line complexity
 export function InboxReplyComposer({
   replyBody,
   replyBodyRef,

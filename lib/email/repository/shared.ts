@@ -35,13 +35,13 @@ export function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 }
 
-export function toStringArray(value: unknown) {
+function toStringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
 }
 
-export function toParticipants(value: unknown) {
+function toParticipants(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -73,7 +73,7 @@ export function toParticipants(value: unknown) {
     .filter((entry): entry is EmailParticipant => Boolean(entry));
 }
 
-export function toParticipant(value: unknown) {
+function toParticipant(value: unknown) {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -181,7 +181,7 @@ export function toThreadRecord(thread: {
   };
 }
 
-export function toAttachmentRecord(attachment: {
+function toAttachmentRecord(attachment: {
   id: string;
   messageId: string;
   providerAttachmentId: string;

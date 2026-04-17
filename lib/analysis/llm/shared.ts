@@ -7,14 +7,14 @@ import { z } from "zod";
 import { aiCachePolicy, hasAiClient } from "@/lib/ai/gateway";
 import { runStructuredOpenRouterTask } from "@/lib/ai/structured";
 
-export type LlmTask =
+type LlmTask =
   | "extract_section"
   | "analyze_risks"
   | "generate_summary"
   | "generate_brief"
   | "consolidate_clauses";
 
-export type LlmRoute = {
+type LlmRoute = {
   primary: string;
   fallbacks: string[];
 };

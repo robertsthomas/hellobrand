@@ -106,6 +106,7 @@ function summarizePayment(aggregate: DealAggregate, compact: boolean) {
     : `You are set to be paid ${amount}.`;
 }
 
+// fallow-ignore-next-line complexity
 function summarizeRights(
   aggregate: DealAggregate,
   compact: boolean,
@@ -250,6 +251,7 @@ function normalizeAmount(amount: number) {
   return Math.round(amount).toString();
 }
 
+// fallow-ignore-next-line complexity
 export function validateSummaryVariantBody(
   aggregate: DealAggregate,
   body: string
@@ -325,6 +327,7 @@ export function validateSummaryVariantBody(
   return null;
 }
 
+// fallow-ignore-next-line complexity
 function buildGroundingPayload(aggregate: DealAggregate, baseSummary: SummaryRecord) {
   return {
     baseSummary: toPlainDealSummary(baseSummary.body) ?? baseSummary.body,

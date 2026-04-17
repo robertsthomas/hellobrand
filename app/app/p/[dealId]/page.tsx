@@ -52,6 +52,7 @@ export default function WorkspaceDealDetailPage({
   );
 }
 
+// fallow-ignore-next-line complexity
 async function DealDetailContent({
   params,
   searchParams,

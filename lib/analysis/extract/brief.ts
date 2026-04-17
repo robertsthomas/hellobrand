@@ -132,9 +132,6 @@ export function parseBriefDeliverables(text: string, evidence: FieldEvidence[]) 
 
   return deliverables;
 }
-
-export { isGenericCampaignName };
-
 export function isBriefLikeDocumentKind(documentKind: DocumentKind) {
   return (
     documentKind === "campaign_brief" ||

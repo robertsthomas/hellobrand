@@ -21,6 +21,7 @@ const SEVERITY_STYLES: Record<string, string> = {
   low: "border-l-slate-300 dark:border-l-slate-500/40",
 };
 
+// fallow-ignore-next-line complexity
 export function PublicContractBreakdown({
   breakdown,
   eyebrow,

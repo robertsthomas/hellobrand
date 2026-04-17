@@ -1,7 +1,7 @@
 import type { ViewerEntitlements } from "@/lib/billing/entitlements";
 import type { ConnectedEmailAccountRecord, ProfileRecord } from "@/lib/types";
 
-export type SidebarMilestoneItem = {
+type SidebarMilestoneItem = {
   id: "create_workspace" | "setup_creator_profile" | "connect_email";
   label: string;
   href: string;
@@ -25,7 +25,7 @@ type BuildSidebarMilestonesInput = {
   >;
 };
 
-export function isUsableMilestoneEmailAccount(
+function isUsableMilestoneEmailAccount(
   account: Pick<ConnectedEmailAccountRecord, "provider" | "status" | "mailAuthConfigured">
 ) {
   const hasActiveStatus = account.status === "connected" || account.status === "syncing";

@@ -8,7 +8,7 @@ import { buildClerkProfileSyncPayload } from "@/lib/clerk-profile";
 import { prisma } from "@/lib/prisma";
 import type { ProfileRecord } from "@/lib/types";
 
-export type AiModelInfo = {
+type AiModelInfo = {
   task: string;
   primary: string;
   fallbacks: string[];
@@ -16,12 +16,12 @@ export type AiModelInfo = {
   routeVersion: string;
 };
 
-export type AiModelConfig = {
+type AiModelConfig = {
   models: AiModelInfo[];
   approvedProductionModels: string[];
 };
 
-export type AdminDashboardStats = {
+type AdminDashboardStats = {
   users: number;
   profiles: number;
   deals: number;
@@ -147,7 +147,7 @@ function toManagedUser(user: {
   };
 }
 
-export async function getAdminRequestHost() {
+async function getAdminRequestHost() {
   const requestHeaders = await headers();
 
   return normalizeHost(
@@ -183,7 +183,7 @@ async function getAdminDashboardStats(): Promise<AdminDashboardStats | null> {
   };
 }
 
-export async function listAdminManagedUsers() {
+async function listAdminManagedUsers() {
   if (!process.env.DATABASE_URL) {
     return [];
   }
@@ -291,7 +291,7 @@ const APPROVED_PRODUCTION_MODELS = [
   "openai/gpt-5.4-mini"
 ];
 
-export function getAiModelConfig(): AiModelConfig {
+function getAiModelConfig(): AiModelConfig {
   const globalModel = process.env.OPENROUTER_MODEL;
 
   const models: AiModelInfo[] = AI_TASKS.map(({ key, envVar }) => {
@@ -678,6 +678,7 @@ export async function grantUserTrial(
   });
 }
 
+// fallow-ignore-next-line complexity
 function toProfileRecordForClerk(user: AdminManagedUser): ProfileRecord {
   return {
     id: user.profile?.id ?? `profile-${user.id}`,

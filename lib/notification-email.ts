@@ -21,7 +21,7 @@ type EmailEligibleEventType =
   | "invoice.generate_prompt"
   | "invoice.send_prompt";
 
-export type NotificationEmailCopy = {
+type NotificationEmailCopy = {
   subject: string;
   headline: string;
   body: string;
@@ -541,6 +541,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   });
 }
 
+// fallow-ignore-next-line complexity
 export async function sendNotificationEmailDelivery(appNotificationId: string) {
   if (!process.env.DATABASE_URL) {
     return null;

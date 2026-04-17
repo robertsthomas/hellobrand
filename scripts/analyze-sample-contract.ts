@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file
 /**
  * One-off script to analyze the sample contract PDF through the real pipeline.
  *

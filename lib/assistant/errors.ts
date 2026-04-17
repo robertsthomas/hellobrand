@@ -14,7 +14,7 @@ function assistantErrorText(error: unknown) {
   return "";
 }
 
-export function isAssistantProviderContentPolicyError(message: string) {
+function isAssistantProviderContentPolicyError(message: string) {
   const normalized = message.toLowerCase();
 
   return (

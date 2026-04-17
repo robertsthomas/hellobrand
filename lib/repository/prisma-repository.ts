@@ -255,6 +255,7 @@ export class PrismaRepository {
     return toDealRecord(deal);
   }
 
+// fallow-ignore-next-line complexity
   async updateDeal(userId: string, dealId: string, patch: Partial<DealRecord>) {
     const existing = await prisma.deal.findFirst({
       where: { id: dealId, userId },

@@ -1,13 +1,13 @@
 import { BillingInterval, BillingSubscriptionStatus, PlanTier } from "@prisma/client";
 
-export const ACTIVE_BILLING_SUBSCRIPTION_STATUSES = new Set<BillingSubscriptionStatus>([
+const ACTIVE_BILLING_SUBSCRIPTION_STATUSES = new Set<BillingSubscriptionStatus>([
   BillingSubscriptionStatus.active,
   BillingSubscriptionStatus.trialing,
   BillingSubscriptionStatus.past_due,
   BillingSubscriptionStatus.paused
 ]);
 
-export type TrialOffer = {
+type TrialOffer = {
   days: number;
   source: string;
 };

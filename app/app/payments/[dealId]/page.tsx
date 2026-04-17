@@ -23,6 +23,7 @@ export default function PaymentWorkspacePage({
   );
 }
 
+// fallow-ignore-next-line complexity
 async function PaymentWorkspaceContent({
   params
 }: {

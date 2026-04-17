@@ -75,7 +75,7 @@ export async function getCachedDealForViewer(viewer: Viewer, dealId: string) {
   return allAggregates.find((a) => a.deal.id === dealId) ?? null;
 }
 
-export async function getCachedPayments(viewer: Viewer) {
+async function getCachedPayments(viewer: Viewer) {
   "use cache";
   cacheLife("minutes");
   cacheTag(`user-${viewer.id}-payments`);

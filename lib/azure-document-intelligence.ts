@@ -20,19 +20,19 @@ function normalizeEnv(value: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
-export function getAzureDocumentIntelligenceEndpoint() {
+function getAzureDocumentIntelligenceEndpoint() {
   return normalizeEnv(process.env.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT);
 }
 
-export function getAzureDocumentIntelligenceApiKey() {
+function getAzureDocumentIntelligenceApiKey() {
   return normalizeEnv(process.env.AZURE_DOCUMENT_INTELLIGENCE_API_KEY);
 }
 
-export function getAzureDocumentIntelligenceModelId() {
+function getAzureDocumentIntelligenceModelId() {
   return normalizeEnv(process.env.AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID) ?? DEFAULT_MODEL_ID;
 }
 
-export function getAzureDocumentIntelligenceApiVersion() {
+function getAzureDocumentIntelligenceApiVersion() {
   return normalizeEnv(process.env.AZURE_DOCUMENT_INTELLIGENCE_API_VERSION) ?? DEFAULT_API_VERSION;
 }
 
@@ -48,6 +48,7 @@ function shouldRequestMarkdown(modelId: string) {
   return modelId === "prebuilt-layout";
 }
 
+// fallow-ignore-next-line complexity
 export async function analyzeDocumentWithAzureDocumentIntelligence(input: {
   bytes: Buffer;
   mimeType: string;

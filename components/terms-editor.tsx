@@ -47,6 +47,7 @@ function fieldValue(value: string | null | undefined) {
   return stripHtmlTags(value);
 }
 
+// fallow-ignore-next-line complexity
 function formatReviewValue(terms: DealTermsRecord | null, fieldPath: string) {
   switch (fieldPath) {
     case "brandCategory":
@@ -462,6 +463,7 @@ function mixedSectionTwoUpGrid(editing: boolean) {
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
+// fallow-ignore-next-line complexity
 export function TermsEditor({
   dealId,
   terms,

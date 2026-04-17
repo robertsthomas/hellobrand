@@ -5,13 +5,13 @@ import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
 import { DEFAULT_E2E_VIEWER } from "@/lib/e2e-auth";
 import { prisma } from "@/lib/prisma";
 
-export type DevDashboardViewer = {
+type DevDashboardViewer = {
   id: string;
   email: string | null;
   displayName: string | null;
 };
 
-export type DevDashboardDatabaseSummary = {
+type DevDashboardDatabaseSummary = {
   users: number;
   profiles: number;
   onboardingStates: number;
@@ -24,7 +24,7 @@ export type DevDashboardDatabaseSummary = {
   billingWebhookEvents: number;
 };
 
-export type DevDashboardSnapshot = {
+type DevDashboardSnapshot = {
   host: string | null;
   environment: string;
   databaseConfigured: boolean;
@@ -57,7 +57,7 @@ function normalizeHost(host: string | null) {
   return normalized.split(":")[0] ?? null;
 }
 
-export function isLocalDevelopmentHost(host: string | null) {
+function isLocalDevelopmentHost(host: string | null) {
   const normalizedHost = normalizeHost(host);
 
   return (
@@ -71,7 +71,7 @@ export function isLocalDevelopmentRequest(host: string | null) {
   return process.env.NODE_ENV !== "production" && isLocalDevelopmentHost(host);
 }
 
-export async function getRequestHost() {
+async function getRequestHost() {
   const requestHeaders = await headers();
 
   return (
@@ -165,7 +165,7 @@ async function getClerkUserCount() {
   }
 }
 
-export async function getDevDashboardSnapshot(): Promise<DevDashboardSnapshot> {
+async function getDevDashboardSnapshot(): Promise<DevDashboardSnapshot> {
   const host = await getRequestHost();
   const [database, clerkUserCount] = await Promise.all([
     getDatabaseSummary(),

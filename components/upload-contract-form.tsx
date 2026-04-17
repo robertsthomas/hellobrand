@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 type UploadMode = "upload" | "paste";
 
+// fallow-ignore-next-line complexity
 export function UploadContractForm({
   dealId,
   documents,

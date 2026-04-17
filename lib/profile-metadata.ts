@@ -39,7 +39,7 @@ export interface SocialHandleEntry {
   partnershipContext: string | null;
 }
 
-export interface ProfileMetadata {
+interface ProfileMetadata {
   bio: string | null;
   location: string | null;
   primaryPlatform: ProfilePlatform | null;

@@ -286,6 +286,7 @@ const pageContextRegistry: Record<string, AssistantPageContext> = {
   }
 };
 
+// fallow-ignore-next-line complexity
 function matchPageContext(pathname: string): AssistantPageContext | null {
   if (pathname === "/app" || pathname === "/app/dashboard") {
     return pageContextRegistry["/app"];

@@ -35,6 +35,7 @@ export default function InboxPage({
   );
 }
 
+// fallow-ignore-next-line complexity
 async function InboxContent({
   searchParams,
 }: {

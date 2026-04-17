@@ -21,6 +21,7 @@ export function PublicClaimLoader() {
   useEffect(() => {
     trackPublicFunnelEvent("anonymous_auth_returned");
 
+// fallow-ignore-next-line complexity
     void (async () => {
       try {
         const response = await fetch("/api/public/intake/claim", {

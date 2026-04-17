@@ -25,7 +25,7 @@ export async function getConnectedEmailAccount(accountId: string) {
   return account ? toAccountRecord(account) : null;
 }
 
-export async function getConnectedEmailAccountForUser(userId: string, accountId: string) {
+async function getConnectedEmailAccountForUser(userId: string, accountId: string) {
   const account = await prisma.connectedEmailAccount.findFirst({
     where: { id: accountId, userId }
   });
@@ -262,6 +262,7 @@ export async function listExistingEmailMessageProviderIdsForAccount(
   return rows.map((row) => row.providerMessageId);
 }
 
+// fallow-ignore-next-line complexity
 export async function upsertEmailSyncState(
   accountId: string,
   patch: Partial<

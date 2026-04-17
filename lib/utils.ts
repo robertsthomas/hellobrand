@@ -38,7 +38,7 @@ export function slugify(value: string) {
     .slice(0, 48);
 }
 
-export function initials(value: string) {
+function initials(value: string) {
   return value
     .split(/\s+/)
     .filter(Boolean)
@@ -51,7 +51,7 @@ export function humanizeToken(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (part) => part.toUpperCase());
 }
 
-export function decodeHtmlEntities(value: string) {
+function decodeHtmlEntities(value: string) {
   return value
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")

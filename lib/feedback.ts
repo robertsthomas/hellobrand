@@ -14,7 +14,7 @@ import type { Viewer } from "@/lib/types";
 const SUPPORT_EMAIL = "support@hellobrand.com";
 const LOW_SCORE_SUPPORT_THRESHOLD = 3;
 
-export type FeedbackSubmissionInput = {
+type FeedbackSubmissionInput = {
   score: number;
   message: string | null;
   pagePath: string;

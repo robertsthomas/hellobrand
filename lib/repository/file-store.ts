@@ -13,9 +13,11 @@ import type { AppStore, DealAggregate, DealRecord, DocumentRecord } from "@/lib/
 const runtimeDir = getRuntimeDir();
 const dataFile = getRuntimePath("app-store.json");
 
-export function normalizeStore(store: Partial<AppStore>): AppStore {
+// fallow-ignore-next-line complexity
+function normalizeStore(store: Partial<AppStore>): AppStore {
   return {
     users: store.users ?? [],
+// fallow-ignore-next-line complexity
     deals: (store.deals ?? []).map((deal) => ({
       ...deal,
       confirmedAt: deal.confirmedAt ?? deal.createdAt ?? null,
@@ -65,6 +67,7 @@ export function normalizeStore(store: Partial<AppStore>): AppStore {
         processingStartedAt: document.processingStartedAt ?? null,
       };
     }),
+// fallow-ignore-next-line complexity
     dealTerms: (store.dealTerms ?? []).map((terms) => ({
       ...terms,
       brandName: terms.brandName ?? null,

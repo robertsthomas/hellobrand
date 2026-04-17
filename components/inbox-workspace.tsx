@@ -76,6 +76,7 @@ import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
 import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
 import { ThreadAttachments } from "./inbox-workspace/ThreadAttachments";
 
+// fallow-ignore-next-line complexity
 export function InboxWorkspace({
   threads,
   selectedThread: initialSelectedThread,

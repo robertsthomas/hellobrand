@@ -41,6 +41,7 @@ export function getBillingBaseUrl() {
   );
 }
 
+// fallow-ignore-next-line unused-export
 export function getDevPlanOverride() {
   if (!isNonProduction()) {
     return null;
@@ -109,7 +110,7 @@ export function getStripeWebhookSecret() {
   return process.env.STRIPE_WEBHOOK_SECRET?.trim() || null;
 }
 
-export function stripePriceEnvName(planTier: PlanTier, interval: BillingInterval) {
+function stripePriceEnvName(planTier: PlanTier, interval: BillingInterval) {
   const suffix = interval === BillingInterval.month ? "MONTHLY" : "YEARLY";
   return `STRIPE_PRICE_${planTier.toUpperCase()}_${suffix}`;
 }

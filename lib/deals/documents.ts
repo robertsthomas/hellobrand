@@ -41,7 +41,7 @@ async function processDocumentPipeline(
   return runDocumentPipelineSteps(document.id, runId);
 }
 
-export async function startDocumentProcessingRun(documentId: string) {
+async function startDocumentProcessingRun(documentId: string) {
   const repository = getRepository();
   const document = await repository.getDocument(documentId);
 
@@ -163,14 +163,14 @@ async function processDocumentById(documentId: string, runId?: string) {
   }
 }
 
-export interface DirectUploadFileRegistration {
+interface DirectUploadFileRegistration {
   fileName: string;
   mimeType: string;
   fileSizeBytes: number;
   checksumSha256: string | null;
 }
 
-export interface RegisteredDirectDocumentUpload {
+interface RegisteredDirectDocumentUpload {
   documentId: string;
   fileName: string;
   mimeType: string;

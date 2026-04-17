@@ -14,7 +14,7 @@ import type {
   Viewer
 } from "@/lib/types";
 
-export function asArtifactPayload(value: unknown): Record<string, unknown> | null {
+function asArtifactPayload(value: unknown): Record<string, unknown> | null {
   if (value == null) {
     return null;
   }

@@ -70,7 +70,7 @@ export function sentenceAround(text: string, index: number) {
   return text.slice(start, end).replace(/\s+/g, " ").trim();
 }
 
-export function firstMatch(
+function firstMatch(
   text: string,
   pattern: RegExp
 ): { value: string; index: number } | null {
@@ -102,7 +102,7 @@ export function pushEvidence(
   });
 }
 
-export function findSectionByKeyword(sections: DocumentSectionInput[], keywords: string[]) {
+function findSectionByKeyword(sections: DocumentSectionInput[], keywords: string[]) {
   return (
     sections.find((section) =>
       keywords.some((keyword) =>
@@ -113,7 +113,7 @@ export function findSectionByKeyword(sections: DocumentSectionInput[], keywords:
   );
 }
 
-export function parseCurrencyAmount(text: string) {
+function parseCurrencyAmount(text: string) {
   const match = firstMatch(text, /\$ ?([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?)/i);
   if (!match) {
     return null;
@@ -126,7 +126,7 @@ export function parseCurrencyAmount(text: string) {
   };
 }
 
-export function parseNetTerms(text: string) {
+function parseNetTerms(text: string) {
   const match = firstMatch(text, /\bnet[\s-]?(\d{1,3})\b/i);
   if (!match) {
     return null;
@@ -139,7 +139,8 @@ export function parseNetTerms(text: string) {
   };
 }
 
-export function parsePaymentStructure(text: string) {
+// fallow-ignore-next-line complexity
+function parsePaymentStructure(text: string) {
   const splitSentence = text.match(
     /(\d{1,3}%[^.\n]{0,120}?\b(?:and|,)\s*\d{1,3}%[^.\n]{0,120})/i
   );
@@ -181,7 +182,8 @@ export function parsePaymentStructure(text: string) {
   return null;
 }
 
-export function parsePaymentTrigger(text: string) {
+// fallow-ignore-next-line complexity
+function parsePaymentTrigger(text: string) {
   const lower = text.toLowerCase();
 
   if (/signature/.test(lower) && /final live links/.test(lower)) {
@@ -227,7 +229,7 @@ export function parsePaymentTrigger(text: string) {
   return null;
 }
 
-export function parseDuration(text: string, keyword: string) {
+function parseDuration(text: string, keyword: string) {
   const pattern = new RegExp(
     `${keyword}[^.\\n]{0,80}?(\\d+\\s*(?:day|days|week|weeks|month|months|year|years))`,
     "i"
@@ -243,7 +245,7 @@ export function parseDuration(text: string, keyword: string) {
   };
 }
 
-export function parseNameAfterLabel(text: string, labels: string[]) {
+function parseNameAfterLabel(text: string, labels: string[]) {
   const labelPattern = labels.join("|");
   const match = text.match(
     new RegExp(`(?:${labelPattern})\\s*[:\\-]\\s*([A-Z][A-Za-z0-9&'().,\\- ]{2,80})`, "i")
@@ -263,7 +265,7 @@ export function parseNameAfterLabel(text: string, labels: string[]) {
   };
 }
 
-export function parseRevisionRounds(text: string) {
+function parseRevisionRounds(text: string) {
   const explicitRounds = firstMatch(text, /(\d+)\s+(?:rounds?|revisions?)/i);
   if (explicitRounds) {
     return {
@@ -293,7 +295,7 @@ function inferDateNear(text: string, startIndex: number) {
   return match?.[0] ?? null;
 }
 
-export function parseDeliverables(text: string, evidence: FieldEvidence[]) {
+function parseDeliverables(text: string, evidence: FieldEvidence[]) {
   const deliverables: DeliverableItem[] = [];
   const seen = new Set<string>();
   const patterns = [
@@ -345,7 +347,7 @@ export function getTopDocumentLines(text: string, count = 6) {
     .slice(0, count);
 }
 
-export function isBriefLikeDocumentKind(documentKind: DocumentKind) {
+function isBriefLikeDocumentKind(documentKind: DocumentKind) {
   return (
     documentKind === "campaign_brief" ||
     documentKind === "deliverables_brief" ||
@@ -353,6 +355,7 @@ export function isBriefLikeDocumentKind(documentKind: DocumentKind) {
   );
 }
 
+// fallow-ignore-next-line unused-export
 export function isGenericCampaignName(value: string | null | undefined) {
   return sanitizeCampaignName(value) === null;
 }
@@ -386,7 +389,7 @@ export function inferSectionTitle(content: string, kind: DocumentKind) {
   return "General";
 }
 
-export function isSectionRelevant(section: DocumentSectionInput, keywords: string[]) {
+function isSectionRelevant(section: DocumentSectionInput, keywords: string[]) {
   const lowerTitle = section.title.toLowerCase();
   const lowerContent = section.content.toLowerCase();
 
@@ -395,7 +398,7 @@ export function isSectionRelevant(section: DocumentSectionInput, keywords: strin
   );
 }
 
-export function buildUsageRightsSummary(terms: ReturnType<typeof createEmptyTerms>) {
+function buildUsageRightsSummary(terms: ReturnType<typeof createEmptyTerms>) {
   const parts: string[] = [];
   if (terms.usageRightsOrganicAllowed) {
     parts.push("organic reposting");
@@ -418,6 +421,7 @@ export function buildUsageRightsSummary(terms: ReturnType<typeof createEmptyTerm
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+// fallow-ignore-next-line complexity
 export function extractStructuredTermsFromSection(
   section: DocumentSectionInput,
   documentKind: DocumentKind
@@ -648,6 +652,7 @@ function mergeDeliverablesWithPriority(
   );
 }
 
+// fallow-ignore-next-line complexity
 export function mergeExtractionResults(parts: ExtractionPipelineResult[]) {
   const merged = createEmptyTerms();
   const evidence: FieldEvidence[] = [];

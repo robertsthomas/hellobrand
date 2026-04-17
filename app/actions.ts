@@ -1,14 +1,8 @@
-export { createDealAction } from "@/app/server-actions/deal-actions";
-export { uploadDocumentsAction } from "@/app/server-actions/deal-actions";
-export { reprocessDocumentAction } from "@/app/server-actions/deal-actions";
-export { saveDealMetaAction } from "@/app/server-actions/deal-actions";
-export { saveTermsAction } from "@/app/server-actions/deal-actions";
+export { reprocessDocumentAction } from "@/app/server-actions/deal-actions";export { saveTermsAction } from "@/app/server-actions/deal-actions";
 export { confirmTermsReviewAction } from "@/app/server-actions/deal-actions";
 export { saveDealNotesAction } from "@/app/server-actions/deal-actions";
 export { activateSummaryVariantAction } from "@/app/server-actions/deal-actions";
-export { restoreSummaryVersionAction } from "@/app/server-actions/deal-actions";
-export { deleteWorkspaceAction } from "@/app/server-actions/deal-actions";
-export { deleteWorkspaceConfirmedAction } from "@/app/server-actions/deal-actions";
+export { restoreSummaryVersionAction } from "@/app/server-actions/deal-actions";export { deleteWorkspaceConfirmedAction } from "@/app/server-actions/deal-actions";
 export { archiveDealAction } from "@/app/server-actions/deal-actions";
 export { unarchiveDealAction } from "@/app/server-actions/deal-actions";
 export { applyPendingChangesAction } from "@/app/server-actions/deal-actions";
@@ -19,17 +13,8 @@ export { regenerateInvoiceDraftAction } from "@/app/server-actions/deal-actions"
 export { saveInvoiceDraftAction } from "@/app/server-actions/deal-actions";
 export { finalizeInvoiceAction } from "@/app/server-actions/deal-actions";
 export { voidInvoiceAction } from "@/app/server-actions/deal-actions";
-export { deleteInvoiceAction } from "@/app/server-actions/deal-actions";
-
-export { startIntakeAction } from "@/app/server-actions/intake-actions";
-export { retryIntakeSessionAction } from "@/app/server-actions/intake-actions";
-export { deleteIntakeDraftAction } from "@/app/server-actions/intake-actions";
-export { confirmIntakeSessionAction } from "@/app/server-actions/intake-actions";
-export { startBulkIntakeAction } from "@/app/server-actions/intake-actions";
-export { confirmBatchGroupAction } from "@/app/server-actions/intake-actions";
-export { reassignDocumentAction } from "@/app/server-actions/intake-actions";
-
-export { savePaymentAction } from "@/app/server-actions/account-actions";
+export { deleteInvoiceAction } from "@/app/server-actions/deal-actions";export { deleteIntakeDraftAction } from "@/app/server-actions/intake-actions";
+export { confirmIntakeSessionAction } from "@/app/server-actions/intake-actions";export { savePaymentAction } from "@/app/server-actions/account-actions";
 export { saveProfileAction } from "@/app/server-actions/account-actions";
 export { startCheckoutAction } from "@/app/server-actions/account-actions";
 export { openBillingPortalAction } from "@/app/server-actions/account-actions";

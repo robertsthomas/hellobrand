@@ -1,6 +1,6 @@
 import { absoluteUrl } from "@/lib/site";
 
-export type BlogSection = {
+type BlogSection = {
   heading: string;
   paragraphs: string[];
   bullets?: string[];

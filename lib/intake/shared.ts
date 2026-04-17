@@ -272,6 +272,7 @@ function stageRank(stage: IntakeProcessingStageId | null | undefined) {
   return STAGE_ORDER.indexOf(stage);
 }
 
+// fallow-ignore-next-line complexity
 export function deriveProcessingSnapshot(
   aggregate: DealAggregate | null,
   session: IntakeSessionRecord

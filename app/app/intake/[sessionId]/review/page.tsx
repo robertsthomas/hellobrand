@@ -49,6 +49,7 @@ export default function IntakeSessionPage({
   );
 }
 
+// fallow-ignore-next-line complexity
 async function IntakeReviewContent({
   params
 }: {

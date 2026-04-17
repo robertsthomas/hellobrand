@@ -3,7 +3,7 @@ import { cache } from "react";
 
 import { prisma } from "@/lib/prisma";
 
-export const DEFAULT_APP_SETTINGS = {
+const DEFAULT_APP_SETTINGS = {
   id: "primary",
   appAccessEnabled: true,
   publicSiteEnabled: true,

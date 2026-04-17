@@ -1,9 +1,9 @@
 import { classifyDocumentHeuristically } from "@/lib/analysis/fallback";
 import type { DocumentClassificationResult, DocumentKind, DocumentRecord } from "@/lib/types";
 
-export type DocumentExtractionRoute = "fallback";
+type DocumentExtractionRoute = "fallback";
 
-export interface DocumentRoutingDecision {
+interface DocumentRoutingDecision {
   classification: DocumentClassificationResult;
   extractionRoute: DocumentExtractionRoute;
   processor: string | null;

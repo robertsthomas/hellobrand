@@ -94,7 +94,7 @@ export interface NotificationSeed {
   createdAt?: Date | string;
 }
 
-export interface WorkspaceNotificationClientPayload {
+interface WorkspaceNotificationClientPayload {
   sessionId: string;
   dealId: string;
   brandName?: string | null;
@@ -143,6 +143,7 @@ const WORKSPACE_SUPERSESSION_MAP: Partial<Record<NotificationEventType, Notifica
     ],
   };
 
+// fallow-ignore-next-line complexity
 export function notificationTypeForEventType(eventType: NotificationEventType): NotificationType {
   switch (eventType) {
     case "payment.overdue":

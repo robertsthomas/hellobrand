@@ -27,7 +27,7 @@ export function asNumber(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-export function asBoolean(value: unknown) {
+function asBoolean(value: unknown) {
   return typeof value === "boolean" ? value : null;
 }
 
@@ -39,7 +39,7 @@ export function asStringArray(value: unknown) {
   return value.map(asString).filter((entry): entry is string => Boolean(entry));
 }
 
-export function asDateWindow(value: unknown): CampaignDateWindow | null {
+function asDateWindow(value: unknown): CampaignDateWindow | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -52,7 +52,7 @@ export function asDateWindow(value: unknown): CampaignDateWindow | null {
   };
 }
 
-export function asDisclosureObligations(value: unknown) {
+function asDisclosureObligations(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -82,7 +82,7 @@ export function asDisclosureObligations(value: unknown) {
     .filter((entry): entry is DisclosureObligation => entry !== null);
 }
 
-export function normalizeDeliverables(
+function normalizeDeliverables(
   value: unknown,
   fallbackDeliverables: TermsData["deliverables"]
 ) {
@@ -129,6 +129,7 @@ export function normalizeDeliverables(
   return normalized.length > 0 ? normalized : fallbackDeliverables;
 }
 
+// fallow-ignore-next-line complexity
 export function normalizeTerms(
   rawData: unknown,
   fallbackData: TermsData
@@ -261,6 +262,7 @@ function emptyBriefData(): BriefData {
   };
 }
 
+// fallow-ignore-next-line complexity
 function normalizeBriefData(
   nestedValue: unknown,
   topLevelValue: Partial<

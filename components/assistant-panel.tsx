@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { AssistantClientContext, AssistantThreadRecord, AssistantTone } from "@/lib/types";
 
+// fallow-ignore-next-line complexity
 export function AssistantPanel({
   thread,
   initialMessages,

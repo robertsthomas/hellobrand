@@ -6,7 +6,7 @@ import type {
   JobType
 } from "@/lib/types";
 
-export type DocumentDisplayState =
+type DocumentDisplayState =
   | "uploaded"
   | "parsing"
   | "extracting"
@@ -14,7 +14,7 @@ export type DocumentDisplayState =
   | "ready"
   | "failed";
 
-export interface DocumentDisplayStatus {
+interface DocumentDisplayStatus {
   state: DocumentDisplayState;
   label: string;
   detail: string;
@@ -38,6 +38,7 @@ function isParsingJob(jobType: JobType | null) {
   );
 }
 
+// fallow-ignore-next-line complexity
 export function getDocumentDisplayStatus(input: {
   document: DocumentRecord;
   jobs?: JobRecord[];

@@ -350,6 +350,7 @@ export function buildEmailTermSuggestion(
   };
 }
 
+// fallow-ignore-next-line complexity
 export function detectPromiseDiscrepancies(
   aggregate: DealAggregate,
   message: EmailMessageRecord

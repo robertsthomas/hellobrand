@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export const ADMIN_CACHE_TARGETS = [
+const ADMIN_CACHE_TARGETS = [
   {
     key: "inbox",
     label: "Inbox",

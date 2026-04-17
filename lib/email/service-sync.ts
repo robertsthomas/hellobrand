@@ -53,7 +53,7 @@ function hasInngestEventKey() {
   return Boolean(process.env.INNGEST_EVENT_KEY);
 }
 
-export type IncrementalEmailSyncRequest = {
+type IncrementalEmailSyncRequest = {
   accountId: string;
   gmailHistoryId?: string | null;
   outlookMessageIds?: string[];
@@ -228,6 +228,7 @@ export async function enqueueEmailEvent(name: string, data: Record<string, unkno
   return { mode: "local" as const };
 }
 
+// fallow-ignore-next-line complexity
 async function syncGmailAccount(
   account: ConnectedEmailAccountRecord,
   mode: "initial" | "incremental",
@@ -380,6 +381,7 @@ async function syncGmailAccount(
   }
 }
 
+// fallow-ignore-next-line complexity
 async function syncOutlookAccount(
   account: ConnectedEmailAccountRecord,
   mode: "initial" | "incremental",
@@ -470,6 +472,7 @@ async function syncOutlookAccount(
   }
 }
 
+// fallow-ignore-next-line complexity
 async function syncYahooAccount(
   account: ConnectedEmailAccountRecord,
   mode: "initial" | "incremental",

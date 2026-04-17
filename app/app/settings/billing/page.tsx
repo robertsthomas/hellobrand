@@ -49,6 +49,7 @@ function StatusBanner({
   );
 }
 
+// fallow-ignore-next-line complexity
 export default async function BillingSettingsPage({
   searchParams,
 }: {

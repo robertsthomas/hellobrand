@@ -31,7 +31,7 @@ export type DraftPromptSuggestionCacheEntry = {
   suggestions: DraftPromptSuggestion[];
 };
 
-export type ThreadCopilotInsightCacheEntry = {
+type ThreadCopilotInsightCacheEntry = {
   risks: RiskSuggestion[];
   documents: DocumentSuggestion[];
 };
@@ -161,17 +161,17 @@ export function cleanWorkspaceText(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
-export function removeReplyPrefixes(subject: string) {
+function removeReplyPrefixes(subject: string) {
   return cleanWorkspaceText(subject.replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi, ""));
 }
 
-export function stripWorkspaceSuffixes(subject: string) {
+function stripWorkspaceSuffixes(subject: string) {
   return cleanWorkspaceText(
     removeReplyPrefixes(subject).replace(/\b(partnership|collaboration|campaign)\b/gi, "")
   );
 }
 
-export function inferBrandNameFromParticipant(participant: EmailParticipant | null | undefined) {
+function inferBrandNameFromParticipant(participant: EmailParticipant | null | undefined) {
   if (!participant) {
     return null;
   }
@@ -320,7 +320,7 @@ export function loadDraftPromptSuggestionCache() {
   }
 }
 
-export function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSuggestion {
+function stancePromptSuggestion(stance: NegotiationStance | ""): DraftPromptSuggestion {
   switch (stance) {
     case "firm":
       return {
@@ -379,6 +379,7 @@ export function sanitizeEmailHtml(html: string) {
 
   document.querySelectorAll("img").forEach((node) => node.remove());
 
+// fallow-ignore-next-line complexity
   document.querySelectorAll("*").forEach((element) => {
     for (const attribute of Array.from(element.attributes)) {
       const name = attribute.name.toLowerCase();

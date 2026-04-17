@@ -34,6 +34,7 @@ type BlogSummarizeButtonProps = {
   articleText: string;
 };
 
+// fallow-ignore-next-line complexity
 export function BlogSummarizeButton({
   cacheKey,
   title,

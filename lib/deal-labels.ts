@@ -26,7 +26,7 @@ function normalizeDisplayLabel(value: string | null | undefined) {
     .trim();
 }
 
-export function splitDisplayDealLabelSegments(value: string | null | undefined) {
+function splitDisplayDealLabelSegments(value: string | null | undefined) {
   const raw = presentDisplayText(value);
   if (!raw) {
     return [] as string[];
@@ -55,12 +55,12 @@ function dedupeRepeatedCampaignSuffix(value: string | null | undefined) {
   return normalized;
 }
 
-export function formatDisplayBrandName(value: string | null | undefined) {
+function formatDisplayBrandName(value: string | null | undefined) {
   const cleaned = splitDisplayDealLabelSegments(value)[0] ?? normalizeDisplayLabel(value);
   return cleaned && !isGenericWorkspaceLabel(cleaned) ? cleaned : null;
 }
 
-export function formatDisplayCampaignName(
+function formatDisplayCampaignName(
   value: string | null | undefined,
   brandName?: string | null | undefined,
 ) {

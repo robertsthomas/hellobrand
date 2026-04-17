@@ -111,6 +111,7 @@ function cleanFileName(fileName: string) {
   );
 }
 
+// fallow-ignore-next-line complexity
 function isGenericIntakeLabel(value: string | null | undefined) {
   const normalized = presentText(value)?.toLowerCase();
   if (!normalized) {
@@ -470,6 +471,7 @@ function nearestPhoneFromWindow(lines: string[], emailIndex: number) {
   return best?.phone ?? null;
 }
 
+// fallow-ignore-next-line complexity
 function buildPrimaryContactFromDocumentText(input: {
   aggregate: DealAggregate;
   agencyName: string | null;
@@ -567,6 +569,7 @@ function buildPrimaryContactFromDocumentText(input: {
   return candidates.sort((left, right) => right.score - left.score)[0] ?? null;
 }
 
+// fallow-ignore-next-line complexity
 function contactFromBriefData(
   aggregate: DealAggregate,
   agencyName: string | null,
@@ -631,6 +634,7 @@ function contactFromBriefData(
   );
 }
 
+// fallow-ignore-next-line complexity
 function contactFromExtractionEvidence(
   aggregate: DealAggregate,
   agencyName: string | null,
@@ -790,6 +794,7 @@ function extractPrimaryContact(
   return emptyPrimaryContact(agencyName, brandName);
 }
 
+// fallow-ignore-next-line complexity
 function extractLikelyBrandFromFileNames(fileNames: string[]) {
   for (const fileName of fileNames) {
     const rawName = presentText(fileName.replace(/\.[a-z0-9]+$/i, ""));
@@ -875,6 +880,7 @@ function extractBrandFromText(text: string) {
   return null;
 }
 
+// fallow-ignore-next-line complexity
 function inferBrandName(aggregate: DealAggregate) {
   const persisted = sanitizePartyName(
     getPersistedIntakeRecord(aggregate.summaries)?.brandName,
@@ -974,6 +980,7 @@ function parseMoneyValues(text: string) {
   ).filter((value) => Number.isFinite(value));
 }
 
+// fallow-ignore-next-line complexity
 function inferPaymentAmount(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.paymentAmount;
   if (typeof persisted === "number") {
@@ -1036,6 +1043,7 @@ function cleanDeliverables(deliverables: DeliverableItem[]) {
     .filter((item) => presentText(item.title));
 }
 
+// fallow-ignore-next-line complexity
 function parseDeliverablesFromText(aggregate: DealAggregate) {
   const found: DeliverableItem[] = [];
 
@@ -1174,6 +1182,7 @@ function scoreTimelineSnippet(snippet: string, kind: DocumentKind, hasDate: bool
   return score;
 }
 
+// fallow-ignore-next-line complexity
 function extractTimelineItems(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.timelineItems;
   if (persisted?.length) {
@@ -1259,6 +1268,7 @@ function extractTimelineItems(aggregate: DealAggregate) {
     }));
 }
 
+// fallow-ignore-next-line complexity
 function extractAnalytics(aggregate: DealAggregate) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.analytics;
   if (persisted?.highlights?.length) {
@@ -1348,6 +1358,7 @@ function extractAnalytics(aggregate: DealAggregate) {
   return highlights.length > 0 ? { highlights: highlights.slice(0, 6) } : null;
 }
 
+// fallow-ignore-next-line complexity
 function inferContractTitle(
   aggregate: DealAggregate,
   brandName: string | null,
@@ -1611,6 +1622,7 @@ function buildEvidenceGroups(input: {
   return groups.filter((group) => group.snippets.length > 0);
 }
 
+// fallow-ignore-next-line complexity
 export function buildNormalizedIntakeRecord(
   aggregate: DealAggregate | null,
   options?: IntakeNormalizationOptions

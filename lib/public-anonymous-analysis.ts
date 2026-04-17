@@ -222,7 +222,7 @@ export function buildAnonymousDealBreakdown(input: {
   };
 }
 
-export async function createAnonymousAnalysisSession(input: AnonymousSessionInput) {
+async function createAnonymousAnalysisSession(input: AnonymousSessionInput) {
   const token = `anon_${randomBytes(18).toString("hex")}`;
   const expiresAt = new Date(Date.now() + ANONYMOUS_SESSION_TTL_MS);
   const delegate = getAnonymousSessionDelegate();
@@ -343,7 +343,7 @@ function scheduleAnonymousStorageMaintenance() {
   void maintenancePromise.catch(() => undefined);
 }
 
-export async function getAnonymousAnalysisSessionByToken(token: string) {
+async function getAnonymousAnalysisSessionByToken(token: string) {
   scheduleAnonymousStorageMaintenance();
   const delegate = getAnonymousSessionDelegate();
 
@@ -435,7 +435,7 @@ export async function countRecentAnonymousUploadAttempts(input: {
   };
 }
 
-export async function updateStoredSession(
+async function updateStoredSession(
   token: string,
   patch: Partial<AnonymousAnalysisSessionRecord>
 ) {
@@ -590,6 +590,7 @@ export async function analyzeAnonymousUpload(input: {
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function claimAnonymousAnalysisSession(viewer: Viewer, token: string) {
   const session = await getAnonymousAnalysisSessionByToken(token);
 

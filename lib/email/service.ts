@@ -58,8 +58,6 @@ import {
   refreshEmailDealSuggestionsForViewer,
   textBodyToHtml,
 } from "@/lib/email/service-shared";
-export type { IncrementalEmailSyncRequest } from "./service-sync";
-
 export {
   coalesceIncrementalEmailSyncRequests,
   getIncrementalEmailSyncBatchConfig,
@@ -84,7 +82,7 @@ export async function renewExpiringEmailSubscriptions() {
   return module.renewExpiringEmailSubscriptions();
 }
 
-export async function createGoogleConnectUrlForViewer(
+async function createGoogleConnectUrlForViewer(
   ...args: Parameters<typeof import("./service-connect").createGoogleConnectUrlForViewer>
 ) {
   const module = await import("./service-connect");
@@ -100,7 +98,7 @@ export async function createGoogleConnectUrlForViewerWithReturnBaseUrl(
   return module.createGoogleConnectUrlForViewerWithReturnBaseUrl(...args);
 }
 
-export async function createOutlookConnectUrlForViewer(
+async function createOutlookConnectUrlForViewer(
   ...args: Parameters<typeof import("./service-connect").createOutlookConnectUrlForViewer>
 ) {
   const module = await import("./service-connect");
@@ -116,7 +114,7 @@ export async function createOutlookConnectUrlForViewerWithReturnBaseUrl(
   return module.createOutlookConnectUrlForViewerWithReturnBaseUrl(...args);
 }
 
-export async function createYahooConnectUrlForViewer(
+async function createYahooConnectUrlForViewer(
   ...args: Parameters<typeof import("./service-connect").createYahooConnectUrlForViewer>
 ) {
   const module = await import("./service-connect");
@@ -181,7 +179,7 @@ export async function summarizeEmailThreadForViewer(
   return module.summarizeEmailThreadForViewer(...args);
 }
 
-export async function draftReplyForViewer(
+async function draftReplyForViewer(
   ...args: Parameters<typeof import("./service-ai").draftReplyForViewer>
 ) {
   const module = await import("./service-ai");
@@ -259,6 +257,7 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
   return detail;
 }
 
+// fallow-ignore-next-line complexity
 export async function sendEmailThreadReplyForViewer(
   viewer: Viewer,
   threadId: string,
@@ -437,6 +436,7 @@ export async function sendEmailThreadReplyForViewer(
   };
 }
 
+// fallow-ignore-next-line complexity
 export async function getEmailAttachmentForViewer(viewer: Viewer, attachmentId: string) {
   await assertPremiumInboxAccess(viewer);
   if (!process.env.DATABASE_URL) {
@@ -734,6 +734,7 @@ export async function discoverDealEmailCandidatesForViewer(viewer: Viewer) {
   return listDealEmailCandidatesForViewer(viewer);
 }
 
+// fallow-ignore-next-line complexity
 export async function reviewDealEmailCandidatesForViewer(
   viewer: Viewer,
   input: {

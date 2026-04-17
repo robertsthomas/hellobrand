@@ -148,7 +148,7 @@ export function detectChangedFields(
   return changed;
 }
 
-export function mergeDeliverables(
+function mergeDeliverables(
   existing: NonNullable<DealTermsRecord["deliverables"]>,
   incoming: NonNullable<DealTermsRecord["deliverables"]>
 ) {
@@ -169,7 +169,8 @@ export function mergeDeliverables(
   );
 }
 
-export function mergeBriefData(
+// fallow-ignore-next-line complexity
+function mergeBriefData(
   base: BriefData | null,
   patch: BriefData | null
 ): BriefData | null {
@@ -308,7 +309,7 @@ export function earliestDeliverableDate(terms: Pick<DealTermsRecord, "deliverabl
   );
 }
 
-export function shouldLogDocumentPipeline() {
+function shouldLogDocumentPipeline() {
   return (
     process.env.DEBUG_DOCUMENT_PIPELINE === "1" ||
     process.env.NODE_ENV !== "production"
@@ -331,7 +332,7 @@ export function logDocumentPipeline(
   });
 }
 
-export async function runStage<T>(
+async function runStage<T>(
   dealId: string,
   documentId: string,
   type: JobType,
@@ -388,7 +389,7 @@ export async function runStage<T>(
   }
 }
 
-export function writeGenerationSnapshot(input: {
+function writeGenerationSnapshot(input: {
   dealId: string;
   documentId: string;
   fileName: string;
@@ -434,4 +435,4 @@ export function writeGenerationSnapshot(input: {
   );
 }
 
-export { getViewerById, getRepository };
+export { getViewerById };

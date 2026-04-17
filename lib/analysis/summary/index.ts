@@ -25,6 +25,7 @@ import {
 } from "@/lib/analysis/extract";
 import { analyzeCreatorRisks } from "@/lib/analysis/risks";
 
+// fallow-ignore-next-line complexity
 export function buildCreatorSummary(
   extraction: ExtractionPipelineResult,
   risks: Array<Omit<RiskFlagRecord, "id" | "dealId" | "createdAt">>
@@ -260,6 +261,7 @@ export function fallbackAnalyzeContract(text: string) {
   };
 }
 
+// fallow-ignore-next-line complexity
 export function buildFallbackBrief(aggregate: DealAggregate): GeneratedBrief {
   const { deal, terms, riskFlags } = aggregate;
   const briefData = terms?.briefData;

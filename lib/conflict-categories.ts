@@ -228,7 +228,7 @@ export function normalizeDealCategory(value: string | null | undefined): DealCat
   return null;
 }
 
-export function inferDealCategoryFromLabels(
+function inferDealCategoryFromLabels(
   values: Array<string | null | undefined>
 ): DealCategory | null {
   const combined = uniqueStrings(values).join("\n");

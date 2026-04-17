@@ -5,7 +5,7 @@ import type {
   SummaryType
 } from "@/lib/types";
 
-export const SUMMARY_TYPES: SummaryType[] = ["legal", "plain_language", "short"];
+const SUMMARY_TYPES: SummaryType[] = ["legal", "plain_language", "short"];
 
 const SUMMARY_TYPE_LABELS: Record<SummaryType, string> = {
   legal: "Legal",
@@ -13,15 +13,15 @@ const SUMMARY_TYPE_LABELS: Record<SummaryType, string> = {
   short: "Short"
 };
 
-export function isIntakeSummaryVersion(version: string) {
+function isIntakeSummaryVersion(version: string) {
   return version.startsWith("intake-normalized:");
 }
 
-export function isSummaryType(value: unknown): value is SummaryType {
+function isSummaryType(value: unknown): value is SummaryType {
   return typeof value === "string" && SUMMARY_TYPES.includes(value as SummaryType);
 }
 
-export function isSummarySource(value: unknown): value is SummarySource {
+function isSummarySource(value: unknown): value is SummarySource {
   return value === "analysis" || value === "simplification";
 }
 

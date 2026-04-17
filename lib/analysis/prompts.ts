@@ -42,10 +42,7 @@ const BRIEF_SECTION_IDS = [
   "do-not-mention",
   "approval-requirements",
 ] as const;
-
-export { BRIEF_SECTION_IDS };
-
-export const ANALYSIS_PROMPT_VERSION = "2026-04-16-v3";
+const ANALYSIS_PROMPT_VERSION = "2026-04-16-v3";
 
 export function extractSectionSystemPrompt() {
   return joinPromptSections([

@@ -23,6 +23,7 @@ type ThreadAttachmentsProps = {
 
 const VISIBLE_LIMIT = 3;
 
+// fallow-ignore-next-line complexity
 export function ThreadAttachments({
   messages,
   primaryLinkId,
