@@ -7,6 +7,7 @@ import {
   mergeConflictIntelligence
 } from "@/lib/conflict-intelligence";
 import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
+import { sanitizePlainTextInput } from "@/lib/utils";
 export {
   createDocumentProcessingRunState,
   DOCUMENT_PIPELINE_STEPS,
@@ -122,6 +123,10 @@ function sanitizeCreatorExtractionResult(
         (!brandName || agencyName.toLowerCase() !== brandName.toLowerCase())
           ? agencyName
           : null,
+      deliverables: (extraction.data.deliverables ?? []).map((item) => ({
+        ...item,
+        description: item.description ? sanitizePlainTextInput(item.description) : item.description
+      })),
       creatorName,
       pendingExtraction: null
     },

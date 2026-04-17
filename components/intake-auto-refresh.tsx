@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
 import { useIntakeUiStore } from "@/lib/stores/intake-ui-store";
-import type {
-  DealAggregate,
-  DocumentArtifactRecord,
-  IntakeSessionStatus
-} from "@/lib/types";
+import type { DealAggregate, DocumentArtifactRecord, IntakeSessionStatus } from "@/lib/types";
+
+const INTAKE_DRAFT_DELETE_START_EVENT = "intake-draft-delete-start";
 
 function logClientRefresh(event: string, details: Record<string, unknown>) {
   if (process.env.NODE_ENV === "production") {
@@ -62,7 +60,7 @@ function logDocumentAiBrowserResponses(
       step: artifact.step,
       processor: artifact.processor,
       createdAt: artifact.createdAt,
-      response: artifact.payload
+      response: artifact.payload,
     });
   }
 }
@@ -71,7 +69,7 @@ export function IntakeAutoRefresh({
   sessionId,
   status,
   readyHref,
-  forcePolling = false
+  forcePolling = false,
 }: {
   sessionId: string;
   status: IntakeSessionStatus;
@@ -84,16 +82,43 @@ export function IntakeAutoRefresh({
   const isSubmitting = useIntakeUiStore((state) => state.isSubmitting);
   const lastKnownStatus = useRef(status);
   const loggedDocumentAiArtifactIds = useRef(new Set<string>());
+  const isDeletePendingRef = useRef(false);
   const [remoteStatus, setRemoteStatus] = useState<IntakeSessionStatus>(status);
+  const [isDeletePending, setIsDeletePending] = useState(false);
   const shouldPoll =
-    forcePolling ||
-    ["uploading", "processing"].includes(status) ||
-    (status === "draft" && pendingSessionId === sessionId && isSubmitting);
+    !isDeletePending &&
+    (forcePolling ||
+      ["uploading", "processing"].includes(status) ||
+      (status === "draft" && pendingSessionId === sessionId && isSubmitting));
 
   useEffect(() => {
     lastKnownStatus.current = status;
     setRemoteStatus(status);
   }, [status]);
+
+  useEffect(() => {
+    isDeletePendingRef.current = false;
+    setIsDeletePending(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    const handleDeleteStart = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+      if (detail?.sessionId !== sessionId) {
+        return;
+      }
+
+      isDeletePendingRef.current = true;
+      setIsDeletePending(true);
+    };
+
+    window.addEventListener(INTAKE_DRAFT_DELETE_START_EVENT, handleDeleteStart as EventListener);
+    return () =>
+      window.removeEventListener(
+        INTAKE_DRAFT_DELETE_START_EVENT,
+        handleDeleteStart as EventListener
+      );
+  }, [sessionId]);
 
   useEffect(() => {
     if (!shouldPoll) {
@@ -106,8 +131,12 @@ export function IntakeAutoRefresh({
       try {
         const response = await fetch(`/api/intake/${sessionId}`, {
           method: "GET",
-          cache: "no-store"
+          cache: "no-store",
         });
+
+        if (isDeletePendingRef.current && response.status === 404) {
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Status request failed: ${response.status}`);
@@ -129,19 +158,16 @@ export function IntakeAutoRefresh({
         if (nextProcessing && typeof window !== "undefined") {
           window.dispatchEvent(
             new CustomEvent("intake-processing-update", {
-              detail: { sessionId, processing: nextProcessing }
+              detail: { sessionId, processing: nextProcessing },
             })
           );
         }
 
-        if (
-          readyHref &&
-          ["ready_for_confirmation", "failed"].includes(nextStatus)
-        ) {
+        if (readyHref && ["ready_for_confirmation", "failed"].includes(nextStatus)) {
           logClientRefresh("ready_redirect", {
             sessionId,
             status: nextStatus,
-            readyHref
+            readyHref,
           });
           router.replace(readyHref);
           return;
@@ -151,7 +177,7 @@ export function IntakeAutoRefresh({
           logClientRefresh("status_changed", {
             sessionId,
             from: lastKnownStatus.current,
-            to: nextStatus
+            to: nextStatus,
           });
 
           startTransition(() => {
@@ -163,7 +189,7 @@ export function IntakeAutoRefresh({
         if (["ready_for_confirmation", "failed", "completed"].includes(nextStatus)) {
           logClientRefresh("terminal_status_refresh", {
             sessionId,
-            status: nextStatus
+            status: nextStatus,
           });
 
           startTransition(() => {
@@ -171,10 +197,13 @@ export function IntakeAutoRefresh({
           });
         }
       } catch (error) {
+        if (isDeletePendingRef.current) {
+          return;
+        }
+
         logClientRefresh("poll_failed", {
           sessionId,
-          error:
-            error instanceof Error ? error.message : "Could not poll intake status."
+          error: error instanceof Error ? error.message : "Could not poll intake status.",
         });
       }
     }
@@ -195,7 +224,16 @@ export function IntakeAutoRefresh({
       disposed = true;
       clearTimeout(timeoutId);
     };
-  }, [forcePolling, isSubmitting, pendingSessionId, router, sessionId, shouldPoll, startTransition, status]);
+  }, [
+    forcePolling,
+    isSubmitting,
+    pendingSessionId,
+    router,
+    sessionId,
+    shouldPoll,
+    startTransition,
+    status,
+  ]);
 
   if (!shouldPoll && !["uploading", "processing"].includes(remoteStatus)) {
     return null;
@@ -207,8 +245,8 @@ export function IntakeAutoRefresh({
       {status === "draft" && shouldPoll
         ? "Uploading your source and preparing analysis."
         : remoteStatus === status
-        ? "Checking intake status automatically."
-        : `Refreshing intake after ${remoteStatus.replaceAll("_", " ")}.`}
+          ? "Checking intake status automatically."
+          : `Refreshing intake after ${remoteStatus.replaceAll("_", " ")}.`}
     </p>
   );
 }

@@ -86,7 +86,9 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="h-full">
       <body className={`${inter.variable} min-h-dvh bg-background`}>
-        <HtmlLangSync />
+        <Suspense fallback={null}>
+          <HtmlLangSync />
+        </Suspense>
         <a href="#main-content" className="skip-link">
           Skip to content
         </a>

@@ -11,6 +11,7 @@ import { FormInput, FormSelect, FormTextarea } from "@/components/generic/form";
 import { IntakeAccordion } from "@/components/intake";
 import { dealCategoryLabel, dealCategoryOptions } from "@/lib/conflict-categories";
 import { createClientRowId, dedupeRowsById } from "@/lib/row-identity";
+import { sanitizePlainTextInput } from "@/lib/utils";
 import type {
   CampaignDateWindow,
   DealCategory,
@@ -83,7 +84,7 @@ function normalizeDeliverables(deliverables: DeliverableItem[]) {
       channel: item.channel ?? "",
       quantity: item.quantity,
       status: item.status ?? "pending",
-      description: item.description ?? "",
+      description: sanitizePlainTextInput(item.description),
       source: item.source ?? null,
     }))
   );
@@ -168,7 +169,9 @@ export function IntakeGeneratedFieldsEditor({
                 ? item.quantity
                 : null,
             status: item.status,
-            description: item.description?.trim() ? item.description.trim() : null,
+            description: item.description?.trim()
+              ? sanitizePlainTextInput(item.description)
+              : null,
             source: item.source,
           }))
           .filter((item) => item.title.length > 0)

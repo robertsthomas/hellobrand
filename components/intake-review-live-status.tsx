@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, LoaderCircle } from "lucide-react";
 
 import type {
   ConflictResult,
   IntakeProcessingSnapshot,
   IntakeSessionStatus,
-  RiskFlagRecord
+  RiskFlagRecord,
 } from "@/lib/types";
+
+const INTAKE_DRAFT_DELETE_START_EVENT = "intake-draft-delete-start";
 
 type AttentionItem = {
   id: string;
@@ -40,21 +42,18 @@ function buildAttentionItems(
       id: `conflict-${conflict.type}-${conflict.title}`,
       label: conflict.title,
       detail: conflict.detail,
-      tone: "warning" as const
+      tone: "warning" as const,
     })),
     ...riskFlags.slice(0, 4).map((flag) => ({
       id: flag.id,
       label: flag.title,
       detail: flag.detail,
-      tone: (flag.severity === "high" ? "warning" : "neutral") as "warning" | "neutral"
-    }))
+      tone: (flag.severity === "high" ? "warning" : "neutral") as "warning" | "neutral",
+    })),
   ]);
 }
 
-function getStageState(
-  processing: IntakeProcessingSnapshot,
-  stageId: "risk_review" | "summary"
-) {
+function getStageState(processing: IntakeProcessingSnapshot, stageId: "risk_review" | "summary") {
   if (processing.completedStages.includes(stageId)) {
     return "complete" as const;
   }
@@ -76,7 +75,7 @@ function getIntakeReviewPollDelayMs() {
 
 function StageStatusRow({
   label,
-  state
+  state,
 }: {
   label: string;
   state: "pending" | "active" | "complete";
@@ -93,11 +92,7 @@ function StageStatusRow({
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink">{label}</p>
         <p className="text-xs text-black/50 dark:text-white/50">
-          {state === "complete"
-            ? "Finished"
-            : state === "active"
-              ? "Generating now"
-              : "Queued"}
+          {state === "complete" ? "Finished" : state === "active" ? "Generating now" : "Queued"}
         </p>
       </div>
     </div>
@@ -109,7 +104,7 @@ export function IntakeReviewLiveStatus({
   initialStatus,
   initialProcessing,
   conflictResults,
-  initialRiskFlags
+  initialRiskFlags,
 }: {
   sessionId: string;
   initialStatus: IntakeSessionStatus;
@@ -120,6 +115,8 @@ export function IntakeReviewLiveStatus({
   const [status, setStatus] = useState(initialStatus);
   const [processing, setProcessing] = useState(initialProcessing);
   const [riskFlags, setRiskFlags] = useState(initialRiskFlags);
+  const isDeletePendingRef = useRef(false);
+  const [isDeletePending, setIsDeletePending] = useState(false);
 
   useEffect(() => {
     setStatus(initialStatus);
@@ -128,7 +125,31 @@ export function IntakeReviewLiveStatus({
   }, [initialProcessing, initialRiskFlags, initialStatus]);
 
   useEffect(() => {
-    if (!processing.isRunning) {
+    isDeletePendingRef.current = false;
+    setIsDeletePending(false);
+  }, [sessionId]);
+
+  useEffect(() => {
+    const handleDeleteStart = (event: Event) => {
+      const detail = (event as CustomEvent<{ sessionId?: string }>).detail;
+      if (detail?.sessionId !== sessionId) {
+        return;
+      }
+
+      isDeletePendingRef.current = true;
+      setIsDeletePending(true);
+    };
+
+    window.addEventListener(INTAKE_DRAFT_DELETE_START_EVENT, handleDeleteStart as EventListener);
+    return () =>
+      window.removeEventListener(
+        INTAKE_DRAFT_DELETE_START_EVENT,
+        handleDeleteStart as EventListener
+      );
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (isDeletePending || !processing.isRunning) {
       return;
     }
 
@@ -139,8 +160,12 @@ export function IntakeReviewLiveStatus({
       try {
         const response = await fetch(`/api/intake/${sessionId}`, {
           method: "GET",
-          cache: "no-store"
+          cache: "no-store",
         });
+
+        if (isDeletePendingRef.current && response.status === 404) {
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Status request failed: ${response.status}`);
@@ -156,6 +181,10 @@ export function IntakeReviewLiveStatus({
         setProcessing(payload?.processing ?? initialProcessing);
         setRiskFlags(payload?.aggregate?.riskFlags ?? []);
       } catch {
+        if (isDeletePendingRef.current) {
+          return;
+        }
+
         // Keep the last rendered state and try again on the next interval.
       }
 
@@ -170,7 +199,7 @@ export function IntakeReviewLiveStatus({
       disposed = true;
       clearTimeout(timeoutId);
     };
-  }, [initialProcessing, initialStatus, processing.isRunning, sessionId]);
+  }, [initialProcessing, initialStatus, isDeletePending, processing.isRunning, sessionId]);
 
   const attentionItems = buildAttentionItems(conflictResults, riskFlags);
   const showBackgroundStatus =
@@ -186,15 +215,12 @@ export function IntakeReviewLiveStatus({
             <h2 className="text-sm font-semibold text-ink">Finalizing AI review</h2>
           </div>
           <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-            Your extracted fields are ready to review. We&apos;re still finishing
-            risk review and the workspace summary in the background.
+            Your extracted fields are ready to review. We&apos;re still finishing risk review and
+            the workspace summary in the background.
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <StageStatusRow label="Core fields ready to review" state="complete" />
-            <StageStatusRow
-              label="Risk review"
-              state={getStageState(processing, "risk_review")}
-            />
+            <StageStatusRow label="Risk review" state={getStageState(processing, "risk_review")} />
             <StageStatusRow
               label="Workspace summary"
               state={getStageState(processing, "summary")}
@@ -224,17 +250,13 @@ export function IntakeReviewLiveStatus({
               >
                 <span
                   className={`mt-1.5 h-2 w-2 shrink-0 ${
-                    item.tone === "warning"
-                      ? "bg-clay"
-                      : "bg-black/20 dark:bg-white/20"
+                    item.tone === "warning" ? "bg-clay" : "bg-black/20 dark:bg-white/20"
                   }`}
                 />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-ink">{item.label}</p>
                   {item.detail ? (
-                    <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                      {item.detail}
-                    </p>
+                    <p className="mt-1 text-sm text-black/55 dark:text-white/55">{item.detail}</p>
                   ) : null}
                 </div>
               </div>
