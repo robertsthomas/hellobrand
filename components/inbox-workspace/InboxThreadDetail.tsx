@@ -99,8 +99,6 @@ export function InboxThreadDetail({
         throw new Error("Sync failed");
       }
 
-      // Refresh the thread to show new messages
-      // In a production app, you'd trigger a proper revalidation
       window.location.reload();
     } catch (error) {
       console.error("Email sync error:", error);

@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { DealRecord, EmailThreadListItem } from "@/lib/types";
+import { isLikelyBrandDealEmail } from "@/lib/email/smart-inbox";
 import { inferWorkspaceDraftFromThread } from "./inbox-workspace/helpers";
+
+const CACHE_TTL = 10 * 60 * 1000;
+const RESYNC_COOLDOWN = 60 * 1000;
 
 type UseInboxManualAddOptions = {
   deals: DealRecord[];
@@ -18,7 +22,9 @@ export function useInboxManualAdd({
   selectedFilterDealId,
 }: UseInboxManualAddOptions) {
   const router = useRouter();
-  const manualAddSyncedRef = useRef(false);
+  const cacheAtRef = useRef(0);
+  const lastSyncAtRef = useRef(0);
+  const resyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const linkableDeals = useMemo(
     () => deals.filter((deal) => deal.status !== "completed" && deal.status !== "paid"),
@@ -34,8 +40,17 @@ export function useInboxManualAdd({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [isResyncing, setIsResyncing] = useState(false);
+  const [resyncCooldown, setResyncCooldown] = useState(false);
 
-  // Pre-select deal when modal opens
+  useEffect(() => {
+    return () => {
+      if (resyncTimeoutRef.current) clearTimeout(resyncTimeoutRef.current);
+    };
+  }, []);
+
+  // Pre-select deal when modal opens (only if a filter deal is active)
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -46,8 +61,8 @@ export function useInboxManualAdd({
       return;
     }
 
-    setDealId((current) => current || linkableDeals[0]?.id || "");
-  }, [isOpen, linkableDeals, selectedFilterDealId]);
+    setDealId("");
+  }, [isOpen, selectedFilterDealId]);
 
   // Deselect threads that are already linked when deal changes
   useEffect(() => {
@@ -74,8 +89,8 @@ export function useInboxManualAdd({
       onErrorMessage(null);
 
       try {
-        if (!manualAddSyncedRef.current) {
-          manualAddSyncedRef.current = true;
+        if (Date.now() - lastSyncAtRef.current >= CACHE_TTL) {
+          lastSyncAtRef.current = Date.now();
           try {
             const syncRes = await fetch("/api/email/sync?force=1", { method: "POST" });
             if (!syncRes.ok) {
@@ -94,7 +109,7 @@ export function useInboxManualAdd({
           params.set("q", trimmed);
           params.set("limit", "1000");
         } else {
-          params.set("limit", "20");
+          params.set("limit", "500");
         }
 
         const response = await fetch(`/api/email/threads?${params.toString()}`);
@@ -105,6 +120,9 @@ export function useInboxManualAdd({
 
         const nextThreads = (payload.threads ?? []) as EmailThreadListItem[];
         setThreads(nextThreads);
+        if (!trimmed) {
+          cacheAtRef.current = Date.now();
+        }
         setSelectedThreadIds((current) =>
           current.filter((threadId) => nextThreads.some((thread) => thread.thread.id === threadId))
         );
@@ -117,21 +135,47 @@ export function useInboxManualAdd({
     [isOpen, onErrorMessage]
   );
 
-  // Debounced fetch on query change
+  // Debounced fetch on query change, with cache check for empty queries
   useEffect(() => {
     if (!isOpen) {
       return;
     }
 
-    const timeoutId = window.setTimeout(
-      () => {
+    if (query.trim()) {
+      const timeoutId = window.setTimeout(() => {
         void fetchThreads(query);
-      },
-      query.trim() ? 250 : 0
-    );
+      }, 250);
+      return () => window.clearTimeout(timeoutId);
+    }
 
+    if (cacheAtRef.current > 0 && Date.now() - cacheAtRef.current < CACHE_TTL) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void fetchThreads(query);
+    }, 0);
     return () => window.clearTimeout(timeoutId);
   }, [fetchThreads, isOpen, query]);
+
+  const resync = useCallback(async () => {
+    if (isResyncing || resyncCooldown) {
+      return;
+    }
+
+    setIsResyncing(true);
+    cacheAtRef.current = 0;
+    lastSyncAtRef.current = 0;
+
+    try {
+      await fetchThreads(query);
+    } finally {
+      setIsResyncing(false);
+      setResyncCooldown(true);
+      if (resyncTimeoutRef.current) clearTimeout(resyncTimeoutRef.current);
+      resyncTimeoutRef.current = setTimeout(() => setResyncCooldown(false), RESYNC_COOLDOWN);
+    }
+  }, [fetchThreads, isResyncing, query, resyncCooldown]);
 
   const toggleThread = useCallback((threadId: string) => {
     setSelectedThreadIds((current) =>
@@ -146,8 +190,7 @@ export function useInboxManualAdd({
     setQuery("");
     setProviderFilter("");
     setSelectedThreadIds([]);
-    setThreads([]);
-    manualAddSyncedRef.current = false;
+    setShowAll(false);
   }, []);
 
   const selectedThreadIdSet = useMemo(() => new Set(selectedThreadIds), [selectedThreadIds]);
@@ -160,11 +203,16 @@ export function useInboxManualAdd({
     [selectedThreadIds, threads]
   );
 
-  const filteredThreads = useMemo(
-    () =>
-      providerFilter ? threads.filter((item) => item.account.provider === providerFilter) : threads,
-    [providerFilter, threads]
-  );
+  const filteredThreads = useMemo(() => {
+    let result = threads.filter((item) => item.links.length === 0);
+    if (providerFilter) {
+      result = result.filter((item) => item.account.provider === providerFilter);
+    }
+    if (!showAll) {
+      result = result.filter(isLikelyBrandDealEmail);
+    }
+    return result;
+  }, [providerFilter, showAll, threads]);
 
   const submit = useCallback(async () => {
     if (!dealId || selectedThreadIds.length === 0) {
@@ -278,32 +326,31 @@ export function useInboxManualAdd({
   }, [close, onErrorMessage, router, selectedThreadIds, selectedThreads, threads]);
 
   return {
-    // Modal open/close
     isOpen,
     open,
     close,
-    // Form state
     dealId,
     setDealId,
     query,
     setQuery,
     providerFilter,
     setProviderFilter,
-    // Thread data
+    showAll,
+    setShowAll,
     threads,
     filteredThreads,
     selectedThreadIdSet,
     selectedThreadIds,
     selectedThreads,
     toggleThread,
-    // Async state
     isLoading,
     isSubmitting,
     isCreatingWorkspace,
-    // Actions
+    isResyncing,
+    resyncCooldown,
+    resync,
     submit,
     createWorkspace,
-    // Derived
     linkableDeals,
   };
 }

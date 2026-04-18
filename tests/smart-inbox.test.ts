@@ -1,7 +1,11 @@
 import { describe, expect, test } from "vitest";
 
-import { detectImportantEmailEvents } from "@/lib/email/smart-inbox";
-import type { EmailAttachmentRecord, EmailMessageRecord } from "@/lib/types";
+import { detectImportantEmailEvents, isLikelyBrandDealEmail } from "@/lib/email/smart-inbox";
+import type {
+  EmailAttachmentRecord,
+  EmailMessageRecord,
+  EmailThreadListItem,
+} from "@/lib/types";
 
 function createAttachment(overrides: Partial<EmailAttachmentRecord> = {}): EmailAttachmentRecord {
   return {
@@ -52,6 +56,76 @@ function createMessage(overrides: Partial<EmailMessageRecord> = {}): EmailMessag
   };
 }
 
+type ThreadListItemOverrides = Partial<Omit<EmailThreadListItem, "thread" | "account">> & {
+  thread?: Partial<EmailThreadListItem["thread"]>;
+  account?: Partial<EmailThreadListItem["account"]>;
+};
+
+function createThreadListItem(overrides: ThreadListItemOverrides = {}): EmailThreadListItem {
+  const threadOverrides = overrides.thread ?? {};
+  const accountOverrides = overrides.account ?? {};
+  const baseThread: EmailThreadListItem["thread"] = {
+    id: "thread-1",
+    accountId: "account-1",
+    provider: "gmail",
+    providerThreadId: "provider-thread-1",
+    subject: "Paid Partnership Opportunity",
+    snippet: "We'd love to partner on a campaign.",
+    participants: [
+      {
+        name: "Brand Team",
+        email: "partnerships@example.com",
+      },
+    ],
+    lastMessageAt: "2026-04-18T12:00:00.000Z",
+    messageCount: 1,
+    isContractRelated: false,
+    aiSummary: null,
+    aiSummaryUpdatedAt: null,
+    workflowState: "unlinked",
+    draftUpdatedAt: null,
+    createdAt: "2026-04-18T12:00:00.000Z",
+    updatedAt: "2026-04-18T12:00:00.000Z",
+  };
+  const baseAccount: EmailThreadListItem["account"] = {
+    id: "account-1",
+    userId: "user-1",
+    provider: "gmail",
+    providerAccountId: "provider-account-1",
+    emailAddress: "thomas@example.com",
+    displayName: "Thomas",
+    status: "connected",
+    scopes: [],
+    accessTokenEncrypted: null,
+    refreshTokenEncrypted: null,
+    mailAuthConfigured: false,
+    tokenExpiresAt: null,
+    lastSyncAt: null,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    createdAt: "2026-04-18T12:00:00.000Z",
+    updatedAt: "2026-04-18T12:00:00.000Z",
+  };
+
+  return {
+    thread: { ...baseThread, ...threadOverrides },
+    account: { ...baseAccount, ...accountOverrides },
+    links: [],
+    primaryLink: null,
+    referenceLinks: [],
+    importantEventCount: 0,
+    latestImportantEventAt: null,
+    pendingTermSuggestionCount: 0,
+    pendingActionItemCount: 0,
+    latestPendingActionItemAt: null,
+    savedDraft: null,
+    noteCount: 0,
+    ...Object.fromEntries(
+      Object.entries(overrides).filter(([key]) => key !== "thread" && key !== "account")
+    ),
+  };
+}
+
 describe("smart inbox event detection", () => {
   test("does not classify attachment OCR as message-level inbox updates", () => {
     const message = createMessage({
@@ -91,5 +165,31 @@ describe("smart inbox event detection", () => {
       "ask",
       "attachment"
     ]);
+  });
+});
+
+describe("isLikelyBrandDealEmail", () => {
+  test("matches campaign collaboration outreach like the inbox find flow expects", () => {
+    const item = createThreadListItem({
+      thread: {
+        subject: "Holiday Campaign Collaboration - BrightHome x Target",
+        snippet:
+          "Hi Thomas, I hope this message finds you well. I'm reaching out on behalf of BrightHome about a holiday campaign.",
+      },
+    });
+
+    expect(isLikelyBrandDealEmail(item)).toBe(true);
+  });
+
+  test("matches short collab pitch subjects that rely on creator outreach language", () => {
+    const item = createThreadListItem({
+      thread: {
+        subject: "Quick collab idea 👀",
+        snippet:
+          "Hey Thomas, Came across your content and think you'd be perfect for something we're testing.",
+      },
+    });
+
+    expect(isLikelyBrandDealEmail(item)).toBe(true);
   });
 });

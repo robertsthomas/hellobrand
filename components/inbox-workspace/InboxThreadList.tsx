@@ -8,9 +8,7 @@ import {
   ArrowUpDown,
   SlidersHorizontal,
 } from "lucide-react";
-import { AppTooltip } from "@/components/app-tooltip";
 import type { EmailThreadListItem, EmailThreadPreviewStateRecord } from "@/lib/types";
-import type { InboxSortOption } from "@/lib/email/inbox-sort";
 import {
   providerLabel,
   workflowStateLabel,
@@ -19,7 +17,6 @@ import {
   participantLabel,
 } from "./formatters";
 import {
-  THREAD_ACTION_BUTTON_CLASS,
   hasUnseenPreviewSection,
 } from "./helpers";
 
@@ -101,12 +98,6 @@ export function InboxThreadList({
           filteredThreads.map((item) => {
             const active = item.thread.id === activeThreadId;
             const itemPreviewState = threadPreviewStates[item.thread.id];
-            const threadHasUnseenUpdates =
-              item.importantEventCount > 0 &&
-              hasUnseenPreviewSection(
-                item.latestImportantEventAt,
-                itemPreviewState?.previewUpdatesSeenAt
-              );
             const threadHasUnseenActionItems =
               item.pendingActionItemCount > 0 &&
               hasUnseenPreviewSection(
@@ -172,15 +163,6 @@ export function InboxThreadList({
                       {item.noteCount > 0 ? (
                         <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
                           {item.noteCount} note{item.noteCount === 1 ? "" : "s"}
-                        </span>
-                      ) : null}
-                      {item.importantEventCount > 0 ? (
-                        <span className="inline-flex items-center gap-1.5 bg-[#eef3ff] px-2.5 py-1 text-[10px] font-medium text-[#3152a3]">
-                          {threadHasUnseenUpdates ? (
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#3152a3]" />
-                          ) : null}
-                          {item.importantEventCount} update
-                          {item.importantEventCount === 1 ? "" : "s"}
                         </span>
                       ) : null}
                       {item.pendingActionItemCount > 0 ? (

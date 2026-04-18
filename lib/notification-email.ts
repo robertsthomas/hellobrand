@@ -1,7 +1,7 @@
-import { getAppSettings } from "@/lib/admin-settings";
-import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
 import { emailDeliveryEnabled } from "@/flags";
+import { getAppSettings } from "@/lib/admin-settings";
 import { getAppBaseUrl } from "@/lib/email/config";
+import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
 import { inngest } from "@/lib/inngest/client";
 import { prisma } from "@/lib/prisma";
 import { createResendClient } from "@/lib/resend-client";
@@ -22,6 +22,7 @@ type EmailEligibleEventType =
 
 type NotificationEmailCopy = {
   subject: string;
+  preview: string;
   headline: string;
   body: string;
   ctaLabel: string;
@@ -59,6 +60,28 @@ function normalizeEmail(value: string | null | undefined) {
 
   const normalized = value.trim().toLowerCase();
   return normalized.length > 0 ? normalized : null;
+}
+
+function extractMailbox(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = value.match(/<([^>]+)>/);
+  return normalizeEmail(match ? match[1] : value);
+}
+
+function formatNotificationFromEmail(value: string) {
+  const mailbox = extractMailbox(value);
+  if (!mailbox) {
+    return value;
+  }
+
+  if (value.includes("<") && value.includes(">")) {
+    return value.trim();
+  }
+
+  return `HelloBrand <${mailbox}>`;
 }
 
 function normalizeTimeZone(value: string | null | undefined) {
@@ -145,13 +168,14 @@ export function resolveNotificationRecipient(
 
 export function getNotificationEmailConfig() {
   const apiKey = process.env.RESEND_API_KEY?.trim() || null;
-  const fromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const rawFromEmail = process.env.RESEND_FROM_EMAIL?.trim() || "onboarding@resend.dev";
+  const mailbox = extractMailbox(rawFromEmail);
   const testToEmail = normalizeEmail(process.env.RESEND_TEST_TO_EMAIL);
-  const testMode = fromEmail.toLowerCase().endsWith("@resend.dev");
+  const testMode = mailbox?.endsWith("@resend.dev") ?? false;
 
   return {
     apiKey,
-    fromEmail,
+    fromEmail: formatNotificationFromEmail(rawFromEmail),
     testToEmail,
     testMode,
   };
@@ -162,9 +186,9 @@ export function canSendNotificationEmailInCurrentMode(input: {
   testToEmail: string | null;
   recipientEmail: string;
 }) {
-  const fromEmail = input.fromEmail.trim().toLowerCase();
+  const fromEmail = extractMailbox(input.fromEmail);
   const recipientEmail = input.recipientEmail.trim().toLowerCase();
-  const testMode = fromEmail.endsWith("@resend.dev");
+  const testMode = fromEmail?.endsWith("@resend.dev") ?? false;
 
   if (!testMode) {
     return true;
@@ -196,6 +220,112 @@ function truncateEntityName(name: string, maxLength: number): string {
     return name;
   }
   return name.slice(0, maxLength - 1).trimEnd() + "\u2026";
+}
+
+function buildSubjectWithEntity(prefix: string, entity: string) {
+  const maxEntityLength = Math.max(8, 60 - prefix.length);
+  return `${prefix}${truncateEntityName(entity, maxEntityLength)}`;
+}
+
+function truncatePreviewText(value: string, maxLength = 90) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  return `${value.slice(0, maxLength - 1).trimEnd()}\u2026`;
+}
+
+function resolveInvoiceEmailCopy(
+  eventType: EmailEligibleEventType,
+  title: string,
+  body: string
+): Omit<NotificationEmailCopy, "ctaLabel"> | null {
+  if (eventType !== "invoice.generate_prompt" && eventType !== "invoice.send_prompt") {
+    return null;
+  }
+
+  const patterns =
+    eventType === "invoice.generate_prompt"
+      ? [
+          {
+            pattern:
+              /^Today is the final posting milestone for (.+?)\. Generate the workspace invoice now\.$/,
+            subjectPrefix: "Generate invoice for ",
+            headline: "Generate your invoice",
+            preview: "Final posting milestone is today. Generate the invoice now in HelloBrand.",
+            bodyForCampaign: (campaign: string) =>
+              `${campaign} reached its final posting milestone today. Generate the invoice now so it is ready to send and track in your workspace.`,
+          },
+          {
+            pattern:
+              /^You still have not generated the invoice for (.+?)\. Review the workspace invoice tab and send it when ready\.$/,
+            subjectPrefix: "Reminder: generate invoice for ",
+            headline: "Invoice reminder",
+            preview: "Your workspace invoice is still waiting to be generated.",
+            bodyForCampaign: (campaign: string) =>
+              `You have not generated the invoice for ${campaign} yet. Open the workspace invoice tab to create it and send it when ready.`,
+          },
+          {
+            pattern:
+              /^It has been \d+ days since the final posting milestone for (.+?)\. Generate or attach the invoice if it is still outstanding\.$/,
+            subjectPrefix: "Invoice still not generated for ",
+            headline: "Invoice reminder",
+            preview: "Your invoice reminder is still open in HelloBrand.",
+            bodyForCampaign: (campaign: string) =>
+              `The invoice for ${campaign} still appears outstanding. Generate or attach it now if the brand has not been billed yet.`,
+          },
+        ]
+      : [
+          {
+            pattern:
+              /^Your invoice for (.+?) is finalized\. Send it from the linked inbox thread or export it now\.$/,
+            subjectPrefix: "Send invoice for ",
+            headline: "Send your invoice",
+            preview: "Your finalized invoice is ready to send.",
+            bodyForCampaign: (campaign: string) =>
+              `Your invoice for ${campaign} is finalized and ready to send. Open the linked inbox thread or export it from the workspace now.`,
+          },
+          {
+            pattern:
+              /^Your finalized invoice for (.+?) still has not been sent\. Open the workspace invoice tab or linked inbox to send it\.$/,
+            subjectPrefix: "Reminder: send invoice for ",
+            headline: "Invoice reminder",
+            preview: "Your finalized invoice is still waiting to be sent.",
+            bodyForCampaign: (campaign: string) =>
+              `Your finalized invoice for ${campaign} still has not been sent. Open the workspace or linked inbox now to send it.`,
+          },
+          {
+            pattern:
+              /^It has been \d+ days since the invoice for (.+?) was finalized\. Send or resend it if payment is still pending\.$/,
+            subjectPrefix: "Invoice still not sent for ",
+            headline: "Invoice reminder",
+            preview: "Follow up on the invoice if payment is still pending.",
+            bodyForCampaign: (campaign: string) =>
+              `Your invoice for ${campaign} still appears unsent. Send or resend it now if payment is still pending.`,
+          },
+        ];
+
+  for (const candidate of patterns) {
+    const match = body.match(candidate.pattern);
+    if (!match) {
+      continue;
+    }
+
+    const campaignName = match[1];
+    return {
+      subject: buildSubjectWithEntity(candidate.subjectPrefix, campaignName),
+      preview: truncatePreviewText(candidate.preview),
+      headline: candidate.headline,
+      body: candidate.bodyForCampaign(campaignName),
+    };
+  }
+
+  return {
+    subject: truncateEntityName(title, 60),
+    preview: truncatePreviewText(body),
+    headline: title,
+    body,
+  };
 }
 
 function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string): string {
@@ -240,10 +370,10 @@ function buildSubjectForEvent(eventType: EmailEligibleEventType, title: string):
       return `Your ${entity} inbox needs to reconnect`;
     }
     case "invoice.generate_prompt": {
-      return title;
+      return truncateEntityName(title, 60);
     }
     case "invoice.send_prompt": {
-      return title;
+      return truncateEntityName(title, 60);
     }
   }
 }
@@ -314,8 +444,17 @@ export function resolveNotificationEmailCopy(input: {
   body: string;
 }): NotificationEmailCopy {
   if (isEmailEligibleEventType(input.eventType)) {
+    const invoiceCopy = resolveInvoiceEmailCopy(input.eventType, input.title, input.body);
+    if (invoiceCopy) {
+      return {
+        ...invoiceCopy,
+        ctaLabel: resolveCtaLabel(input.eventType),
+      };
+    }
+
     return {
       subject: buildSubjectForEvent(input.eventType, input.title),
+      preview: truncatePreviewText(input.body),
       headline: input.title,
       body: input.body,
       ctaLabel: resolveCtaLabel(input.eventType),
@@ -324,6 +463,7 @@ export function resolveNotificationEmailCopy(input: {
 
   return {
     subject: input.title,
+    preview: truncatePreviewText(input.body),
     headline: input.title,
     body: input.body,
     ctaLabel: "Open in HelloBrand",
@@ -342,6 +482,7 @@ export function buildNotificationEmailPayload(input: {
     body: input.body,
   });
   const absoluteHref = toAbsoluteHref(input.href);
+  const escapedPreview = escapeHtml(copy.preview);
   const escapedHeadline = escapeHtml(copy.headline);
   const escapedBody = escapeHtml(copy.body);
   const escapedCtaLabel = escapeHtml(copy.ctaLabel);
@@ -352,6 +493,9 @@ export function buildNotificationEmailPayload(input: {
     subject: copy.subject,
     html: `
       <div style="font-family: Arial, sans-serif; background: #f6f3ee; padding: 32px;">
+        <div style="display: none; overflow: hidden; line-height: 1px; opacity: 0; max-height: 0; max-width: 0; mso-hide: all;">
+          ${escapedPreview}
+        </div>
         <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 0; border: 1px solid #e7dfd3;">
           <div style="border-top: 2px solid #1f1a14; padding: 32px;">
             <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">${escapedHeadline}</h1>

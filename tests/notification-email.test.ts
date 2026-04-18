@@ -35,129 +35,117 @@ type DeliveryRecord = {
   updatedAt: Date;
 };
 
-const {
-  notifications,
-  deliveries,
-  auditEvents,
-  inngestSend,
-  resendSend,
-  prismaMock
-} = vi.hoisted(() => {
-  type NR = {
-    id: string;
-    category: string;
-    eventType: string;
-    status: string;
-    title: string;
-    body: string;
-    href: string;
-    userId: string;
-    user: {
-      email: string;
-      profile: {
-        id: string;
-        contactEmail: string | null;
-        timeZone: string | null;
-        emailNotificationsEnabled: boolean;
-        createdAt: Date;
-      } | null;
+const { notifications, deliveries, auditEvents, inngestSend, resendSend, prismaMock } = vi.hoisted(
+  () => {
+    type NR = {
+      id: string;
+      category: string;
+      eventType: string;
+      status: string;
+      title: string;
+      body: string;
+      href: string;
+      userId: string;
+      user: {
+        email: string;
+        profile: {
+          id: string;
+          contactEmail: string | null;
+          timeZone: string | null;
+          emailNotificationsEnabled: boolean;
+          createdAt: Date;
+        } | null;
+      };
     };
-  };
-  type DR = {
-    id: string;
-    appNotificationId: string;
-    userId: string;
-    recipientEmail: string;
-    provider: string;
-    providerMessageId: string | null;
-    status: "pending" | "sent" | "failed" | "skipped";
-    errorMessage: string | null;
-    sentAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-
-  const notifications = new Map<string, NR>();
-  const deliveries = new Map<string, DR>();
-  const auditEvents = new Map<string, Array<{ changedFields: unknown }>>();
-  const inngestSend = vi.fn();
-  const resendSend = vi.fn();
-
-  function cloneDelivery(record: DR) {
-    return {
-      ...record,
-      sentAt: record.sentAt ? new Date(record.sentAt) : null,
-      createdAt: new Date(record.createdAt),
-      updatedAt: new Date(record.updatedAt)
+    type DR = {
+      id: string;
+      appNotificationId: string;
+      userId: string;
+      recipientEmail: string;
+      provider: string;
+      providerMessageId: string | null;
+      status: "pending" | "sent" | "failed" | "skipped";
+      errorMessage: string | null;
+      sentAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
     };
-  }
 
-  const prismaMock = {
-    appNotification: {
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => {
-        const notification = notifications.get(where.id);
-        return notification ? structuredClone(notification) : null;
-      })
-    },
-    notificationEmailDelivery: {
-      findUnique: vi.fn(
-        async ({
-          where,
-          include
-        }: {
-          where: { appNotificationId?: string; id?: string };
-          include?: { appNotification?: unknown };
-        }) => {
-          const delivery =
-            where.appNotificationId
+    const notifications = new Map<string, NR>();
+    const deliveries = new Map<string, DR>();
+    const auditEvents = new Map<string, Array<{ changedFields: unknown }>>();
+    const inngestSend = vi.fn();
+    const resendSend = vi.fn();
+
+    function cloneDelivery(record: DR) {
+      return {
+        ...record,
+        sentAt: record.sentAt ? new Date(record.sentAt) : null,
+        createdAt: new Date(record.createdAt),
+        updatedAt: new Date(record.updatedAt),
+      };
+    }
+
+    const prismaMock = {
+      appNotification: {
+        findUnique: vi.fn(async ({ where }: { where: { id: string } }) => {
+          const notification = notifications.get(where.id);
+          return notification ? structuredClone(notification) : null;
+        }),
+      },
+      notificationEmailDelivery: {
+        findUnique: vi.fn(
+          async ({
+            where,
+            include,
+          }: {
+            where: { appNotificationId?: string; id?: string };
+            include?: { appNotification?: unknown };
+          }) => {
+            const delivery = where.appNotificationId
               ? deliveries.get(where.appNotificationId)
               : [...deliveries.values()].find((entry) => entry.id === where.id);
 
-          if (!delivery) {
-            return null;
-          }
+            if (!delivery) {
+              return null;
+            }
 
-          const cloned = cloneDelivery(delivery);
-          if (include?.appNotification) {
-            return {
-              ...cloned,
-              appNotification: structuredClone(notifications.get(cloned.appNotificationId) ?? null)
+            const cloned = cloneDelivery(delivery);
+            if (include?.appNotification) {
+              return {
+                ...cloned,
+                appNotification: structuredClone(
+                  notifications.get(cloned.appNotificationId) ?? null
+                ),
+              };
+            }
+
+            return cloned;
+          }
+        ),
+        create: vi.fn(
+          async ({
+            data,
+          }: {
+            data: Pick<
+              DR,
+              "appNotificationId" | "userId" | "recipientEmail" | "provider" | "status"
+            >;
+          }) => {
+            const record: DR = {
+              id: `delivery-${deliveries.size + 1}`,
+              providerMessageId: null,
+              errorMessage: null,
+              sentAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              ...data,
             };
+            deliveries.set(record.appNotificationId, record);
+            return cloneDelivery(record);
           }
-
-          return cloned;
-        }
-      ),
-      create: vi.fn(
-        async ({
-          data
-        }: {
-          data: Pick<
-            DR,
-            "appNotificationId" | "userId" | "recipientEmail" | "provider" | "status"
-          >;
-        }) => {
-          const record: DR = {
-            id: `delivery-${deliveries.size + 1}`,
-            providerMessageId: null,
-            errorMessage: null,
-            sentAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            ...data
-          };
-          deliveries.set(record.appNotificationId, record);
-          return cloneDelivery(record);
-        }
-      ),
-      update: vi.fn(
-        async ({
-          where,
-          data
-        }: {
-          where: { id: string };
-          data: Partial<DR>;
-        }) => {
+        ),
+        update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<DR> }) => {
           const existing = [...deliveries.values()].find((entry) => entry.id === where.id);
           if (!existing) {
             throw new Error("Delivery not found");
@@ -166,51 +154,51 @@ const {
           const updated: DR = {
             ...existing,
             ...data,
-            updatedAt: new Date()
+            updatedAt: new Date(),
           };
           deliveries.set(updated.appNotificationId, updated);
           return cloneDelivery(updated);
-        }
-      )
-    },
-    profileAuditEvent: {
-      findMany: vi.fn(async ({ where }: { where: { profileId: string } }) =>
-        structuredClone(auditEvents.get(where.profileId) ?? [])
-      )
-    },
-    appSettings: {
-      upsert: vi.fn(async () => ({
-        id: "primary",
-        appAccessEnabled: true,
-        publicSiteEnabled: true,
-        signUpsEnabled: true,
-        emailDeliveryEnabled: true,
-        updatedByAdminUsername: null,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }))
-    }
-  };
+        }),
+      },
+      profileAuditEvent: {
+        findMany: vi.fn(async ({ where }: { where: { profileId: string } }) =>
+          structuredClone(auditEvents.get(where.profileId) ?? [])
+        ),
+      },
+      appSettings: {
+        upsert: vi.fn(async () => ({
+          id: "primary",
+          appAccessEnabled: true,
+          publicSiteEnabled: true,
+          signUpsEnabled: true,
+          emailDeliveryEnabled: true,
+          updatedByAdminUsername: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+      },
+    };
 
-  return { notifications, deliveries, auditEvents, inngestSend, resendSend, prismaMock };
-});
+    return { notifications, deliveries, auditEvents, inngestSend, resendSend, prismaMock };
+  }
+);
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: prismaMock
+  prisma: prismaMock,
 }));
 
 vi.mock("@/lib/inngest/client", () => ({
   inngest: {
-    send: inngestSend
-  }
+    send: inngestSend,
+  },
 }));
 
 vi.mock("resend", () => ({
   Resend: vi.fn().mockImplementation(() => ({
     emails: {
-      send: resendSend
-    }
-  }))
+      send: resendSend,
+    },
+  })),
 }));
 
 import {
@@ -220,7 +208,7 @@ import {
   getNotificationEmailLocalSendDelayMs,
   resolveNotificationEmailCopy,
   resolveNotificationRecipient,
-  sendNotificationEmailDelivery
+  sendNotificationEmailDelivery,
 } from "@/lib/notification-email";
 
 function seedWorkspaceNotification(input?: Partial<NotificationRecord>) {
@@ -240,10 +228,10 @@ function seedWorkspaceNotification(input?: Partial<NotificationRecord>) {
         contactEmail: "owner@example.com",
         timeZone: null,
         emailNotificationsEnabled: true,
-        createdAt: new Date("2026-03-30T00:00:00.000Z")
-      }
+        createdAt: new Date("2026-03-30T00:00:00.000Z"),
+      },
     },
-    ...input
+    ...input,
   };
 
   notifications.set(notification.id, notification);
@@ -263,7 +251,7 @@ describe("notification email helpers", () => {
       canSendNotificationEmailInCurrentMode({
         fromEmail: "onboarding@resend.dev",
         testToEmail: "owner@example.com",
-        recipientEmail: "owner@example.com"
+        recipientEmail: "owner@example.com",
       })
     ).toBe(true);
 
@@ -271,7 +259,7 @@ describe("notification email helpers", () => {
       canSendNotificationEmailInCurrentMode({
         fromEmail: "onboarding@resend.dev",
         testToEmail: "owner@example.com",
-        recipientEmail: "other@example.com"
+        recipientEmail: "other@example.com",
       })
     ).toBe(false);
   });
@@ -324,9 +312,9 @@ describe("notification email queueing", () => {
           contactEmail: "owner@example.com",
           timeZone: null,
           emailNotificationsEnabled: false,
-          createdAt: new Date("2026-03-01T00:00:00.000Z")
-        }
-      }
+          createdAt: new Date("2026-03-01T00:00:00.000Z"),
+        },
+      },
     });
     auditEvents.set("profile-1", [{ changedFields: ["emailNotificationsEnabled"] }]);
 
@@ -341,8 +329,8 @@ describe("notification email queueing", () => {
     seedWorkspaceNotification({
       user: {
         email: "owner@example.com",
-        profile: null
-      }
+        profile: null,
+      },
     });
 
     const result = await enqueueNotificationEmailDelivery("notification-1");
@@ -361,9 +349,9 @@ describe("notification email queueing", () => {
           contactEmail: "owner@example.com",
           timeZone: null,
           emailNotificationsEnabled: false,
-          createdAt: new Date("2026-03-01T00:00:00.000Z")
-        }
-      }
+          createdAt: new Date("2026-03-01T00:00:00.000Z"),
+        },
+      },
     });
 
     const result = await enqueueNotificationEmailDelivery("notification-1");
@@ -375,7 +363,7 @@ describe("notification email queueing", () => {
 
   it("does not enqueue deliveries for intermediate workspace events", async () => {
     seedWorkspaceNotification({
-      eventType: "workspace.processing_started"
+      eventType: "workspace.processing_started",
     });
 
     const result = await enqueueNotificationEmailDelivery("notification-1");
@@ -404,7 +392,7 @@ describe("notification email queueing", () => {
       eventType: "invoice.generate_prompt",
       title: "Generate the Nimbus invoice",
       body: "Today is the final posting milestone. Generate the invoice now.",
-      href: "/app/p/deal-1?tab=invoices"
+      href: "/app/p/deal-1?tab=invoices",
     });
 
     const result = await enqueueNotificationEmailDelivery("notification-invoice");
@@ -443,11 +431,11 @@ describe("notification email sending", () => {
       errorMessage: null,
       sentAt: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
     resendSend.mockResolvedValue({
       data: { id: "email-123" },
-      error: null
+      error: null,
     });
 
     const result = await sendNotificationEmailDelivery("notification-1");
@@ -455,6 +443,11 @@ describe("notification email sending", () => {
     expect(result?.status).toBe("sent");
     expect(result?.providerMessageId).toBe("email-123");
     expect(resendSend).toHaveBeenCalledTimes(1);
+    expect(resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "HelloBrand <onboarding@resend.dev>",
+      })
+    );
   });
 
   it("marks a delivery as skipped when resend.dev test mode recipient does not match", async () => {
@@ -466,9 +459,9 @@ describe("notification email sending", () => {
           contactEmail: "other@example.com",
           timeZone: null,
           emailNotificationsEnabled: true,
-          createdAt: new Date("2026-03-30T00:00:00.000Z")
-        }
-      }
+          createdAt: new Date("2026-03-30T00:00:00.000Z"),
+        },
+      },
     });
     deliveries.set("notification-1", {
       id: "delivery-1",
@@ -481,7 +474,7 @@ describe("notification email sending", () => {
       errorMessage: null,
       sentAt: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     const result = await sendNotificationEmailDelivery("notification-1");
@@ -492,7 +485,7 @@ describe("notification email sending", () => {
 
   it("marks an existing delivery as skipped when the notification is no longer an email-eligible event", async () => {
     seedWorkspaceNotification({
-      eventType: "workspace.processing_started"
+      eventType: "workspace.processing_started",
     });
     deliveries.set("notification-1", {
       id: "delivery-1",
@@ -505,7 +498,7 @@ describe("notification email sending", () => {
       errorMessage: null,
       sentAt: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     const result = await sendNotificationEmailDelivery("notification-1");
@@ -528,14 +521,14 @@ describe("notification email sending", () => {
       errorMessage: null,
       sentAt: null,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
     resendSend.mockResolvedValue({
       data: null,
       error: {
         message: "Invalid sender",
-        statusCode: 403
-      }
+        statusCode: 403,
+      },
     });
 
     const result = await sendNotificationEmailDelivery("notification-1");
@@ -553,7 +546,7 @@ describe("notification email copy", () => {
     "workspace.missing_deliverables",
     "workspace.missing_usage_rights",
     "email.resync_required",
-    "invoice.generate_prompt"
+    "invoice.generate_prompt",
   ] as const;
 
   const COPY_FIXTURES: Array<{
@@ -561,6 +554,7 @@ describe("notification email copy", () => {
     title: string;
     body: string;
     expectedSubject: string;
+    expectedHeadline: string;
     expectedCtaLabel: string;
   }> = [
     {
@@ -568,78 +562,91 @@ describe("notification email copy", () => {
       title: "Nimbus workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
       expectedSubject: "Nimbus workspace is ready for review",
-      expectedCtaLabel: "Review workspace"
+      expectedHeadline: "Nimbus workspace is ready for review",
+      expectedCtaLabel: "Review workspace",
     },
     {
       eventType: "workspace.failed",
       title: "Nimbus workspace processing failed",
       body: "Something went wrong processing your documents.",
       expectedSubject: "Nimbus workspace could not be processed",
-      expectedCtaLabel: "View error details"
+      expectedHeadline: "Nimbus workspace processing failed",
+      expectedCtaLabel: "View error details",
     },
     {
       eventType: "workspace.missing_payment",
       title: "Payment amount missing from Summer Campaign 2026",
       body: "Add a payment amount to track your earnings, or upload documents that include payment details.",
       expectedSubject: "Summer Campaign 2026 is missing a payment amount",
-      expectedCtaLabel: "Add payment amount"
+      expectedHeadline: "Payment amount missing from Summer Campaign 2026",
+      expectedCtaLabel: "Add payment amount",
     },
     {
       eventType: "workspace.missing_deliverables",
       title: "No deliverables found in Summer Campaign 2026",
       body: "Add deliverables so HelloBrand can track due dates and send reminders.",
       expectedSubject: "No deliverables found in Summer Campaign 2026",
-      expectedCtaLabel: "Add deliverables"
+      expectedHeadline: "No deliverables found in Summer Campaign 2026",
+      expectedCtaLabel: "Add deliverables",
     },
     {
       eventType: "workspace.missing_usage_rights",
       title: "Usage rights not specified in Summer Campaign 2026",
       body: "Add usage rights to understand what the brand can do with your content.",
       expectedSubject: "Usage rights missing from Summer Campaign 2026",
-      expectedCtaLabel: "Add usage rights"
+      expectedHeadline: "Usage rights not specified in Summer Campaign 2026",
+      expectedCtaLabel: "Add usage rights",
     },
     {
       eventType: "email.resync_required",
       title: "Gmail inbox needs resync",
       body: "We couldn't continue syncing test@gmail.com. Reconnect this inbox to start a fresh sync.",
       expectedSubject: "Your Gmail inbox needs to reconnect",
-      expectedCtaLabel: "Reconnect inbox"
+      expectedHeadline: "Gmail inbox needs resync",
+      expectedCtaLabel: "Reconnect inbox",
     },
     {
       eventType: "invoice.generate_prompt",
       title: "Nimbus invoice is ready to generate",
       body: "Today is the final posting milestone for Summer Campaign. Generate the workspace invoice now.",
-      expectedSubject: "Nimbus invoice is ready to generate",
-      expectedCtaLabel: "Generate invoice"
-    }
+      expectedSubject: "Generate invoice for Summer Campaign",
+      expectedHeadline: "Generate your invoice",
+      expectedCtaLabel: "Generate invoice",
+    },
   ];
 
-  it.each(COPY_FIXTURES)(
-    "generates correct copy for $eventType",
-    ({ eventType, title, body, expectedSubject, expectedCtaLabel }) => {
-      const copy = resolveNotificationEmailCopy({ eventType, title, body });
+  it.each(COPY_FIXTURES)("generates correct copy for $eventType", ({
+    eventType,
+    title,
+    body,
+    expectedSubject,
+    expectedHeadline,
+    expectedCtaLabel,
+  }) => {
+    const copy = resolveNotificationEmailCopy({ eventType, title, body });
 
-      expect(copy.subject).toBe(expectedSubject);
-      expect(copy.ctaLabel).toBe(expectedCtaLabel);
-      expect(copy.headline).toBe(title);
-      expect(copy.body).toBe(body);
-    }
-  );
+    expect(copy.subject).toBe(expectedSubject);
+    expect(copy.ctaLabel).toBe(expectedCtaLabel);
+    expect(copy.headline).toBe(expectedHeadline);
+    expect(copy.body.length).toBeGreaterThan(0);
+    expect(copy.preview.length).toBeGreaterThan(0);
+  });
 
-  it.each(COPY_FIXTURES)(
-    "subject for $eventType is under 60 characters",
-    ({ eventType, title, body }) => {
-      const copy = resolveNotificationEmailCopy({ eventType, title, body });
-      expect(copy.subject.length).toBeLessThanOrEqual(60);
-    }
-  );
+  it.each(COPY_FIXTURES)("subject for $eventType is under 60 characters", ({
+    eventType,
+    title,
+    body,
+  }) => {
+    const copy = resolveNotificationEmailCopy({ eventType, title, body });
+    expect(copy.subject.length).toBeLessThanOrEqual(60);
+  });
 
   it("truncates long entity names to stay under 60 characters", () => {
     const longBrand = "Amazon Kids Stories with Alexa Extended Edition";
     const copy = resolveNotificationEmailCopy({
       eventType: "workspace.ready_for_review",
       title: `${longBrand} workspace is ready for review`,
-      body: "Your workspace has been analyzed and is ready for review."
+      body: "Your workspace has been analyzed and is ready for review.",
     });
 
     expect(copy.subject.length).toBeLessThanOrEqual(60);
@@ -658,7 +665,7 @@ describe("notification email copy", () => {
       const copy = resolveNotificationEmailCopy({
         eventType,
         title: "Test title",
-        body: "Test body"
+        body: "Test body",
       });
       expect(copy.ctaLabel).not.toBe("Open in HelloBrand");
     }
@@ -675,7 +682,7 @@ describe("notification email HTML rendering", () => {
       eventType: "workspace.ready_for_review",
       title: "Nimbus workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
-      href: "/app/intake/session-1/review"
+      href: "/app/intake/session-1/review",
     });
 
     expect(payload.html).toContain("Review workspace");
@@ -688,12 +695,10 @@ describe("notification email HTML rendering", () => {
       eventType: "workspace.ready_for_review",
       title: "Nimbus workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
-      href: "/app/intake/session-1/review"
+      href: "/app/intake/session-1/review",
     });
 
-    expect(payload.html).not.toMatch(
-      /text-transform:\s*uppercase[^>]*>HelloBrand<\/p>/
-    );
+    expect(payload.html).not.toMatch(/text-transform:\s*uppercase[^>]*>HelloBrand<\/p>/);
   });
 
   it("includes a footer with notification settings link", () => {
@@ -701,11 +706,25 @@ describe("notification email HTML rendering", () => {
       eventType: "workspace.ready_for_review",
       title: "Test",
       body: "Test body",
-      href: "/app/intake/session-1/review"
+      href: "/app/intake/session-1/review",
     });
 
     expect(payload.html).toContain("/app/settings/notifications");
     expect(payload.html).toContain("email notifications enabled");
+  });
+
+  it("renders preview text ahead of the main email content", () => {
+    const payload = buildNotificationEmailPayload({
+      eventType: "invoice.generate_prompt",
+      title: "Nimbus invoice is ready to generate",
+      body: "Today is the final posting milestone for Summer Campaign. Generate the workspace invoice now.",
+      href: "/app/p/deal-1?tab=invoices",
+    });
+
+    expect(payload.html).toContain(
+      "Final posting milestone is today. Generate the invoice now in HelloBrand."
+    );
+    expect(payload.html).toContain("Generate your invoice");
   });
 
   it("does not contain em dashes or en dashes", () => {
@@ -713,7 +732,7 @@ describe("notification email HTML rendering", () => {
       eventType: "workspace.ready_for_review",
       title: "Test workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
-      href: "/app/intake/session-1/review"
+      href: "/app/intake/session-1/review",
     });
 
     expect(payload.html).not.toContain("\u2013");

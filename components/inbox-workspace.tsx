@@ -12,7 +12,7 @@
  */
 "use client";
 
-import { Inbox, Info, MailSearch, Plus, X, XCircle } from "lucide-react";
+import { Inbox, MailSearch, Plus, RefreshCw, X, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
@@ -34,6 +34,10 @@ import { Input } from "@/components/ui/input";
 import { useElementWidth } from "@/components/use-element-width";
 import { useInboxAiSuggestions } from "@/components/use-inbox-ai-suggestions";
 import { useInboxCandidateDiscovery } from "@/components/use-inbox-candidate-discovery";
+import {
+  CREATE_NEW_WORKSPACE_VALUE,
+  useInboxFindEmails,
+} from "@/components/use-inbox-find-emails";
 import { useInboxManualAdd } from "@/components/use-inbox-manual-add";
 import { useInboxReplyComposer } from "@/components/use-inbox-reply-composer";
 import { useInboxThreadDetailState } from "@/components/use-inbox-thread-detail-state";
@@ -73,6 +77,7 @@ import {
 } from "./inbox-workspace/helpers";
 import { InboxReplyComposer } from "./inbox-workspace/InboxReplyComposer";
 import { InboxThreadDetail } from "./inbox-workspace/InboxThreadDetail";
+import { InboxWorkspaceDropdown } from "./inbox-workspace/FoundEmailsWorkspaceDropdown";
 import { InboxThreadList } from "./inbox-workspace/InboxThreadList";
 import { ThreadAttachments } from "./inbox-workspace/ThreadAttachments";
 
@@ -259,6 +264,8 @@ export function InboxWorkspace({
     setQuery: setManualAddQuery,
     providerFilter: manualAddProviderFilter,
     setProviderFilter: setManualAddProviderFilter,
+    showAll: manualAddShowAll,
+    setShowAll: setManualAddShowAll,
     threads: manualAddThreads,
     filteredThreads: manualAddFilteredThreads,
     selectedThreadIdSet: selectedManualThreadIdSet,
@@ -268,6 +275,9 @@ export function InboxWorkspace({
     isLoading: isManualAddLoading,
     isSubmitting: isManualAddSubmitting,
     isCreatingWorkspace: isManualAddCreatingWorkspace,
+    isResyncing: isManualAddResyncing,
+    resyncCooldown: manualAddResyncCooldown,
+    resync: resyncManualAdd,
     submit: submitManualAddThreads,
     createWorkspace: createWorkspaceFromSelectedThreads,
     linkableDeals,
@@ -275,6 +285,28 @@ export function InboxWorkspace({
     deals,
     onErrorMessage: setErrorMessage,
     selectedFilterDealId: selectedFilters.dealId,
+  });
+
+  const {
+    isOpen: isFindEmailsModalOpen,
+    isScanning: isFindingEmails,
+    isSubmitting: isFindEmailsSubmitting,
+    results: findEmailsResults,
+    assignments: findEmailsAssignments,
+    selectedThreadIds: findEmailsSelectedIds,
+    linkableDeals: findEmailsLinkableDeals,
+    unassignedCount: findEmailsUnassignedCount,
+    scan: scanForEmails,
+    cancelScan: cancelFindEmails,
+    close: closeFindEmailsModal,
+    toggleThread: toggleFindEmailsThread,
+    setAssignment: setFindEmailsAssignment,
+    submit: submitFindEmails,
+    openManualAdd: openManualAddFromFindEmails,
+  } = useInboxFindEmails({
+    deals,
+    onErrorMessage: setErrorMessage,
+    onOpenManualAdd: openManualAddModal,
   });
 
   const [aiReplyControlRef, aiReplyMenuWidth] = useElementWidth<HTMLDivElement>([
@@ -285,6 +317,26 @@ export function InboxWorkspace({
     draftInstructions,
     isDrafting,
   ]);
+  const manualAddWorkspaceOptions = useMemo(
+    () =>
+      linkableDeals.map((deal) => {
+        const labels = getDisplayDealLabels(deal);
+        return {
+          value: deal.id,
+          label: labels.campaignName ?? deal.campaignName,
+        };
+      }),
+    [linkableDeals]
+  );
+  const manualAddProviderOptions = useMemo(
+    () => [
+      { value: "", label: "All providers" },
+      { value: "gmail", label: "Gmail" },
+      { value: "outlook", label: "Outlook" },
+      { value: "yahoo", label: "Yahoo" },
+    ],
+    []
+  );
 
   useEffect(() => {
     setErrorMessage(null);
@@ -750,14 +802,14 @@ export function InboxWorkspace({
                     <AppTooltip content="Find emails" sideOffset={8}>
                       <button
                         type="button"
-                        onClick={() => void discoverCandidates()}
-                        disabled={isDiscovering}
-                        aria-label={isDiscovering ? "Finding emails" : "Find emails"}
-                        className="inline-flex h-9 items-center justify-center px-1 text-foreground transition hover:text-black/70 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-white/70"
+                        onClick={() => void scanForEmails()}
+                        disabled={isFindingEmails}
+                        aria-label={isFindingEmails ? "Finding emails" : "Find emails"}
+                        className={`${THREAD_ACTION_BUTTON_CLASS} shrink-0`}
                       >
                         <MailSearch
                           strokeWidth={1.5}
-                          className={`h-5 w-5 shrink-0 ${isDiscovering ? "animate-pulse" : ""}`}
+                          className={`h-4 w-4 shrink-0${isFindingEmails ? " animate-pulse" : ""}`}
                         />
                       </button>
                     </AppTooltip>
@@ -799,18 +851,18 @@ export function InboxWorkspace({
                   {hasConnectedAccounts ? (
                     <>
                       <AppTooltip
-                        content="We search recent synced mail first, then keep expanding in the background."
+                        content="We search recent synced mail for brand & agency deal emails."
                         sideOffset={8}
                       >
                         <button
                           type="button"
-                          onClick={() => void discoverCandidates()}
-                          disabled={isDiscovering}
+                          onClick={() => void scanForEmails()}
+                          disabled={isFindingEmails}
                           aria-label="Find emails"
                           className="inline-flex h-12 min-w-[15rem] items-center justify-center gap-2 border border-black/10 px-6 text-[13px] font-semibold text-foreground transition hover:border-black/20 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          <span>{isDiscovering ? "Finding emails..." : "Find emails"}</span>
-                          <Info className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <MailSearch className={`h-4 w-4 shrink-0${isFindingEmails ? " animate-pulse" : ""}`} />
+                          <span>{isFindingEmails ? "Finding emails..." : "Find emails"}</span>
                         </button>
                       </AppTooltip>
                       <button
@@ -1154,19 +1206,19 @@ export function InboxWorkspace({
         onApply={applyDialogSort}
       />
 
-      {isDiscovering ? (
+      {isFindingEmails ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
           <div className="w-full max-w-sm border border-black/8 bg-white px-6 py-5 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-black/10 border-t-foreground" />
-                <p className="text-[14px] font-medium text-foreground">Fetching recent emails...</p>
+                <p className="text-[14px] font-medium text-foreground">Finding emails...</p>
               </div>
               <button
                 type="button"
-                onClick={cancelDiscovery}
+                onClick={() => cancelFindEmails()}
                 className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground transition hover:text-foreground"
-                aria-label="Cancel email discovery"
+                aria-label="Cancel email search"
               >
                 <XCircle className="h-5 w-5" />
               </button>
@@ -1276,6 +1328,142 @@ export function InboxWorkspace({
         }}
       />
 
+      <Dialog open={isFindEmailsModalOpen} onOpenChange={(open) => { if (!open) closeFindEmailsModal(); }}>
+        <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-[720px] flex-col overflow-hidden rounded-none p-0 sm:max-w-[720px] [&>button]:rounded-none">
+          <DialogHeader className="shrink-0 gap-3 border-b border-black/8 px-6 py-5 pr-12">
+            <DialogTitle>Found emails</DialogTitle>
+            <DialogDescription>
+              {findEmailsResults.length > 0
+                ? `We found ${findEmailsResults.length} brand or agency deal email${findEmailsResults.length === 1 ? "" : "s"}. Assign each to a workspace to add it.`
+                : "No brand or agency deal emails found in your inbox."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {findEmailsResults.length === 0 ? (
+            <div className="flex flex-col items-center gap-4 px-6 py-10">
+              <p className="text-sm text-muted-foreground">
+                Try searching manually or check back after new emails arrive.
+              </p>
+              <button
+                type="button"
+                onClick={openManualAddFromFindEmails}
+                className={`${THREAD_ACTION_BUTTON_CLASS} min-w-[12rem]`}
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                Find threads manually
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {findEmailsResults.map((item) => {
+                  const isSelected = findEmailsSelectedIds.has(item.thread.id);
+                  const dealId = findEmailsAssignments[item.thread.id] ?? "";
+                  const alreadyLinked = item.links.length > 0;
+                  const foundEmailWorkspaceOptions = [
+                    {
+                      value: CREATE_NEW_WORKSPACE_VALUE,
+                      label: "Create new workspace",
+                    },
+                    ...findEmailsLinkableDeals.map((deal) => {
+                      const labels = getDisplayDealLabels(deal);
+                      return {
+                        value: deal.id,
+                        label: labels.campaignName ?? deal.campaignName,
+                      };
+                    }),
+                  ];
+
+                  return (
+                    <div
+                      key={item.thread.id}
+                      className="flex items-start gap-3 border-b border-black/6 px-6 py-4 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleFindEmailsThread(item.thread.id)}
+                        className="mt-1 h-4 w-4 rounded border-border"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-semibold text-foreground">
+                              {item.thread.participants[0]?.name?.trim() ||
+                                item.thread.participants[0]?.email ||
+                                "Unknown"}
+                            </p>
+                            <p className="truncate text-[12px] text-foreground/90">
+                              {item.thread.subject}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-[11px] text-muted-foreground">
+                            {new Date(item.thread.lastMessageAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">
+                          {item.thread.snippet || "No preview available."}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="bg-white px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                            {providerLabel(item.account.provider)}
+                          </span>
+                          {alreadyLinked ? (
+                            <span className="bg-secondary/60 px-2.5 py-1 text-[10px] font-medium text-foreground">
+                              Already linked
+                            </span>
+                          ) : null}
+                          {isSelected && !alreadyLinked ? (
+                            <InboxWorkspaceDropdown
+                              value={dealId}
+                              onChange={(value) => setFindEmailsAssignment(item.thread.id, value)}
+                              options={foundEmailWorkspaceOptions}
+                              createValue={CREATE_NEW_WORKSPACE_VALUE}
+                              placeholder="Assign to workspace"
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex shrink-0 flex-col gap-4 border-t border-black/8 px-6 py-4 md:flex-row md:items-end md:justify-between">
+                <p className="text-[12px] text-muted-foreground">
+                  {findEmailsSelectedIds.size} selected
+                  {findEmailsUnassignedCount > 0
+                    ? ` · ${findEmailsUnassignedCount} need${findEmailsUnassignedCount === 1 ? "s" : ""} a workspace`
+                    : ""}
+                </p>
+                <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:flex-wrap md:justify-end">
+                  <button
+                    type="button"
+                    onClick={openManualAddFromFindEmails}
+                    className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[10rem] md:w-auto`}
+                  >
+                    <Plus className="h-4 w-4 shrink-0" />
+                    Find threads manually
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitFindEmails()}
+                    disabled={
+                      findEmailsSelectedIds.size === 0 ||
+                      findEmailsUnassignedCount > 0 ||
+                      isFindEmailsSubmitting
+                    }
+                    className={`${THREAD_ACTION_BUTTON_CLASS} w-full min-w-[9.75rem] md:w-auto`}
+                  >
+                    {isFindEmailsSubmitting ? "Adding..." : "Add to workspaces"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={isManualAddModalOpen}
         onOpenChange={(open) => {
@@ -1288,42 +1476,48 @@ export function InboxWorkspace({
       >
         <DialogContent className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-[920px] flex-col overflow-hidden rounded-none p-0 sm:max-w-[920px] [&>button]:rounded-none">
           <DialogHeader className="shrink-0 gap-3 border-b border-black/8 px-6 py-5 pr-12">
-            <DialogTitle>Add threads manually</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Add threads manually</DialogTitle>
+              <button
+                type="button"
+                onClick={() => void resyncManualAdd()}
+                disabled={isManualAddResyncing || manualAddResyncCooldown || isManualAddLoading}
+                className="inline-flex h-7 items-center gap-1.5 rounded-none border border-black/10 px-2.5 text-[11px] font-medium text-muted-foreground transition hover:border-black/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3${isManualAddResyncing ? " animate-spin" : ""}`} />
+                {isManualAddResyncing ? "Syncing..." : "Resync"}
+              </button>
+            </div>
             <DialogDescription className="line-clamp-2">
-              Browse the latest 20 synced emails by default. Search scans up to the first 1000
+              Browse your latest synced emails. Search scans up to the first 1000
               synced emails and lets you link the threads you want to a workspace.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
+          <div className={`relative flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden px-6 py-5${isManualAddCreatingWorkspace ? " pointer-events-none opacity-50" : ""}`}>
+            {isManualAddCreatingWorkspace && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+                <p className="text-[13px] font-medium text-foreground">Creating workspace...</p>
+              </div>
+            )}
             <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
-              <InboxSelect
+              <InboxWorkspaceDropdown
                 value={manualAddDealId}
                 onChange={setManualAddDealId}
-                className="w-full shrink-0 sm:w-[240px]"
-              >
-                <option value="">Select a workspace</option>
-                {linkableDeals.map((deal) => {
-                  const labels = getDisplayDealLabels(deal);
+                options={manualAddWorkspaceOptions}
+                placeholder="Select a workspace"
+                className="h-9 w-full min-w-0 max-w-none shrink-0 px-6 text-[12px] sm:w-[240px]"
+                contentClassName="w-[240px]"
+              />
 
-                  return (
-                    <option key={deal.id} value={deal.id}>
-                      {labels.campaignName ?? deal.campaignName}
-                    </option>
-                  );
-                })}
-              </InboxSelect>
-
-              <InboxSelect
+              <InboxWorkspaceDropdown
                 value={manualAddProviderFilter}
                 onChange={setManualAddProviderFilter}
-                className="w-full shrink-0 sm:w-[140px]"
-              >
-                <option value="">All providers</option>
-                <option value="gmail">Gmail</option>
-                <option value="outlook">Outlook</option>
-                <option value="yahoo">Yahoo</option>
-              </InboxSelect>
+                options={manualAddProviderOptions}
+                placeholder="All providers"
+                className="h-9 w-full min-w-0 max-w-none shrink-0 px-6 text-[12px] sm:w-[140px]"
+                contentClassName="w-[160px]"
+              />
 
               <Input
                 value={manualAddQuery}
@@ -1332,41 +1526,56 @@ export function InboxWorkspace({
                 aria-label="Search synced emails"
                 className="h-9 min-w-0 flex-1 rounded-none border-black/10 bg-white text-[12px] shadow-none"
               />
+
+              <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[12px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={manualAddShowAll}
+                  onChange={(event) => setManualAddShowAll(event.currentTarget.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Show all
+              </label>
             </div>
 
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/8 rounded-none">
               <div className="flex shrink-0 items-center justify-between border-b border-black/8 px-4 py-3 text-[12px] text-muted-foreground">
                 <span>
-                  {manualAddQuery.trim()
-                    ? `Search results from up to 1000 synced emails`
-                    : "Latest 20 synced emails"}
+                  {manualAddShowAll
+                    ? manualAddQuery.trim()
+                    ? "Search results from up to 1000 synced emails"
+                    : "Latest synced emails (all)"
+                    : manualAddQuery.trim()
+                      ? "Filtered brand & agency deal emails"
+                      : "Brand & agency deal emails"}
                 </span>
                 <span>
-                  {manualAddProviderFilter
-                    ? manualAddThreads.filter(
-                        (item) => item.account.provider === manualAddProviderFilter
-                      ).length
-                    : manualAddThreads.length}
+                  {manualAddFilteredThreads.length}
                 </span>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto">
                 {isManualAddLoading ? (
                   <div className="px-4 py-8 text-sm text-muted-foreground">Loading emails...</div>
-                ) : manualAddThreads.filter(
-                    (item) =>
-                      !manualAddProviderFilter || item.account.provider === manualAddProviderFilter
-                  ).length === 0 ? (
-                  <div className="px-4 py-8 text-sm text-muted-foreground">
-                    No synced emails match this search.
+                ) : manualAddFilteredThreads.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 px-4 py-8 text-sm text-muted-foreground">
+                    <span>
+                      {manualAddShowAll
+                        ? "No synced emails match this search."
+                        : "No brand or agency deal emails found."}
+                    </span>
+                    {!manualAddShowAll && (
+                      <button
+                        type="button"
+                        onClick={() => setManualAddShowAll(true)}
+                        className="text-[12px] underline underline-offset-2 hover:text-foreground"
+                      >
+                        Show all emails
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  manualAddThreads
-                    .filter(
-                      (item) =>
-                        !manualAddProviderFilter ||
-                        item.account.provider === manualAddProviderFilter
-                    )
+                  manualAddFilteredThreads
                     .map((item) => {
                       const alreadyLinkedToSelectedDeal = Boolean(
                         manualAddDealId &&

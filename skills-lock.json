@@ -46,6 +46,16 @@
       "sourceType": "github",
       "computedHash": "1f6f4adee0b964e8344c0baef46b4e303ab3ba20932907bcbb1444ba7b3273b2"
     },
+    "email-best-practices": {
+      "source": "resend/email-best-practices",
+      "sourceType": "github",
+      "computedHash": "6a88d51e8c8ffd7d5b70831c303878ad29a3734792db9b56456269c4d70c2ff8"
+    },
+    "email-sequence": {
+      "source": "coreyhaines31/marketingskills",
+      "sourceType": "github",
+      "computedHash": "49c9d1795813eec119a1fd9344e763fc911c05616411a68117b30d77204fa399"
+    },
     "flags-sdk": {
       "source": "vercel/flags",
       "sourceType": "github",
@@ -55,6 +65,31 @@
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",
       "computedHash": "ea5d6d0faa9fabd6a8a3165dca69dac9ab7c622dc130bdce3f1dfa88e02ba948"
+    },
+    "inngest-durable-functions": {
+      "source": "inngest/inngest-skills",
+      "sourceType": "github",
+      "computedHash": "41bb4227cae8585e3678041f0e898c65a4c48ca841dc5099cfdd741586301bfa"
+    },
+    "inngest-events": {
+      "source": "inngest/inngest-skills",
+      "sourceType": "github",
+      "computedHash": "4200e01340c04ea17efc929dfc829481ac986598599fdf99ea5c4209890dba81"
+    },
+    "inngest-flow-control": {
+      "source": "inngest/inngest-skills",
+      "sourceType": "github",
+      "computedHash": "740354a5b02936c86721364234f4dc00b0a1b6bbf0c3a357748770b2691dbe1c"
+    },
+    "inngest-middleware": {
+      "source": "inngest/inngest-skills",
+      "sourceType": "github",
+      "computedHash": "7a6c3c9020193f1ef62d3ff4f0e5bb7ca75388b316db67c4c893da6b66813d66"
+    },
+    "inngest-steps": {
+      "source": "inngest/inngest-skills",
+      "sourceType": "github",
+      "computedHash": "70a5c25b8c6c99a7dd63f23377d70fd75e2211425da659996b6e2f7eeed08554"
     },
     "layout": {
       "source": "pbakaus/impeccable",
@@ -95,6 +130,11 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "53ca5b03a78c3d0c8117eaf330b73d83d06ed0d66789490ca8a263ce92849d22"
+    },
+    "resend": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "computedHash": "936851c3e22e6de1d416134a9cd170d7540ddebe5a1c0113eef66537c843c6ed"
     },
     "shadcn": {
       "source": "shadcn/ui",

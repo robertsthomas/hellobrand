@@ -510,3 +510,90 @@ function extractSentenceAround(text: string, index: number): string {
   const sentence = text.slice(start, end > index ? end + 1 : Math.min(text.length, index + 150));
   return sentence.trim().slice(0, 200);
 }
+
+const STRONG_SUBJECT_PATTERNS = [
+  /\bbrand\s*(?:deal|partnership|collab(?:oration)?|ambassador|opportunity|offer|inquiry)\b/i,
+  /\bsponsor(?:ship|ed)?\b/i,
+  /\bpartnership\s*(?:opportunity|inquiry|request|proposal|offer)\b/i,
+  /\b(?:paid|gifted|compensated)\s*(?:partnership|collab(?:oration)?|sponsor|post|content|deal|opportunity)\b/i,
+  /\bcollab(?:oration)?\s*(?:opportunity|inquiry|offer|proposal|request|deal)\b/i,
+  /\b(?:ambassador|influencer|creator)\s*(?:program|opportunity|partnership|campaign|deal|search|application)\b/i,
+  /\bugc\s*(?:campaign|content|creator|deal|opportunity|project)\b/i,
+  /\b(?:gifting|gifted)\s*(?:collab|opportunity|campaign|partnership|deal)\b/i,
+  /\bproduct\s*seed(?:ing)?\b/i,
+  /\bpr\s*(?:package|box|kit|sample)\b/i,
+  /\bmedia\s*kit\b/i,
+  /\brate\s*card\b/i,
+  /\b(?:content|creative)\s*brief\b/i,
+  /\bscope\s*of\s*work\b/i,
+  /\b(?:talent|booking)\s*(?:inquiry|management|agency|request)\b/i,
+  /\bcampaign\s*(?:brief|proposal|offer|deal|terms|details)\b/i,
+];
+
+const BODY_CATEGORY_PATTERNS = [
+  /\b(compensation|deliverables?|scope\s*of\s*work|flat\s*(?:fee|rate)|payment\s*terms|content\s*brief|creative\s*brief|rate\s*card|media\s*kit|usage\s*(?:rights|license))\b/i,
+  /\b(tiktok|reel|ugc\b|user[- ]?generated\s*content|content\s*(?:creation|calendar)|youtube\s*(?:shorts?|videos?)|instagram\s*(?:reels?|stories?|posts?))\b/i,
+  /\b(exclusiv|whitelist|whitelisting|paid\s*social|organic\s*(?:post|content|placement)|barter|seeding|sponsorship|ambassador|influencer|creator\s*(?:fund|program))\b/i,
+  /\b(collab(?:oration)?|partnership|sponsor)\b/i,
+  /\b(we\s*(?:would\s*love|want|'d\s*like)\s*to\s*(?:work|collab|partner)|interested\s*in\s*(?:a\s*)?(?:collab|partnership|sponsor|working)|would\s*you\s*be\s*(?:interested|open)|open\s*to\s*(?:a\s*)?(?:collab|partnership|sponsor))\b/i,
+];
+
+const OUTREACH_PATTERNS = [
+  /\breaching\s+out\s+(?:on\s+behalf\s+of|from|because)\b/i,
+  /\bcame\s+across\s+your\s+content\b/i,
+  /\b(?:been\s+following|love|enjoy)\s+your\s+content\b/i,
+  /\byou(?:'d|\s+would)\s+be\s+perfect\s+for\b/i,
+  /\b(?:invite|inviting)\s+you\s+to\s+(?:collab(?:orate)?|partner)\b/i,
+];
+
+const SUBJECT_COLLAB_PATTERN = /\b(collab(?:oration)?|partnership|sponsor(?:ship)?)\b/i;
+const SUBJECT_CONTEXT_PATTERN = /\b(campaign|idea|concept|test|launch|holiday)\b/i;
+const SUBJECT_BRAND_PAIR_PATTERN =
+  /\b[a-z0-9&][a-z0-9&' -]{1,40}\s+x\s+[a-z0-9&][a-z0-9&' -]{1,40}\b/i;
+
+const AGENCY_DOMAIN_WORDS = new Set([
+  "talent", "influencer", "creator", "agency", "mgmt",
+  "casting", "bookings", "collective", "publicrelations",
+]);
+
+export function isLikelyBrandDealEmail(item: EmailThreadListItem): boolean {
+  if (item.links.length > 0) {
+    return true;
+  }
+
+  const subject = compactText(item.thread.subject).toLowerCase();
+  const snippet = compactText(item.thread.snippet).toLowerCase();
+
+  for (const pattern of STRONG_SUBJECT_PATTERNS) {
+    if (pattern.test(subject) || pattern.test(snippet)) {
+      return true;
+    }
+  }
+
+  const combined = `${subject} ${snippet}`;
+  const matchedCategories = BODY_CATEGORY_PATTERNS.filter((p) => p.test(combined));
+  if (matchedCategories.length >= 2) {
+    return true;
+  }
+
+  const hasCollabLanguage = SUBJECT_COLLAB_PATTERN.test(combined);
+  const hasPitchContext =
+    SUBJECT_CONTEXT_PATTERN.test(subject) ||
+    SUBJECT_BRAND_PAIR_PATTERN.test(subject) ||
+    OUTREACH_PATTERNS.some((pattern) => pattern.test(combined));
+  if (hasCollabLanguage && hasPitchContext) {
+    return true;
+  }
+
+  for (const participant of item.thread.participants) {
+    const domain = participant.email.split("@")[1]?.toLowerCase();
+    if (domain) {
+      const parts = domain.replace(/\.[a-z]+$/, "").split(/[.\-]/);
+      if (parts.some((part) => AGENCY_DOMAIN_WORDS.has(part))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
