@@ -96,6 +96,11 @@ export const CATEGORY_KEYWORDS: Record<DealCategory, string[]> = {
     "vacation",
     "destination",
     "booking",
+    "carry-on",
+    "carry on",
+    "luggage",
+    "suitcase",
+    "weekender",
   ],
   finance: [
     "finance",

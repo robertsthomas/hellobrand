@@ -5,6 +5,34 @@ import { useSearchParams } from "next/navigation";
 
 import { Tabs } from "@/components/ui/tabs";
 
+const WORKSPACE_TAB_CHANGE_EVENT = "workspace-tab-change";
+
+function buildWorkspaceTabUrl(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === "overview") {
+    params.delete("tab");
+  } else {
+    params.set("tab", value);
+  }
+
+  const query = params.toString();
+  return window.location.pathname + (query ? `?${query}` : "");
+}
+
+function openWorkspaceTab(value: string) {
+  const url = buildWorkspaceTabUrl(value);
+  window.history.replaceState(null, "", url);
+  window.dispatchEvent(
+    new CustomEvent(WORKSPACE_TAB_CHANGE_EVENT, {
+      detail: { tab: value },
+    })
+  );
+
+  requestAnimationFrame(() => {
+    scrollActiveTabIntoView(value);
+  });
+}
+
 function scrollActiveTabIntoView(tab: string) {
   const panel = document.getElementById(`tab-${tab}`);
   if (!panel) return;
@@ -14,9 +42,21 @@ function scrollActiveTabIntoView(tab: string) {
     document.querySelector<HTMLElement>("[data-workspace-scroll-container]");
 
   if (scrollContainer) {
+    const tabBar = scrollContainer.querySelector<HTMLElement>("[data-guide='workspace-tabs']");
+    if (!tabBar) return;
+
+    const tabBarRect = tabBar.getBoundingClientRect();
     const containerRect = scrollContainer.getBoundingClientRect();
+
+    const tabBarVisible =
+      tabBarRect.top >= containerRect.top &&
+      tabBarRect.bottom <= containerRect.bottom;
+
+    if (tabBarVisible) return;
+
+    const tabBarHeight = tabBarRect.height;
     const panelRect = panel.getBoundingClientRect();
-    const top = scrollContainer.scrollTop + (panelRect.top - containerRect.top) - 24;
+    const top = scrollContainer.scrollTop + (panelRect.top - containerRect.top) - tabBarHeight - 16;
 
     scrollContainer.scrollTo({
       top: Math.max(0, top),
@@ -62,29 +102,54 @@ export function WorkspaceTabs({
     }
   }, [activeTab, searchParams]);
 
+  useEffect(() => {
+    const handleWorkspaceTabChange = (event: Event) => {
+      const nextTab =
+        event instanceof CustomEvent && typeof event.detail?.tab === "string"
+          ? event.detail.tab
+          : null;
+
+      if (!nextTab || nextTab === activeTab) {
+        return;
+      }
+
+      setActiveTab(nextTab);
+    };
+
+    window.addEventListener(WORKSPACE_TAB_CHANGE_EVENT, handleWorkspaceTabChange);
+    return () => {
+      window.removeEventListener(WORKSPACE_TAB_CHANGE_EVENT, handleWorkspaceTabChange);
+    };
+  }, [activeTab]);
+
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
-
-    // Update URL bar without triggering any navigation or server re-render
-    const params = new URLSearchParams(window.location.search);
-    if (value === "overview") {
-      params.delete("tab");
-    } else {
-      params.set("tab", value);
-    }
-
-    const query = params.toString();
-    const url = window.location.pathname + (query ? `?${query}` : "");
-    window.history.replaceState(null, "", url);
-
-    requestAnimationFrame(() => {
-      scrollActiveTabIntoView(value);
-    });
+    openWorkspaceTab(value);
   }, []);
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-6">
       {children}
     </Tabs>
+  );
+}
+
+export function WorkspaceTabButton({
+  tab,
+  className,
+  children,
+}: {
+  tab: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => openWorkspaceTab(tab)}
+      className={className}
+    >
+      {children}
+    </button>
   );
 }

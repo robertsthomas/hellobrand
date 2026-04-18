@@ -1,17 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { ChevronDown, GitCompareArrows, History, LoaderCircle, RotateCcw } from "lucide-react";
+import { useState, useTransition } from "react";
+import { LoaderCircle } from "lucide-react";
 
-import { activateSummaryVariantAction, restoreSummaryVersionAction } from "@/app/actions";
+import { activateSummaryVariantAction } from "@/app/actions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { parseDealSummarySections, toPlainDealSummary } from "@/lib/deal-summary";
-import { getSummaryTypeLabel, getWorkspaceSummaries } from "@/lib/summaries";
+import { getSummaryTypeLabel } from "@/lib/summaries";
 import type { SummaryRecord, SummaryType } from "@/lib/types";
-import { cn, formatDate, humanizeToken } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 
 interface DealSummaryPanelProps {
   dealId: string;
@@ -61,16 +58,10 @@ function SummaryBody({ summary }: { summary: SummaryRecord }) {
   );
 }
 
-export function DealSummaryPanel({ dealId, summaries, currentSummary }: DealSummaryPanelProps) {
+export function DealSummaryPanel({ dealId, summaries: _summaries, currentSummary }: DealSummaryPanelProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [compareSummaryId, setCompareSummaryId] = useState<string | null>(null);
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const workspaceSummaries = useMemo(() => getWorkspaceSummaries(summaries), [summaries]);
-  const compareSummary =
-    workspaceSummaries.find((summary) => summary.id === compareSummaryId) ?? null;
 
   const runVariantAction = (summaryType: SummaryType) => {
     setErrorMessage(null);
@@ -80,21 +71,6 @@ export function DealSummaryPanel({ dealId, summaries, currentSummary }: DealSumm
       const result = await activateSummaryVariantAction(dealId, summaryType);
       if (result?.error) {
         setErrorMessage(result.error);
-      }
-      setPendingLabel(null);
-    });
-  };
-
-  const runRestoreAction = (summaryId: string) => {
-    setErrorMessage(null);
-    setPendingLabel("Restoring summary version...");
-
-    startTransition(async () => {
-      const result = await restoreSummaryVersionAction(dealId, summaryId);
-      if (result?.error) {
-        setErrorMessage(result.error);
-      } else if (compareSummaryId === summaryId) {
-        setCompareSummaryId(null);
       }
       setPendingLabel(null);
     });
@@ -138,86 +114,7 @@ export function DealSummaryPanel({ dealId, summaries, currentSummary }: DealSumm
           })}
         </div>
 
-        {/* History toggle */}
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">
-            {formatDate(currentSummary.createdAt)}
-          </span>
-          <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-            <CollapsibleTrigger asChild>
-              <Button type="button" size="sm" variant="outline">
-                <History className="h-4 w-4" />
-                History
-                <Badge variant="secondary" className="ml-1">
-                  {workspaceSummaries.length}
-                </Badge>
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : ""}`}
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4 w-full max-w-full border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-black/10 md:max-w-[520px]">
-              <div className="space-y-3">
-                {workspaceSummaries.map((summary) => {
-                  const isCurrent = summary.id === currentSummary.id;
-                  const isComparing = summary.id === compareSummaryId;
-
-                  return (
-                    <div
-                      key={summary.id}
-                      className="flex flex-wrap items-center justify-between gap-3 border border-black/6 px-3 py-3 dark:border-white/10"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">
-                            {summary.summaryType
-                              ? getSummaryTypeLabel(summary.summaryType)
-                              : "Summary"}
-                          </span>
-                          {isCurrent ? (
-                            <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                              Current
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(summary.createdAt)} ·{" "}
-                          {humanizeToken(summary.source ?? "analysis")}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={isComparing ? "default" : "outline"}
-                          onClick={() =>
-                            setCompareSummaryId((current) =>
-                              current === summary.id ? null : summary.id
-                            )
-                          }
-                        >
-                          <GitCompareArrows className="h-4 w-4" />
-                          {isComparing ? "Hide compare" : "Compare"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending || isCurrent}
-                          onClick={() => runRestoreAction(summary.id)}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          Restore
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+        <span className="text-sm text-muted-foreground">{formatDate(currentSummary.createdAt)}</span>
       </div>
 
       {isPending && pendingLabel ? (
@@ -234,38 +131,7 @@ export function DealSummaryPanel({ dealId, summaries, currentSummary }: DealSumm
         </Alert>
       ) : null}
 
-      {compareSummary && compareSummary.id !== currentSummary.id ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {compareSummary.summaryType
-                  ? getSummaryTypeLabel(compareSummary.summaryType)
-                  : "Summary"}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {formatDate(compareSummary.createdAt)}
-              </span>
-            </div>
-            <SummaryBody summary={compareSummary} />
-          </div>
-          <div className="space-y-3 border border-black/8 p-4 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                Current
-              </span>
-              <span className="text-sm font-medium text-foreground">
-                {currentSummary.summaryType
-                  ? getSummaryTypeLabel(currentSummary.summaryType)
-                  : "Summary"}
-              </span>
-            </div>
-            <SummaryBody summary={currentSummary} />
-          </div>
-        </div>
-      ) : (
-        <SummaryBody summary={currentSummary} />
-      )}
+      <SummaryBody summary={currentSummary} />
     </div>
   );
 }

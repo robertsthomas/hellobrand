@@ -1,87 +1,37 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Sparkles, RefreshCw, Printer, ClipboardCopy, Pencil, Check, Loader2 } from "lucide-react";
+import { useCallback, useState } from "react";
+import { ClipboardCopy, Loader2, Printer, RefreshCw, Sparkles } from "lucide-react";
 
 import { ProseText } from "@/components/prose-text";
-import type { BriefData, DocumentRecord, GeneratedBrief, GeneratedBriefSection } from "@/lib/types";
+import type { BriefData, GeneratedBrief, GeneratedBriefSection } from "@/lib/types";
 
 interface BriefGeneratorProps {
   dealId: string;
   briefData: BriefData | null | undefined;
-  documents: DocumentRecord[];
 }
 
-function SectionCard({
-  section,
-  isEditing,
-  editedContent,
-  editedItems,
-  onToggleEdit,
-  onContentChange,
-  onItemsChange,
-}: {
-  section: GeneratedBriefSection;
-  isEditing: boolean;
-  editedContent: string;
-  editedItems: string[];
-  onToggleEdit: () => void;
-  onContentChange: (value: string) => void;
-  onItemsChange: (value: string[]) => void;
-}) {
+function SectionCard({ section }: { section: GeneratedBriefSection }) {
   return (
-    <div className="space-y-2 border border-black/8 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {section.title}
-        </p>
-        <button
-          type="button"
-          onClick={onToggleEdit}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground"
-        >
-          {isEditing ? <Check className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
-          {isEditing ? "Done" : "Edit"}
-        </button>
-      </div>
-
-      {isEditing ? (
-        <div className="space-y-3">
-          <textarea
-            className="w-full resize-y rounded border border-black/10 bg-transparent px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:border-white/10"
-            rows={4}
-            value={editedContent}
-            onChange={(e) => onContentChange(e.target.value)}
-          />
-          {editedItems.length > 0 && (
-            <textarea
-              className="w-full resize-y rounded border border-black/10 bg-transparent px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary dark:border-white/10"
-              rows={Math.max(3, editedItems.length)}
-              value={editedItems.join("\n")}
-              onChange={(e) => onItemsChange(e.target.value.split("\n"))}
-              placeholder="One item per line"
-            />
-          )}
-        </div>
-      ) : (
-        <>
-          <ProseText content={editedContent} className="text-sm leading-relaxed text-foreground" />
-          {editedItems.length > 0 && (
-            <ul className="list-disc space-y-1 pl-5">
-              {editedItems.map((item, i) => (
-                <li key={i} className="text-sm text-foreground">
-                  <ProseText content={item} className="inline text-sm text-foreground" />
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+    <div className="space-y-3 border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-white/[0.03]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {section.title}
+      </p>
+      <ProseText content={section.content} className="text-sm leading-6 text-foreground" />
+      {section.items && section.items.length > 0 ? (
+        <ul className="list-disc space-y-1.5 pl-5">
+          {section.items.map((item, index) => (
+            <li key={`${section.id}-${index}`} className="text-sm leading-6 text-foreground">
+              <ProseText content={item} className="inline text-sm text-foreground" />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
 
-function formatBriefAsText(sections: Array<{ title: string; content: string; items?: string[] }>) {
+function formatBriefAsText(sections: GeneratedBriefSection[]) {
   return sections
     .map((section) => {
       const lines = [section.title.toUpperCase(), "", section.content];
@@ -97,16 +47,14 @@ function formatBriefAsText(sections: Array<{ title: string; content: string; ite
 }
 
 // fallow-ignore-next-line complexity
-export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorProps) {
-  const [brief, setBrief] = useState<GeneratedBrief | null>(null);
-  const [editedSections, setEditedSections] = useState<
-    Record<string, { content: string; items: string[] }>
-  >({});
-  const [editingIds, setEditingIds] = useState<Set<string>>(new Set());
+export function BriefGenerator({ dealId, briefData }: BriefGeneratorProps) {
+  const hasUploadedBrief = Boolean(briefData);
+  const [brief, setBrief] = useState<GeneratedBrief | null>(
+    hasUploadedBrief ? briefData?.generatedSummary ?? null : null
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const hasUploadedBrief = Boolean(briefData);
   const actionLabel = hasUploadedBrief ? "Generate brief summary" : "Generate brief";
 
   const generate = useCallback(async () => {
@@ -122,19 +70,9 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(payload?.error ?? "Failed to generate brief");
       }
-      const data = await response.json();
-      const generated = data.brief as GeneratedBrief;
-      setBrief(generated);
 
-      const initial: Record<string, { content: string; items: string[] }> = {};
-      for (const section of generated.sections) {
-        initial[section.id] = {
-          content: section.content,
-          items: section.items ?? [],
-        };
-      }
-      setEditedSections(initial);
-      setEditingIds(new Set());
+      const data = await response.json();
+      setBrief(data.brief as GeneratedBrief);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Could not generate the campaign brief."
@@ -144,33 +82,19 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
     }
   }, [dealId, hasUploadedBrief]);
 
-  const toggleEdit = useCallback((id: string) => {
-    setEditingIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
   const handleExportPdf = useCallback(() => {
     window.print();
   }, []);
 
   const handleCopy = useCallback(async () => {
-    if (!brief) return;
-    const sections = brief.sections.map((s) => ({
-      title: s.title,
-      content: editedSections[s.id]?.content ?? s.content,
-      items: editedSections[s.id]?.items ?? s.items ?? [],
-    }));
-    await navigator.clipboard.writeText(formatBriefAsText(sections));
+    if (!brief) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(formatBriefAsText(brief.sections));
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
-  }, [brief, editedSections]);
+  }, [brief]);
 
   if (!brief) {
     return (
@@ -182,7 +106,7 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {hasUploadedBrief
-                ? "Summarize the uploaded brand brief into key creator-facing terms."
+                ? "Summarize the uploaded brand brief into clear creator-facing terms."
                 : "Synthesize all partnership context into a polished, section-structured brief."}
             </p>
           </div>
@@ -210,20 +134,21 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
   }
 
   return (
-    <section className="border border-black/8 bg-white p-6 dark:border-white/10 dark:bg-card">
-      <div className="space-y-6">
+    <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
+      <div className="space-y-5">
         {errorMessage ? (
           <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {errorMessage}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-foreground">
               {hasUploadedBrief ? "Brief Summary" : "Campaign Brief"}
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              Generated {new Date(brief.generatedAt).toLocaleString()} · {brief.modelVersion}
+              Generated {new Date(brief.generatedAt).toLocaleString()}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -240,14 +165,16 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
               )}
               {hasUploadedBrief ? "Regenerate summary" : "Regenerate"}
             </button>
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              className="inline-flex items-center gap-1.5 border border-black/10 bg-white px-3 py-2 text-xs font-medium text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
-            >
-              <Printer className="h-3.5 w-3.5" />
-              Export PDF
-            </button>
+            {!hasUploadedBrief ? (
+              <button
+                type="button"
+                onClick={handleExportPdf}
+                className="inline-flex items-center gap-1.5 border border-black/10 bg-white px-3 py-2 text-xs font-medium text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Export PDF
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleCopy}
@@ -259,44 +186,9 @@ export function BriefGenerator({ dealId, briefData, documents }: BriefGeneratorP
           </div>
         </div>
 
-        <div data-print-brief className="grid gap-4 md:grid-cols-2">
+        <div data-print-brief className="grid gap-3">
           {brief.sections.map((section) => (
-            <div
-              key={section.id}
-              className={
-                section.id === "campaign-overview" || section.id === "deliverables-summary"
-                  ? "md:col-span-2"
-                  : ""
-              }
-            >
-              <SectionCard
-                section={section}
-                isEditing={editingIds.has(section.id)}
-                editedContent={editedSections[section.id]?.content ?? section.content}
-                editedItems={editedSections[section.id]?.items ?? section.items ?? []}
-                onToggleEdit={() => toggleEdit(section.id)}
-                onContentChange={(value) =>
-                  setEditedSections((prev) => ({
-                    ...prev,
-                    [section.id]: {
-                      ...prev[section.id],
-                      content: value,
-                      items: prev[section.id]?.items ?? section.items ?? [],
-                    },
-                  }))
-                }
-                onItemsChange={(value) =>
-                  setEditedSections((prev) => ({
-                    ...prev,
-                    [section.id]: {
-                      ...prev[section.id],
-                      content: prev[section.id]?.content ?? section.content,
-                      items: value,
-                    },
-                  }))
-                }
-              />
-            </div>
+            <SectionCard key={section.id} section={section} />
           ))}
         </div>
       </div>

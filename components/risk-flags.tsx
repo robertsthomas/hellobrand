@@ -1,5 +1,6 @@
-import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { cleanDisplayText } from "@/lib/display-text";
+import { AssistantSuggestionDropdown } from "@/components/assistant-suggestion-dropdown";
+import { buildRiskFlagSuggestions } from "@/lib/assistant-suggestions";
 import type { RiskFlagRecord } from "@/lib/types";
 import { cn, normalizeEvidenceSnippet } from "@/lib/utils";
 import {
@@ -16,7 +17,7 @@ function cleanRiskEvidence(evidence: string[]) {
 }
 
 export function RiskFlags({ flags, dealId }: { flags: RiskFlagRecord[]; dealId?: string }) {
-  const leadFlag = flags[0] ?? null;
+  const riskSuggestions = dealId ? buildRiskFlagSuggestions(dealId, flags) : [];
 
   return (
     <section className="border border-black/8 bg-white p-4 dark:border-white/10 dark:bg-card sm:p-6">
@@ -29,22 +30,8 @@ export function RiskFlags({ flags, dealId }: { flags: RiskFlagRecord[]; dealId?:
             These are creator-focused negotiation flags, not legal advice.
           </p>
         </div>
-        {dealId && leadFlag ? (
-          <AssistantTriggerButton
-            label="Draft negotiation email"
-            trigger={{
-              kind: "risk_flag",
-              sourceId: leadFlag.id,
-              label: "Negotiate watchout",
-              prompt: [
-                `Draft a creator-professional negotiation email for this partnership that addresses this watchout: ${leadFlag.title}.`,
-                leadFlag.suggestedAction
-                  ? `Use this as the primary ask: ${leadFlag.suggestedAction}.`
-                  : "Ask for a concrete revision or clarification.",
-                "Keep it grounded in the saved workspace facts and avoid inventing prior agreements.",
-              ].join(" "),
-            }}
-          />
+        {riskSuggestions.length > 0 ? (
+          <AssistantSuggestionDropdown suggestions={riskSuggestions} />
         ) : null}
       </div>
       {flags.length > 0 ? (
@@ -92,17 +79,17 @@ export function RiskFlags({ flags, dealId }: { flags: RiskFlagRecord[]; dealId?:
                       </p>
                     ) : null}
                     {evidence.length > 0 ? (
-                      <details className="border border-black/8 px-4 py-3 dark:border-white/10">
+                      <details className="pt-1">
                         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.2em] text-black/45 dark:text-white/45">
-                          Evidence ({Math.min(evidence.length, 2)})
+                          Source snippets ({Math.min(evidence.length, 2)})
                         </summary>
-                        <div className="mt-3 divide-y divide-black/8 border border-black/8 dark:divide-white/10 dark:border-white/10">
+                        <div className="mt-3 space-y-2">
                           {evidence.slice(0, 2).map((snippet, index) => (
-                            <div key={snippet} className="px-3 py-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-black/40 dark:text-white/40">
-                                Evidence {index + 1}
-                              </p>
-                              <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-black/60 dark:text-white/65">
+                            <div
+                              key={`${flag.id}-evidence-${index}`}
+                              className="border-l border-black/10 pl-3 dark:border-white/12"
+                            >
+                              <p className="whitespace-pre-wrap text-xs leading-5 text-black/58 dark:text-white/62">
                                 {snippet}
                               </p>
                             </div>

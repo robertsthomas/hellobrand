@@ -11,7 +11,6 @@ export {
 } from "./deal-workspace-actions";
 export {
   activateSummaryVariantAction,
-  restoreSummaryVersionAction,
   applyPendingChangesAction,
   dismissPendingChangesAction,
   updateDeliverablesAction,

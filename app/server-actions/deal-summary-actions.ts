@@ -11,7 +11,6 @@ import {
   activateSummaryVariantForViewer,
   applyPendingChangesForViewer,
   dismissPendingChangesForViewer,
-  restoreSummaryForViewer,
   updateTermsForViewer as updateTermsFromDeals
 } from "@/lib/deals";
 import { captureHandledError } from "@/lib/monitoring/sentry";
@@ -53,33 +52,6 @@ export async function activateSummaryVariantAction(
         error instanceof Error
           ? error.message
           : "Could not switch summary versions right now."
-    };
-  }
-}
-
-export async function restoreSummaryVersionAction(dealId: string, summaryId: string) {
-  const viewer = await requireViewer();
-
-  try {
-    await restoreSummaryForViewer(viewer, dealId, summaryId);
-    invalidateDealWorkspace(viewer.id, dealId);
-    return { ok: true };
-  } catch (error) {
-    captureHandledError(error, {
-      area: "workspace",
-      name: "restore_summary_version",
-      viewerId: viewer.id,
-      captureExpected: true,
-      extras: {
-        dealId,
-        summaryId
-      }
-    });
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not restore that summary version."
     };
   }
 }

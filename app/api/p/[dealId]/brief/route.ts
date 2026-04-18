@@ -12,7 +12,7 @@ import {
   assertViewerWithinUsageLimit,
   recordViewerUsage
 } from "@/lib/billing/entitlements";
-import { getDealForViewer } from "@/lib/deals";
+import { getDealForViewer, saveGeneratedBriefSummaryForViewer } from "@/lib/deals";
 import { fail, ok } from "@/lib/http";
 
 export async function POST(
@@ -35,6 +35,11 @@ export async function POST(
     const brief = hasLlmKey()
       ? await generateBriefWithLlm(aggregate, { mode })
       : buildFallbackBrief(aggregate);
+
+    if (mode === "summary" && aggregate.terms?.briefData) {
+      await saveGeneratedBriefSummaryForViewer(viewer, dealId, brief);
+    }
+
     await recordViewerUsage(viewer, "brief_generations_monthly");
 
     return ok({ brief });

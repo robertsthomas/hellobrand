@@ -14,7 +14,7 @@ export {
   updateDealForViewer,
   deleteDealForViewer,
   activateSummaryVariantForViewer,
-  restoreSummaryForViewer,
+  saveGeneratedBriefSummaryForViewer,
 } from "./deals/service";
 
 export {

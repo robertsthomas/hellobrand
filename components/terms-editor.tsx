@@ -17,7 +17,6 @@ import {
 import { dealCategoryLabel } from "@/lib/conflict-categories";
 import {
   EditableStringListField,
-  TermsArrayFieldsEditor,
 } from "@/components/terms-array-fields-editor";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -45,6 +44,35 @@ import { humanizeToken, stripHtmlTags } from "@/lib/utils";
 function fieldValue(value: string | null | undefined) {
   if (!value) return "";
   return stripHtmlTags(value);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function personalizeCreatorFacingText(value: string, creatorName: string | null | undefined) {
+  const normalizedCreatorName = fieldValue(creatorName);
+  if (!value || !normalizedCreatorName) {
+    return value;
+  }
+
+  const escapedCreatorName = escapeRegex(normalizedCreatorName.trim());
+  if (!escapedCreatorName) {
+    return value;
+  }
+
+  const withPossessiveReplaced = value.replace(
+    new RegExp(`\\b${escapedCreatorName}'s\\b`, "gi"),
+    "your"
+  );
+  const withNameReplaced = withPossessiveReplaced.replace(
+    new RegExp(`\\b${escapedCreatorName}\\b`, "gi"),
+    "you"
+  );
+
+  return withNameReplaced.replace(/^(you|your)\b/, (match) =>
+    match.charAt(0).toUpperCase() + match.slice(1)
+  );
 }
 
 // fallow-ignore-next-line complexity
@@ -208,8 +236,16 @@ function Section({
 /*  Read-only display helpers                                          */
 /* ------------------------------------------------------------------ */
 
-function ReadOnlyValue({ value, placeholder }: { value: string; placeholder?: string }) {
-  const display = value.trim();
+function ReadOnlyValue({
+  value,
+  placeholder,
+  creatorName,
+}: {
+  value: string;
+  placeholder?: string;
+  creatorName?: string | null;
+}) {
+  const display = personalizeCreatorFacingText(value.trim(), creatorName).trim();
   if (!display) {
     return (
       <span className="text-[15px] leading-7 text-black/30 dark:text-white/30">
@@ -486,7 +522,6 @@ export function TermsEditor({
     partnership: true,
     payment: true,
     workflow: true,
-    deliverables: true,
     usage: true,
     exclusivity: true,
     termination: true,
@@ -513,6 +548,7 @@ export function TermsEditor({
     value: c,
     label: dealCategoryLabel(c) ?? c,
   }));
+  const creatorDisplayName = fieldValue(terms?.creatorName);
   const briefTermDetails = terms?.briefData ?? null;
   const hasWorkflowTerms = Boolean(
     briefTermDetails?.campaignCode ||
@@ -791,7 +827,12 @@ export function TermsEditor({
           <Field
             label="Payment terms"
             editing={ed("payment")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentTerms)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.paymentTerms)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <textarea
                 className={`${FORM_TEXTAREA_CLASS} min-h-[4.5rem]`}
@@ -803,7 +844,12 @@ export function TermsEditor({
           <Field
             label="Payment structure"
             editing={ed("payment")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentStructure)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.paymentStructure)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -835,7 +881,12 @@ export function TermsEditor({
           <Field
             label="Payment trigger"
             editing={ed("payment")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.paymentTrigger)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.paymentTrigger)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <textarea
                 className={`${FORM_TEXTAREA_CLASS} min-h-[4.5rem]`}
@@ -850,19 +901,34 @@ export function TermsEditor({
             <Field
               label="Payment schedule"
               editing={false}
-              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentSchedule)} />}
+              readOnly={
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.paymentSchedule)}
+                  creatorName={creatorDisplayName}
+                />
+              }
               editControl={null}
             />
             <Field
               label="Payment requirements"
               editing={false}
-              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentRequirements)} />}
+              readOnly={
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.paymentRequirements)}
+                  creatorName={creatorDisplayName}
+                />
+              }
               editControl={null}
             />
             <Field
               label="Payment notes"
               editing={false}
-              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.paymentNotes)} />}
+              readOnly={
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.paymentNotes)}
+                  creatorName={creatorDisplayName}
+                />
+              }
               editControl={null}
             />
           </div>
@@ -937,6 +1003,7 @@ export function TermsEditor({
                     fieldValue(briefTermDetails?.campaignFlight) ||
                     fieldValue(terms?.campaignDateWindow?.postingWindow)
                   }
+                  creatorName={creatorDisplayName}
                 />
               }
               editControl={null}
@@ -998,7 +1065,12 @@ export function TermsEditor({
             <Field
               label="Posting schedule"
               editing={false}
-              readOnly={<ReadOnlyValue value={fieldValue(briefTermDetails?.postingSchedule)} />}
+              readOnly={
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.postingSchedule)}
+                  creatorName={creatorDisplayName}
+                />
+              }
               editControl={null}
             />
             <Field
@@ -1019,7 +1091,10 @@ export function TermsEditor({
               label="Approval requirements"
               editing={false}
               readOnly={
-                <ReadOnlyValue value={fieldValue(briefTermDetails?.approvalRequirements)} />
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.approvalRequirements)}
+                  creatorName={creatorDisplayName}
+                />
               }
               editControl={null}
             />
@@ -1027,7 +1102,10 @@ export function TermsEditor({
               label="Revision requirements"
               editing={false}
               readOnly={
-                <ReadOnlyValue value={fieldValue(briefTermDetails?.revisionRequirements)} />
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.revisionRequirements)}
+                  creatorName={creatorDisplayName}
+                />
               }
               editControl={null}
             />
@@ -1035,7 +1113,10 @@ export function TermsEditor({
               label="Reporting requirements"
               editing={false}
               readOnly={
-                <ReadOnlyValue value={fieldValue(briefTermDetails?.reportingRequirements)} />
+                <ReadOnlyValue
+                  value={fieldValue(briefTermDetails?.reportingRequirements)}
+                  creatorName={creatorDisplayName}
+                />
               }
               editControl={null}
             />
@@ -1068,28 +1149,6 @@ export function TermsEditor({
         </Section>
       ) : null}
 
-      {/* ───── Deliverables (always editable) ───── */}
-      <Section
-        sectionKey="deliverables"
-        title="Deliverables"
-        description="Use editable rows instead of raw JSON for deliverables and channel permissions."
-        open={isOpen("deliverables")}
-        onToggleOpen={() => toggleOpen("deliverables")}
-        editing
-        showEditToggle={false}
-        reviewCount={sectionReviewItems.deliverables.length}
-        onOpenReview={() => setOpenReviewSection("deliverables")}
-        onToggleEdit={() => undefined}
-      >
-        <TermsArrayFieldsEditor
-          deliverables={terms?.deliverables ?? []}
-          usageChannels={terms?.usageChannels ?? []}
-          inputClassName={FORM_INPUT_CLASS}
-          textareaClassName={FORM_TEXTAREA_CLASS}
-        />
-        <Signals fields={["deliverables"]} evidence={evidence} sections={sections} />
-      </Section>
-
       {/* ───── Usage rights ───── */}
       <Section
         sectionKey="usage"
@@ -1105,7 +1164,12 @@ export function TermsEditor({
         <Field
           label="Usage rights summary"
           editing={ed("usage")}
-          readOnly={<ReadOnlyValue value={fieldValue(terms?.usageRights)} />}
+          readOnly={
+            <ReadOnlyValue
+              value={fieldValue(terms?.usageRights)}
+              creatorName={creatorDisplayName}
+            />
+          }
           editControl={
             <textarea
               className={`${FORM_TEXTAREA_CLASS} min-h-24`}
@@ -1147,7 +1211,12 @@ export function TermsEditor({
           <Field
             label="Usage duration"
             editing={ed("usage")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.usageDuration)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.usageDuration)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1160,7 +1229,12 @@ export function TermsEditor({
           <Field
             label="Usage territory"
             editing={ed("usage")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.usageTerritory)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.usageTerritory)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1199,7 +1273,12 @@ export function TermsEditor({
         <Field
           label="Exclusivity summary"
           editing={ed("exclusivity")}
-          readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivity)} />}
+          readOnly={
+            <ReadOnlyValue
+              value={fieldValue(terms?.exclusivity)}
+              creatorName={creatorDisplayName}
+            />
+          }
           editControl={
             <textarea
               className={`${FORM_TEXTAREA_CLASS} min-h-20`}
@@ -1246,6 +1325,7 @@ export function TermsEditor({
                     fieldValue(terms?.exclusivityRestrictions)
                   }
                   placeholder="No restrictions"
+                  creatorName={creatorDisplayName}
                 />
               }
               editControl={null}
@@ -1274,7 +1354,12 @@ export function TermsEditor({
           <Field
             label="Exclusivity category"
             editing={ed("exclusivity")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivityCategory)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.exclusivityCategory)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1287,7 +1372,12 @@ export function TermsEditor({
           <Field
             label="Exclusivity duration"
             editing={ed("exclusivity")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.exclusivityDuration)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.exclusivityDuration)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1340,7 +1430,12 @@ export function TermsEditor({
           <Field
             label="Revisions"
             editing={ed("termination")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.revisions)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.revisions)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1374,7 +1469,12 @@ export function TermsEditor({
           <Field
             label="Termination summary"
             editing={ed("termination")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.termination)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.termination)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <textarea
                 className={`${FORM_TEXTAREA_CLASS} min-h-20`}
@@ -1386,7 +1486,12 @@ export function TermsEditor({
           <Field
             label="Termination conditions"
             editing={ed("termination")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.terminationConditions)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.terminationConditions)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <textarea
                 className={`${FORM_TEXTAREA_CLASS} min-h-20`}
@@ -1406,7 +1511,12 @@ export function TermsEditor({
           <Field
             label="Termination notice"
             editing={ed("termination")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.terminationNotice)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.terminationNotice)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1419,7 +1529,12 @@ export function TermsEditor({
           <Field
             label="Governing law"
             editing={ed("termination")}
-            readOnly={<ReadOnlyValue value={fieldValue(terms?.governingLaw)} />}
+            readOnly={
+              <ReadOnlyValue
+                value={fieldValue(terms?.governingLaw)}
+                creatorName={creatorDisplayName}
+              />
+            }
             editControl={
               <input
                 className={FORM_INPUT_CLASS}
@@ -1462,7 +1577,11 @@ export function TermsEditor({
           />
         ) : (
           <>
-            <ReadOnlyValue value={fieldValue(terms?.notes)} placeholder="No notes yet" />
+            <ReadOnlyValue
+              value={fieldValue(terms?.notes)}
+              placeholder="No notes yet"
+              creatorName={creatorDisplayName}
+            />
             {textHidden("notes", fieldValue(terms?.notes))}
           </>
         )}

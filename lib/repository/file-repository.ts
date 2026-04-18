@@ -640,6 +640,12 @@ export class FileRepository {
       );
     }
 
+    if (normalized.summaryType !== null) {
+      store.summaries = store.summaries.filter(
+        (entry) => !(entry.dealId === dealId && entry.summaryType === normalized.summaryType)
+      );
+    }
+
     const next: SummaryRecord = {
       body: normalized.body,
       version: normalized.version,
@@ -670,9 +676,9 @@ export class FileRepository {
     return getLatestSummaryByType(history, summaryType);
   }
 
-  async restoreSummary(dealId: string, summaryId: string) {
+  async setCurrentSummary(dealId: string, summaryId: string) {
     const store = await ensureStore();
-    let restored: SummaryRecord | null = null;
+    let current: SummaryRecord | null = null;
 
     store.summaries = store.summaries.map((summary) => {
       if (summary.dealId !== dealId || summary.summaryType === null) {
@@ -680,8 +686,8 @@ export class FileRepository {
       }
 
       if (summary.id === summaryId) {
-        restored = { ...summary, isCurrent: true };
-        return restored;
+        current = { ...summary, isCurrent: true };
+        return current;
       }
 
       return {
@@ -690,12 +696,12 @@ export class FileRepository {
       };
     });
 
-    if (!restored) {
+    if (!current) {
       return null;
     }
 
     await saveStore(store);
-    return restored;
+    return current;
   }
 
   async createJob(job: Omit<JobRecord, "id" | "createdAt" | "updatedAt">) {

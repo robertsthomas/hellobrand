@@ -589,6 +589,8 @@ describe("intake normalization", () => {
       },
     ];
     aggregate.latestDocument = aggregate.documents[0];
+    aggregate.summaries = [];
+    aggregate.currentSummary = null;
 
     const normalized = buildNormalizedIntakeRecord(aggregate);
 
@@ -597,6 +599,100 @@ describe("intake normalization", () => {
     expect(normalized?.primaryContact.title).toBe("Campaign Activation Manager, Media");
     expect(normalized?.primaryContact.email).toBe("amber.logan@inmar.com");
     expect(normalized?.primaryContact.phone).toBe("312-555-0101");
+  });
+
+  test("treats a deal memo owner agency as the primary contact organization type", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Beis",
+      agencyName: null,
+    };
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "13_notion_calendar_beis.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          CAMPAIGN TIMELINE & DEAL MEMO
+          Project
+          Beis - The Carry-On Collection Fall 2026
+          Owner
+          Apex Social Agency, LLC
+          Brand contact
+          Leila Park
+          lpark@beisworld.com
+        `,
+        rawText: `
+          CAMPAIGN TIMELINE & DEAL MEMO
+          Project
+          Beis - The Carry-On Collection Fall 2026
+          Owner
+          Apex Social Agency, LLC
+          Brand contact
+          Leila Park
+          lpark@beisworld.com
+        `,
+      },
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.agencyName).toBe("Apex Social, LLC");
+    expect(normalized?.primaryContact.name).toBe("Leila Park");
+    expect(normalized?.primaryContact.email).toBe("lpark@beisworld.com");
+    expect(normalized?.primaryContact.organizationType).toBe("agency");
+  });
+
+  test("infers brand category from deal memo project language when extraction leaves it blank", () => {
+    const aggregate = createAggregate();
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Beis",
+      agencyName: null,
+      brandCategory: null,
+    };
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "13_notion_calendar_beis.pdf",
+        documentKind: "contract",
+        normalizedText: `
+          CAMPAIGN TIMELINE & DEAL MEMO
+          Project
+          Beis - The Carry-On Collection Fall 2026
+          Owner
+          Apex Social Agency, LLC
+          Creator assigned
+          Zara Osei / @zaraosei (TikTok, Instagram)
+          Brand contact
+          Leila Park
+          lpark@beisworld.com
+          Territory
+          USA + Canada
+        `,
+        rawText: `
+          CAMPAIGN TIMELINE & DEAL MEMO
+          Project
+          Beis - The Carry-On Collection Fall 2026
+          Owner
+          Apex Social Agency, LLC
+          Creator assigned
+          Zara Osei / @zaraosei (TikTok, Instagram)
+          Brand contact
+          Leila Park
+          lpark@beisworld.com
+          Territory
+          USA + Canada
+        `,
+      },
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandCategory).toBe("travel_hospitality");
   });
 
   test("keeps primary contact blank when only creator contact details are present", () => {

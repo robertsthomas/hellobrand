@@ -5,7 +5,6 @@ import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
 import { BriefGenerator } from "@/components/brief-generator";
-import { BriefOverview } from "@/components/brief-overview";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DealEmailPanel } from "@/components/deal-email-panel";
 import { DealNotesDrawer } from "@/components/deal-notes-drawer";
@@ -22,7 +21,7 @@ import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
 import { UploadContractForm } from "@/components/upload-contract-form";
-import { WorkspaceTabs } from "@/components/workspace-tabs";
+import { WorkspaceTabButton, WorkspaceTabs } from "@/components/workspace-tabs";
 import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
@@ -94,6 +93,15 @@ async function DealDetailContent({
     buildWorkspaceDisplayState(aggregate);
   const riskCount = riskFlags.length;
   const invoiceDocuments = documents.filter((document) => document.documentKind === "invoice");
+  const briefSourceDocument =
+    (terms?.briefData?.sourceDocumentIds ?? [])
+      .map((documentId) => documents.find((document) => document.id === documentId) ?? null)
+      .find((document) => document !== null) ??
+    documents.find(
+      (document) =>
+        document.documentKind === "campaign_brief" || document.documentKind === "deliverables_brief"
+    ) ??
+    null;
 
   const hasInvoice = Boolean(aggregate.invoiceRecord);
   const rawTab = resolvedSearchParams?.tab ?? "";
@@ -187,34 +195,24 @@ async function DealDetailContent({
 
           {/* ── Overview: "Today" view ── */}
           <TabsContent value="overview" id="tab-overview" className="mt-0 space-y-6">
-            {/* Next action */}
-            <div
-              className={`flex items-center justify-between gap-4 border p-4 ${nextActionToneClass(nextAction.tone)}`}
-            >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Next step
-                </p>
-                <p className="mt-1 text-sm font-medium text-foreground">{nextAction.label}</p>
-              </div>
-              {nextAction.tab !== "overview" ? (
-                <Link
-                  href={`/app/p/${deal.id}?tab=${nextAction.tab}`}
-                  className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-foreground transition hover:text-primary"
-                >
-                  Go <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : null}
-            </div>
-
             {/* Needs attention */}
             {attentionItems.length > 0 ? (
               <div className="border border-clay/15 bg-clay/[0.04] p-4 dark:border-clay/20">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
-                  <p className="text-sm font-semibold text-ink">
-                    Needs attention ({attentionItems.length})
-                  </p>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-clay" />
+                    <p className="text-sm font-semibold text-ink">
+                      Needs attention ({attentionItems.length})
+                    </p>
+                  </div>
+                  {nextAction.tab !== "overview" ? (
+                    <WorkspaceTabButton
+                      tab={nextAction.tab}
+                      className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-foreground transition hover:text-primary"
+                    >
+                      Go <ArrowRight className="h-3.5 w-3.5" />
+                    </WorkspaceTabButton>
+                  ) : null}
                 </div>
                 <div className="mt-3 grid gap-2">
                   {attentionItems.map((item) => (
@@ -273,24 +271,26 @@ async function DealDetailContent({
             ) : null}
             <DeliverablesList dealId={deal.id} deliverables={terms?.deliverables ?? []} />
 
-            {/* Brief section */}
-            <BriefOverview
-              dealId={deal.id}
-              briefData={terms?.briefData}
-              documents={documents}
-              hasPremiumInbox={hasPremiumInbox}
-            />
+            {briefSourceDocument ? (
+              <div className="flex items-center">
+                <Link
+                  href={`/api/documents/${briefSourceDocument.id}/content`}
+                  className="inline-flex items-center gap-2 border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+                >
+                  View brief document
+                </Link>
+              </div>
+            ) : null}
             {hasBriefGeneration ? (
               <BriefGenerator
                 dealId={deal.id}
                 briefData={terms?.briefData ?? null}
-                documents={documents}
               />
             ) : (
               <FeatureUpgradeCard
                 eyebrow="Basic briefs"
                 title="AI brief generation unlocks on Basic"
-                description="Free keeps the extracted brief overview, but generated campaign briefs and regenerations are part of the Basic and Premium workflow."
+                description="AI brief summaries, campaign briefs, and regenerations are part of the Basic and Premium workflow."
                 requiredTier={PlanTier.basic}
                 currentTier={entitlements.effectiveTier}
                 hasActiveSubscription={entitlements.hasActiveSubscription}

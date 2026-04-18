@@ -631,7 +631,7 @@ export function AppFrame({
                 onClick={closeSidebar}
                 className={cn(
                   buttonVariants({ size: "sm" }),
-                  "h-11 w-full justify-center rounded-none px-4 text-sm"
+                  "h-11 w-full justify-center rounded-none px-4 text-sm shadow-sm transition-[transform,box-shadow,background-color] hover:shadow-md active:translate-y-px active:shadow-sm"
                 )}
               >
                 <span>{t("newWorkspace")}</span>

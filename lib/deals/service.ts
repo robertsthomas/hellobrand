@@ -9,7 +9,7 @@ import { emitNotificationSeedForUser } from "@/lib/notification-service";
 import { getRepository } from "@/lib/repository";
 import { buildGeneratedSummaryVariant } from "@/lib/summary-variants";
 import { getLatestSummaryByType } from "@/lib/summaries";
-import type { DealAggregate, DealRecord, SummaryType, Viewer } from "@/lib/types";
+import type { DealAggregate, DealRecord, GeneratedBrief, SummaryType, Viewer } from "@/lib/types";
 import {
   createEmptyTerms,
   hydrateProfileBackedCreatorName,
@@ -160,32 +160,32 @@ export async function activateSummaryVariantForViewer(
   }
 
   if (summaryType === "legal") {
-    const restored = await repository.restoreSummary(dealId, latestLegal.id);
+    const activated = await repository.setCurrentSummary(dealId, latestLegal.id);
 
-    if (!restored) {
-      throw new Error("Could not restore the legal summary.");
+    if (!activated) {
+      throw new Error("Could not switch to the legal summary.");
     }
 
     await repository.updateDeal(viewer.id, dealId, {
-      summary: restored.body,
+      summary: activated.body,
     });
     void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
-    return restored;
+    return activated;
   }
 
   const latestVariant = getLatestSummaryByType(aggregate.summaries, summaryType);
   if (latestVariant?.parentSummaryId === latestLegal.id) {
-    const restored = await repository.restoreSummary(dealId, latestVariant.id);
+    const activated = await repository.setCurrentSummary(dealId, latestVariant.id);
 
-    if (!restored) {
-      throw new Error("Could not restore the saved summary variant.");
+    if (!activated) {
+      throw new Error("Could not switch to the saved summary variant.");
     }
 
     await repository.updateDeal(viewer.id, dealId, {
-      summary: restored.body,
+      summary: activated.body,
     });
     void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
-    return restored;
+    return activated;
   }
 
   const generated = await buildGeneratedSummaryVariant({
@@ -202,7 +202,11 @@ export async function activateSummaryVariantForViewer(
   return saved;
 }
 
-export async function restoreSummaryForViewer(viewer: Viewer, dealId: string, summaryId: string) {
+export async function saveGeneratedBriefSummaryForViewer(
+  viewer: Viewer,
+  dealId: string,
+  generatedSummary: GeneratedBrief
+) {
   const repository = getRepository();
   const aggregate = await repository.getDealAggregate(viewer.id, dealId);
 
@@ -210,20 +214,21 @@ export async function restoreSummaryForViewer(viewer: Viewer, dealId: string, su
     throw new Error("Deal not found.");
   }
 
-  const summary = aggregate.summaries.find((entry) => entry.id === summaryId);
-  if (!summary || summary.summaryType === null) {
-    throw new Error("Summary version not found.");
+  const currentTerms = aggregate.terms ?? createEmptyTerms(aggregate.deal);
+  const currentBriefData = currentTerms.briefData;
+
+  if (!currentBriefData) {
+    throw new Error("No uploaded brief is available for this workspace.");
   }
 
-  const restored = await repository.restoreSummary(dealId, summaryId);
-
-  if (!restored) {
-    throw new Error("Could not restore that summary version.");
-  }
-
-  await repository.updateDeal(viewer.id, dealId, {
-    summary: restored.body,
+  const nextTerms = mergeTerms(currentTerms, {
+    briefData: {
+      ...currentBriefData,
+      generatedSummary,
+    },
   });
+
+  const savedTerms = await repository.upsertTerms(dealId, nextTerms);
   void queueAssistantSnapshotRefresh(viewer, dealId).catch(() => undefined);
-  return restored;
+  return savedTerms;
 }

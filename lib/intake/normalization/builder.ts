@@ -17,6 +17,7 @@ import type {
   NormalizedIntakeRecord,
   SummaryRecord,
 } from "@/lib/types";
+import { CATEGORY_KEYWORDS, normalizeDealCategory } from "@/lib/conflict-categories";
 import { stripInlineMarkdown, toPlainDealSummary } from "@/lib/deal-summary";
 import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
 import { sanitizePlainTextInput } from "@/lib/utils";
@@ -449,6 +450,14 @@ const PAYMENT_CONTACT_CONTEXT_PATTERN =
   /\b(payment|invoice|billing|remit|wire|ach|w-9|tax|accounts payable)\b/i;
 const EXTERNAL_CONTACT_SIGNAL_PATTERN =
   /\b(brand|agency|management|partnerships?|campaign|marketing|media|approval|approvals|questions|contact|manager|director|coordinator|executive|team)\b/i;
+const CATEGORY_INLINE_PATTERN = /\b(?:brand\s+category|industry|vertical|sector)\b[:\s-]+(.+)$/i;
+const CATEGORY_LABEL_PATTERN = /^(?:brand\s+category|industry|vertical|sector)$/i;
+const CATEGORY_CONTEXT_EXCLUSION_PATTERN =
+  /\b(competitor|restricted|restriction|exclusiv(?:e|ity)|conflict|blackout|prohibited|avoid)\b/i;
+const CATEGORY_FOCUS_LABEL_PATTERN =
+  /^(?:project|campaign|brand(?:\s+name)?|client|product|collection|line)$/i;
+const CATEGORY_FOCUS_LINE_PATTERN =
+  /\b(?:project|campaign|brand(?:\s+name)?|client|product|collection|line|deliverables?|featuring)\b/i;
 
 function buildExcludedContactEmails(options: IntakeNormalizationOptions | undefined) {
   return new Set(
@@ -622,6 +631,43 @@ function normalizeOrganizationToken(value: string | null | undefined) {
   return normalized.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function organizationContextTokens(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .map((token) => token.trim())
+    .filter(
+      (token) =>
+        token.length >= 3 &&
+        ![
+          "agency",
+          "company",
+          "management",
+          "group",
+          "llc",
+          "inc",
+          "ltd",
+          "co",
+          "corp",
+        ].includes(token)
+    );
+}
+
+function windowMentionsOrganization(windowText: string, organizationName: string | null | undefined) {
+  const tokens = organizationContextTokens(organizationName);
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  const lowerWindowText = windowText.toLowerCase();
+  return tokens.every((token) => lowerWindowText.includes(token));
+}
+
 function inferOrganizationTypeFromSignals(input: {
   email: string | null;
   agencyName: string | null;
@@ -629,6 +675,7 @@ function inferOrganizationTypeFromSignals(input: {
   windowLines: string[];
 }) {
   const windowText = input.windowLines.join("\n").toLowerCase();
+  const normalizedWindowText = normalizeOrganizationToken(windowText);
   const emailDomainRoot =
     normalizeEmail(input.email)
       ?.split("@")[1]
@@ -637,16 +684,22 @@ function inferOrganizationTypeFromSignals(input: {
   const normalizedAgency = normalizeOrganizationToken(input.agencyName);
   const normalizedBrand = normalizeOrganizationToken(input.brandName);
 
+  if (
+    (normalizedAgency && normalizedWindowText?.includes(normalizedAgency)) ||
+    windowMentionsOrganization(windowText, input.agencyName)
+  ) {
+    return "agency" as const;
+  }
+  if (
+    (normalizedBrand && normalizedWindowText?.includes(normalizedBrand)) ||
+    windowMentionsOrganization(windowText, input.brandName)
+  ) {
+    return "brand" as const;
+  }
   if (emailDomainRoot && normalizedAgency && emailDomainRoot.includes(normalizedAgency)) {
     return "agency" as const;
   }
   if (emailDomainRoot && normalizedBrand && emailDomainRoot.includes(normalizedBrand)) {
-    return "brand" as const;
-  }
-  if (input.agencyName && windowText.includes(input.agencyName.toLowerCase())) {
-    return "agency" as const;
-  }
-  if (input.brandName && windowText.includes(input.brandName.toLowerCase())) {
     return "brand" as const;
   }
   if (/\b(agency|management|talent management)\b/.test(windowText)) {
@@ -1180,6 +1233,24 @@ function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
       .map((line) => line.trim())
       .filter(Boolean);
 
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
+      const inlineOwnerMatch = line.match(
+        /\b(?:owner|agency|management company|represented by|managed by)\b[:\s-]+(.+)$/i
+      );
+      const inlineCandidate = sanitizePartyName(inlineOwnerMatch?.[1] ?? null, "agency");
+      if (inlineCandidate && inlineCandidate !== brandName) {
+        return inlineCandidate;
+      }
+
+      if (/^(?:owner|agency|management company|represented by|managed by)$/i.test(line)) {
+        const pairedCandidate = sanitizePartyName(lines[index + 1] ?? null, "agency");
+        if (pairedCandidate && pairedCandidate !== brandName) {
+          return pairedCandidate;
+        }
+      }
+    }
+
     const signatureMatch =
       lines.find(
         (line) =>
@@ -1199,6 +1270,127 @@ function parseMoneyValues(text: string) {
   return Array.from(text.matchAll(/\$[\d,]+(?:\.\d{2})?/g), (match) =>
     Number(match[0].replace(/[$,]/g, ""))
   ).filter((value) => Number.isFinite(value));
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textContainsCategoryKeyword(text: string, keyword: string) {
+  const normalizedKeyword = keyword.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return false;
+  }
+
+  if (normalizedKeyword.includes(" ") || /[^a-z0-9\s]/i.test(normalizedKeyword)) {
+    return text.includes(normalizedKeyword);
+  }
+
+  const pattern = new RegExp(`\\b${escapeRegex(normalizedKeyword)}\\b`, "i");
+  return pattern.test(text);
+}
+
+function scoreBrandCategoryText(text: string, category: DealCategory) {
+  const lower = text.toLowerCase();
+  return CATEGORY_KEYWORDS[category].reduce((score, keyword) => {
+    if (textContainsCategoryKeyword(lower, keyword)) {
+      return score + Math.max(1, keyword.split(/[\s-]+/).filter(Boolean).length);
+    }
+
+    return score;
+  }, 0);
+}
+
+function inferBrandCategoryFromDocuments(aggregate: DealAggregate) {
+  const evidenceCategory = normalizeDealCategory(
+    bestEvidenceSnippet(aggregate.extractionEvidence, ["brandCategory"])
+  );
+  if (evidenceCategory) {
+    return evidenceCategory;
+  }
+
+  const candidateTexts: string[] = [];
+
+  for (const document of aggregate.documents) {
+    const lines = (document.normalizedText ?? document.rawText ?? "")
+      .split(/\r?\n/)
+      .map((line) => presentText(line))
+      .filter((line): line is string => Boolean(line));
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
+
+      const inlineMatch = line.match(CATEGORY_INLINE_PATTERN);
+      if (
+        inlineMatch &&
+        !CATEGORY_CONTEXT_EXCLUSION_PATTERN.test(line) &&
+        !CATEGORY_CONTEXT_EXCLUSION_PATTERN.test(inlineMatch[1] ?? "")
+      ) {
+        const explicitCategory = normalizeDealCategory(inlineMatch[1]);
+        if (explicitCategory) {
+          return explicitCategory;
+        }
+      }
+
+      if (CATEGORY_LABEL_PATTERN.test(line)) {
+        const pairedValue = lines[index + 1] ?? null;
+        if (!pairedValue || CATEGORY_CONTEXT_EXCLUSION_PATTERN.test(pairedValue)) {
+          continue;
+        }
+
+        const explicitCategory = normalizeDealCategory(pairedValue);
+        if (explicitCategory) {
+          return explicitCategory;
+        }
+      }
+
+      if (CATEGORY_CONTEXT_EXCLUSION_PATTERN.test(line)) {
+        continue;
+      }
+
+      if (index < 14 || CATEGORY_FOCUS_LINE_PATTERN.test(line)) {
+        candidateTexts.push(line);
+      }
+
+      if (CATEGORY_FOCUS_LABEL_PATTERN.test(line)) {
+        const pairedValue = lines[index + 1] ?? null;
+        if (pairedValue && !CATEGORY_CONTEXT_EXCLUSION_PATTERN.test(pairedValue)) {
+          candidateTexts.push(pairedValue);
+        }
+      }
+    }
+
+    candidateTexts.push(cleanFileName(document.fileName));
+  }
+
+  const combinedText = sanitizeDisplayList([
+    aggregate.deal.brandName,
+    aggregate.deal.campaignName,
+    aggregate.terms?.brandName,
+    aggregate.terms?.campaignName,
+    ...candidateTexts,
+  ]).join("\n");
+
+  if (!combinedText) {
+    return null;
+  }
+
+  let bestCategory: DealCategory | null = null;
+  let bestScore = 0;
+
+  for (const category of Object.keys(CATEGORY_KEYWORDS) as DealCategory[]) {
+    if (category === "other") {
+      continue;
+    }
+
+    const score = scoreBrandCategoryText(combinedText, category);
+    if (score > bestScore) {
+      bestCategory = category;
+      bestScore = score;
+    }
+  }
+
+  return bestScore >= 2 ? bestCategory : null;
 }
 
 // fallow-ignore-next-line complexity
@@ -1943,7 +2135,8 @@ export function buildNormalizedIntakeRecord(
       ? persisted.analytics
       : extractAnalytics(aggregate)
   );
-  const brandCategory = persisted?.brandCategory ?? aggregate.terms?.brandCategory ?? null;
+  const brandCategory =
+    persisted?.brandCategory ?? aggregate.terms?.brandCategory ?? inferBrandCategoryFromDocuments(aggregate);
   const competitorCategories = sanitizeDisplayList(
     Array.isArray(persisted?.competitorCategories) && persisted.competitorCategories.length > 0
       ? persisted.competitorCategories

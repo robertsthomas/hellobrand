@@ -1,5 +1,6 @@
-import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import { ProseText } from "@/components/prose-text";
+import { AssistantSuggestionDropdown } from "@/components/assistant-suggestion-dropdown";
+import { buildDeliverableSuggestions } from "@/lib/assistant-suggestions";
 import type { DeliverableItem } from "@/lib/types";
 import { formatDate, humanizeToken } from "@/lib/utils";
 
@@ -10,10 +11,7 @@ export function DeliverablesList({
   deliverables: DeliverableItem[];
   dealId?: string;
 }) {
-  const deliverableNames = deliverables
-    .slice(0, 4)
-    .map((item) => item.title)
-    .join(", ");
+  const suggestions = dealId ? buildDeliverableSuggestions(dealId, deliverables) : [];
 
   if (deliverables.length === 0) {
     return (
@@ -25,20 +23,11 @@ export function DeliverablesList({
             </h2>
             <p className="mt-4 text-sm text-black/60 dark:text-white/65">
               No deliverables have been extracted yet. Upload a contract, brief, or email thread,
-              then confirm them in the key terms editor.
+              then confirm them with the brand.
             </p>
           </div>
-          {dealId ? (
-            <AssistantTriggerButton
-              label="Clarify deliverables"
-              trigger={{
-                kind: "deliverable",
-                sourceId: dealId,
-                label: "Clarify deliverables",
-                prompt:
-                  "Draft a concise creator-professional email asking the brand to confirm the deliverables, timeline, and approval flow for this partnership because the workspace does not show a reliable deliverables list yet.",
-              }}
-            />
+          {suggestions.length > 0 ? (
+            <AssistantSuggestionDropdown suggestions={suggestions} />
           ) : null}
         </div>
       </section>
@@ -53,32 +42,11 @@ export function DeliverablesList({
             Deliverables
           </h2>
           <p className="mt-2 text-sm text-black/60 dark:text-white/65">
-            Creator obligations extracted from the partnership documents. Edit them in Key Terms if
-            anything looks off.
+            Creator obligations extracted from the partnership documents.
           </p>
         </div>
-        {dealId ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <AssistantTriggerButton
-              label="Confirm deliverables"
-              trigger={{
-                kind: "deliverable",
-                sourceId: dealId,
-                label: "Confirm deliverables",
-                prompt: `Draft a concise creator-professional email confirming the current deliverables for this partnership. Use these deliverables as the starting point: ${deliverableNames || "the saved workspace deliverables"}. Ask the brand to correct anything that is off.`,
-              }}
-            />
-            <AssistantTriggerButton
-              label="Clarify timeline"
-              trigger={{
-                kind: "deliverable",
-                sourceId: dealId,
-                label: "Clarify timeline",
-                prompt:
-                  "Draft a concise creator-professional email clarifying the production timeline, approval window, and posting deadlines for the current deliverables in this partnership.",
-              }}
-            />
-          </div>
+        {suggestions.length > 0 ? (
+          <AssistantSuggestionDropdown suggestions={suggestions} />
         ) : null}
       </div>
       <div className="mt-5 grid gap-3">

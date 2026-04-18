@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 
 const contentClassName =
-  "max-w-[220px] rounded-md bg-white px-2.5 py-1.5 text-center text-[11px] leading-4 text-[#475467] shadow-md ring-1 ring-black/8 dark:bg-card dark:text-white/70 dark:ring-white/10";
+  "max-w-[220px] rounded-none border border-black/12 bg-white px-2.5 py-1.5 text-center text-[11px] leading-4 text-black/55 shadow-none dark:border-white/12 dark:bg-[#161a20] dark:text-white/60";
 
 export function AppTooltip({
   children,

@@ -103,7 +103,7 @@ function sourceSummary(inputSource: "upload" | "paste" | "mixed" | null) {
 }
 
 const GENERATE_WORKSPACE_BUTTON_CLASS =
-  "h-10 border border-black/10 bg-white px-4 text-sm font-semibold text-foreground transition hover:border-black/20 hover:bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.05]";
+  "h-10 border border-black/10 bg-white px-4 text-sm font-semibold text-foreground transition hover:border-black/20 hover:bg-black/[0.02] hover:text-foreground dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/20 dark:hover:bg-white/[0.05] dark:hover:text-foreground";
 
 function pendingSourceSummary(files: SelectedFileMeta[], pastedText: string) {
   const hasText = pastedText.trim().length > 0;

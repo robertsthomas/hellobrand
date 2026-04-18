@@ -131,6 +131,7 @@ export interface BriefData {
   agencyContactTitle?: string | null;
   agencyContactEmail?: string | null;
   agencyContactPhone?: string | null;
+  generatedSummary?: GeneratedBrief | null;
   sourceDocumentIds: string[];
 }
 

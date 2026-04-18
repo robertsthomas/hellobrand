@@ -928,6 +928,15 @@ export class PrismaRepository {
         });
       }
 
+      if (normalized.summaryType !== null) {
+        await tx.summary.deleteMany({
+          where: {
+            dealId,
+            summaryType: normalized.summaryType,
+          },
+        });
+      }
+
       return tx.summary.create({
         data: {
           dealId,
@@ -963,8 +972,8 @@ export class PrismaRepository {
     return getLatestSummaryByTypeFromHistory(history, summaryType);
   }
 
-  async restoreSummary(dealId: string, summaryId: string) {
-    const restored = await prisma.$transaction(async (tx) => {
+  async setCurrentSummary(dealId: string, summaryId: string) {
+    const current = await prisma.$transaction(async (tx) => {
       const existing = await tx.summary.findFirst({
         where: {
           id: summaryId,
@@ -997,7 +1006,7 @@ export class PrismaRepository {
       });
     });
 
-    return restored ? toSummaryRecord(restored) : null;
+    return current ? toSummaryRecord(current) : null;
   }
 
   async createJob(job: Omit<JobRecord, "id" | "createdAt" | "updatedAt">) {

@@ -2,7 +2,7 @@ export { reprocessDocumentAction } from "@/app/server-actions/deal-actions";expo
 export { confirmTermsReviewAction } from "@/app/server-actions/deal-actions";
 export { saveDealNotesAction } from "@/app/server-actions/deal-actions";
 export { activateSummaryVariantAction } from "@/app/server-actions/deal-actions";
-export { restoreSummaryVersionAction } from "@/app/server-actions/deal-actions";export { deleteWorkspaceConfirmedAction } from "@/app/server-actions/deal-actions";
+export { deleteWorkspaceConfirmedAction } from "@/app/server-actions/deal-actions";
 export { archiveDealAction } from "@/app/server-actions/deal-actions";
 export { unarchiveDealAction } from "@/app/server-actions/deal-actions";
 export { applyPendingChangesAction } from "@/app/server-actions/deal-actions";

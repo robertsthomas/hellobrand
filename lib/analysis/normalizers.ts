@@ -10,6 +10,7 @@ import type {
   DealTermsRecord,
   DisclosureObligation,
   FieldEvidence,
+  GeneratedBrief,
   GeneratedBriefSection,
   RiskFlagRecord
 } from "@/lib/types";
@@ -258,7 +259,26 @@ function emptyBriefData(): BriefData {
     reportingRequirements: null,
     campaignNotes: null,
     doNotMention: [],
+    generatedSummary: null,
     sourceDocumentIds: []
+  };
+}
+
+function asGeneratedBrief(value: unknown): GeneratedBrief | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  const sections = normalizeBriefSections(row.sections);
+  if (sections.length === 0) {
+    return null;
+  }
+
+  return {
+    sections,
+    generatedAt: asString(row.generatedAt) ?? new Date(0).toISOString(),
+    modelVersion: asString(row.modelVersion) ?? "saved"
   };
 }
 
@@ -501,7 +521,9 @@ function normalizeBriefData(
       asString(nested?.agencyContactPhone) ??
       topLevelValue.agencyContactPhone ??
       fallbackBriefData?.agencyContactPhone ??
-      null
+      null,
+    generatedSummary:
+      asGeneratedBrief(nested?.generatedSummary) ?? fallbackBriefData?.generatedSummary ?? null
   };
 
   const base = fallbackBriefData ?? emptyBriefData();
@@ -695,7 +717,12 @@ export function buildBriefContext(aggregate: import("@/lib/types").DealAggregate
     exclusivityDuration: terms?.exclusivityDuration,
     exclusivityCategory: terms?.exclusivityCategory,
     campaignDateWindow: terms?.campaignDateWindow,
-    briefData: terms?.briefData,
+    briefData: terms?.briefData
+      ? {
+          ...terms.briefData,
+          generatedSummary: undefined
+        }
+      : null,
     riskFlags: riskFlags.map((f) => ({
       category: f.category,
       title: f.title,

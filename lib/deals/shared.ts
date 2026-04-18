@@ -230,6 +230,7 @@ function mergeBriefData(
     agencyContactTitle: patch.agencyContactTitle ?? base.agencyContactTitle,
     agencyContactEmail: patch.agencyContactEmail ?? base.agencyContactEmail,
     agencyContactPhone: patch.agencyContactPhone ?? base.agencyContactPhone,
+    generatedSummary: patch.generatedSummary ?? base.generatedSummary ?? null,
     sourceDocumentIds: Array.from(new Set([...base.sourceDocumentIds, ...patch.sourceDocumentIds]))
   };
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, LoaderCircle, MessageSquareText, Plus } from "lucide-react";
+import { FileText, LoaderCircle } from "lucide-react";
 import { usePostHog } from "posthog-js/react";
 
 import { reprocessDocumentAction } from "@/app/actions";
@@ -13,8 +13,6 @@ import { cn, humanizeToken } from "@/lib/utils";
 import { captureAppEvent } from "@/lib/posthog/events";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-
-type UploadMode = "upload" | "paste";
 
 // fallow-ignore-next-line complexity
 export function UploadContractForm({
@@ -31,7 +29,6 @@ export function UploadContractForm({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const router = useRouter();
   const posthog = usePostHog();
-  const [mode, setMode] = useState<UploadMode>("upload");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -76,7 +73,7 @@ export function UploadContractForm({
 
     captureAppEvent(
       posthog,
-      mode === "upload" ? "workspace_documents_submitted" : "workspace_pasted_context_submitted",
+      selectedFiles.length > 0 ? "workspace_documents_submitted" : "workspace_pasted_context_submitted",
       {
         surface: "deal_upload_form",
         dealId,
@@ -119,146 +116,91 @@ export function UploadContractForm({
     >
       <input type="hidden" name="dealId" value={dealId} />
 
-      <div className="flex flex-col gap-4 border-b border-black/8 pb-5 dark:border-white/10 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className="text-[28px] font-semibold tracking-[-0.04em] text-foreground">
-            Add documents
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
-            Attach another file or paste more context for this workspace.
+      <div className="border-b border-black/8 pb-5 dark:border-white/10">
+        <h2 className="text-[28px] font-semibold tracking-[-0.04em] text-foreground">
+          Add documents
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-black/60 dark:text-white/65">
+          Attach another file or paste more context for this workspace.
+        </p>
+      </div>
+
+      <div className="space-y-5 pt-5">
+        <div className="space-y-3">
+          <input
+            ref={fileInputRef}
+            className="hidden"
+            type="file"
+            name="documents"
+            multiple
+            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
+          />
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              if (isSubmitting) return;
+              captureAppEvent(posthog, "workspace_file_picker_clicked", {
+                surface: "deal_upload_form",
+                mode: "upload",
+              });
+              fileInputRef.current?.click();
+            }}
+            onKeyDown={(event) => {
+              if (isSubmitting) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 border border-dashed border-black/12 p-4 transition hover:border-black/20 hover:bg-black/[0.01] dark:border-white/12 dark:hover:border-white/20 dark:hover:bg-white/[0.02]",
+              selectedFiles.length > 0 && "border-solid border-black/10 bg-black/[0.015] dark:border-white/10 dark:bg-white/[0.02]"
+            )}
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/8 text-black/55 dark:border-white/10 dark:text-white/60">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">{selectedFilesLabel}</p>
+              <p className="text-xs text-black/45 dark:text-white/45">
+                PDFs, DOCX, and TXT · click to browse
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Textarea
+            name="pastedText"
+            className="min-h-28 rounded-none border-black/10 px-4 py-4 text-sm dark:border-white/12"
+            placeholder="Or paste an email thread, contract excerpt, brief, or other plain-text context."
+            disabled={isSubmitting}
+          />
+          <p className="text-xs text-black/45 dark:text-white/45">
+            Plain text works best. The content will be attached to this workspace only.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end">
           <button
-            type="button"
-            onClick={() => {
-              captureAppEvent(posthog, "workspace_source_mode_selected", {
-                mode: "upload",
-                surface: "deal_upload_form",
-              });
-              setMode("upload");
-            }}
-            className={cn(
-              "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
-              mode === "upload"
-                ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
-                : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"
-            )}
+            type="submit"
+            aria-busy={isSubmitting || undefined}
+            disabled={isSubmitting}
+            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" />
-            Add documents
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              captureAppEvent(posthog, "workspace_source_mode_selected", {
-                mode: "paste",
-                surface: "deal_upload_form",
-              });
-              setMode("paste");
-            }}
-            className={cn(
-              "inline-flex min-h-[44px] items-center gap-2 border px-3 py-2 text-sm transition",
-              mode === "paste"
-                ? "border-black/15 bg-black/5 text-foreground dark:border-white/15 dark:bg-white/[0.06]"
-                : "border-black/8 text-black/55 hover:border-black/12 hover:text-foreground dark:border-white/10 dark:text-white/60 dark:hover:text-white"
+            {isSubmitting ? (
+              <>
+                <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
+                Adding to workspace...
+              </>
+            ) : (
+              "Add to workspace"
             )}
-          >
-            <MessageSquareText className="h-4 w-4" />
-            Paste content
           </button>
         </div>
-      </div>
-
-      <div className="pt-5">
-        {mode === "upload" ? (
-          <div className="space-y-4">
-            <input
-              ref={fileInputRef}
-              className="hidden"
-              type="file"
-              name="documents"
-              multiple
-              accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
-              onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
-            />
-
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center border border-black/8 text-black/55 dark:border-white/10 dark:text-white/60">
-                  <FileText className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{selectedFilesLabel}</p>
-                  <p className="text-xs text-black/45 dark:text-white/45">
-                    PDFs, DOCX, and TXT work best.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => {
-                    captureAppEvent(posthog, "workspace_file_picker_clicked", {
-                      surface: "deal_upload_form",
-                      mode,
-                    });
-                    fileInputRef.current?.click();
-                  }}
-                  className="text-sm font-medium text-foreground underline underline-offset-4"
-                >
-                  Choose files
-                </button>
-                <button
-                  type="submit"
-                  aria-busy={isSubmitting || undefined}
-                  disabled={isSubmitting}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
-                      Adding to workspace...
-                    </>
-                  ) : (
-                    "Add to workspace"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <Textarea
-              name="pastedText"
-              className="min-h-36 rounded-none border-black/10 px-4 py-4 text-sm dark:border-white/12"
-              placeholder="Paste an email thread, contract excerpt, brief, or other plain-text context."
-            />
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-black/45 dark:text-white/45">
-                Plain text works best here. The content will be attached to this workspace only.
-              </p>
-              <button
-                type="submit"
-                aria-busy={isSubmitting || undefined}
-                disabled={isSubmitting}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-[background-color,color,border-color,box-shadow,transform] duration-200 hover:bg-primary/94 hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
-                    Adding to workspace...
-                  </>
-                ) : (
-                  "Add to workspace"
-                )}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {latestDocument ? (
