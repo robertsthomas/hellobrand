@@ -195,37 +195,62 @@ export async function runIncrementalEmailSync(
 }
 
 export async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
-  if (hasInngestEventKey()) {
-    try {
-      await inngest.send({ name, data });
-      return { mode: "inngest" as const };
-    } catch {
-      // fall through to local execution
+  if (!hasInngestEventKey()) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`Inngest email processing is required but INNGEST_EVENT_KEY is not configured for ${name}.`);
     }
+
+    if (name === "email/account.initial_sync.requested") {
+      await syncEmailAccount(String(data.accountId), {
+        mode: "initial",
+        recentLimit:
+          typeof data.recentLimit === "number" ? data.recentLimit : undefined
+      });
+    } else if (name === "email/account.incremental_sync.requested") {
+      await runIncrementalEmailSync([
+        {
+          accountId: String(data.accountId),
+          gmailHistoryId:
+            typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
+          outlookMessageIds: Array.isArray(data.outlookMessageIds)
+            ? data.outlookMessageIds.filter(
+                (entry): entry is string => typeof entry === "string"
+              )
+            : []
+        }
+      ]);
+    }
+
+    return { mode: "local" as const };
   }
 
-  if (name === "email/account.initial_sync.requested") {
-    await syncEmailAccount(String(data.accountId), {
-      mode: "initial",
-      recentLimit:
-        typeof data.recentLimit === "number" ? data.recentLimit : undefined
+  if (hasInngestEventKey()) {
+    const accountId = String(data.accountId ?? "");
+    const gmailHistoryId =
+      typeof data.gmailHistoryId === "string" ? data.gmailHistoryId.trim() : "";
+    const outlookMessageIds = Array.isArray(data.outlookMessageIds)
+      ? data.outlookMessageIds
+          .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+          .sort()
+      : [];
+    const eventIdParts = [name, accountId];
+
+    if (gmailHistoryId) {
+      eventIdParts.push(gmailHistoryId);
+    }
+
+    if (outlookMessageIds.length > 0) {
+      eventIdParts.push(outlookMessageIds.join(","));
+    }
+
+    await inngest.send({
+      id: eventIdParts.filter(Boolean).join(":"),
+      name,
+      data
     });
-  } else if (name === "email/account.incremental_sync.requested") {
-    await runIncrementalEmailSync([
-      {
-        accountId: String(data.accountId),
-        gmailHistoryId:
-          typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
-        outlookMessageIds: Array.isArray(data.outlookMessageIds)
-          ? data.outlookMessageIds.filter(
-              (entry): entry is string => typeof entry === "string"
-            )
-          : []
-      }
-    ]);
-  }
 
-  return { mode: "local" as const };
+    return { mode: "inngest" as const };
+  }
 }
 
 // fallow-ignore-next-line complexity

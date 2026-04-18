@@ -3,6 +3,7 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { maintenanceMode } from "./flags";
 import { routing } from "./i18n/routing";
 
 const handleI18nRouting = createMiddleware(routing);
@@ -12,8 +13,8 @@ const appRoutePattern = /^\/app(?:\/.*)?$/;
 const localeRoutePattern = new RegExp(`^\\/(?:${localeAlternation})(?:\\/.*)?$`);
 const localizedAppRoutePattern = new RegExp(`^\\/((?:${localeAlternation}))\\/app(?:\\/(.*))?$`);
 
-function isMaintenanceModeEnabled() {
-  return process.env.MAINTENANCE_MODE?.trim().toLowerCase() === "true";
+async function isMaintenanceModeEnabled() {
+  return (await maintenanceMode()) === true;
 }
 
 function shouldHandleI18n(pathname: string) {
@@ -89,10 +90,10 @@ function isMaintenanceAllowedPath(pathname: string) {
   );
 }
 
-export default clerkMiddleware((auth, request: NextRequest) => {
+export default clerkMiddleware(async (auth, request: NextRequest) => {
   const { pathname } = request.nextUrl;
 
-  if (isMaintenanceModeEnabled() && !isMaintenanceAllowedPath(pathname)) {
+  if ((await isMaintenanceModeEnabled()) && !isMaintenanceAllowedPath(pathname)) {
     // Block API routes with 503 during maintenance
     if (pathname.startsWith("/api")) {
       return NextResponse.json(

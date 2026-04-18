@@ -1,8 +1,11 @@
 import { inngest } from "@/lib/inngest/client";
 
 export const notificationEmailSendFunction = inngest.createFunction(
-  { id: "notification-email-send" },
-  { event: "notification/email.send.requested" },
+  {
+    id: "notification-email-send",
+    idempotency: "event.data.appNotificationId",
+    triggers: [{ event: "notification/email.send.requested" }],
+  },
   async ({ event, step }) => {
     const appNotificationId = String(event.data.appNotificationId ?? "");
     const eventType = String(event.data.eventType ?? "");
@@ -58,27 +61,39 @@ export const notificationEmailSendFunction = inngest.createFunction(
 );
 
 export const workspaceReminderSweepFunction = inngest.createFunction(
-  { id: "workspace-reminder-sweep" },
-  { cron: "0 10 * * *" },
-  async () => {
-    const { sendPendingWorkspaceReminders } = await import("@/lib/notification-email");
-    const result = await sendPendingWorkspaceReminders();
+  {
+    id: "workspace-reminder-sweep",
+    triggers: [{ cron: "0 10 * * *" }],
+  },
+  async ({ step }) => {
+    const result = await step.run("send-pending-workspace-reminders", async () => {
+      const { sendPendingWorkspaceReminders } = await import("@/lib/notification-email");
+      return sendPendingWorkspaceReminders();
+    });
 
     return { ok: true, ...result };
   }
 );
 
 export const invoiceReminderSweepFunction = inngest.createFunction(
-  { id: "invoice-reminder-sweep" },
-  { cron: "0 9 * * *" },
-  async () => {
-    const { invoiceRemindersEnabled } = await import("@/flags");
-    if ((await invoiceRemindersEnabled()) !== true) {
+  {
+    id: "invoice-reminder-sweep",
+    triggers: [{ cron: "0 9 * * *" }],
+  },
+  async ({ step }) => {
+    const isEnabled = await step.run("check-invoice-reminders-flag", async () => {
+      const { invoiceRemindersEnabled } = await import("@/flags");
+      return invoiceRemindersEnabled();
+    });
+
+    if (isEnabled !== true) {
       return { ok: true, processedDeals: 0, notified: 0 };
     }
 
-    const { runInvoiceReminderSweep } = await import("@/lib/invoices");
-    const result = await runInvoiceReminderSweep();
+    const result = await step.run("run-invoice-reminder-sweep", async () => {
+      const { runInvoiceReminderSweep } = await import("@/lib/invoices");
+      return runInvoiceReminderSweep();
+    });
 
     return {
       ok: true,
@@ -88,22 +103,30 @@ export const invoiceReminderSweepFunction = inngest.createFunction(
 );
 
 export const workspaceNudgeSweepFunction = inngest.createFunction(
-  { id: "workspace-nudge-sweep" },
-  { cron: "0 11 * * *" },
-  async () => {
-    const { runWorkspaceNudgeSweep } = await import("@/lib/notification-service");
-    const result = await runWorkspaceNudgeSweep();
+  {
+    id: "workspace-nudge-sweep",
+    triggers: [{ cron: "0 11 * * *" }],
+  },
+  async ({ step }) => {
+    const result = await step.run("run-workspace-nudge-sweep", async () => {
+      const { runWorkspaceNudgeSweep } = await import("@/lib/notification-service");
+      return runWorkspaceNudgeSweep();
+    });
 
     return { ok: true, ...result };
   }
 );
 
 export const noDocumentsUploadedSweepFunction = inngest.createFunction(
-  { id: "no-documents-uploaded-sweep" },
-  { cron: "*/15 * * * *" },
-  async () => {
-    const { runNoDocumentsUploadedSweep } = await import("@/lib/notification-service");
-    const result = await runNoDocumentsUploadedSweep();
+  {
+    id: "no-documents-uploaded-sweep",
+    triggers: [{ cron: "*/15 * * * *" }],
+  },
+  async ({ step }) => {
+    const result = await step.run("run-no-documents-uploaded-sweep", async () => {
+      const { runNoDocumentsUploadedSweep } = await import("@/lib/notification-service");
+      return runNoDocumentsUploadedSweep();
+    });
 
     return { ok: true, ...result };
   }

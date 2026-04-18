@@ -26,6 +26,7 @@ import { PublicFunnelLink } from "@/components/public-funnel-link";
 import { HeroTabRail } from "@/components/hero-tab-rail";
 import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
+import { maintenanceMode } from "@/flags";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 const DocumentScanShowcase = dynamic(() =>
@@ -54,8 +55,8 @@ export function generateMetadata(): Metadata {
   };
 }
 
-function isMaintenanceModeEnabled() {
-  return process.env.MAINTENANCE_MODE?.trim().toLowerCase() === "true";
+async function isMaintenanceModeEnabled() {
+  return (await maintenanceMode()) === true;
 }
 
 export default async function LandingPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -69,7 +70,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
     redirect("/app");
   }
 
-  if (isMaintenanceModeEnabled()) {
+  if (await isMaintenanceModeEnabled()) {
     return <MaintenancePage />;
   }
 

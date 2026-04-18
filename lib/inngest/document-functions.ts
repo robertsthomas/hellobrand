@@ -4,6 +4,7 @@ export const documentProcessingFunction = inngest.createFunction(
   {
     id: "document-processing",
     concurrency: 3,
+    idempotency: "event.data.runId",
     retries: 2,
     singleton: {
       key: "event.data.documentId",
@@ -13,6 +14,7 @@ export const documentProcessingFunction = inngest.createFunction(
       limit: 10,
       period: "1m"
     },
+    triggers: [{ event: "document/process.requested" }],
     onFailure: async ({ event, error }) => {
       const payload = event.data as { documentId?: string; runId?: string } | undefined;
       const documentId = String(payload?.documentId ?? "");
@@ -36,7 +38,6 @@ export const documentProcessingFunction = inngest.createFunction(
       return { ok: false, documentId, runId };
     }
   },
-  { event: "document/process.requested" },
   async ({ event, step }) => {
     const documentId = String(event.data.documentId ?? "");
     const runId = String(event.data.runId ?? "");

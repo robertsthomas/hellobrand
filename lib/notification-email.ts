@@ -672,6 +672,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
 
   if (hasInngestEventKey()) {
     await inngest.send({
+      id: `notification-email-send-requested-${appNotificationId}`,
       name: "notification/email.send.requested",
       data: { appNotificationId, eventType: notification.eventType },
     });

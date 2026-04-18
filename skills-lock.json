@@ -46,6 +46,11 @@
       "sourceType": "github",
       "computedHash": "1f6f4adee0b964e8344c0baef46b4e303ab3ba20932907bcbb1444ba7b3273b2"
     },
+    "doppler-secret-validation": {
+      "source": "terrylica/cc-skills",
+      "sourceType": "github",
+      "computedHash": "678136e0e89e9befc3f38911aa9647c5bab29197d9464dc5b00d32433b3c57dd"
+    },
     "email-best-practices": {
       "source": "resend/email-best-practices",
       "sourceType": "github",

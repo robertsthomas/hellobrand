@@ -128,6 +128,7 @@ describe("enqueueDocumentProcessing", () => {
     });
 
     expect(inngestSendMock).toHaveBeenCalledWith({
+      id: expect.stringMatching(/^document-process-requested-/),
       name: "document/process.requested",
       data: {
         documentId: "doc-1",

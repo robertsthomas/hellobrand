@@ -97,6 +97,7 @@ export async function enqueueDocumentProcessing(documentId: string) {
   try {
     const { inngest } = await import("@/lib/inngest/client");
     await inngest.send({
+      id: `document-process-requested-${startedRun.runId}`,
       name: "document/process.requested",
       data: { documentId, runId: startedRun.runId }
     });
