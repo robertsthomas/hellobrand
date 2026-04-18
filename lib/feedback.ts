@@ -1,5 +1,3 @@
-import { Resend } from "resend";
-
 import { getProfileForViewer } from "@/lib/profile";
 import { getAppBaseUrl } from "@/lib/email/config";
 import {
@@ -9,6 +7,7 @@ import {
 import { captureHandledError } from "@/lib/monitoring/sentry";
 import { capturePostHogServerEvent } from "@/lib/posthog/server";
 import { prisma } from "@/lib/prisma";
+import { createResendClient } from "@/lib/resend-client";
 import type { Viewer } from "@/lib/types";
 
 const SUPPORT_EMAIL = "support@hellobrand.com";
@@ -104,7 +103,7 @@ async function sendFeedbackEmail(input: {
     return { messageId: null, sentAt: null } satisfies SendEmailResult;
   }
 
-  const resend = new Resend(config.apiKey);
+  const resend = await createResendClient(config.apiKey);
   const response = await resend.emails.send({
     from: config.fromEmail,
     to: [input.to],

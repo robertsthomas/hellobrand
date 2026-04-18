@@ -59,7 +59,7 @@ doppler secrets upload .env --project hellobrand --config dev
 7. Optional for Azure Document Intelligence-backed text extraction, set:
    - `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`
    - `AZURE_DOCUMENT_INTELLIGENCE_API_KEY`
-   - optional `AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID` (defaults to `prebuilt-layout`)
+   - optional `AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID` (defaults to `prebuilt-read`)
    - optional `AZURE_DOCUMENT_INTELLIGENCE_API_VERSION` (defaults to `2024-11-30`)
    When configured, HelloBrand uses Azure for PDF and DOCX text/layout extraction before falling back to local parsers.
 8. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.

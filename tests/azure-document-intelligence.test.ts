@@ -71,8 +71,8 @@ describe("azure document intelligence", () => {
     pollUntilDoneMock.mockResolvedValue({
       body: {
         analyzeResult: {
-          modelId: "prebuilt-layout",
-          contentFormat: "markdown",
+          modelId: "prebuilt-read",
+          contentFormat: "text",
           content: "# Contract\n\nPayment terms Net 30",
           pages: [{ pageNumber: 1 }, { pageNumber: 2 }],
         },
@@ -89,16 +89,17 @@ describe("azure document intelligence", () => {
       { key: "test-key" },
       { apiVersion: "2024-11-30" }
     );
-    expect(pathMock).toHaveBeenCalledWith("/documentModels/{modelId}:analyze", "prebuilt-layout");
+    expect(pathMock).toHaveBeenCalledWith("/documentModels/{modelId}:analyze", "prebuilt-read");
     expect(postMock).toHaveBeenCalledWith(
       expect.objectContaining({
         contentType: "application/json",
         body: { base64Source: Buffer.from("hello").toString("base64") },
+        queryParameters: { locale: "en-US" },
       })
     );
     expect(getLongRunningPollerMock).toHaveBeenCalledWith({ path: pathMock }, initialResponse);
     expect(result.fullText).toContain("Payment terms Net 30");
     expect(result.pageCount).toBe(2);
-    expect(result.modelId).toBe("prebuilt-layout");
+    expect(result.modelId).toBe("prebuilt-read");
   });
 });

@@ -1,7 +1,6 @@
-import { Resend } from "resend";
-
 import { buildEmailSubscriptionHeaders } from "@/lib/email-subscriptions";
 import { getNotificationEmailConfig } from "@/lib/notification-email";
+import { createResendClient } from "@/lib/resend-client";
 
 export async function sendWaitlistConfirmationEmail(email: string) {
   const config = getNotificationEmailConfig();
@@ -10,7 +9,7 @@ export async function sendWaitlistConfirmationEmail(email: string) {
     return null;
   }
 
-  const resend = new Resend(config.apiKey);
+  const resend = await createResendClient(config.apiKey);
   const { headers, unsubscribeUrl } = buildEmailSubscriptionHeaders({
     email,
     category: "product_updates"

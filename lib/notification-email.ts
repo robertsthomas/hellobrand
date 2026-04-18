@@ -1,11 +1,10 @@
-import { Resend } from "resend";
-
 import { getAppSettings } from "@/lib/admin-settings";
 import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
 import { emailDeliveryEnabled } from "@/flags";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { inngest } from "@/lib/inngest/client";
 import { prisma } from "@/lib/prisma";
+import { createResendClient } from "@/lib/resend-client";
 
 type NotificationEmailStatus = "pending" | "sent" | "failed" | "skipped";
 
@@ -618,7 +617,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     return delivery;
   }
 
-  const resend = new Resend(config.apiKey);
+  const resend = await createResendClient(config.apiKey);
   const email = buildNotificationEmailPayload({
     eventType: notification.eventType,
     title: notification.title,

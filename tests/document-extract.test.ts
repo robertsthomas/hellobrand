@@ -24,8 +24,8 @@ describe("extractDocumentText", () => {
       fullText: "Northstar Skin agreement\nPayment terms Net 30\nUsage rights limited.\n".repeat(4),
       pageCount: 3,
       rawResponse: { status: "succeeded" },
-      contentFormat: "markdown",
-      modelId: "prebuilt-layout",
+      contentFormat: "text",
+      modelId: "prebuilt-read",
     });
 
     const result = await extractDocumentText(
@@ -38,7 +38,7 @@ describe("extractDocumentText", () => {
       bytes: Buffer.from("fake-pdf"),
       mimeType: "application/pdf",
     });
-    expect(result._debug?.parser).toBe("azure-document-intelligence:prebuilt-layout");
+    expect(result._debug?.parser).toBe("azure-document-intelligence:prebuilt-read");
     expect(result.normalizedText).toContain("Northstar Skin agreement");
   });
 

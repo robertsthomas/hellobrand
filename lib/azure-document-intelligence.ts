@@ -4,7 +4,7 @@ import DocumentIntelligence, {
 } from "@azure-rest/ai-document-intelligence";
 
 const DEFAULT_API_VERSION = "2024-11-30";
-const DEFAULT_MODEL_ID = "prebuilt-layout";
+const DEFAULT_MODEL_ID = "prebuilt-read";
 const DEFAULT_LOCALE = "en-US";
 
 type AzureAnalyzeResult = {
