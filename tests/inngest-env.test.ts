@@ -5,14 +5,12 @@ import {
   shouldIgnoreInngestUrlOverride,
 } from "@/lib/inngest/env";
 
-const originalNodeEnv = process.env.NODE_ENV;
-
 beforeEach(() => {
-  process.env.NODE_ENV = originalNodeEnv;
+  vi.unstubAllEnvs();
 });
 
 afterEach(() => {
-  process.env.NODE_ENV = originalNodeEnv;
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 

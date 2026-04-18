@@ -14,8 +14,8 @@ type DiagnosticLogInput = {
 const loggedServices = new Set<string>();
 
 export function shouldLogNetworkDiagnostics(
-  nodeEnv = process.env.NODE_ENV,
-  vercelEnv = process.env.VERCEL_ENV
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+  vercelEnv: string | undefined = process.env.VERCEL_ENV
 ) {
   if (vercelEnv === "production" || vercelEnv === "preview") {
     return true;
