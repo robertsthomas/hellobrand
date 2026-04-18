@@ -2,14 +2,7 @@ import { BadgeCheck } from "lucide-react";
 
 import { AssistantTriggerButton } from "@/components/assistant-trigger-button";
 import type { DisclosureObligation } from "@/lib/types";
-
-function stripMarkup(text: string) {
-  return text
-    .replace(/<[^>]*>/g, "")
-    .replace(/\*{1,2}([^*]*)\*{1,2}/g, "$1")
-    .replace(/_{1,2}([^_]*)_{1,2}/g, "$1")
-    .replace(/`([^`]*)`/g, "$1");
-}
+import { sanitizePlainTextInput } from "@/lib/utils";
 
 export function DisclosureObligations({
   obligations,
@@ -54,13 +47,15 @@ export function DisclosureObligations({
                 <BadgeCheck className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-sm font-semibold text-ink">{stripMarkup(obligation.title)}</div>
+                <div className="text-sm font-semibold text-ink">
+                  {sanitizePlainTextInput(obligation.title)}
+                </div>
                 <p className="mt-1 text-sm text-black/60 dark:text-white/65">
-                  {stripMarkup(obligation.detail)}
+                  {sanitizePlainTextInput(obligation.detail)}
                 </p>
                 {obligation.source ? (
                   <p className="mt-2 text-xs text-black/45 dark:text-white/45">
-                    {stripMarkup(obligation.source)}
+                    {sanitizePlainTextInput(obligation.source)}
                   </p>
                 ) : null}
               </div>

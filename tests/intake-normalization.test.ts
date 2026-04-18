@@ -651,6 +651,80 @@ describe("intake normalization", () => {
     expect(normalized?.contractTitle).not.toBe("NimbusPM - Campaign");
   });
 
+  test("does not keep a generic brand and creator subject as the contract title", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "neutrogena-partnership.msg",
+        documentKind: "email_thread",
+        normalizedText: `
+          Subject: neutrogena creator
+          Brand: Neutrogena
+          Deliverables: 1 Instagram Reel
+        `,
+        rawText: `
+          Subject: neutrogena creator
+          Brand: Neutrogena
+          Deliverables: 1 Instagram Reel
+        `,
+      },
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "Neutrogena",
+      agencyName: null,
+      campaignName: null,
+      deliverables: [
+        {
+          id: "deliverable-1",
+          title: "Instagram Reel",
+          dueDate: null,
+          channel: "Instagram",
+          quantity: 1,
+          status: "pending",
+        },
+      ],
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.contractTitle).toBe("Neutrogena Instagram Reel Partnership");
+  });
+
+  test("capitalizes lowercase brand names and strips creator from contract titles", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "dove-unilever-email.msg",
+        documentKind: "email_thread",
+        normalizedText: `
+          Subject: dove unilever creator
+          Brand: dove unilever
+        `,
+        rawText: `
+          Subject: dove unilever creator
+          Brand: dove unilever
+        `,
+      },
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      brandName: "dove unilever",
+      agencyName: null,
+      campaignName: null,
+      deliverables: [],
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.brandName).toBe("Dove Unilever");
+    expect(normalized?.contractTitle).toBe("Dove Unilever");
+  });
+
   test("filters boilerplate contract delivery clauses out of timeline items", () => {
     const aggregate = createAggregate();
     aggregate.documents = [
@@ -699,6 +773,94 @@ describe("intake normalization", () => {
       "6/18",
       "07/08",
     ]);
+  });
+
+  test("sanitizes extracted timeline source text before it reaches the review UI", () => {
+    const aggregate = createAggregate();
+    aggregate.documents = [
+      {
+        ...aggregate.documents[0],
+        fileName: "timeline-table.html",
+        documentKind: "deliverables_brief",
+        normalizedText: `
+          <td>First Draft Content Submission</td> <td>July 10, 2026</td>
+          <td>Content Live</td> <td>July 21, 2026</td>
+          <td>Concept Submission</td> <td>July 3, 2026</td>
+        `,
+        rawText: `
+          <td>First Draft Content Submission</td> <td>July 10, 2026</td>
+          <td>Content Live</td> <td>July 21, 2026</td>
+          <td>Concept Submission</td> <td>July 3, 2026</td>
+        `,
+      },
+    ];
+    aggregate.latestDocument = aggregate.documents[0];
+    aggregate.terms = {
+      ...aggregate.terms!,
+      deliverables: [],
+    };
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.timelineItems.map((item) => item.source)).toEqual([
+      "First Draft Content Submission July 10",
+      "Content Live July 21",
+      "Concept Submission July 3",
+    ]);
+  });
+
+  test("sanitizes persisted intake text fields before display", () => {
+    const aggregate = createAggregate();
+    aggregate.summaries = [
+      {
+        ...aggregate.summaries[0],
+        id: "persisted-sanitized-intake",
+        version: INTAKE_NORMALIZED_VERSION,
+        body: JSON.stringify({
+          timelineItems: [
+            {
+              id: "timeline-1",
+              label: "<strong>Draft due</strong>",
+              date: "07/10/2026",
+              source: "<td>First Draft Content Submission</td> <td>July 10</td>",
+              status: "scheduled",
+            },
+          ],
+          disclosureObligations: [
+            {
+              id: "disclosure-1",
+              title: "<strong>FTC disclosure required</strong>",
+              detail: "<td>Include #ad in caption</td>",
+              source: "<td>Section 4</td>",
+            },
+          ],
+          analytics: {
+            highlights: ["<strong>42%</strong> watched full video"],
+          },
+          competitorCategories: ["<td>Beauty</td>"],
+          restrictedCategories: ["<td>Skincare</td>"],
+          campaignDateWindow: {
+            startDate: "2026-07-03",
+            endDate: "2026-07-21",
+            postingWindow: "<td>July 3</td> to <td>July 21</td>",
+          },
+          notes: "<strong>Creator</strong> note",
+        }),
+      },
+    ];
+
+    const normalized = buildNormalizedIntakeRecord(aggregate);
+
+    expect(normalized?.timelineItems[0]?.label).toBe("Draft due");
+    expect(normalized?.timelineItems[0]?.source).toBe("First Draft Content Submission July 10");
+    expect(normalized?.disclosureObligations[0]?.title).toBe("FTC disclosure required");
+    expect(normalized?.disclosureObligations[0]?.detail).toBe("Include #ad in caption");
+    expect(normalized?.disclosureObligations[0]?.source).toBe("Section 4");
+    expect(normalized?.analytics?.highlights).toEqual(["42% watched full video"]);
+    expect(normalized?.competitorCategories).toEqual(["Beauty"]);
+    expect(normalized?.restrictedCategories).toEqual(["Skincare"]);
+    expect(normalized?.campaignDateWindow?.postingWindow).toBe("July 3 to July 21");
+    expect(normalized?.notes).toBe("Creator note");
   });
 
   test("does not treat contract agency text as analytics", () => {

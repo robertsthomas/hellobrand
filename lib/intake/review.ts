@@ -244,7 +244,22 @@ export async function confirmIntakeSessionForViewer(
       profile?.creatorLegalName?.trim() ??
       profile?.displayName?.trim() ??
       viewer.displayName,
-    notes: input.notes?.trim() || aggregate.terms?.notes || null
+    notes: input.notes?.trim() || aggregate.terms?.notes || null,
+    manuallyEditedFields: [
+      "brandName",
+      "campaignName",
+      "agencyName",
+      "paymentAmount",
+      "currency",
+      "deliverables",
+      "brandCategory",
+      "competitorCategories",
+      "restrictedCategories",
+      "campaignDateWindow",
+      "disclosureObligations",
+      "notes",
+    ],
+    pendingExtraction: null
   });
 
   const contractSummary =

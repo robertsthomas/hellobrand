@@ -32,7 +32,8 @@ export async function updateTermsForViewer(
   const changedFields = detectChangedFields(existing, patch);
   const nextManualEdits = Array.from(new Set([
     ...(aggregate.terms?.manuallyEditedFields ?? []),
-    ...changedFields
+    ...changedFields,
+    ...(patch.manuallyEditedFields ?? [])
   ]));
 
   const nextTerms = mergeTerms(
@@ -40,6 +41,9 @@ export async function updateTermsForViewer(
     { ...patch, manuallyEditedFields: nextManualEdits }
   );
   nextTerms.manuallyEditedFields = nextManualEdits;
+  if ("pendingExtraction" in patch) {
+    nextTerms.pendingExtraction = patch.pendingExtraction ?? null;
+  }
   const terms = await getRepository().upsertTerms(dealId, nextTerms);
   if (process.env.DATABASE_URL) {
     await syncPaymentRecordForDeal(dealId, nextTerms);

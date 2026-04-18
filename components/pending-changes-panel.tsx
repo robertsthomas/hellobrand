@@ -7,8 +7,9 @@ import {
   applyPendingChangesAction,
   dismissPendingChangesAction
 } from "@/app/actions";
+import { dealCategoryLabel, normalizeDealCategory } from "@/lib/conflict-categories";
 import type { PendingChangesSummary, TermsDiffEntry } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, humanizeToken, sanitizePlainTextInput } from "@/lib/utils";
 
 type ChangePriority = "critical" | "standard";
 
@@ -22,6 +23,7 @@ const FIELD_METADATA: Record<
   brandName: { label: "Brand name", priority: "standard" },
   campaignName: { label: "Campaign name", priority: "standard" },
   brandCategory: { label: "Brand category", priority: "standard" },
+  campaignDateWindow: { label: "Campaign date window", priority: "standard" },
   deliverables: { label: "Deliverables", priority: "critical" },
   usageChannels: { label: "Usage channels", priority: "critical" },
   restrictedCategories: { label: "Restricted categories", priority: "critical" },
@@ -50,29 +52,166 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function stripMarkup(text: string) {
-  return text
-    .replace(/<[^>]*>/g, "")
-    .replace(/#{1,6}\s*/g, "")
-    .replace(/\*{1,2}([^*]*)\*{1,2}/g, "$1")
-    .replace(/_{1,2}([^_]*)_{1,2}/g, "$1")
-    .replace(/`([^`]*)`/g, "$1");
+function formatDateLabel(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return trimmed;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(parsed);
 }
 
-// fallow-ignore-next-line complexity
-function formatValue(value: unknown): string {
+function formatCategoryValue(value: unknown) {
+  if (typeof value !== "string") {
+    return "Not set";
+  }
+
+  return dealCategoryLabel(normalizeDealCategory(value)) ?? humanizeToken(value) ?? "Not set";
+}
+
+function formatCampaignDateWindowValue(
+  value: unknown,
+  expanded: boolean
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (typeof value === "string") {
+      return sanitizePlainTextInput(value).trim() || "Not set";
+    }
+    return value === null || value === undefined ? "Not set" : String(value);
+  }
+
+  const window = value as {
+    startDate?: string | null;
+    endDate?: string | null;
+    postingWindow?: string | null;
+  };
+
+  const postingWindow = sanitizePlainTextInput(window.postingWindow);
+  const startDate = formatDateLabel(window.startDate);
+  const endDate = formatDateLabel(window.endDate);
+
+  if (!expanded) {
+    return (
+      postingWindow ||
+      (startDate && endDate ? `${startDate} to ${endDate}` : startDate || endDate || "Not set")
+    );
+  }
+
+  const lines = [
+    postingWindow ? `Posting window: ${postingWindow}` : null,
+    startDate ? `Start date: ${startDate}` : null,
+    endDate ? `End date: ${endDate}` : null
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return lines.join("\n") || "Not set";
+}
+
+function formatDeliverableLine(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return sanitizePlainTextInput(String(value));
+  }
+
+  const item = value as {
+    title?: string | null;
+    channel?: string | null;
+    quantity?: number | null;
+    dueDate?: string | null;
+    description?: string | null;
+  };
+
+  const parts = [
+    sanitizePlainTextInput(item.title),
+    typeof item.quantity === "number" ? `Qty ${item.quantity}` : null,
+    item.channel ? sanitizePlainTextInput(item.channel) : null,
+    item.dueDate ? `Due ${formatDateLabel(item.dueDate) ?? item.dueDate}` : null,
+    item.description ? sanitizePlainTextInput(item.description) : null
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return parts.join(" | ");
+}
+
+function formatArrayValue(value: unknown, expanded: boolean) {
+  if (!Array.isArray(value)) {
+    return "Not set";
+  }
+
+  if (value.length === 0) {
+    return "None";
+  }
+
+  if (!expanded) {
+    if (typeof value[0] === "string") {
+      return value.map((entry) => sanitizePlainTextInput(String(entry))).join(", ");
+    }
+    return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  }
+
+  if (typeof value[0] === "string") {
+    return value.map((entry) => sanitizePlainTextInput(String(entry))).join("\n");
+  }
+
+  return value
+    .map((entry, index) => `${index + 1}. ${formatDeliverableLine(entry)}`)
+    .join("\n");
+}
+
+function formatObjectValue(value: unknown, expanded: boolean) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "Not set";
+  }
+
+  const entries = Object.entries(value).filter(([, entry]) => entry !== null && entry !== undefined);
+  if (entries.length === 0) {
+    return "Not set";
+  }
+
+  if (!expanded) {
+    return `${entries.length} field${entries.length === 1 ? "" : "s"}`;
+  }
+
+  return entries
+    .map(([key, entry]) => {
+      const rendered =
+        typeof entry === "string" ? sanitizePlainTextInput(entry) : JSON.stringify(entry);
+      return `${humanizeToken(key)}: ${rendered}`;
+    })
+    .join("\n");
+}
+
+function formatValueForDisplay(
+  entry: Pick<TermsDiffEntry, "field">,
+  value: unknown,
+  expanded = false
+): string {
+  if (entry.field === "brandCategory") {
+    return formatCategoryValue(value);
+  }
+
+  if (entry.field === "campaignDateWindow") {
+    return formatCampaignDateWindowValue(value, expanded);
+  }
+
   if (value === null || value === undefined) return "Not set";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") {
     return Math.abs(value) >= 1000 ? formatCurrency(value) : String(value);
   }
-  if (typeof value === "string") return stripMarkup(value).trim() || "Not set";
-  if (Array.isArray(value)) {
-    if (value.length === 0) return "None";
-    if (typeof value[0] === "string") return value.map((v) => stripMarkup(String(v))).join(", ");
-    return `${value.length} item${value.length === 1 ? "" : "s"}`;
-  }
-  if (typeof value === "object") return JSON.stringify(value);
+  if (typeof value === "string") return sanitizePlainTextInput(value).trim() || "Not set";
+  if (Array.isArray(value)) return formatArrayValue(value, expanded);
+  if (typeof value === "object") return formatObjectValue(value, expanded);
   return String(value);
 }
 
@@ -85,10 +224,16 @@ function previewText(value: string, maxLength = 96) {
 }
 
 function shouldAllowExpansion(entry: TermsDiffEntry) {
-  const current = formatValue(entry.currentValue);
-  const proposed = formatValue(entry.proposedValue);
+  const current = formatValueForDisplay(entry, entry.currentValue, true);
+  const proposed = formatValueForDisplay(entry, entry.proposedValue, true);
 
-  return current.length > 80 || proposed.length > 120 || entry.fieldType === "json_array";
+  return (
+    current.length > 80 ||
+    proposed.length > 120 ||
+    entry.fieldType === "json_array" ||
+    (typeof entry.currentValue === "object" && entry.currentValue !== null) ||
+    (typeof entry.proposedValue === "object" && entry.proposedValue !== null)
+  );
 }
 
 function displayLabel(entry: TermsDiffEntry) {
@@ -111,8 +256,8 @@ function DiffRow({
   onToggle: (field: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const current = formatValue(entry.currentValue);
-  const proposed = formatValue(entry.proposedValue);
+  const current = formatValueForDisplay(entry, entry.currentValue, expanded);
+  const proposed = formatValueForDisplay(entry, entry.proposedValue, expanded);
   const priority = displayPriority(entry);
   const canExpand = shouldAllowExpansion(entry);
 
@@ -176,7 +321,7 @@ function DiffRow({
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Current
               </p>
-              <p className="mt-1 text-sm leading-6 text-black/45 line-through dark:text-white/45">
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-black/45 line-through dark:text-white/45">
                 {expanded ? current : previewText(current, 120)}
               </p>
             </div>
@@ -185,7 +330,7 @@ function DiffRow({
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 Suggested
               </p>
-              <p className="mt-1 text-sm font-medium leading-6 text-emerald-700 dark:text-emerald-400">
+              <p className="mt-1 whitespace-pre-wrap text-sm font-medium leading-6 text-emerald-700 dark:text-emerald-400">
                 {expanded ? proposed : previewText(proposed, 180)}
               </p>
             </div>

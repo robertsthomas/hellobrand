@@ -109,6 +109,15 @@ function isWorseIdentityValue(field: string, current: unknown, proposed: unknown
 
   if (!currentTrimmed) return false;
 
+  if (
+    currentTrimmed.toLowerCase() === proposedTrimmed.toLowerCase() &&
+    currentTrimmed !== proposedTrimmed &&
+    proposedTrimmed === proposedTrimmed.toLowerCase() &&
+    currentTrimmed !== currentTrimmed.toLowerCase()
+  ) {
+    return true;
+  }
+
   // Proposed is a generic placeholder (exact match)
   if (GENERIC_VALUES.has(proposedTrimmed.toLowerCase())) return true;
 

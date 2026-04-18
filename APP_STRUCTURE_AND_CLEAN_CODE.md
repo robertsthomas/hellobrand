@@ -327,6 +327,40 @@ Examples:
 - `app/actions.ts` can remain a barrel if the real logic lives elsewhere.
 - Re-exporting is fine when it reduces churn for import sites.
 
+## Dead Code and Analyzer Hygiene
+
+Dead code should be removed, not normalized into the repo.
+
+Use this order of operations when cleanup tooling such as `fallow` reports problems:
+
+1. delete unreachable files
+2. remove unused exports, imports, and types
+3. remove dependencies that no longer have live imports
+4. refactor real complexity hotspots when the file is still active
+5. add a targeted suppression or config exception only when the pattern is intentional
+
+Rules:
+
+- If a file is not imported by any reachable entry point and is not a known runtime entry file, delete it.
+- If a symbol is exported but nothing imports it, remove the export unless it is intentionally part of a stable public surface.
+- If removing dead files leaves packages unused in `package.json`, remove those packages in the same cleanup.
+- Do not keep old UI components, abandoned dialogs, unused shadcn wrappers, or one-off migration helpers "just in case."
+- If a file is a real runtime/config/script entry point that static analysis cannot see, document that explicitly and suppress at the file level instead of deleting it.
+
+Acceptable exceptions:
+
+- thin facade modules that intentionally preserve a stable import path
+- repository or adapter patterns that static analysis undercounts
+- known circular-dependency reports that are accepted temporarily during an incremental refactor
+- config files and scripts that are executed by tooling rather than imported through the app graph
+
+Exception rules:
+
+- Prefer one explicit repo-level config rule over many noisy inline comments when the exception is architectural and repeated.
+- Prefer inline suppression only when the exception is narrow and local.
+- Every suppression should be treated as debt unless the guide explicitly blesses the pattern.
+- If a suppression becomes stale, remove it immediately.
+
 ## Naming Rules
 
 Use file names to describe the job, not the implementation detail.

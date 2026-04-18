@@ -12,7 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export function CreatorProfileSetupDialog({
   email,
   initialName,
   initialHandle,
-  configured
+  configured,
 }: {
   email: string;
   initialName: string;
@@ -48,7 +48,9 @@ export function CreatorProfileSetupDialog({
           className={cn(
             buttonVariants({
               variant: configured ? "outline" : "default",
-              className: configured ? "" : "bg-ocean text-white hover:bg-ocean/90"
+              className: configured
+                ? "rounded-none self-center"
+                : "rounded-none bg-ocean text-white hover:bg-ocean/90",
             })
           )}
         >
@@ -60,9 +62,7 @@ export function CreatorProfileSetupDialog({
           action={(formData) => {
             startTransition(async () => {
               const creatorName = String(formData.get("creatorLegalName") ?? "").trim();
-              const creatorHandle = normalizeHandle(
-                String(formData.get("businessName") ?? "")
-              );
+              const creatorHandle = normalizeHandle(String(formData.get("businessName") ?? ""));
 
               formData.set("creatorLegalName", creatorName);
               formData.set("businessName", creatorHandle);
@@ -80,8 +80,8 @@ export function CreatorProfileSetupDialog({
               Setup creator profile
             </DialogTitle>
             <DialogDescription className="text-sm leading-6 text-black/60 dark:text-white/65">
-              Save your name and handle so HelloBrand can prefill creator defaults in
-              intake and partnership workspaces.
+              Save your name and handle so HelloBrand can prefill creator defaults in intake and
+              partnership workspaces.
             </DialogDescription>
           </DialogHeader>
 
@@ -105,8 +105,7 @@ export function CreatorProfileSetupDialog({
                 placeholder="@therobertscasa"
               />
               <span className="text-xs font-normal text-black/50 dark:text-white/50">
-                We&apos;ll use your handle as the business fallback for intake and deal
-                defaults.
+                We&apos;ll use your handle as the business fallback for intake and deal defaults.
               </span>
             </label>
 
@@ -125,7 +124,7 @@ export function CreatorProfileSetupDialog({
               disabled={isPending}
               className={cn(
                 buttonVariants({
-                  className: "w-full bg-ocean text-white hover:bg-ocean/90"
+                  className: "w-full bg-ocean text-white hover:bg-ocean/90",
                 }),
                 isPending ? "cursor-not-allowed opacity-60" : ""
               )}

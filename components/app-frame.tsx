@@ -7,9 +7,8 @@
 import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePanelRef } from "react-resizable-panels";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bot, ChevronRight, Hand, Menu, MessageSquareMore, Search } from "lucide-react";
 
@@ -20,6 +19,7 @@ import { AssistantProvider, useAssistant } from "@/components/assistant-provider
 import { GuideProvider } from "@/components/guide-provider";
 import { GuideMobileModal } from "@/components/guide-mobile-modal";
 import { GuideTooltip } from "@/components/guide-tooltip";
+import { ThemeSwitch } from "@/components/theme-switch";
 import type { ProductGuideState } from "@/lib/types";
 import type { NotificationItem } from "@/lib/notifications";
 
@@ -29,14 +29,24 @@ const NotificationsCenter = lazy(() =>
   }))
 );
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { ThemeSwitch } from "@/components/theme-switch";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import {
   getAppRouteMeta,
   localizeAppHref,
@@ -66,7 +76,7 @@ function MobileAssistantButton({ onClick }: { onClick?: () => void }) {
         onClick?.();
         openAssistant();
       }}
-      className="group flex h-10 w-full items-center gap-3 px-3 text-[13px] font-medium transition-colors hover:bg-secondary/35 lg:hidden"
+      className="group flex h-10 w-full items-center gap-3 px-3 text-sm font-medium transition-colors hover:bg-secondary/35 lg:hidden"
     >
       <span className="assistant-shimmer inline-flex shrink-0 items-center gap-3 bg-gradient-to-r from-[#1a4d3e] via-[#81b29a] to-[#1a4d3e] bg-[length:200%_100%] bg-clip-text text-transparent dark:from-[#81b29a] dark:via-[#d4e7dc] dark:to-[#81b29a]">
         <Bot className="h-4.5 w-4.5 shrink-0 stroke-[#1a4d3e] dark:stroke-[#81b29a]" />
@@ -117,8 +127,6 @@ export function AppFrame({
   const router = useRouter();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLDivElement | null>(null);
-  const sidebarPanelRef = usePanelRef();
-  const desktopSidebarHeaderRef = useRef<HTMLDivElement | null>(null);
   const { signOut } = useClerk();
   const t = useTranslations("appShell");
 
@@ -126,22 +134,18 @@ export function AppFrame({
   const normalizedPathname = useMemo(() => normalizeAppPathname(pathname), [pathname]);
   const [sidebarQuery, setSidebarQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("sidebar_collapsed") === "true";
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("sidebar_collapsed") !== "true";
   });
-  const [hideDesktopWordmark, setHideDesktopWordmark] = useState(false);
   const [guideOpenedMobileMenu, setGuideOpenedMobileMenu] = useState(false);
   const [feedbackOpenRequestKey, setFeedbackOpenRequestKey] = useState(0);
 
-  const toggleSidebar = useCallback(() => {
-    const panel = sidebarPanelRef.current;
-    if (!panel) return;
-    if (panel.isCollapsed()) {
-      panel.expand();
-    } else {
-      panel.collapse();
-    }
+  const handleSidebarOpenChange = useCallback((nextOpen: boolean) => {
+    setSidebarOpen(nextOpen);
+    try {
+      localStorage.setItem("sidebar_collapsed", String(!nextOpen));
+    } catch {}
   }, []);
   const isInboxRoute = normalizedPathname === "/app/inbox";
   const hasVisibleSidebarMilestones = sidebarMilestones?.visible === true;
@@ -249,35 +253,6 @@ export function AppFrame({
     };
   }, []);
 
-  useEffect(() => {
-    const element = desktopSidebarHeaderRef.current;
-    if (!element) {
-      return;
-    }
-
-    const updateWordmarkVisibility = (width: number) => {
-      setHideDesktopWordmark(width < 165);
-    };
-
-    updateWordmarkVisibility(element.getBoundingClientRect().width);
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) {
-        return;
-      }
-
-      updateWordmarkVisibility(entry.contentRect.width);
-    });
-
-    observer.observe(element);
-
-    return () => observer.disconnect();
-  }, [sidebarCollapsed]);
-
-  const compactDesktopBrand = sidebarCollapsed || hideDesktopWordmark;
-  const compactDesktopSidebar = sidebarCollapsed || hideDesktopWordmark;
-
   const handleSidebarSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -348,66 +323,81 @@ export function AppFrame({
     const guideId = `sidebar-${item.labelKey.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`;
 
     return (
-      <div key={item.href}>
-        <Link
-          href={localizeHref(item.href)}
-          prefetch={false}
-          data-guide={guideId}
-          title={options?.collapsed ? itemLabel : undefined}
-          onClick={options?.onClick}
+      <SidebarMenuItem key={item.href}>
+        <SidebarMenuButton
+          asChild
+          isActive={active}
+          tooltip={itemLabel}
           className={cn(
-            "group flex h-10 w-full items-center gap-3 text-[13px] font-medium transition-colors outline-none focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
+            "h-10 rounded-none text-sm font-medium shadow-none ring-0 focus-visible:ring-0",
             options?.collapsed ? "justify-center px-0" : "px-3",
             active
               ? "bg-secondary/55 text-foreground"
               : "text-muted-foreground hover:bg-secondary/35 hover:text-foreground"
           )}
         >
-          <Icon
-            className={cn(
-              options?.collapsed ? "h-5.5 w-5.5" : "h-6.5 w-6.5",
-              "shrink-0",
-              active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-            )}
-          />
-          {options?.collapsed ? null : <span className="truncate">{itemLabel}</span>}
-        </Link>
-        {!options?.collapsed && active && sidebarSubItem?.parentHref === item.href ? (
           <Link
-            href={localizeHref(sidebarSubItem.href)}
+            href={localizeHref(item.href)}
             prefetch={false}
+            data-guide={guideId}
             onClick={options?.onClick}
-            className="ml-9 mt-1 flex h-9 items-center border-l border-black/10 pl-3 text-[13px] font-medium text-foreground dark:border-white/10"
           >
-            <span className="truncate">{sidebarSubItem.label}</span>
+            <Icon
+              className={cn(
+                options?.collapsed ? "h-5.5 w-5.5" : "h-6.5 w-6.5",
+                "shrink-0",
+                active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+              )}
+            />
+            {options?.collapsed ? null : <span>{itemLabel}</span>}
           </Link>
+        </SidebarMenuButton>
+        {!options?.collapsed && active && sidebarSubItem?.parentHref === item.href ? (
+          <SidebarMenuSub className="mt-1 border-black/10 dark:border-white/10">
+            <SidebarMenuSubItem>
+              <SidebarMenuSubButton
+                asChild
+                isActive
+                className="h-9 rounded-none pl-3 text-sm font-medium text-foreground"
+              >
+                <Link
+                  href={localizeHref(sidebarSubItem.href)}
+                  prefetch={false}
+                  onClick={options?.onClick}
+                >
+                  <span>{sidebarSubItem.label}</span>
+                </Link>
+              </SidebarMenuSubButton>
+            </SidebarMenuSubItem>
+          </SidebarMenuSub>
         ) : null}
-      </div>
+      </SidebarMenuItem>
     );
   };
 
   const renderFeedbackItem = (options?: { onClick?: () => void; collapsed?: boolean }) =>
     hasVisibleSidebarMilestones ? null : (
-      <button
-        type="button"
-        title={options?.collapsed ? t("feedback") : undefined}
-        onClick={() => {
-          setFeedbackOpenRequestKey((current) => current + 1);
-          options?.onClick?.();
-        }}
-        className={cn(
-          "group flex h-10 w-full items-center gap-3 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-secondary/35 hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/40 focus-visible:ring-[3px]",
-          options?.collapsed ? "justify-center px-0" : "px-3"
-        )}
-      >
-        <MessageSquareMore
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          tooltip={t("feedback")}
+          onClick={() => {
+            setFeedbackOpenRequestKey((current) => current + 1);
+            options?.onClick?.();
+          }}
           className={cn(
-            options?.collapsed ? "h-4 w-4" : "h-4.5 w-4.5",
-            "shrink-0 text-muted-foreground group-hover:text-foreground"
+            "h-10 rounded-none text-sm font-medium text-muted-foreground shadow-none ring-0 hover:bg-secondary/35 hover:text-foreground focus-visible:ring-0",
+            options?.collapsed ? "justify-center px-0" : "px-3"
           )}
-        />
-        {options?.collapsed ? null : <span className="truncate">{t("feedback")}</span>}
-      </button>
+        >
+          <MessageSquareMore
+            className={cn(
+              options?.collapsed ? "h-4 w-4" : "h-4.5 w-4.5",
+              "shrink-0 text-muted-foreground group-hover:text-foreground"
+            )}
+          />
+          {options?.collapsed ? null : <span>{t("feedback")}</span>}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     );
 
   const renderSidebarMilestones = (options?: { onNavigate?: () => void }) =>
@@ -432,114 +422,6 @@ export function AppFrame({
         </GuideProvider>
       )
     : (content: ReactNode) => content;
-
-  const renderSheet = () => (
-    <Sheet open={mobileMenuOpen} onOpenChange={handleMobileMenuOpenChange}>
-      <SheetContent
-        side="left"
-        className="w-64 p-0 pt-[env(safe-area-inset-top)] dark:bg-[#121419]"
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <SheetHeader className="sr-only">
-          <SheetTitle>{t("navigationMenuTitle")}</SheetTitle>
-          <SheetDescription>{t("navigationMenuDescription")}</SheetDescription>
-        </SheetHeader>
-        <div className="flex h-[72px] items-center justify-between border-b border-border px-7 dark:border-white/8">
-          <Link
-            href={localizeHref("/app")}
-            prefetch={false}
-            className="group flex items-center gap-3"
-            onClick={() => handleMobileMenuOpenChange(false)}
-          >
-            <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-              <Hand className="hello-hand-wave h-5 w-5 rotate-[18deg]" strokeWidth={2.15} />
-            </div>
-            <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
-              HelloBrand
-            </div>
-          </Link>
-        </div>
-        <div className="border-b border-border px-5 py-5 dark:border-white/8">
-          <form
-            onSubmit={(e) => {
-              handleSidebarSearch(e);
-              handleMobileMenuOpenChange(false);
-            }}
-            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 focus-within:ring-2 focus-within:ring-ring/30 dark:border-white/10 dark:bg-white/[0.04]"
-          >
-            <Search className="h-4 w-4 shrink-0" />
-            <input
-              type="search"
-              value={sidebarQuery}
-              onChange={(event) => setSidebarQuery(event.target.value)}
-              placeholder={t("searchPlaceholder")}
-              aria-label={t("searchAriaLabel")}
-              className="min-w-0 flex-1 self-center appearance-none border-0 bg-transparent p-0 leading-none text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
-            />
-          </form>
-        </div>
-        <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
-          <div>
-            <div className="mb-4 px-2 pt-5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                {t("sections.workspace")}
-              </p>
-            </div>
-            <nav aria-label={t("mobileNavigationAriaLabel")} className="space-y-1">
-              {primaryAppNavItems.map((item) =>
-                renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
-              )}
-            </nav>
-            <div className="mb-4 mt-8 px-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                {t("sections.preferences")}
-              </p>
-            </div>
-            <div className="space-y-1">
-              {secondaryAppNavItems.map((item) =>
-                renderNavItem(item, { onClick: () => handleMobileMenuOpenChange(false) })
-              )}
-              <MobileAssistantButton onClick={() => handleMobileMenuOpenChange(false)} />
-            </div>
-            {renderSidebarMilestones({ onNavigate: () => handleMobileMenuOpenChange(false) })}
-          </div>
-          <div className="mt-auto pt-4">
-            {renderFeedbackItem({ onClick: () => handleMobileMenuOpenChange(false) })}
-          </div>
-        </div>
-        <div className="border-t border-border px-5 py-5 dark:border-white/8">
-          <div className="space-y-3">
-            <PostHogActionLink
-              href={localizeHref("/app/intake/new")}
-              prefetch={false}
-              eventName="workspace_entry_cta_clicked"
-              payload={{ source: "sidebar_mobile" }}
-              data-guide="sidebar-new-workspace"
-              onClick={() => handleMobileMenuOpenChange(false)}
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "h-11 w-full justify-between rounded-none px-4"
-              )}
-            >
-              <span>{t("newWorkspace")}</span>
-            </PostHogActionLink>
-            <button
-              type="button"
-              onClick={() => {
-                handleMobileMenuOpenChange(false);
-                signOut({ redirectUrl: "/login" });
-              }}
-              className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
-            >
-              {t("logOut")}
-            </button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
 
   const renderHeader = () => (
     <header className="fixed inset-x-0 top-0 z-30 border-b border-border bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/90 lg:absolute dark:border-white/8 dark:bg-[#111318]/95 dark:supports-[backdrop-filter]:bg-[#111318]/90">
@@ -608,176 +490,191 @@ export function AppFrame({
     </>
   );
 
-  const renderDesktopSidebar = () => (
-    <>
-      <div
-        ref={desktopSidebarHeaderRef}
-        className={cn(
-          "flex h-[72px] items-center",
-          compactDesktopBrand ? "justify-center px-0" : "justify-between px-7"
-        )}
+  const SidebarStateSync = () => {
+    const { openMobile, setOpenMobile } = useSidebar();
+
+    useEffect(() => {
+      if (openMobile !== mobileMenuOpen) {
+        setOpenMobile(mobileMenuOpen);
+      }
+    }, [mobileMenuOpen, openMobile, setOpenMobile]);
+
+    useEffect(() => {
+      handleMobileMenuOpenChange(openMobile);
+    }, [handleMobileMenuOpenChange, openMobile]);
+
+    return null;
+  };
+
+  const AppSidebarContainer = () => {
+    const { isMobile, state } = useSidebar();
+    const compactSidebar = !isMobile && state === "collapsed";
+    const navigationLabel = t(isMobile ? "mobileNavigationAriaLabel" : "mainNavigationAriaLabel");
+    const closeSidebar = isMobile ? () => handleMobileMenuOpenChange(false) : undefined;
+
+    return (
+      <Sidebar
+        collapsible="icon"
+        className="border-r border-border bg-white dark:border-white/10 dark:bg-[#121419]"
       >
-        <Link
-          href={localizeHref("/app")}
-          prefetch={false}
-          className={cn("group flex items-center", compactDesktopBrand ? "gap-0" : "gap-3")}
-        >
+        <SidebarHeader className="gap-0 p-0 pt-[env(safe-area-inset-top)] lg:pt-0">
           <div
             className={cn(
-              "flex items-center justify-center bg-primary text-primary-foreground",
-              compactDesktopBrand ? "h-8 w-8" : "h-10 w-10"
+              "flex h-[72px] items-center",
+              compactSidebar ? "justify-center px-0" : "justify-between px-7"
             )}
           >
-            <Hand
-              className={cn(
-                "hello-hand-wave rotate-[18deg]",
-                compactDesktopBrand ? "h-4 w-4" : "h-5 w-5"
+            <Link
+              href={localizeHref("/app")}
+              prefetch={false}
+              className={cn("group flex items-center", compactSidebar ? "gap-0" : "gap-3")}
+              onClick={closeSidebar}
+            >
+              <div
+                className={cn(
+                  "flex items-center justify-center bg-primary text-primary-foreground",
+                  compactSidebar ? "h-8 w-8" : "h-10 w-10"
+                )}
+              >
+                <Hand
+                  className={cn(
+                    "hello-hand-wave rotate-[18deg]",
+                    compactSidebar ? "h-4 w-4" : "h-5 w-5"
+                  )}
+                  strokeWidth={2.15}
+                />
+              </div>
+              {compactSidebar ? null : (
+                <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
+                  HelloBrand
+                </div>
               )}
-              strokeWidth={2.15}
-            />
+            </Link>
           </div>
-          {compactDesktopBrand ? null : (
-            <div className="text-[1.625rem] font-bold tracking-[-0.05em] text-foreground">
-              HelloBrand
+          {compactSidebar ? null : (
+            <div className="border-b border-border px-5 py-5 dark:border-white/8">
+              <form
+                onSubmit={(event) => {
+                  handleSidebarSearch(event);
+                  closeSidebar?.();
+                }}
+                className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 focus-within:ring-2 focus-within:ring-ring/30 dark:border-white/10 dark:bg-white/[0.04]"
+              >
+                <Search className="h-4 w-4 shrink-0" />
+                <SidebarInput
+                  type="search"
+                  value={sidebarQuery}
+                  onChange={(event) => setSidebarQuery(event.target.value)}
+                  placeholder="Search"
+                  aria-label={t("searchAriaLabel")}
+                  className="h-auto min-w-0 flex-1 rounded-none border-0 bg-transparent p-0 text-sm text-foreground shadow-none ring-0 placeholder:text-muted-foreground focus-visible:ring-0"
+                />
+              </form>
             </div>
           )}
-        </Link>
-      </div>
-      {sidebarCollapsed ? null : (
-        <div className="border-b border-border px-5 py-5 dark:border-white/8">
-          <form
-            onSubmit={handleSidebarSearch}
-            className="flex h-10 items-center gap-3 border border-border bg-secondary/35 px-3 focus-within:ring-2 focus-within:ring-ring/30 dark:border-white/10 dark:bg-white/[0.04]"
-          >
-            <Search className="h-4 w-4 shrink-0" />
-            <input
-              type="search"
-              value={sidebarQuery}
-              onChange={(event) => setSidebarQuery(event.target.value)}
-              placeholder={compactDesktopSidebar ? "" : t("searchPlaceholder")}
-              aria-label={t("searchAriaLabel")}
-              className="min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[13px] text-foreground shadow-none outline-none ring-0 placeholder:text-muted-foreground focus:border-0 focus:outline-none focus:ring-0"
-            />
-          </form>
-        </div>
-      )}
-      <div className="flex flex-1 flex-col overflow-auto px-3 pb-4">
-        <div>
-          {compactDesktopSidebar ? null : (
-            <div className="mb-4 px-2 pt-5">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+        </SidebarHeader>
+        <SidebarContent className="gap-0 px-3 pb-4">
+          <SidebarGroup className="gap-0 p-0">
+            {compactSidebar ? null : (
+              <SidebarGroupLabel className="mb-4 px-2 pt-5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {t("sections.workspace")}
-              </p>
-            </div>
-          )}
-          <nav
-            aria-label={t("mainNavigationAriaLabel")}
-            className={cn("space-y-1", compactDesktopSidebar ? "pt-5" : "")}
-          >
-            {primaryAppNavItems.map((item) =>
-              renderNavItem(item, { collapsed: compactDesktopSidebar })
+              </SidebarGroupLabel>
             )}
-          </nav>
-          {compactDesktopSidebar ? null : (
-            <div className="mb-4 mt-8 px-2">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <SidebarGroupContent>
+              <SidebarMenu
+                aria-label={navigationLabel}
+                className={cn("gap-1", compactSidebar ? "pt-5" : "")}
+              >
+                {primaryAppNavItems.map((item) =>
+                  renderNavItem(item, {
+                    collapsed: compactSidebar,
+                    onClick: closeSidebar,
+                  })
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup className="gap-0 p-0">
+            {compactSidebar ? null : (
+              <SidebarGroupLabel className="mb-4 mt-8 px-2 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                 {t("sections.preferences")}
-              </p>
-            </div>
-          )}
-          <div className={cn("space-y-1", compactDesktopSidebar ? "mt-4" : "")}>
-            {secondaryAppNavItems.map((item) =>
-              renderNavItem(item, { collapsed: compactDesktopSidebar })
+              </SidebarGroupLabel>
             )}
+            <SidebarGroupContent>
+              <SidebarMenu className={cn("gap-1", compactSidebar ? "mt-4" : "")}>
+                {secondaryAppNavItems.map((item) =>
+                  renderNavItem(item, {
+                    collapsed: compactSidebar,
+                    onClick: closeSidebar,
+                  })
+                )}
+              </SidebarMenu>
+              {isMobile ? <MobileAssistantButton onClick={closeSidebar} /> : null}
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {compactSidebar ? null : renderSidebarMilestones({ onNavigate: closeSidebar })}
+          <div className="mt-auto pt-4">
+            <SidebarMenu>
+              {renderFeedbackItem({ collapsed: compactSidebar, onClick: closeSidebar })}
+            </SidebarMenu>
           </div>
-          {compactDesktopSidebar ? null : renderSidebarMilestones()}
-        </div>
-        <div className="mt-auto pt-4">
-          {renderFeedbackItem({ collapsed: compactDesktopSidebar })}
-        </div>
-      </div>
-      <div className="border-t border-border px-5 py-5 dark:border-white/8">
-        <div className="space-y-3">
-          {sidebarCollapsed ? null : (
-            <>
+        </SidebarContent>
+        <SidebarFooter className="gap-0 border-t border-border px-5 py-5 dark:border-white/8">
+          {compactSidebar ? null : (
+            <div className="space-y-3">
               <PostHogActionLink
                 href={localizeHref("/app/intake/new")}
                 prefetch={false}
                 eventName="workspace_entry_cta_clicked"
-                payload={{ source: "sidebar_desktop" }}
+                payload={{ source: isMobile ? "sidebar_mobile" : "sidebar_desktop" }}
                 data-guide="sidebar-new-workspace"
+                onClick={closeSidebar}
                 className={cn(
                   buttonVariants({ size: "sm" }),
-                  "h-11 w-full justify-between rounded-none px-4"
+                  "h-11 w-full justify-center rounded-none px-4 text-sm"
                 )}
               >
                 <span>{t("newWorkspace")}</span>
               </PostHogActionLink>
               <button
                 type="button"
-                onClick={() => signOut({ redirectUrl: "/login" })}
-                className="text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
+                onClick={() => {
+                  closeSidebar?.();
+                  signOut({ redirectUrl: "/login" });
+                }}
+                className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
               >
                 {t("logOut")}
               </button>
-            </>
+            </div>
           )}
-        </div>
-      </div>
-    </>
-  );
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+    );
+  };
 
   return (
     <AssistantProvider>
       {guideWrapper(
-        <div className="h-dvh min-h-dvh overflow-hidden bg-white dark:bg-[#0f1115]">
-          <div className="flex h-full min-h-0 flex-col overflow-hidden lg:hidden dark:bg-[#0f1115]">
-            {renderSheet()}
+        <SidebarProvider
+          open={sidebarOpen}
+          onOpenChange={handleSidebarOpenChange}
+          className="h-dvh min-h-dvh overflow-hidden bg-white dark:bg-[#0f1115]"
+          style={
+            {
+              "--sidebar-width": "14rem",
+              "--sidebar-width-icon": "3.5rem",
+            } as CSSProperties
+          }
+        >
+          <SidebarStateSync />
+          <AppSidebarContainer />
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
             {renderHeader()}
             {renderMain(children)}
           </div>
-          <ResizablePanelGroup
-            orientation="horizontal"
-            onLayoutChanged={(layout) => {
-              const sidebarSize = layout["sidebar"];
-              if (sidebarSize == null) return;
-              if (sidebarSize < 10) {
-                sidebarPanelRef.current?.collapse();
-              } else if (!sidebarCollapsed) {
-                sidebarPanelRef.current?.resize("14%");
-              }
-            }}
-            className="hidden h-full min-h-0 overflow-hidden lg:flex dark:bg-[#0f1115]"
-          >
-            <ResizablePanel
-              panelRef={sidebarPanelRef}
-              id="sidebar"
-              defaultSize={sidebarCollapsed ? "6%" : "14%"}
-              minSize="6%"
-              maxSize="14%"
-              collapsible
-              collapsedSize="6%"
-              onResize={(size) => {
-                const isNowCollapsed = sidebarPanelRef.current?.isCollapsed?.() ?? false;
-                if (isNowCollapsed !== sidebarCollapsed) {
-                  setSidebarCollapsed(isNowCollapsed);
-                  try {
-                    localStorage.setItem("sidebar_collapsed", String(isNowCollapsed));
-                  } catch {}
-                }
-              }}
-              className="flex h-full flex-col border-r border-border bg-white dark:border-white/10 dark:bg-[#121419]"
-            >
-              {renderDesktopSidebar()}
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel className="relative flex min-h-0 min-w-0 flex-col bg-white dark:bg-[#111318]">
-              {renderSheet()}
-              {renderHeader()}
-              {renderMain(children)}
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+        </SidebarProvider>
       )}
     </AssistantProvider>
   );

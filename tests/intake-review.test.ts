@@ -1,17 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const prismaMock = {
-  intakeSession: {
-    findFirst: vi.fn(),
-    update: vi.fn()
-  }
-};
-
-const startNextQueuedIntakeSessionForUserMock = vi.fn();
-const startQueuedIntakeSessionByIdMock = vi.fn();
-const syncIntakeSessionForDealIdMock = vi.fn();
-const emitWorkspaceNotificationForCurrentStateMock = vi.fn();
-const reprocessDocumentForViewerMock = vi.fn();
+const {
+  prismaMock,
+  startNextQueuedIntakeSessionForUserMock,
+  startQueuedIntakeSessionByIdMock,
+  syncIntakeSessionForDealIdMock,
+  emitWorkspaceNotificationForCurrentStateMock,
+  reprocessDocumentForViewerMock,
+  getDealForViewerMock,
+  updateDealForViewerMock,
+  updateTermsForViewerMock,
+  getProfileForViewerMock,
+  saveSummaryMock,
+  createPersistedIntakeRecordMock
+} = vi.hoisted(() => ({
+  prismaMock: {
+    intakeSession: {
+      findFirst: vi.fn(),
+      update: vi.fn()
+    }
+  },
+  startNextQueuedIntakeSessionForUserMock: vi.fn(),
+  startQueuedIntakeSessionByIdMock: vi.fn(),
+  syncIntakeSessionForDealIdMock: vi.fn(),
+  emitWorkspaceNotificationForCurrentStateMock: vi.fn(),
+  reprocessDocumentForViewerMock: vi.fn(),
+  getDealForViewerMock: vi.fn(),
+  updateDealForViewerMock: vi.fn(),
+  updateTermsForViewerMock: vi.fn(),
+  getProfileForViewerMock: vi.fn(),
+  saveSummaryMock: vi.fn(),
+  createPersistedIntakeRecordMock: vi.fn()
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: prismaMock
@@ -32,30 +52,31 @@ vi.mock("@/lib/notification-service", () => ({
 }));
 
 vi.mock("@/lib/deals", () => ({
-  getDealForViewer: vi.fn(),
+  getDealForViewer: getDealForViewerMock,
   reprocessDocumentForViewer: reprocessDocumentForViewerMock,
-  updateDealForViewer: vi.fn(),
-  updateTermsForViewer: vi.fn()
+  updateDealForViewer: updateDealForViewerMock,
+  updateTermsForViewer: updateTermsForViewerMock
 }));
 
 vi.mock("@/lib/profile", () => ({
-  getProfileForViewer: vi.fn()
+  getProfileForViewer: getProfileForViewerMock
 }));
 
 vi.mock("@/lib/repository", () => ({
   getRepository: vi.fn(() => ({
-    saveSummary: vi.fn()
+    saveSummary: saveSummaryMock
   }))
 }));
 
 vi.mock("@/lib/intake-normalization", () => ({
-  createPersistedIntakeRecord: vi.fn()
+  createPersistedIntakeRecord: createPersistedIntakeRecordMock
 }));
 
 import {
+  confirmIntakeSessionForViewer,
   retryIntakeSessionForViewer,
   startQueuedIntakeAnalysisForViewer
-} from "@/lib/intake";
+} from "@/lib/intake/review";
 
 describe("intake review workflows", () => {
   const viewer = {
@@ -73,6 +94,12 @@ describe("intake review workflows", () => {
     syncIntakeSessionForDealIdMock.mockReset();
     emitWorkspaceNotificationForCurrentStateMock.mockReset();
     reprocessDocumentForViewerMock.mockReset();
+    getDealForViewerMock.mockReset();
+    updateDealForViewerMock.mockReset();
+    updateTermsForViewerMock.mockReset();
+    getProfileForViewerMock.mockReset();
+    saveSummaryMock.mockReset();
+    createPersistedIntakeRecordMock.mockReset();
   });
 
   it("throws when no queued workspaces are ready to analyze", async () => {
@@ -151,5 +178,122 @@ describe("intake review workflows", () => {
       status: "processing",
       errorMessage: null
     });
+  });
+
+  it("clears pending extraction and protects intake-confirmed structured fields on confirmation", async () => {
+    prismaMock.intakeSession.findFirst.mockResolvedValue({
+      id: "session-1",
+      userId: viewer.id,
+      dealId: "deal-1",
+      status: "ready_for_confirmation",
+      completedAt: null
+    });
+    prismaMock.intakeSession.update.mockResolvedValue(null);
+    getProfileForViewerMock.mockResolvedValue(null);
+    updateDealForViewerMock.mockResolvedValue(null);
+    updateTermsForViewerMock.mockResolvedValue(null);
+    createPersistedIntakeRecordMock.mockReturnValue({ body: "{}", version: "intake-normalized:v2" });
+    saveSummaryMock.mockResolvedValue(undefined);
+    emitWorkspaceNotificationForCurrentStateMock.mockResolvedValue(undefined);
+
+    const aggregate = {
+      deal: {
+        id: "deal-1",
+        brandName: "Dove",
+        campaignName: "Dove Partnership",
+        confirmedAt: null,
+        summary: null
+      },
+      terms: {
+        brandName: "Dove",
+        agencyName: null,
+        creatorName: "Creator",
+        campaignName: "Dove Partnership",
+        paymentAmount: null,
+        currency: "USD",
+        paymentTerms: null,
+        paymentStructure: null,
+        netTermsDays: null,
+        paymentTrigger: null,
+        deliverables: [],
+        usageRights: null,
+        usageRightsOrganicAllowed: null,
+        usageRightsPaidAllowed: null,
+        whitelistingAllowed: null,
+        usageDuration: null,
+        usageTerritory: null,
+        usageChannels: [],
+        exclusivity: null,
+        exclusivityApplies: null,
+        exclusivityCategory: null,
+        exclusivityDuration: null,
+        exclusivityRestrictions: null,
+        brandCategory: null,
+        competitorCategories: [],
+        restrictedCategories: [],
+        campaignDateWindow: null,
+        disclosureObligations: [],
+        revisions: null,
+        revisionRounds: null,
+        termination: null,
+        terminationAllowed: null,
+        terminationNotice: null,
+        terminationConditions: null,
+        governingLaw: null,
+        notes: null,
+        manuallyEditedFields: [],
+        briefData: null,
+        pendingExtraction: {
+          brandCategory: "beauty_personal_care",
+          campaignDateWindow: {
+            startDate: "2026-07-03",
+            endDate: "2026-07-21",
+            postingWindow: "July 3 to July 21"
+          }
+        }
+      },
+      currentSummary: null
+    };
+    getDealForViewerMock.mockResolvedValueOnce(aggregate).mockResolvedValueOnce(aggregate);
+
+    await confirmIntakeSessionForViewer(viewer, "session-1", {
+      brandName: "Dove",
+      contractTitle: "Dove Partnership",
+      brandCategory: "beauty_personal_care",
+      campaignDateWindow: {
+        startDate: "2026-07-03",
+        endDate: "2026-07-21",
+        postingWindow: "July 3 to July 21"
+      },
+      deliverables: [],
+      timelineItems: [],
+      disclosureObligations: [],
+      competitorCategories: [],
+      restrictedCategories: [],
+      analytics: null,
+      notes: null
+    });
+
+    expect(updateTermsForViewerMock).toHaveBeenCalledWith(
+      viewer,
+      "deal-1",
+      expect.objectContaining({
+        brandCategory: "beauty_personal_care",
+        campaignDateWindow: {
+          startDate: "2026-07-03",
+          endDate: "2026-07-21",
+          postingWindow: "July 3 to July 21"
+        },
+        pendingExtraction: null,
+        manuallyEditedFields: expect.arrayContaining([
+          "deliverables",
+          "brandCategory",
+          "campaignDateWindow",
+          "disclosureObligations",
+          "competitorCategories",
+          "restrictedCategories"
+        ])
+      })
+    );
   });
 });

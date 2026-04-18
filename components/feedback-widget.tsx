@@ -33,14 +33,27 @@ const INITIAL_STATE: FeedbackActionState = {
   submissionId: null
 };
 
-const FEEDBACK_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+const FEEDBACK_SUBMISSION_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
+const FEEDBACK_NOT_NOW_SNOOZE_SEQUENCE_MS = [
+  48 * 60 * 60 * 1000,
+  10 * 24 * 60 * 60 * 1000,
+  30 * 24 * 60 * 60 * 1000,
+] as const;
 
 function getDismissStorageKey(viewerId: string) {
   return `hellobrand.feedback.dismissed.${viewerId}`;
 }
 
+function getPermanentDismissStorageKey(viewerId: string) {
+  return `hellobrand.feedback.dismissed_forever.${viewerId}`;
+}
+
 function getCooldownStorageKey(viewerId: string) {
   return `hellobrand.feedback.cooldown_until.${viewerId}`;
+}
+
+function getSnoozeCountStorageKey(viewerId: string) {
+  return `hellobrand.feedback.snooze_count.${viewerId}`;
 }
 
 function getEligibilityStorageKey(viewerId: string) {
@@ -87,6 +100,16 @@ function readActiveCooldown(viewerId: string) {
   const rawValue = window.localStorage.getItem(getCooldownStorageKey(viewerId));
   const parsed = Number(rawValue ?? "");
   return Number.isFinite(parsed) && parsed > Date.now();
+}
+
+function readPermanentDismissed(viewerId: string) {
+  return window.localStorage.getItem(getPermanentDismissStorageKey(viewerId)) === "1";
+}
+
+function readSnoozeCount(viewerId: string) {
+  const rawValue = window.localStorage.getItem(getSnoozeCountStorageKey(viewerId));
+  const parsed = Number(rawValue ?? "");
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function readOrCreateEligibilityTime(viewerId: string) {
@@ -245,21 +268,27 @@ export function FeedbackWidget({
   useEffect(() => {
     const dismissedForSession =
       window.sessionStorage.getItem(getDismissStorageKey(viewerId)) === "1";
+    const dismissedPermanently = readPermanentDismissed(viewerId);
     const hiddenForCooldown = readActiveCooldown(viewerId);
     const eligibleAt = readOrCreateEligibilityTime(viewerId);
     const hiddenForSchedule = eligibleAt > Date.now();
 
-    onDismissedChange?.(dismissedForSession);
+    onDismissedChange?.(dismissedForSession || dismissedPermanently);
 
     if (eligibilityTimerRef.current) {
       window.clearTimeout(eligibilityTimerRef.current);
       eligibilityTimerRef.current = null;
     }
 
-    if (dismissedForSession || hiddenForCooldown || hiddenForSchedule) {
+    if (dismissedForSession || dismissedPermanently || hiddenForCooldown || hiddenForSchedule) {
       setHidden(true);
 
-      if (!dismissedForSession && !hiddenForCooldown && hiddenForSchedule) {
+      if (
+        !dismissedForSession &&
+        !dismissedPermanently &&
+        !hiddenForCooldown &&
+        hiddenForSchedule
+      ) {
         eligibilityTimerRef.current = window.setTimeout(() => {
           setHidden(false);
           window.requestAnimationFrame(() => setRevealed(true));
@@ -297,9 +326,11 @@ export function FeedbackWidget({
 
     window.localStorage.setItem(
       getCooldownStorageKey(viewerId),
-      String(Date.now() + FEEDBACK_COOLDOWN_MS)
+      String(Date.now() + FEEDBACK_SUBMISSION_COOLDOWN_MS)
     );
     window.sessionStorage.removeItem(getDismissStorageKey(viewerId));
+    window.localStorage.removeItem(getPermanentDismissStorageKey(viewerId));
+    window.localStorage.removeItem(getSnoozeCountStorageKey(viewerId));
     onDismissedChange?.(false);
     setOpen(true);
 
@@ -348,6 +379,46 @@ export function FeedbackWidget({
       pageGroup,
       pageTitle,
       hasDeal: Boolean(dealId)
+    });
+  }
+
+  function snoozeFeedbackPrompt() {
+    const snoozeCount = readSnoozeCount(viewerId);
+    const snoozeMs =
+      FEEDBACK_NOT_NOW_SNOOZE_SEQUENCE_MS[snoozeCount] ??
+      FEEDBACK_NOT_NOW_SNOOZE_SEQUENCE_MS[FEEDBACK_NOT_NOW_SNOOZE_SEQUENCE_MS.length - 1];
+
+    window.localStorage.setItem(
+      getCooldownStorageKey(viewerId),
+      String(Date.now() + snoozeMs)
+    );
+    window.localStorage.setItem(getSnoozeCountStorageKey(viewerId), String(snoozeCount + 1));
+    window.sessionStorage.removeItem(getDismissStorageKey(viewerId));
+    setOpen(false);
+    setHidden(true);
+    onDismissedChange?.(true);
+    captureAppEvent(posthog, "feedback_widget_dismissed", {
+      pagePath,
+      pageGroup,
+      pageTitle,
+      hasDeal: Boolean(dealId),
+      mode: "not_now"
+    });
+  }
+
+  function dismissPermanently() {
+    window.localStorage.setItem(getPermanentDismissStorageKey(viewerId), "1");
+    window.localStorage.removeItem(getCooldownStorageKey(viewerId));
+    window.sessionStorage.removeItem(getDismissStorageKey(viewerId));
+    setOpen(false);
+    setHidden(true);
+    onDismissedChange?.(true);
+    captureAppEvent(posthog, "feedback_widget_dismissed", {
+      pagePath,
+      pageGroup,
+      pageTitle,
+      hasDeal: Boolean(dealId),
+      mode: "dont_show_again"
     });
   }
 
@@ -428,9 +499,14 @@ export function FeedbackWidget({
                 </CardContent>
                 {!isSubmitted ? (
                   <CardFooter className="justify-between border-t border-black/8 pt-3 pb-4 dark:border-white/10">
-                    <Button type="button" variant="ghost" onClick={dismissForSession}>
-                      Not now
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="ghost" onClick={snoozeFeedbackPrompt}>
+                        Not now
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={dismissPermanently}>
+                        Don&apos;t show again
+                      </Button>
+                    </div>
                     <SubmitButton
                       pendingLabel="Sending feedback..."
                       showSpinner
@@ -518,9 +594,14 @@ export function FeedbackWidget({
                   errorMessage={state.status === "error" ? state.message : null}
                 />
                 <div className="flex items-center justify-between gap-3 border-t border-black/8 pt-4 pb-1 dark:border-white/10">
-                  <Button type="button" variant="ghost" onClick={dismissForSession}>
-                    Not now
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="ghost" onClick={snoozeFeedbackPrompt}>
+                      Not now
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={dismissPermanently}>
+                      Don&apos;t show again
+                    </Button>
+                  </div>
                   <SubmitButton
                     pendingLabel="Sending feedback..."
                     showSpinner

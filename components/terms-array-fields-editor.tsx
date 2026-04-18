@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { createClientRowId } from "@/lib/row-identity";
+import { createClientRowId, dedupeRowsById } from "@/lib/row-identity";
 import type { DeliverableItem } from "@/lib/types";
 
 const ADD_BUTTON_CLASS =
@@ -75,18 +75,20 @@ function toDateValue(value: string | null | undefined) {
 }
 
 function normalizeDeliverables(items: DeliverableItem[]) {
-  return items.map((item, index) => ({
-    id: item.id || `deliverable-${index + 1}`,
-    title: sanitizeText(item.title),
-    dueDate: toDateValue(item.dueDate),
-    channel: sanitizeText(item.channel),
-    quantity:
-      item.quantity === null || item.quantity === undefined
-        ? ""
-        : String(item.quantity),
-    description: sanitizeText(item.description),
-    status: item.status ?? "pending"
-  }));
+  return dedupeRowsById(
+    items.map((item, index) => ({
+      id: item.id || `deliverable-${index + 1}`,
+      title: sanitizeText(item.title),
+      dueDate: toDateValue(item.dueDate),
+      channel: sanitizeText(item.channel),
+      quantity:
+        item.quantity === null || item.quantity === undefined
+          ? ""
+          : String(item.quantity),
+      description: sanitizeText(item.description),
+      status: item.status ?? "pending"
+    }))
+  );
 }
 
 function normalizeLines(values: string[], fallback?: string | null) {

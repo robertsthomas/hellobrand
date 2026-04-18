@@ -28,7 +28,7 @@ function joinLines(values: string[]) {
 function splitLines(value: string) {
   return value
     .split("\n")
-    .map((entry) => entry.trim())
+    .map((entry) => sanitizePlainTextInput(entry).trim())
     .filter(Boolean);
 }
 
@@ -79,13 +79,13 @@ function normalizeDeliverables(deliverables: DeliverableItem[]) {
   return dedupeRowsById(
     deliverables.map((item, index) => ({
       id: item.id || `deliverable-${index + 1}`,
-      title: item.title ?? "",
+      title: sanitizePlainTextInput(item.title),
       dueDate: toDateInputValue(item.dueDate),
-      channel: item.channel ?? "",
+      channel: sanitizePlainTextInput(item.channel),
       quantity: item.quantity,
       status: item.status ?? "pending",
       description: sanitizePlainTextInput(item.description),
-      source: item.source ?? null,
+      source: sanitizePlainTextInput(item.source) || null,
     }))
   );
 }
@@ -94,9 +94,9 @@ function normalizeTimelineItems(items: IntakeTimelineItem[]) {
   return dedupeRowsById(
     items.map((item, index) => ({
       id: item.id || `timeline-${index + 1}`,
-      label: item.label ?? "",
+      label: sanitizePlainTextInput(item.label),
       date: toDateInputValue(item.date),
-      source: item.source ?? "",
+      source: sanitizePlainTextInput(item.source),
       status: item.status ?? "unknown",
     }))
   );
@@ -106,9 +106,9 @@ function normalizeDisclosureObligations(items: DisclosureObligation[]) {
   return dedupeRowsById(
     items.map((item, index) => ({
       id: item.id || `disclosure-${index + 1}`,
-      title: item.title ?? "",
-      detail: item.detail ?? "",
-      source: item.source ?? "",
+      title: sanitizePlainTextInput(item.title),
+      detail: sanitizePlainTextInput(item.detail),
+      source: sanitizePlainTextInput(item.source),
     }))
   );
 }
@@ -136,10 +136,10 @@ export function IntakeGeneratedFieldsEditor({
 }) {
   const [brandCategory, setBrandCategory] = useState<DealCategory | "">(initialBrandCategory ?? "");
   const [competitorCategories, setCompetitorCategories] = useState(
-    joinLines(initialCompetitorCategories)
+    joinLines(initialCompetitorCategories.map((value) => sanitizePlainTextInput(value)).filter(Boolean))
   );
   const [restrictedCategories, setRestrictedCategories] = useState(
-    joinLines(initialRestrictedCategories)
+    joinLines(initialRestrictedCategories.map((value) => sanitizePlainTextInput(value)).filter(Boolean))
   );
   const [campaignDateWindow, setCampaignDateWindow] = useState({
     startDate: toDateInputValue(initialCampaignDateWindow?.startDate),
@@ -152,7 +152,11 @@ export function IntakeGeneratedFieldsEditor({
   const [deliverables, setDeliverables] = useState(normalizeDeliverables(initialDeliverables));
   const [timelineItems, setTimelineItems] = useState(normalizeTimelineItems(initialTimelineItems));
   const [analyticsHighlights, setAnalyticsHighlights] = useState(
-    joinLines(initialAnalytics?.highlights ?? [])
+    joinLines(
+      (initialAnalytics?.highlights ?? [])
+        .map((value) => sanitizePlainTextInput(value))
+        .filter(Boolean)
+    )
   );
 
   const deliverablesJson = useMemo(
@@ -161,9 +165,9 @@ export function IntakeGeneratedFieldsEditor({
         deliverables
           .map((item) => ({
             id: item.id,
-            title: item.title.trim(),
+            title: sanitizePlainTextInput(item.title).trim(),
             dueDate: item.dueDate?.trim() ? item.dueDate.trim() : null,
-            channel: item.channel?.trim() ? item.channel.trim() : null,
+            channel: item.channel?.trim() ? sanitizePlainTextInput(item.channel).trim() : null,
             quantity:
               typeof item.quantity === "number" && Number.isFinite(item.quantity)
                 ? item.quantity
@@ -172,7 +176,7 @@ export function IntakeGeneratedFieldsEditor({
             description: item.description?.trim()
               ? sanitizePlainTextInput(item.description)
               : null,
-            source: item.source,
+            source: item.source?.trim() ? sanitizePlainTextInput(item.source).trim() : null,
           }))
           .filter((item) => item.title.length > 0)
       ),
@@ -185,9 +189,9 @@ export function IntakeGeneratedFieldsEditor({
         timelineItems
           .map((item) => ({
             id: item.id,
-            label: item.label.trim(),
+            label: sanitizePlainTextInput(item.label).trim(),
             date: item.date?.trim() ? item.date.trim() : null,
-            source: item.source?.trim() ? item.source.trim() : null,
+            source: item.source?.trim() ? sanitizePlainTextInput(item.source).trim() : null,
             status: item.status,
           }))
           .filter((item) => item.label.length > 0)
@@ -201,9 +205,9 @@ export function IntakeGeneratedFieldsEditor({
         disclosureObligations
           .map((item) => ({
             id: item.id,
-            title: item.title.trim(),
-            detail: item.detail.trim(),
-            source: item.source?.trim() ? item.source.trim() : null,
+            title: sanitizePlainTextInput(item.title).trim(),
+            detail: sanitizePlainTextInput(item.detail).trim(),
+            source: item.source?.trim() ? sanitizePlainTextInput(item.source).trim() : null,
           }))
           .filter((item) => item.title.length > 0 && item.detail.length > 0)
       ),

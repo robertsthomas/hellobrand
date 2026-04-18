@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { buildAppliedTerms, planExtractionMerge } from "@/lib/pending-changes";
+import { buildAppliedTerms, computeTermsDiff, planExtractionMerge } from "@/lib/pending-changes";
 import type { DealTermsRecord, ExtractionPipelineResult } from "@/lib/types";
 
 function makeTerms(overrides?: Partial<DealTermsRecord>): DealTermsRecord {
@@ -152,5 +152,18 @@ describe("pending change merge planning", () => {
     expect(applied.paymentTerms).toBe("Net 45");
     expect(applied.manuallyEditedFields).toContain("paymentTerms");
     expect(applied.pendingExtraction).toBeNull();
+  });
+
+  test("does not surface lowercase-only campaign name downgrades as pending changes", () => {
+    const current = makeTerms({
+      campaignName: "Dove Unilever Creator",
+    });
+
+    const diff = computeTermsDiff(current, {
+      ...makeExtraction().data,
+      campaignName: "dove unilever creator",
+    });
+
+    expect(diff.entries.find((entry) => entry.field === "campaignName")).toBeUndefined();
   });
 });

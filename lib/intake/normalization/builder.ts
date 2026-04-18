@@ -15,15 +15,17 @@ import type {
   IntakePrimaryContact,
   IntakeTimelineItem,
   NormalizedIntakeRecord,
-  SummaryRecord
+  SummaryRecord,
 } from "@/lib/types";
 import { stripInlineMarkdown, toPlainDealSummary } from "@/lib/deal-summary";
 import { sanitizeCampaignName, sanitizePartyName } from "@/lib/party-labels";
+import { sanitizePlainTextInput } from "@/lib/utils";
 import {
   cleanWorkspaceFileName,
   deriveWorkspaceTitleFromFileNames,
-  isGenericWorkspaceLabel
+  isGenericWorkspaceLabel,
 } from "@/lib/workspace-labels";
+import { formatDeliverableTitle } from "./deliverable-formatter";
 
 export const INTAKE_NORMALIZED_VERSION = "intake-normalized:v2";
 
@@ -69,6 +71,41 @@ function presentText(value: string | null | undefined) {
   }
 
   return trimmed;
+}
+
+function sanitizeDisplayText(value: string | null | undefined) {
+  const cleaned = sanitizePlainTextInput(value);
+  return presentText(cleaned);
+}
+
+function sanitizeDisplayList(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => sanitizeDisplayText(value))
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+}
+
+function cleanCampaignDateWindow(value: CampaignDateWindow | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const startDate = sanitizeDisplayText(value.startDate);
+  const endDate = sanitizeDisplayText(value.endDate);
+  const postingWindow = sanitizeDisplayText(value.postingWindow);
+
+  if (!startDate && !endDate && !postingWindow) {
+    return null;
+  }
+
+  return {
+    startDate,
+    endDate,
+    postingWindow,
+  };
 }
 
 function normalizeLabelText(value: string | null | undefined) {
@@ -145,6 +182,190 @@ function isGenericIntakeLabel(value: string | null | undefined) {
   );
 }
 
+const TITLE_CONNECTOR_WORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "as",
+  "at",
+  "by",
+  "for",
+  "in",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "via",
+  "with",
+  "x",
+]);
+
+const GENERIC_TITLE_ROLE_TOKENS = new Set([
+  "agreement",
+  "brand",
+  "campaign",
+  "collab",
+  "collaboration",
+  "content",
+  "contract",
+  "creator",
+  "deal",
+  "influencer",
+  "partnership",
+  "talent",
+  "ugc",
+]);
+
+function humanizeTitleCandidate(value: string | null | undefined) {
+  const normalized = presentText(stripInlineMarkdown(value ?? ""))
+    ?.replace(/[_|]+/g, " ")
+    ?.replace(/\s{2,}/g, " ")
+    ?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const looksFlatCase =
+    normalized === normalized.toLowerCase() || normalized === normalized.toUpperCase();
+  if (!looksFlatCase) {
+    return normalized;
+  }
+
+  return normalized
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word, index) => {
+      if (!/[a-z]/.test(word)) {
+        return word;
+      }
+
+      if (index > 0 && TITLE_CONNECTOR_WORDS.has(word)) {
+        return word;
+      }
+
+      return `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
+    })
+    .join(" ");
+}
+
+function humanizeBrandLabel(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return humanizeTitleCandidate(normalized);
+}
+
+function stripTrailingRoleWords(value: string | null | undefined) {
+  const normalized = presentText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const stripped = normalized
+    .replace(/\b(creator|influencer|talent|ugc|email|thread|message|msg)\b\s*$/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return presentText(stripped);
+}
+
+function normalizedTitleTokens(value: string | null | undefined) {
+  return (
+    presentText(value)
+      ?.toLowerCase()
+      .match(/[a-z0-9]+/g) ?? []
+  ).filter(Boolean);
+}
+
+function isWeakRoleBasedTitle(
+  value: string | null | undefined,
+  brandName: string | null,
+  agencyName: string | null
+) {
+  const tokens = normalizedTitleTokens(value);
+  if (tokens.length === 0) {
+    return true;
+  }
+
+  const hasGenericRoleToken = tokens.some((token) => GENERIC_TITLE_ROLE_TOKENS.has(token));
+  if (!hasGenericRoleToken) {
+    return false;
+  }
+
+  const ignoredTokens = new Set([
+    ...normalizedTitleTokens(brandName),
+    ...normalizedTitleTokens(agencyName),
+    ...Array.from(GENERIC_TITLE_ROLE_TOKENS),
+  ]);
+
+  const specificTokens = tokens.filter((token) => !ignoredTokens.has(token));
+  return specificTokens.length === 0;
+}
+
+function combineBrandAndTitle(
+  brandName: string | null,
+  candidate: string | null,
+  agencyName: string | null
+) {
+  const normalized = humanizeTitleCandidate(stripTrailingRoleWords(candidate));
+  if (
+    !normalized ||
+    isGenericIntakeLabel(normalized) ||
+    isWeakRoleBasedTitle(normalized, brandName, agencyName)
+  ) {
+    return null;
+  }
+
+  return brandName && !normalized.toLowerCase().includes(brandName.toLowerCase())
+    ? `${brandName} - ${normalized}`
+    : normalized;
+}
+
+function buildReadableDeliverableTitle(brandName: string | null, deliverables: DeliverableItem[]) {
+  if (!brandName || deliverables.length === 0) {
+    return null;
+  }
+
+  const labels: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of deliverables) {
+    const title = humanizeTitleCandidate(item.title);
+    const channel = humanizeTitleCandidate(item.channel);
+    const preferredLabel =
+      title && !isGenericIntakeLabel(title)
+        ? title
+        : channel && !isGenericIntakeLabel(channel)
+          ? channel
+          : null;
+
+    if (!preferredLabel) {
+      continue;
+    }
+
+    const normalizedLabel = preferredLabel.toLowerCase();
+    if (seen.has(normalizedLabel)) {
+      continue;
+    }
+
+    seen.add(normalizedLabel);
+    labels.push(preferredLabel);
+
+    if (labels.length === 2) {
+      break;
+    }
+  }
+
+  if (labels.length === 0) {
+    return null;
+  }
+
+  return `${brandName} ${labels.join(" + ")} Partnership`;
+}
+
 function lineScore(kind: DocumentKind) {
   switch (kind) {
     case "contract":
@@ -173,18 +394,13 @@ function parsePersistedIntakeRecord(record: SummaryRecord | null): PersistedInta
   }
 }
 
-function getPersistedIntakeRecord(
-  summaries: SummaryRecord[]
-): PersistedIntakeRecord | null {
+function getPersistedIntakeRecord(summaries: SummaryRecord[]): PersistedIntakeRecord | null {
   return parsePersistedIntakeRecord(
     summaries.find((entry) => entry.version === INTAKE_NORMALIZED_VERSION) ?? null
   );
 }
 
-function bestEvidenceSnippet(
-  entries: ExtractionEvidenceRecord[],
-  fieldPaths: string[]
-) {
+function bestEvidenceSnippet(entries: ExtractionEvidenceRecord[], fieldPaths: string[]) {
   return (
     entries.find((entry) => fieldPaths.includes(entry.fieldPath) && presentText(entry.snippet))
       ?.snippet ?? null
@@ -194,9 +410,8 @@ function bestEvidenceSnippet(
 function extractEmails(text: string) {
   return Array.from(
     new Set(
-      Array.from(
-        text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi),
-        (match) => match[0].trim()
+      Array.from(text.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi), (match) =>
+        match[0].trim()
       )
     )
   );
@@ -210,9 +425,7 @@ function extractPhones(text: string) {
   return Array.from(
     new Set(
       Array.from(
-        text.matchAll(
-          /(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g
-        ),
+        text.matchAll(/(?:\+?1[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/g),
         (match) => match[0].trim()
       )
     )
@@ -227,7 +440,7 @@ const PUBLIC_EMAIL_DOMAINS = new Set([
   "hotmail.com",
   "live.com",
   "yahoo.com",
-  "aol.com"
+  "aol.com",
 ]);
 
 const CREATOR_CONTACT_CONTEXT_PATTERN =
@@ -281,7 +494,9 @@ function isExcludedContactName(name: string | null | undefined, excludedNames: S
 function scoreContactLine(line: string) {
   const lower = line.toLowerCase();
   let score = 0;
-  if (/manager|director|partnership|campaign|media|marketing|talent|agent|coordinator/.test(lower)) {
+  if (
+    /manager|director|partnership|campaign|media|marketing|talent|agent|coordinator/.test(lower)
+  ) {
     score += 2;
   }
   if (/\b(from|best|regards|thanks|warm regards)\b/.test(lower)) {
@@ -350,13 +565,16 @@ function sanitizeContactTitle(value: string | null | undefined) {
   return normalized;
 }
 
-function emptyPrimaryContact(agencyName: string | null, brandName: string | null): IntakePrimaryContact {
+function emptyPrimaryContact(
+  agencyName: string | null,
+  brandName: string | null
+): IntakePrimaryContact {
   return {
     organizationType: agencyName ? "agency" : brandName ? "brand" : null,
     name: null,
     title: null,
     email: null,
-    phone: null
+    phone: null,
   };
 }
 
@@ -368,7 +586,10 @@ function cleanContactCandidate(
 ) {
   const normalizedEmail = normalizeEmail(contact.email);
   const emailDomain = normalizedEmail?.split("@")[1] ?? null;
-  if (isExcludedContactEmail(contact.email, excludedEmails) || isExcludedContactName(contact.name, excludedNames)) {
+  if (
+    isExcludedContactEmail(contact.email, excludedEmails) ||
+    isExcludedContactName(contact.name, excludedNames)
+  ) {
     return null;
   }
   if (emailDomain && excludedDomains.has(emailDomain)) {
@@ -388,7 +609,7 @@ function cleanContactCandidate(
     name,
     title,
     email,
-    phone
+    phone,
   } satisfies IntakePrimaryContact;
 }
 
@@ -409,7 +630,10 @@ function inferOrganizationTypeFromSignals(input: {
 }) {
   const windowText = input.windowLines.join("\n").toLowerCase();
   const emailDomainRoot =
-    normalizeEmail(input.email)?.split("@")[1]?.split(".")[0]?.replace(/[^a-z0-9]/g, "") ?? null;
+    normalizeEmail(input.email)
+      ?.split("@")[1]
+      ?.split(".")[0]
+      ?.replace(/[^a-z0-9]/g, "") ?? null;
   const normalizedAgency = normalizeOrganizationToken(input.agencyName);
   const normalizedBrand = normalizeOrganizationToken(input.brandName);
 
@@ -534,7 +758,7 @@ function buildPrimaryContactFromDocumentText(input: {
         email,
         agencyName: input.agencyName,
         brandName: input.brandName,
-        windowLines
+        windowLines,
       });
       const candidate = cleanContactCandidate(
         {
@@ -542,7 +766,7 @@ function buildPrimaryContactFromDocumentText(input: {
           name: candidateName,
           title: candidateTitle,
           email,
-          phone: nearestPhoneFromWindow(windowLines, localEmailIndex)
+          phone: nearestPhoneFromWindow(windowLines, localEmailIndex),
         },
         input.excludedEmails,
         input.excludedNames,
@@ -561,7 +785,7 @@ function buildPrimaryContactFromDocumentText(input: {
         (candidate.organizationType ? 2 : 0);
       candidates.push({
         ...candidate,
-        score
+        score,
       });
     }
   }
@@ -589,7 +813,7 @@ function contactFromBriefData(
       name: briefData.agencyContactName ?? null,
       title: briefData.agencyContactTitle ?? null,
       email: briefData.agencyContactEmail ?? null,
-      phone: briefData.agencyContactPhone ?? null
+      phone: briefData.agencyContactPhone ?? null,
     },
     excludedEmails,
     excludedNames,
@@ -605,7 +829,7 @@ function contactFromBriefData(
       name: briefData.brandContactName ?? null,
       title: briefData.brandContactTitle ?? null,
       email: briefData.brandContactEmail ?? null,
-      phone: briefData.brandContactPhone ?? null
+      phone: briefData.brandContactPhone ?? null,
     },
     excludedEmails,
     excludedNames,
@@ -626,7 +850,7 @@ function contactFromBriefData(
       name: null,
       title: null,
       email: linkEmail ?? null,
-      phone: linkPhone
+      phone: linkPhone,
     },
     excludedEmails,
     excludedNames,
@@ -643,10 +867,7 @@ function contactFromExtractionEvidence(
   excludedNames: Set<string>,
   excludedDomains: Set<string>
 ) {
-  const candidates = new Map<
-    string,
-    IntakePrimaryContact & { score: number }
-  >();
+  const candidates = new Map<string, IntakePrimaryContact & { score: number }>();
 
   for (const entry of aggregate.extractionEvidence) {
     let organizationType: IntakePrimaryContact["organizationType"] = null;
@@ -668,26 +889,25 @@ function contactFromExtractionEvidence(
     }
 
     const key = `${organizationType}:${entry.sectionId ?? entry.fieldPath}`;
-    const current =
-      candidates.get(key) ?? {
-        organizationType,
-        name: null,
-        title: null,
-        email: null,
-        phone: null,
-        score: 0
-      };
+    const current = candidates.get(key) ?? {
+      organizationType,
+      name: null,
+      title: null,
+      email: null,
+      phone: null,
+      score: 0,
+    };
     const nextValue =
       field === "email"
-        ? extractEmails(entry.snippet)[0] ?? presentText(entry.snippet)
+        ? (extractEmails(entry.snippet)[0] ?? presentText(entry.snippet))
         : field === "phone"
-          ? extractPhones(entry.snippet)[0] ?? presentText(entry.snippet)
+          ? (extractPhones(entry.snippet)[0] ?? presentText(entry.snippet))
           : presentText(entry.snippet);
 
     candidates.set(key, {
       ...current,
       [field]: nextValue,
-      score: current.score + 1
+      score: current.score + 1,
     });
   }
 
@@ -701,11 +921,13 @@ function contactFromExtractionEvidence(
               (candidate.email ? 4 : 0) +
               (candidate.name ? 3 : 0) +
               (candidate.title ? 2 : 0) +
-              (candidate.phone ? 1 : 0)
+              (candidate.phone ? 1 : 0),
           }
         : null
     )
-    .filter((candidate): candidate is IntakePrimaryContact & { score: number } => candidate !== null)
+    .filter(
+      (candidate): candidate is IntakePrimaryContact & { score: number } => candidate !== null
+    )
     .sort((left, right) => right.score - left.score)[0];
 
   if (!bestCandidate) {
@@ -718,7 +940,7 @@ function contactFromExtractionEvidence(
       name: bestCandidate.name,
       title: bestCandidate.title,
       email: bestCandidate.email,
-      phone: bestCandidate.phone
+      phone: bestCandidate.phone,
     },
     excludedEmails,
     excludedNames,
@@ -743,7 +965,7 @@ function extractPrimaryContact(
         name: persisted.name,
         title: persisted.title,
         email: persisted.email,
-        phone: persisted.phone
+        phone: persisted.phone,
       },
       excludedEmails,
       excludedNames,
@@ -785,7 +1007,7 @@ function extractPrimaryContact(
     brandName,
     excludedEmails,
     excludedNames,
-    excludedDomains
+    excludedDomains,
   });
   if (documentContact) {
     return documentContact;
@@ -866,7 +1088,7 @@ function extractBrandFromText(text: string) {
     /for\s+([A-Z][A-Za-z0-9&+.' -]{2,40})\s+at\s+[A-Z]/i,
     /join\s+([A-Z][A-Za-z0-9&+.' -]{2,40})'?s affiliate program/i,
     /deliverables?:.*featuring\s+([A-Z][A-Za-z0-9&+.' -]+)/i,
-    /^([A-Z][A-Za-z0-9&+.' -]{2,60})\n(?:we are looking|deliverables:)/im
+    /^([A-Z][A-Za-z0-9&+.' -]{2,60})\n(?:we are looking|deliverables:)/im,
   ];
 
   for (const pattern of directPatterns) {
@@ -887,12 +1109,12 @@ function inferBrandName(aggregate: DealAggregate) {
     "brand"
   );
   if (persisted && !isGenericIntakeLabel(persisted)) {
-    return persisted;
+    return humanizeBrandLabel(persisted);
   }
 
   const termsBrand = sanitizePartyName(aggregate.terms?.brandName, "brand");
   if (termsBrand && !/^client\b/i.test(termsBrand) && !isGenericIntakeLabel(termsBrand)) {
-    return termsBrand;
+    return humanizeBrandLabel(termsBrand);
   }
 
   for (const document of aggregate.documents.filter(
@@ -901,7 +1123,7 @@ function inferBrandName(aggregate: DealAggregate) {
     const text = document.normalizedText ?? document.rawText ?? "";
     const candidate = extractBrandFromText(text);
     if (candidate) {
-      return candidate;
+      return humanizeBrandLabel(candidate);
     }
   }
 
@@ -911,30 +1133,30 @@ function inferBrandName(aggregate: DealAggregate) {
       .map((document) => document.fileName)
   );
   if (fileBrand) {
-    return fileBrand;
+    return humanizeBrandLabel(fileBrand);
   }
 
   for (const document of aggregate.documents) {
     const text = document.normalizedText ?? document.rawText ?? "";
     const candidate = extractBrandFromText(text);
     if (candidate) {
-      return candidate;
+      return humanizeBrandLabel(candidate);
     }
   }
 
   const evidenceSnippet = bestEvidenceSnippet(aggregate.extractionEvidence, [
     "brandName",
-    "campaignName"
+    "campaignName",
   ]);
   if (evidenceSnippet) {
     const cleaned = sanitizePartyName(evidenceSnippet, "brand");
     if (cleaned && !isGenericIntakeLabel(cleaned)) {
-      return cleaned;
+      return humanizeBrandLabel(cleaned);
     }
   }
 
   const dealBrand = sanitizePartyName(aggregate.deal.brandName, "brand");
-  return dealBrand && !isGenericIntakeLabel(dealBrand) ? dealBrand : null;
+  return dealBrand && !isGenericIntakeLabel(dealBrand) ? humanizeBrandLabel(dealBrand) : null;
 }
 
 function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
@@ -963,8 +1185,7 @@ function inferAgencyName(aggregate: DealAggregate, brandName: string | null) {
         (line) =>
           /technologies|dynamic|intelligence|agency|media by/i.test(line) &&
           !/manager|director|coordinator|partnership|activation/i.test(line)
-      ) ??
-      lines.find((line) => /technologies|dynamic|intelligence|agency/i.test(line));
+      ) ?? lines.find((line) => /technologies|dynamic|intelligence|agency/i.test(line));
     const candidate = sanitizePartyName(signatureMatch, "agency");
     if (candidate && candidate !== brandName) {
       return candidate;
@@ -990,7 +1211,7 @@ function inferPaymentAmount(aggregate: DealAggregate) {
   const texts = aggregate.documents
     .map((document) => ({
       kind: document.documentKind,
-      text: document.normalizedText ?? document.rawText ?? ""
+      text: document.normalizedText ?? document.rawText ?? "",
     }))
     .filter((entry) => entry.text.length > 0);
 
@@ -1036,11 +1257,64 @@ function cleanDeliverables(deliverables: DeliverableItem[]) {
     .map((item, index) => ({
       ...item,
       id: item.id || `deliverable-${index + 1}`,
-      title: cleanExtractedLabel(item.title) ?? item.title,
-      description: presentText(item.description),
-      source: presentText(item.source)
+      title:
+        sanitizeDisplayText(
+          formatDeliverableTitle(cleanExtractedLabel(item.title) ?? item.title, item.source) ??
+            cleanExtractedLabel(item.title) ??
+            item.title
+        ) ?? item.title,
+      description: sanitizeDisplayText(item.description),
+      source: sanitizeDisplayText(item.source),
     }))
     .filter((item) => presentText(item.title));
+}
+
+function cleanTimelineItems(items: IntakeTimelineItem[]) {
+  return items
+    .map((item, index) => {
+      const label = sanitizeDisplayText(item.label);
+      if (!label) {
+        return null;
+      }
+
+      return {
+        ...item,
+        id: item.id || `timeline-${index + 1}`,
+        label,
+        date: sanitizeDisplayText(item.date),
+        source: sanitizeDisplayText(item.source),
+      };
+    })
+    .filter((item): item is IntakeTimelineItem => Boolean(item));
+}
+
+function cleanDisclosureObligations(items: DisclosureObligation[]) {
+  return items
+    .map((item, index) => {
+      const title = sanitizeDisplayText(item.title);
+      const detail = sanitizeDisplayText(item.detail);
+      if (!title || !detail) {
+        return null;
+      }
+
+      return {
+        ...item,
+        id: item.id || `disclosure-${index + 1}`,
+        title,
+        detail,
+        source: sanitizeDisplayText(item.source),
+      };
+    })
+    .filter((item): item is DisclosureObligation => Boolean(item));
+}
+
+function cleanAnalytics(analytics: IntakeAnalyticsRecord | null | undefined) {
+  if (!analytics) {
+    return null;
+  }
+
+  const highlights = sanitizeDisplayList(analytics.highlights ?? []).slice(0, 6);
+  return highlights.length > 0 ? { highlights } : null;
 }
 
 // fallow-ignore-next-line complexity
@@ -1052,9 +1326,7 @@ function parseDeliverablesFromText(aggregate: DealAggregate) {
     const lines = text.split(/\r?\n/);
 
     for (const line of lines) {
-      const match = line.match(
-        /deliverables?:\s*(?:\((\d+)\)\s*)?([A-Za-z0-9&+/' -]{3,120})/i
-      );
+      const match = line.match(/deliverables?:\s*(?:\((\d+)\)\s*)?([A-Za-z0-9&+/' -]{3,120})/i);
       if (!match) {
         continue;
       }
@@ -1073,7 +1345,7 @@ function parseDeliverablesFromText(aggregate: DealAggregate) {
         quantity: match[1] ? Number(match[1]) : 1,
         status: "pending",
         description: null,
-        source: line.trim()
+        source: line.trim(),
       });
     }
   }
@@ -1109,7 +1381,7 @@ function campaignWindowFromTimelineItems(timelineItems: IntakeTimelineItem[]) {
     postingWindow:
       startDate && endDate && startDate !== endDate
         ? `${startDate} to ${endDate}`
-        : startDate ?? endDate ?? null
+        : (startDate ?? endDate ?? null),
   };
 }
 
@@ -1169,13 +1441,21 @@ function scoreTimelineSnippet(snippet: string, kind: DocumentKind, hasDate: bool
   if (hasDate) {
     score += 5;
   }
-  if (/timing:|timeline:|live date|go live|drafts? due|outline due|review by|final due|submission due|due by|due on/i.test(snippet)) {
+  if (
+    /timing:|timeline:|live date|go live|drafts? due|outline due|review by|final due|submission due|due by|due on/i.test(
+      snippet
+    )
+  ) {
     score += 4;
   }
   if (/approx|no later than|within|after accepting/i.test(snippet)) {
     score += 2;
   }
-  if (/services and deliverables|deliver the content to company|publish|distribute|jurisdiction|sole discretion/i.test(snippet)) {
+  if (
+    /services and deliverables|deliver the content to company|publish|distribute|jurisdiction|sole discretion/i.test(
+      snippet
+    )
+  ) {
     score -= 6;
   }
 
@@ -1189,10 +1469,7 @@ function extractTimelineItems(aggregate: DealAggregate) {
     return persisted;
   }
 
-  const snippets = new Map<
-    string,
-    IntakeTimelineItem & { score: number; sourceLength: number }
-  >();
+  const snippets = new Map<string, IntakeTimelineItem & { score: number; sourceLength: number }>();
   const datePattern =
     /\b(?:\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}(?:,\s*\d{4})?|\d+\s*(?:hrs?|hours?|days?)\s+after)\b/i;
 
@@ -1210,7 +1487,11 @@ function extractTimelineItems(aggregate: DealAggregate) {
       }
 
       for (const candidate of splitTimelineCandidates(line)) {
-        if (!/(due|draft|final|live|review|outline|submit|submission|timing|timeline)/i.test(candidate)) {
+        if (
+          !/(due|draft|final|live|review|outline|submit|submission|timing|timeline)/i.test(
+            candidate
+          )
+        ) {
           continue;
         }
         if (isTimelineBoilerplate(candidate)) {
@@ -1233,15 +1514,14 @@ function extractTimelineItems(aggregate: DealAggregate) {
           source: candidate,
           status: "scheduled",
           score,
-          sourceLength: candidate.length
+          sourceLength: candidate.length,
         };
         const existing = snippets.get(key);
 
         if (
           !existing ||
           nextItem.score > existing.score ||
-          (nextItem.score === existing.score &&
-            nextItem.sourceLength < existing.sourceLength)
+          (nextItem.score === existing.score && nextItem.sourceLength < existing.sourceLength)
         ) {
           snippets.set(key, nextItem);
         }
@@ -1264,7 +1544,7 @@ function extractTimelineItems(aggregate: DealAggregate) {
     .slice(0, 6)
     .map(({ score: _score, sourceLength: _sourceLength, ...item }, index) => ({
       ...item,
-      id: `timeline-${index + 1}`
+      id: `timeline-${index + 1}`,
     }));
 }
 
@@ -1289,7 +1569,7 @@ function extractAnalytics(aggregate: DealAggregate) {
     /^(impressions|clicks|ctr|saves|comments|attributed conversions|conversions|engagement rate|average watch time|total viewers|new followers|retention rate)$/i;
 
   function pushHighlight(value: string | null | undefined) {
-    const normalized = presentText(value)?.replace(/\s{2,}/g, " ");
+    const normalized = sanitizeDisplayText(value)?.replace(/\s{2,}/g, " ");
     if (!normalized || highlightSet.has(normalized)) {
       return;
     }
@@ -1313,9 +1593,7 @@ function extractAnalytics(aggregate: DealAggregate) {
       continue;
     }
 
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\s+/g, " ").trim());
+    const lines = text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim());
 
     for (let index = 0; index < lines.length; index += 1) {
       const trimmed = lines[index] ?? "";
@@ -1326,9 +1604,7 @@ function extractAnalytics(aggregate: DealAggregate) {
         continue;
       }
 
-      const nextLine = lines
-        .slice(index + 1)
-        .find((candidate) => candidate.length > 0) ?? null;
+      const nextLine = lines.slice(index + 1).find((candidate) => candidate.length > 0) ?? null;
 
       if (
         analyticsTableLabelPattern.test(trimmed) &&
@@ -1362,7 +1638,8 @@ function extractAnalytics(aggregate: DealAggregate) {
 function inferContractTitle(
   aggregate: DealAggregate,
   brandName: string | null,
-  agencyName: string | null
+  agencyName: string | null,
+  deliverables: DeliverableItem[]
 ) {
   const persisted = getPersistedIntakeRecord(aggregate.summaries)?.contractTitle;
   if (persisted && !isGenericIntakeLabel(persisted)) {
@@ -1375,10 +1652,14 @@ function inferContractTitle(
     campaignSegments[campaignSegments.length - 1] ?? campaign
   );
   if (normalizedCampaign && !/\bname\b/i.test(aggregate.terms?.campaignName ?? "")) {
-    return brandName &&
-      !normalizedCampaign.toLowerCase().includes(brandName.toLowerCase())
-      ? `${brandName} - ${normalizedCampaign}`
-      : normalizedCampaign;
+    return combineBrandAndTitle(brandName, normalizedCampaign, agencyName);
+  }
+
+  const evidenceCampaign = sanitizeCampaignName(
+    cleanExtractedLabel(bestEvidenceSnippet(aggregate.extractionEvidence, ["campaignName"]))
+  );
+  if (evidenceCampaign) {
+    return combineBrandAndTitle(brandName, evidenceCampaign, agencyName);
   }
 
   for (const document of aggregate.documents
@@ -1407,10 +1688,10 @@ function inferContractTitle(
         continue;
       }
 
-      return brandName &&
-        !candidate.toLowerCase().includes(brandName.toLowerCase())
-        ? `${brandName} - ${candidate}`
-        : candidate;
+      const combined = combineBrandAndTitle(brandName, candidate, agencyName);
+      if (combined) {
+        return combined;
+      }
     }
   }
 
@@ -1428,27 +1709,30 @@ function inferContractTitle(
         ?.trim() ?? null
     );
 
-    if (subject && !isGenericIntakeLabel(subject)) {
-      return brandName && !subject.toLowerCase().includes(brandName.toLowerCase())
-        ? `${brandName} - ${subject}`
-        : subject;
+    const combinedSubject = combineBrandAndTitle(brandName, subject, agencyName);
+    if (combinedSubject) {
+      return combinedSubject;
     }
 
     const explicitCampaign = sanitizeCampaignName(
       primaryText.match(/^(?:campaign|project)\s*:\s*(.+)$/im)?.[1] ?? null
     );
     if (explicitCampaign) {
-      return brandName && !explicitCampaign.toLowerCase().includes(brandName.toLowerCase())
-        ? `${brandName} - ${explicitCampaign}`
-        : explicitCampaign;
+      return combineBrandAndTitle(brandName, explicitCampaign, agencyName);
     }
   }
 
   const derivedFileTitle = deriveWorkspaceTitleFromFileNames(
     aggregate.documents.map((document) => document.fileName)
   );
-  if (derivedFileTitle && !isGenericIntakeLabel(derivedFileTitle)) {
-    return derivedFileTitle;
+  const combinedFileTitle = combineBrandAndTitle(brandName, derivedFileTitle, agencyName);
+  if (combinedFileTitle) {
+    return combinedFileTitle;
+  }
+
+  const deliverableTitle = buildReadableDeliverableTitle(brandName, deliverables);
+  if (deliverableTitle) {
+    return deliverableTitle;
   }
 
   const channels = Array.from(
@@ -1480,7 +1764,7 @@ function inferContractTitle(
     return `${brandName} partnership`;
   }
 
-  return sanitizeCampaignName(aggregate.deal.campaignName);
+  return humanizeTitleCandidate(sanitizeCampaignName(aggregate.deal.campaignName));
 }
 
 function buildContractSummary(input: {
@@ -1509,7 +1793,7 @@ function buildContractSummary(input: {
       `The primary payment extracted so far is ${new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: input.currency ?? "USD",
-        maximumFractionDigits: 2
+        maximumFractionDigits: 2,
       }).format(input.paymentAmount)}.`
     );
   }
@@ -1551,52 +1835,54 @@ function buildEvidenceGroups(input: {
   const partnershipSnippets = [
     bestEvidenceSnippet(evidence, ["brandName"]),
     bestEvidenceSnippet(evidence, ["agencyName"]),
-    ...input.aggregate.documents.slice(0, 2).map((document) => cleanFileName(document.fileName))
-  ].filter((entry): entry is string => Boolean(presentText(entry)));
+    ...input.aggregate.documents.slice(0, 2).map((document) => cleanFileName(document.fileName)),
+  ];
 
   groups.push({
     id: "partnership",
     title: "Partnership",
-    snippets: Array.from(new Set(partnershipSnippets)).slice(0, 4)
+    snippets: sanitizeDisplayList(partnershipSnippets).slice(0, 4),
   });
 
   const contactSnippets = [
     input.primaryContact.name,
     input.primaryContact.title,
     input.primaryContact.email,
-    input.primaryContact.phone
-  ].filter((entry): entry is string => Boolean(presentText(entry)));
+    input.primaryContact.phone,
+  ];
 
-  if (contactSnippets.length > 0) {
+  const sanitizedContactSnippets = sanitizeDisplayList(contactSnippets);
+  if (sanitizedContactSnippets.length > 0) {
     groups.push({
       id: "primary-contact",
       title: "Primary contact",
-      snippets: contactSnippets
+      snippets: sanitizedContactSnippets,
     });
   }
 
   const snapshotSnippets = [
     input.contractTitle,
     bestEvidenceSnippet(evidence, ["campaignName"]),
-    bestEvidenceSnippet(evidence, ["paymentAmount"])
-  ].filter((entry): entry is string => Boolean(presentText(entry)));
+    bestEvidenceSnippet(evidence, ["paymentAmount"]),
+  ];
 
   groups.push({
     id: "contract-snapshot",
     title: "Contract snapshot",
-    snippets: Array.from(new Set(snapshotSnippets)).slice(0, 4)
+    snippets: sanitizeDisplayList(snapshotSnippets).slice(0, 4),
   });
 
   const intelligenceSnippets = [
     input.brandCategory ? input.brandCategory.replace(/_/g, " ") : null,
-    ...input.disclosureObligations.map((entry) => entry.title)
-  ].filter((entry): entry is string => Boolean(presentText(entry)));
+    ...input.disclosureObligations.map((entry) => entry.title),
+  ];
 
-  if (intelligenceSnippets.length > 0) {
+  const sanitizedIntelligenceSnippets = sanitizeDisplayList(intelligenceSnippets);
+  if (sanitizedIntelligenceSnippets.length > 0) {
     groups.push({
       id: "rights-and-disclosure",
       title: "Rights and disclosure",
-      snippets: Array.from(new Set(intelligenceSnippets)).slice(0, 6)
+      snippets: sanitizedIntelligenceSnippets.slice(0, 6),
     });
   }
 
@@ -1604,10 +1890,7 @@ function buildEvidenceGroups(input: {
     groups.push({
       id: "timeline",
       title: "Deliverables and timeline",
-      snippets: input.timelineItems
-        .map((item) => item.source)
-        .filter((entry): entry is string => Boolean(presentText(entry)))
-        .slice(0, 6)
+      snippets: sanitizeDisplayList(input.timelineItems.map((item) => item.source)).slice(0, 6),
     });
   }
 
@@ -1615,7 +1898,7 @@ function buildEvidenceGroups(input: {
     groups.push({
       id: "analytics",
       title: "Audience and analytics",
-      snippets: (input.analytics?.highlights ?? []).slice(0, 6)
+      snippets: sanitizeDisplayList(input.analytics?.highlights ?? []).slice(0, 6),
     });
   }
 
@@ -1635,7 +1918,6 @@ export function buildNormalizedIntakeRecord(
   const brandName = inferBrandName(aggregate);
   const agencyName = inferAgencyName(aggregate, brandName);
   const primaryContact = extractPrimaryContact(aggregate, agencyName, brandName, options);
-  const contractTitle = inferContractTitle(aggregate, brandName, agencyName);
   const paymentAmount = inferPaymentAmount(aggregate);
   const persistedDeliverables = Array.isArray(persisted?.deliverables)
     ? persisted.deliverables
@@ -1650,31 +1932,38 @@ export function buildNormalizedIntakeRecord(
         ? aggregateDeliverables
         : parseDeliverablesFromText(aggregate)
   );
-  const timelineItems =
+  const contractTitle = inferContractTitle(aggregate, brandName, agencyName, deliverables);
+  const timelineItems = cleanTimelineItems(
     Array.isArray(persisted?.timelineItems) && persisted.timelineItems.length > 0
       ? persisted.timelineItems
-      : extractTimelineItems(aggregate);
-  const analytics =
+      : extractTimelineItems(aggregate)
+  );
+  const analytics = cleanAnalytics(
     Array.isArray(persisted?.analytics?.highlights) && persisted.analytics.highlights.length > 0
       ? persisted.analytics
-      : extractAnalytics(aggregate);
+      : extractAnalytics(aggregate)
+  );
   const brandCategory = persisted?.brandCategory ?? aggregate.terms?.brandCategory ?? null;
-  const competitorCategories =
+  const competitorCategories = sanitizeDisplayList(
     Array.isArray(persisted?.competitorCategories) && persisted.competitorCategories.length > 0
       ? persisted.competitorCategories
-      : aggregate.terms?.competitorCategories ?? [];
-  const restrictedCategories =
+      : (aggregate.terms?.competitorCategories ?? [])
+  );
+  const restrictedCategories = sanitizeDisplayList(
     Array.isArray(persisted?.restrictedCategories) && persisted.restrictedCategories.length > 0
       ? persisted.restrictedCategories
-      : aggregate.terms?.restrictedCategories ?? [];
-  const campaignDateWindow =
+      : (aggregate.terms?.restrictedCategories ?? [])
+  );
+  const campaignDateWindow = cleanCampaignDateWindow(
     persisted?.campaignDateWindow ??
-    aggregate.terms?.campaignDateWindow ??
-    campaignWindowFromTimelineItems(timelineItems);
-  const disclosureObligations =
+      aggregate.terms?.campaignDateWindow ??
+      campaignWindowFromTimelineItems(timelineItems)
+  );
+  const disclosureObligations = cleanDisclosureObligations(
     Array.isArray(persisted?.disclosureObligations) && persisted.disclosureObligations.length > 0
       ? persisted.disclosureObligations
-      : aggregate.terms?.disclosureObligations ?? [];
+      : (aggregate.terms?.disclosureObligations ?? [])
+  );
   const contractSummary =
     toPlainDealSummary(persisted?.contractSummary) ??
     buildContractSummary({
@@ -1684,11 +1973,11 @@ export function buildNormalizedIntakeRecord(
       paymentAmount,
       currency: aggregate.terms?.currency ?? aggregate.paymentRecord?.currency ?? "USD",
       deliverables,
-      timelineItems
+      timelineItems,
     }) ??
     toPlainDealSummary(aggregate.currentSummary?.body);
 
-  const notes = presentText(persisted?.notes) ?? presentText(aggregate.terms?.notes);
+  const notes = sanitizeDisplayText(persisted?.notes) ?? sanitizeDisplayText(aggregate.terms?.notes);
   const evidenceGroups = buildEvidenceGroups({
     aggregate,
     brandName,
@@ -1698,7 +1987,7 @@ export function buildNormalizedIntakeRecord(
     timelineItems,
     brandCategory,
     disclosureObligations,
-    analytics
+    analytics,
   });
 
   return {
@@ -1710,8 +1999,7 @@ export function buildNormalizedIntakeRecord(
     paymentAmount,
     currency: aggregate.terms?.currency ?? aggregate.paymentRecord?.currency ?? "USD",
     deliverableCount:
-      deliverables.reduce((count, item) => count + (item.quantity ?? 1), 0) ||
-      deliverables.length,
+      deliverables.reduce((count, item) => count + (item.quantity ?? 1), 0) || deliverables.length,
     deliverables,
     timelineItems,
     brandCategory,
@@ -1721,7 +2009,7 @@ export function buildNormalizedIntakeRecord(
     disclosureObligations,
     analytics,
     notes,
-    evidenceGroups
+    evidenceGroups,
   };
 }
 
@@ -1748,6 +2036,6 @@ export function createPersistedIntakeRecord(
 ) {
   return {
     body: JSON.stringify(normalized),
-    version: INTAKE_NORMALIZED_VERSION
+    version: INTAKE_NORMALIZED_VERSION,
   };
 }
