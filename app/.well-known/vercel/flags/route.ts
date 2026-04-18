@@ -7,7 +7,6 @@ import {
   gmailProviderEnabled,
   outlookProviderEnabled,
   invoiceEditorEnabled,
-  aiAssistantEnabled,
   aiRiskAnalysisEnabled,
   aiConflictIntelligence,
   batchIntakeEnabled,
@@ -15,14 +14,8 @@ import {
   smartInboxEnabled,
   invoiceRemindersEnabled,
   sidebarMilestonesEnabled,
-  onboardingGuideEnabled,
-  feedbackWidgetEnabled,
   blogSummarizeEnabled,
-  documentScanShowcase,
   maintenanceMode,
-  signupsEnabled,
-  emailDeliveryEnabled,
-  publicSiteEnabled,
 } from "@/flags";
 
 const flags = {
@@ -32,7 +25,6 @@ const flags = {
   gmailProviderEnabled,
   outlookProviderEnabled,
   invoiceEditorEnabled,
-  aiAssistantEnabled,
   aiRiskAnalysisEnabled,
   aiConflictIntelligence,
   batchIntakeEnabled,
@@ -40,14 +32,8 @@ const flags = {
   smartInboxEnabled,
   invoiceRemindersEnabled,
   sidebarMilestonesEnabled,
-  onboardingGuideEnabled,
-  feedbackWidgetEnabled,
   blogSummarizeEnabled,
-  documentScanShowcase,
   maintenanceMode,
-  signupsEnabled,
-  emailDeliveryEnabled,
-  publicSiteEnabled,
 };
 
 export const GET = createFlagsDiscoveryEndpoint(async () => {

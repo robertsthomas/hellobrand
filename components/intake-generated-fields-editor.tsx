@@ -5,6 +5,7 @@
  * It lets the user review and adjust normalized intake data while the extraction and intake rules stay in the intake domain.
  */
 import { Plus, Trash2 } from "lucide-react";
+import type { ChangeEvent } from "react";
 import { useMemo, useState } from "react";
 
 import { FormInput, FormSelect, FormTextarea } from "@/components/generic/form";
@@ -110,6 +111,25 @@ function normalizeDisclosureObligations(items: DisclosureObligation[]) {
       detail: sanitizePlainTextInput(item.detail),
       source: sanitizePlainTextInput(item.source),
     }))
+  );
+}
+
+function TimelineDateInput({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div className="relative">
+      <FormInput type="date" value={value ?? ""} onChange={onChange} />
+      {!value ? (
+        <span className="pointer-events-none absolute inset-y-0 left-4 right-12 flex items-center text-base text-black/40 dark:text-white/40">
+          Date not set
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -450,17 +470,6 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Explain the requirement"
                   />
-                  <FormInput
-                    value={item.source}
-                    onChange={(event) =>
-                      setDisclosureObligations((current) =>
-                        current.map((entry) =>
-                          entry.id === item.id ? { ...entry, source: event.target.value } : entry
-                        )
-                      )
-                    }
-                    placeholder="Source label"
-                  />
                 </div>
               ))}
             </div>
@@ -659,8 +668,7 @@ export function IntakeGeneratedFieldsEditor({
                     }
                     placeholder="Milestone label"
                   />
-                  <FormInput
-                    type="date"
+                  <TimelineDateInput
                     value={item.date}
                     onChange={(event) =>
                       setTimelineItems((current) =>
@@ -670,18 +678,8 @@ export function IntakeGeneratedFieldsEditor({
                       )
                     }
                   />
-                  <FormInput
-                    value={item.source}
-                    onChange={(event) =>
-                      setTimelineItems((current) =>
-                        current.map((entry) =>
-                          entry.id === item.id ? { ...entry, source: event.target.value } : entry
-                        )
-                      )
-                    }
-                    placeholder="Source"
-                  />
                   <FormSelect
+                    className="md:col-span-2"
                     value={item.status}
                     onChange={(event) =>
                       setTimelineItems((current) =>

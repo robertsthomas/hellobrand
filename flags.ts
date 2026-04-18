@@ -60,29 +60,10 @@ export const outlookProviderEnabled = flag({
   ],
 });
 
-const emailProviderFlags = [
-  yahooProviderEnabled,
-  yahooOAuthEnabled,
-  yahooAppPasswordEnabled,
-  gmailProviderEnabled,
-  outlookProviderEnabled,
-] as const;
-
 export const invoiceEditorEnabled = flag({
   key: "invoice-editor-enabled",
   adapter: vercelAdapter(),
   description: "Toggle the full invoice editor feature.",
-  defaultValue: true,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const aiAssistantEnabled = flag({
-  key: "ai-assistant-enabled",
-  adapter: vercelAdapter(),
-  description: "Toggle the AI assistant chat panel.",
   defaultValue: true,
   options: [
     { value: false, label: "Off" },
@@ -167,43 +148,10 @@ export const sidebarMilestonesEnabled = flag({
   ],
 });
 
-export const onboardingGuideEnabled = flag({
-  key: "onboarding-guide-enabled",
-  adapter: vercelAdapter(),
-  description: "Toggle the onboarding guide component.",
-  defaultValue: true,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const feedbackWidgetEnabled = flag({
-  key: "feedback-widget-enabled",
-  adapter: vercelAdapter(),
-  description: "Toggle the feedback widget visibility.",
-  defaultValue: true,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
 export const blogSummarizeEnabled = flag({
   key: "blog-summarize-enabled",
   adapter: vercelAdapter(),
   description: "Enable AI-powered blog post summarization.",
-  defaultValue: false,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const documentScanShowcase = flag({
-  key: "document-scan-showcase",
-  adapter: vercelAdapter(),
-  description: "Toggle the document scan showcase demo feature.",
   defaultValue: false,
   options: [
     { value: false, label: "Off" },
@@ -216,39 +164,6 @@ export const maintenanceMode = flag({
   adapter: vercelAdapter(),
   description: "Enable maintenance mode. Replaces MAINTENANCE_MODE env var for instant toggling.",
   defaultValue: false,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const signupsEnabled = flag({
-  key: "signups-enabled",
-  adapter: vercelAdapter(),
-  description: "Control new user signups. Replaces signUpsEnabled admin setting.",
-  defaultValue: true,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const emailDeliveryEnabled = flag({
-  key: "email-delivery-enabled",
-  adapter: vercelAdapter(),
-  description: "Control outgoing email delivery. Replaces emailDeliveryEnabled admin setting.",
-  defaultValue: true,
-  options: [
-    { value: false, label: "Off" },
-    { value: true, label: "On" },
-  ],
-});
-
-export const publicSiteEnabled = flag({
-  key: "public-site-enabled",
-  adapter: vercelAdapter(),
-  description: "Show or hide the public marketing site. Replaces publicSiteEnabled admin setting.",
-  defaultValue: true,
   options: [
     { value: false, label: "Off" },
     { value: true, label: "On" },

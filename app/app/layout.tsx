@@ -17,10 +17,10 @@ import {
   getCachedOnboardingState,
   getCachedProfile,
 } from "@/lib/cached-data";
-import { getAppFeatureFlags } from "@/lib/feature-flags";
 import { listEmailAccountsForViewer } from "@/lib/email/service";
 import { listNotificationsForViewer } from "@/lib/notification-service";
 import { buildSidebarMilestones } from "@/lib/sidebar-milestones";
+import { sidebarMilestonesEnabled } from "@/flags";
 
 export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
   const localePromise = getLocale();
@@ -44,7 +44,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
     dealAggregates,
     notificationFeed,
     entitlements,
-    featureFlags,
+    sidebarMilestonesEnabledForViewer,
     emailAccounts,
     locale,
     messages,
@@ -57,7 +57,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
       syncComputed: false,
     }),
     entitlementsPromise,
-    getAppFeatureFlags(),
+    sidebarMilestonesEnabled(),
     entitlementsPromise.then((resolvedEntitlements) =>
       resolvedEntitlements.features.email_connections ? listEmailAccountsForViewer(viewer) : []
     ),
@@ -70,7 +70,7 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
   const hasEverCreatedWorkspace =
     hasActiveWorkspace || onboardingState.productGuideStateJson.hasEverCreatedWorkspace;
   const notifications = notificationFeed.notifications;
-  const sidebarMilestones = featureFlags.sidebarMilestones
+  const sidebarMilestones = sidebarMilestonesEnabledForViewer
     ? buildSidebarMilestones({
         hasActiveWorkspace,
         hasEverCreatedWorkspace,
@@ -98,7 +98,6 @@ export default async function WorkspaceLayout({ children }: { children: ReactNod
             notifications={notifications}
             onboardingComplete={isOnboardingComplete}
             sidebarMilestones={sidebarMilestones}
-            featureFlags={featureFlags}
             workspaceNavItems={dealAggregates.map((aggregate) => {
               const labels = getDisplayDealLabels(aggregate.deal);
 

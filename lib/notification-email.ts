@@ -1,4 +1,3 @@
-import { emailDeliveryEnabled } from "@/flags";
 import { getAppSettings } from "@/lib/admin-settings";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
@@ -608,7 +607,7 @@ export async function enqueueNotificationEmailDelivery(appNotificationId: string
   }
 
   const appSettings = await getAppSettings();
-  if (!appSettings.emailDeliveryEnabled || (await emailDeliveryEnabled()) === false) {
+  if (!appSettings.emailDeliveryEnabled) {
     return null;
   }
 

@@ -56,7 +56,6 @@ import {
   secondaryAppNavItems,
 } from "@/lib/app-shell";
 import type { SidebarMilestones } from "@/lib/sidebar-milestones";
-import type { AppFeatureFlags } from "@/lib/feature-flags";
 
 import { cn } from "@/lib/utils";
 import type { GuideStep } from "@/lib/guide-registry";
@@ -104,7 +103,6 @@ export function AppFrame({
   notifications,
   onboardingComplete,
   sidebarMilestones,
-  featureFlags,
   workspaceNavItems = [],
 }: {
   children: ReactNode;
@@ -116,7 +114,6 @@ export function AppFrame({
   notifications?: NotificationItem[];
   onboardingComplete?: boolean;
   sidebarMilestones?: SidebarMilestones;
-  featureFlags?: AppFeatureFlags;
   workspaceNavItems?: Array<{
     dealId: string;
     label: string;

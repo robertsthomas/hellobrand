@@ -11,6 +11,7 @@ const localeAlternation = routing.locales.join("|");
 const intlRoutePattern = /^\/(?:pricing|upload|sample|blog|privacy)(?:\/.*)?$/;
 const appRoutePattern = /^\/app(?:\/.*)?$/;
 const localeRoutePattern = new RegExp(`^\\/(?:${localeAlternation})(?:\\/.*)?$`);
+const localeRootPattern = new RegExp(`^\\/(?:${localeAlternation})$`);
 const localizedAppRoutePattern = new RegExp(`^\\/((?:${localeAlternation}))\\/app(?:\\/(.*))?$`);
 
 async function isMaintenanceModeEnabled() {
@@ -75,6 +76,7 @@ function getPreferredLocale(request: NextRequest) {
 function isMaintenanceAllowedPath(pathname: string) {
   return (
     pathname === "/" ||
+    localeRootPattern.test(pathname) ||
     pathname.startsWith("/admin") ||
     pathname === "/privacy" ||
     pathname === "/waitlist" ||
