@@ -1,26 +1,8 @@
-function normalizeUrl(value: string | null | undefined) {
-  const trimmed = value?.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  try {
-    return new URL(trimmed);
-  } catch {
-    return null;
-  }
-}
-
-function isLocalHostname(hostname: string) {
-  const normalized = hostname.trim().toLowerCase();
-  return (
-    normalized === "localhost" ||
-    normalized === "127.0.0.1" ||
-    normalized === "0.0.0.0" ||
-    normalized === "::1" ||
-    normalized.endsWith(".localhost")
-  );
-}
+import {
+  isLocalHostname,
+  logOutboundNetworkDiagnostics,
+  normalizeUrl,
+} from "@/lib/network/env-diagnostics";
 
 export function shouldIgnoreResendBaseUrl(baseUrl: string | null | undefined) {
   if (process.env.NODE_ENV !== "production") {
@@ -49,6 +31,13 @@ export function sanitizeResendBaseUrlEnv() {
 
 export async function createResendClient(apiKey: string) {
   sanitizeResendBaseUrlEnv();
+  logOutboundNetworkDiagnostics({
+    service: "resend",
+    urlEnvVars: ["RESEND_BASE_URL"],
+    effectiveHosts: {
+      api: normalizeUrl(process.env.RESEND_BASE_URL)?.hostname ?? "api.resend.com",
+    },
+  });
   const { Resend } = await import("resend");
   return new Resend(apiKey);
 }
