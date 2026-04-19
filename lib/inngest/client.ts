@@ -6,7 +6,8 @@ import { sanitizeInngestUrlEnv } from "@/lib/inngest/env";
 sanitizeInngestUrlEnv();
 
 export const inngest = new Inngest({
-  id: "hellobrand",
+  id: process.env.INNGEST_APP_ID?.trim() || "hellobrand",
+  appVersion: process.env.INNGEST_APP_VERSION?.trim() || undefined,
   eventKey: process.env.INNGEST_EVENT_KEY,
   isDev: process.env.NODE_ENV !== "production",
   checkpointing: {

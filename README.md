@@ -100,6 +100,62 @@ pnpm run build:prd
 pnpm run start:prd
 ```
 
+## Fly.io Inngest worker
+
+The repo now includes a separate Fly.io worker path for moving Inngest execution off Vercel while keeping the main app on Vercel:
+
+- worker entrypoint: [scripts/inngest-worker.ts](/Users/thomasroberts/Desktop/projects/hellobrand/scripts/inngest-worker.ts)
+- shared function registry: [lib/inngest/app.ts](/Users/thomasroberts/Desktop/projects/hellobrand/lib/inngest/app.ts)
+- worker container: [Dockerfile.inngest-worker](/Users/thomasroberts/Desktop/projects/hellobrand/Dockerfile.inngest-worker)
+- Fly config: [fly.toml](/Users/thomasroberts/Desktop/projects/hellobrand/fly.toml)
+
+Required Fly environment variables:
+
+- `INNGEST_EVENT_KEY`
+- `INNGEST_SIGNING_KEY`
+- `DATABASE_URL`
+- any provider secrets your Inngest functions already use, such as `RESEND_API_KEY`, `OPENROUTER_API_KEY`, and email provider credentials
+
+Optional worker environment variables:
+
+- `INNGEST_APP_ID`
+  defaults to `hellobrand`
+- `INNGEST_APP_VERSION`
+  recommended to set to the image tag or git SHA for rollouts
+- `INNGEST_WORKER_INSTANCE_ID`
+  overrides the default instance id detection
+- `INNGEST_WORKER_MAX_CONCURRENCY`
+  caps concurrent step execution on the worker
+
+Local worker run:
+
+```bash
+pnpm run inngest:worker:dev
+```
+
+Cutover note:
+
+- The existing Vercel route under `/api/inngest` still works by default.
+- After the Fly worker is live and healthy, disable the Vercel `serve()` endpoint by setting `INNGEST_SERVE_DISABLED=1` in Vercel and redeploying.
+- Do not keep both the old Vercel `serve()` path and the Fly `connect()` worker actively syncing the same production app during a long transition window.
+
+## Fly.io Next.js app
+
+The repo also includes a separate Fly app config for the main Next.js app:
+
+- app container: [Dockerfile.app](/Users/thomasroberts/Desktop/projects/hellobrand/Dockerfile.app)
+- Fly config: [fly.app.toml](/Users/thomasroberts/Desktop/projects/hellobrand/fly.app.toml)
+- health check route: [app/api/health/route.ts](/Users/thomasroberts/Desktop/projects/hellobrand/app/api/health/route.ts)
+
+Deploy commands:
+
+```bash
+fly deploy -c fly.app.toml
+fly deploy -c fly.toml
+```
+
+The web app and the Inngest worker should run as two separate Fly apps.
+
 ## Environment notes
 
 - Clerk is configured for App Router and supports keyless mode for local development.

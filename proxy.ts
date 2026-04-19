@@ -96,6 +96,10 @@ function isMaintenanceAllowedPath(pathname: string) {
 export default clerkMiddleware(async (auth, request: NextRequest) => {
   const { pathname } = request.nextUrl;
 
+  if (pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
   if ((await isMaintenanceModeEnabled()) && !isMaintenanceAllowedPath(pathname)) {
     // Block API routes with 503 during maintenance
     if (pathname.startsWith("/api")) {

@@ -4,38 +4,22 @@
  */
 import { serve } from "inngest/next";
 
+import { inngestFunctions } from "@/lib/inngest/app";
 import { inngest } from "@/lib/inngest/client";
-import { documentProcessingFunction } from "@/lib/inngest/document-functions";
-import {
-  emailActionItemDeadlineCheckFunction,
-  emailIncrementalSyncFunction,
-  emailInitialSyncFunction,
-  emailPaymentOverdueCheckFunction,
-  emailRenewalSweepFunction,
-} from "@/lib/inngest/email-functions";
-import {
-  invoiceReminderSweepFunction,
-  noDocumentsUploadedSweepFunction,
-  notificationEmailSendFunction,
-  workspaceNudgeSweepFunction,
-  workspaceReminderSweepFunction,
-} from "@/lib/inngest/functions";
 
 export const maxDuration = 300;
 
-export const { GET, POST, PUT } = serve({
+const serveHandlers = serve({
   client: inngest,
-  functions: [
-    documentProcessingFunction,
-    notificationEmailSendFunction,
-    invoiceReminderSweepFunction,
-    workspaceReminderSweepFunction,
-    workspaceNudgeSweepFunction,
-    noDocumentsUploadedSweepFunction,
-    emailInitialSyncFunction,
-    emailIncrementalSyncFunction,
-    emailRenewalSweepFunction,
-    emailActionItemDeadlineCheckFunction,
-    emailPaymentOverdueCheckFunction,
-  ],
+  functions: inngestFunctions,
 });
+
+const inngestServeDisabled = process.env.INNGEST_SERVE_DISABLED === "1";
+
+function disabledHandler() {
+  return new Response("Inngest serve endpoint disabled.", { status: 404 });
+}
+
+export const GET = inngestServeDisabled ? disabledHandler : serveHandlers.GET;
+export const POST = inngestServeDisabled ? disabledHandler : serveHandlers.POST;
+export const PUT = inngestServeDisabled ? disabledHandler : serveHandlers.PUT;

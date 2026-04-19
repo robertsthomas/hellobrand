@@ -15,6 +15,8 @@
     "start:dev": "doppler run --config dev -- next start",
     "db:migrate": "doppler run -- pnpm exec prisma migrate dev",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev",
+    "inngest:worker": "pnpm exec tsx scripts/inngest-worker.ts",
+    "inngest:worker:dev": "INNGEST_DEV=1 pnpm exec tsx scripts/inngest-worker.ts",
     "lint": "biome lint . && node scripts/check-architecture.mjs",
     "format": "biome format --write .",
     "test": "vitest run",
