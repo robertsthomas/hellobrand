@@ -9,8 +9,7 @@ const isSentryEnabled =
   !isDevelopment &&
   !isLocalAppUrl &&
   process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT !== "development" &&
-  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT !== "dev" &&
-  process.env.NEXT_PUBLIC_VERCEL_ENV !== "development";
+  process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT !== "dev";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,

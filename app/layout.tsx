@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 
@@ -97,7 +96,6 @@ export default async function RootLayout({
             <AppProviders>{children}</AppProviders>
           </div>
         </Suspense>
-        <SpeedInsights />
       </body>
     </html>
   );

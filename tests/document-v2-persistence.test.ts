@@ -6,25 +6,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { createDocumentProcessingRunState } from "@/lib/document-pipeline-shared";
 
-const originalVercel = process.env.VERCEL;
 const originalTmpDir = process.env.TMPDIR;
 
 let runtimeTmpDir: string;
 
 beforeEach(async () => {
   runtimeTmpDir = await mkdtemp(path.join(os.tmpdir(), "hb-doc-v2-"));
-  process.env.VERCEL = "1";
   process.env.TMPDIR = runtimeTmpDir;
   vi.resetModules();
 });
 
 afterEach(async () => {
-  if (originalVercel === undefined) {
-    delete process.env.VERCEL;
-  } else {
-    process.env.VERCEL = originalVercel;
-  }
-
   if (originalTmpDir === undefined) {
     delete process.env.TMPDIR;
   } else {

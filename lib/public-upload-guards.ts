@@ -63,7 +63,7 @@ export function resolveAnonymousVisitorIdentity(request: NextRequest) {
     normalizeIp(forwardedFor?.split(",")[0]) ??
     normalizeIp(request.headers.get("x-real-ip")) ??
     normalizeIp(request.headers.get("cf-connecting-ip")) ??
-    normalizeIp(request.headers.get("x-vercel-forwarded-for")) ??
+
     normalizeIp(parseForwardedHeader(request.headers.get("forwarded")));
   const ipHash = hashValue(rawIp ? `ip:${rawIp}` : `visitor-fallback:${visitorId}`);
 

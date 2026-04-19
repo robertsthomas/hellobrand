@@ -23,7 +23,6 @@ const isSentryEnabled =
   !isLocalAppUrl &&
   process.env.SENTRY_ENVIRONMENT !== "development" &&
   process.env.SENTRY_ENVIRONMENT !== "dev" &&
-  process.env.VERCEL_ENV !== "development" &&
   process.env.DOPPLER_CONFIG !== "dev" &&
   process.env.DOPPLER_ENVIRONMENT !== "dev";
 

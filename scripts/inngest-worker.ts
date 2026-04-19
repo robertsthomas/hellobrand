@@ -5,6 +5,7 @@ import { ConnectionState, connect } from "inngest/connect";
 
 import { inngestFunctions } from "@/lib/inngest/app";
 import { inngest } from "@/lib/inngest/client";
+import { waitForLaunchDarkly, isLaunchDarklyConfigured } from "@/lib/launchdarkly";
 
 const DEFAULT_PORT = 8080;
 
@@ -23,6 +24,10 @@ function parseConcurrency(value: string | undefined) {
 }
 
 async function main() {
+  if (isLaunchDarklyConfigured()) {
+    await waitForLaunchDarkly();
+  }
+
   const port = parsePort(process.env.PORT);
   const instanceId =
     process.env.INNGEST_WORKER_INSTANCE_ID?.trim() ||

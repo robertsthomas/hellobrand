@@ -77,7 +77,6 @@ function isMaintenanceAllowedPath(pathname: string) {
   return (
     pathname === "/" ||
     localeRootPattern.test(pathname) ||
-    pathname.startsWith("/.well-known/vercel/flags") ||
     pathname.startsWith("/admin") ||
     pathname === "/privacy" ||
     pathname === "/waitlist" ||

@@ -1,6 +1,7 @@
 FROM node:22-bookworm-slim AS builder
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=3072
 
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN corepack enable

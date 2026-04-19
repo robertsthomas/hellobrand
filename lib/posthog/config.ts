@@ -18,8 +18,7 @@ export function isPostHogClientEnabled() {
     process.env.NODE_ENV !== "development" &&
     !isLocalAppUrl(process.env.NEXT_PUBLIC_APP_URL) &&
     process.env.NEXT_PUBLIC_POSTHOG_ENVIRONMENT !== "development" &&
-    process.env.NEXT_PUBLIC_POSTHOG_ENVIRONMENT !== "dev" &&
-    process.env.NEXT_PUBLIC_VERCEL_ENV !== "development"
+    process.env.NEXT_PUBLIC_POSTHOG_ENVIRONMENT !== "dev"
   );
 }
 

@@ -2,7 +2,6 @@ import path from "node:path";
 
 function usesEphemeralFilesystem() {
   return Boolean(
-    process.env.VERCEL ||
       process.env.LAMBDA_TASK_ROOT ||
       process.env.AWS_EXECUTION_ENV
   );
