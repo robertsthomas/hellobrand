@@ -29,22 +29,13 @@ async function main() {
     process.env.FLY_MACHINE_ID?.trim() ||
     hostname();
   const maxWorkerConcurrency = parseConcurrency(process.env.INNGEST_WORKER_MAX_CONCURRENCY);
-
-  const connection = await connect({
-    apps: [{ client: inngest, functions: inngestFunctions }],
-    instanceId,
-    maxWorkerConcurrency,
-  });
-
-  console.log(
-    `[inngest-worker] connected app=${inngest.id} state=${connection.state} instance=${instanceId}`
-  );
+  let connection: Awaited<ReturnType<typeof connect>> | null = null;
 
   const httpServer = createServer((req, res) => {
     if (req.url === "/ready") {
-      const isReady = connection.state === ConnectionState.ACTIVE;
+      const isReady = connection?.state === ConnectionState.ACTIVE;
       res.writeHead(isReady ? 200 : 503, { "Content-Type": "text/plain" });
-      res.end(isReady ? "OK" : `NOT_READY:${connection.state}`);
+      res.end(isReady ? "OK" : `NOT_READY:${connection?.state ?? "CONNECTING"}`);
       return;
     }
 
@@ -58,9 +49,19 @@ async function main() {
     res.end("NOT_FOUND");
   });
 
-  httpServer.listen(port, "0.0.0.0", () => {
-    console.log(`[inngest-worker] health server listening on 0.0.0.0:${port}`);
+  httpServer.listen(port, "::", () => {
+    console.log(`[inngest-worker] health server listening on [::]:${port}`);
   });
+
+  connection = await connect({
+    apps: [{ client: inngest, functions: inngestFunctions }],
+    instanceId,
+    maxWorkerConcurrency,
+  });
+
+  console.log(
+    `[inngest-worker] connected app=${inngest.id} state=${connection.state} instance=${instanceId}`
+  );
 
   await connection.closed;
   console.log("[inngest-worker] connection closed");

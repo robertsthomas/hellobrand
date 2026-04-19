@@ -93,12 +93,8 @@ function isMaintenanceAllowedPath(pathname: string) {
   );
 }
 
-export default clerkMiddleware(async (auth, request: NextRequest) => {
+const authProxy = clerkMiddleware(async (auth, request: NextRequest) => {
   const { pathname } = request.nextUrl;
-
-  if (pathname === "/api/health") {
-    return NextResponse.next();
-  }
 
   if ((await isMaintenanceModeEnabled()) && !isMaintenanceAllowedPath(pathname)) {
     // Block API routes with 503 during maintenance
@@ -165,6 +161,14 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
 
   return NextResponse.next();
 });
+
+export default function proxy(request: NextRequest, event: unknown) {
+  if (request.nextUrl.pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
+  return authProxy(request, event as never);
+}
 
 export const config = {
   matcher: [
