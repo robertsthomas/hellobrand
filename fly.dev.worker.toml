@@ -15,10 +15,10 @@ kill_timeout = "30s"
 
 [http_service]
   internal_port = 8080
-  force_https = false
+  force_https = true
   auto_start_machines = true
   auto_stop_machines = "stop"
-  min_machines_running = 0
+  min_machines_running = 1
 
 [[http_service.checks]]
   grace_period = "20s"

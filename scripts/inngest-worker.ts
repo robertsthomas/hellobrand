@@ -24,6 +24,14 @@ function parseConcurrency(value: string | undefined) {
 }
 
 async function main() {
+  console.log("[inngest-worker] starting", {
+    appId: process.env.INNGEST_APP_ID || "hellobrand",
+    inngestDev: process.env.INNGEST_DEV,
+    nodeEnv: process.env.NODE_ENV,
+    hasSigningKey: !!process.env.INNGEST_SIGNING_KEY,
+    hasEventKey: !!process.env.INNGEST_EVENT_KEY,
+  });
+
   if (isLaunchDarklyConfigured()) {
     await waitForLaunchDarkly();
   }
@@ -58,11 +66,16 @@ async function main() {
     console.log(`[inngest-worker] health server listening on [::]:${port}`);
   });
 
-  connection = await connect({
-    apps: [{ client: inngest, functions: inngestFunctions }],
-    instanceId,
-    maxWorkerConcurrency,
-  });
+  try {
+    connection = await connect({
+      apps: [{ client: inngest, functions: inngestFunctions }],
+      instanceId,
+      maxWorkerConcurrency,
+    });
+  } catch (error) {
+    console.error("[inngest-worker] connect failed", error);
+    throw error;
+  }
 
   console.log(
     `[inngest-worker] connected app=${inngest.id} state=${connection.state} instance=${instanceId}`
