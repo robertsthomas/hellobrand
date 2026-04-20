@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { MarketingNav } from "@/components/marketing-nav";
@@ -5,6 +6,31 @@ import { PricingBillingToggle } from "@/components/pricing-billing-toggle";
 import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
 import { buildMarketingPlanAvailability } from "@/lib/billing/plans";
+import { absoluteUrl, siteConfig } from "@/lib/site";
+
+const pricingTitle = "Pricing — Free Creator Contract Review | HelloBrand";
+const pricingDescription =
+  "Free contract breakdowns for creators. Upgrade to Basic ($29/mo) or Premium ($79/mo) when your deals stack up. Cancel anytime.";
+
+export const metadata: Metadata = {
+  title: pricingTitle,
+  description: pricingDescription,
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: pricingTitle,
+    description: pricingDescription,
+    url: absoluteUrl("/pricing"),
+    siteName: siteConfig.name,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: pricingTitle,
+    description: pricingDescription,
+  },
+};
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

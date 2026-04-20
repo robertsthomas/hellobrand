@@ -15,6 +15,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1
     },
     {
+      url: absoluteUrl("/upload"),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.9
+    },
+    {
+      url: absoluteUrl("/sample"),
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.85
+    },
+    {
       url: absoluteUrl("/pricing"),
       lastModified: new Date(),
       changeFrequency: "monthly" as const,

@@ -29,28 +29,53 @@ import { getAppSettings } from "@/lib/admin-settings";
 import { maintenanceMode } from "@/flags";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: siteConfig.name,
+  url: absoluteUrl("/"),
+  description: siteConfig.description,
+};
+
+const softwareJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: siteConfig.name,
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description: siteConfig.description,
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+};
+
 const DocumentScanShowcase = dynamic(() =>
   import("@/components/document-scan-showcase").then((m) => m.DocumentScanShowcase)
 );
 
+const homepageTitle = "Brand Deal Contract Review for Creators | HelloBrand";
+const homepageDescription = siteConfig.description;
+
 export function generateMetadata(): Metadata {
   return {
-    title: "HelloBrand",
-    description: siteConfig.description,
+    title: homepageTitle,
+    description: homepageDescription,
     alternates: {
       canonical: "/",
     },
     openGraph: {
-      title: "HelloBrand",
-      description: siteConfig.description,
+      title: homepageTitle,
+      description: homepageDescription,
       url: absoluteUrl("/"),
       siteName: siteConfig.name,
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "HelloBrand",
-      description: siteConfig.description,
+      title: homepageTitle,
+      description: homepageDescription,
     },
   };
 }
@@ -91,6 +116,14 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
       <MarketingNav showWaitlist={false} />
 
       <main>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        />
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.25),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,196,140,0.10),transparent),radial-gradient(ellipse_60%_50%_at_80%_60%,rgba(129,178,154,0.08),transparent)]" />
 

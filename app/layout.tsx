@@ -19,7 +19,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: "HelloBrand",
+    default: "Brand Deal Contract Review for Creators | HelloBrand",
     template: "%s | HelloBrand",
   },
   applicationName: siteConfig.name,

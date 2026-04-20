@@ -1,10 +1,25 @@
 import type { Metadata } from "next";
 
 import { MarketingNav } from "@/components/marketing-nav";
+import { absoluteUrl, siteConfig } from "@/lib/site";
+
+const privacyTitle = "Privacy Policy | HelloBrand";
+const privacyDescription =
+  "How HelloBrand collects, uses, and protects user data. Learn about our data practices, security measures, and your privacy rights.";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | HelloBrand",
-  description: "How HelloBrand collects, uses, and protects user data."
+  title: privacyTitle,
+  description: privacyDescription,
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title: privacyTitle,
+    description: privacyDescription,
+    url: absoluteUrl("/privacy"),
+    siteName: siteConfig.name,
+    type: "website",
+  },
 };
 
 const sections = [

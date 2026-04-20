@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { BlogSummarizeButton } from "@/components/blog-summarize-button";
@@ -273,6 +273,37 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           ))}
         </article>
 
+        {/* CTA */}
+        <section className="mt-16 rounded-2xl border border-[#e8e8e8] bg-[#f9f7f2] p-8 text-center dark:border-[#222] dark:bg-[#141920]">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-primary dark:text-[#8ec6b1]">
+            Ready to review your own contract?
+          </p>
+          <h2 className="mt-3 text-[1.5rem] font-bold tracking-tight text-[#111] sm:text-[1.75rem] dark:text-white">
+            Upload your brand deal for a free breakdown.
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-[0.95rem] leading-relaxed text-[#555] dark:text-[#999]">
+            Get the summary, risk flags, and payment terms from your own contract in seconds. No signup required.
+          </p>
+          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link
+              href="/upload"
+              className="inline-flex h-11 items-center gap-2 bg-primary px-6 text-[14px] font-semibold text-white shadow-sm transition hover:bg-primary/92"
+            >
+              Upload Your Contract
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/sample"
+              className="inline-flex h-11 items-center gap-2 border border-[#ddd] bg-white px-6 text-[14px] font-semibold text-[#333] transition hover:bg-[#f5f3ee] dark:border-[#333] dark:bg-[#1a1f27] dark:text-[#ccc] dark:hover:bg-[#1e2530]"
+            >
+              Try a Sample
+            </Link>
+          </div>
+        </section>
+
+        {/* Related posts */}
+        <RelatedPosts currentSlug={slug} />
+
         {/* Bottom nav */}
         <div className="mt-16 border-t border-[#e8e8e8] pt-8 dark:border-[#222]">
           <Link
@@ -285,5 +316,49 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         </div>
       </main>
     </div>
+  );
+}
+
+function RelatedPosts({ currentSlug }: { currentSlug: string }) {
+  const allPosts = getBlogPosts();
+  const related = allPosts
+    .filter((p) => p.slug !== currentSlug)
+    .slice(0, 3);
+
+  if (related.length === 0) return null;
+
+  return (
+    <section className="mt-12">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#888] dark:text-[#666]">
+        Related articles
+      </p>
+      <div className="mt-5 space-y-5">
+        {related.map((post) => (
+          <Link
+            key={post.slug}
+            href={`/blog/${post.slug}`}
+            className="block px-4 py-5 transition-colors hover:bg-[#fbf8f0] rounded-lg sm:px-5 dark:hover:bg-[#13161b]"
+          >
+            <div className="flex items-center gap-3 text-[13px] text-[#888] dark:text-[#666]">
+              <span>{post.category}</span>
+              <span aria-hidden="true">&middot;</span>
+              <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>
+              <span aria-hidden="true">&middot;</span>
+              <span>{post.readingTime}</span>
+            </div>
+            <h3 className="mt-2 text-[1.1rem] font-bold leading-snug tracking-tight text-[#111] dark:text-white">
+              {post.title}
+            </h3>
+            <p className="mt-1 max-w-xl text-[0.9rem] leading-relaxed text-[#555] dark:text-[#999]">
+              {post.description}
+            </p>
+            <span className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary dark:text-[#8ec6b1]">
+              Read article
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
