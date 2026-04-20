@@ -14,6 +14,42 @@ const localeRoutePattern = new RegExp(`^\\/(?:${localeAlternation})(?:\\/.*)?$`)
 const localeRootPattern = new RegExp(`^\\/(?:${localeAlternation})$`);
 const localizedAppRoutePattern = new RegExp(`^\\/((?:${localeAlternation}))\\/app(?:\\/(.*))?$`);
 
+async function sha256(value: string): Promise<string> {
+  const encoded = new TextEncoder().encode(value);
+  const buffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function isSitePasswordProtected(): boolean {
+  return (process.env.SITE_PASSWORD?.trim()?.length ?? 0) > 0;
+}
+
+function skipSitePassword(pathname: string): boolean {
+  if (pathname.startsWith("/_next")) return true;
+  if (pathname.startsWith("/site-password")) return true;
+  if (pathname === "/api/site-auth") return true;
+  if (pathname === "/favicon.ico" || pathname === "/icon") return true;
+  if (pathname.startsWith("/monitoring")) return true;
+  return false;
+}
+
+async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
+  if (!isSitePasswordProtected()) return null;
+  if (skipSitePassword(request.nextUrl.pathname)) return null;
+
+  const cookie = request.cookies.get("dev-site-auth")?.value;
+  const expected = await sha256(process.env.SITE_PASSWORD!.trim());
+
+  if (cookie === expected) return null;
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/site-password";
+  url.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
+  return NextResponse.redirect(url);
+}
+
 async function isMaintenanceModeEnabled() {
   return (await maintenanceMode()) === true;
 }
@@ -161,10 +197,13 @@ const authProxy = clerkMiddleware(async (auth, request: NextRequest) => {
   return NextResponse.next();
 });
 
-export default function proxy(request: NextRequest, event: unknown) {
+export default async function proxy(request: NextRequest, event: unknown) {
   if (request.nextUrl.pathname === "/api/health") {
     return NextResponse.next();
   }
+
+  const passwordRedirect = await checkSitePassword(request);
+  if (passwordRedirect) return passwordRedirect;
 
   return authProxy(request, event as never);
 }
