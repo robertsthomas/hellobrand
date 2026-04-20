@@ -57,6 +57,9 @@ export const viewport: Viewport = {
 function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider
+      signInFallbackRedirectUrl="/app"
+      signUpFallbackRedirectUrl="/app"
+      afterSignOutUrl="/login"
       waitlistUrl="/waitlist"
       appearance={{
         layout: {

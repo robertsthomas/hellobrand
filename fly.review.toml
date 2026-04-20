@@ -1,4 +1,4 @@
-app = "hellobrand-app"
+app = "hellobrand-review"
 primary_region = "iad"
 kill_signal = "SIGTERM"
 kill_timeout = "30s"
@@ -9,13 +9,15 @@ kill_timeout = "30s"
 [env]
   PORT = "8080"
   HOSTNAME = "::"
+  NODE_ENV = "production"
+  INNGEST_SERVE_DISABLED = "1"
 
 [http_service]
   internal_port = 8080
   force_https = true
   auto_start_machines = true
   auto_stop_machines = "stop"
-  min_machines_running = 1
+  min_machines_running = 0
 
   [http_service.concurrency]
     type = "requests"
@@ -23,12 +25,8 @@ kill_timeout = "30s"
     hard_limit = 25
 
 [[http_service.checks]]
-  grace_period = "60s"
+  grace_period = "30s"
   interval = "15s"
   method = "GET"
-  timeout = "10s"
+  timeout = "5s"
   path = "/api/health"
-
-[metrics]
-  port = 8080
-  path = "/metrics"
