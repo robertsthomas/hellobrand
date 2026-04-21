@@ -524,7 +524,7 @@ export function AppFrame({
             <Link
               href={localizeHref("/app")}
               prefetch={false}
-              className={cn("group flex items-center", compactSidebar ? "gap-0" : "gap-3")}
+              className={cn("group/logo flex items-center", compactSidebar ? "gap-0" : "gap-3")}
               onClick={closeSidebar}
             >
               <div

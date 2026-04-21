@@ -386,6 +386,7 @@ html.dark ::selection {
   }
 }
 
+.group\/logo:hover .hello-hand-wave,
 .group:hover .hello-hand-wave {
   transform-origin: 70% 85%;
   animation: hello-hand-wave 680ms ease-in-out;
