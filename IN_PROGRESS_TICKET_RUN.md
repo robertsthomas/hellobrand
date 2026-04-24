@@ -26,7 +26,7 @@ Why fourth:
 This should follow the schema/setup work in `ROB-181` if that ticket is a real dependency rather than just documentation.
 
 Execution note:
-After codebase review, `ROB-177` was completed before `ROB-181` because the repo already had a distinct brief/deck extraction path plus fallback heuristics that could be improved and verified locally. `ROB-181` remains dependent on external Google Cloud processor setup that is not present in this repo or local secret configuration.
+After codebase review, `ROB-177` was completed before `ROB-181` because the repo already had a distinct brief/deck extraction path plus fallback heuristics that could be improved and verified locally. `ROB-181` has now been canceled because the team is not using Google Cloud Document AI and any remaining vendor-specific Document AI code/config has been removed from the repo.
 
 ## Epics
 
@@ -159,7 +159,7 @@ What is being changed:
 Why:
 - The existing brief extraction handled only the most basic overview and messaging fields.
 - Real creator briefs and pitch decks often include operational guidance such as approval timing, revisions, required claims, links/assets, posting windows, and reporting expectations.
-- `ROB-177` explicitly requires clear fallback behavior for weakly structured creative materials, and that is something the current repo can improve and verify locally even while the external Document AI setup remains unfinished.
+- `ROB-177` explicitly requires clear fallback behavior for weakly structured creative materials, and that is something the current repo can improve and verify locally without depending on any external Document AI vendor setup.
 
 What was done:
 - Expanded `extractBriefData()` in `lib/analysis/summary/index.ts` to capture:
@@ -203,12 +203,11 @@ Verification results:
 - Remaining unrelated compiler issue still present: stale `.next/types/validator.ts` references missing `app/api/inngest/route.js`
 
 Follow-up:
-- When the Google Document AI processors exist, the same normalized brief fields should remain the target contract for vendor-to-app mapping.
 - If richer brief review UX is needed later, it can build on these extracted fields without revisiting the parsing layer first.
 
 ### ROB-181
 
-Status: Blocked outside the repo, not ready for review
+Status: Canceled
 
 What was assessed:
 - Checked the current repo for Google Document AI processor integration, verification scripts, and extractor schema documentation.
@@ -216,23 +215,14 @@ What was assessed:
 
 Findings:
 - The acceptance criteria in `ROB-181` reference `scripts/verify-document-ai-contract.ts` and `scripts/verify-document-ai-brief.ts`, but those files are not present in this repo.
-- The current checked-in document text extraction path uses Azure Document Intelligence for OCR/layout extraction, not Google Document AI custom extractors.
+- At the time of assessment, the checked-in document text extraction path used an optional Azure-based OCR/layout integration rather than Google Document AI custom extractors.
 - `.env.example`, `.env.local` key names, and Doppler secret names do not include Google Document AI processor identifiers or service-account style configuration needed to run the described verification flow.
 - No checked-in documentation currently maps the Google Cloud entity names in the ticket to a live processor configuration.
 
-Why this is blocked:
-- The ticket requires external Google Cloud setup:
-  - defining extractor schemas
-  - uploading labeled training documents
-  - building processor versions
-  - verifying live processor requests from the app
-- None of those acceptance criteria can be completed honestly from this repo alone in its current state.
+What was done:
+- Canceled `ROB-181` because the team is not using Google Cloud Document AI.
+- Removed the optional vendor-specific OCR/document-intelligence code path from the repo so document text extraction now relies on the existing local parsers only.
+- Removed the vendor-specific tests and public config/docs references tied to that code path.
 
 What needs to happen next:
-- Confirm whether the intended vendor is actually Google Document AI or whether the ticket is stale relative to the current Azure-based extraction path.
-- If Google Document AI is still the target:
-  - add the missing runtime configuration and verification scripts
-  - provision the processors and trained versions in Google Cloud
-  - document the processor/entity mapping in the repo
-- If Azure is the actual target now:
-  - rewrite or replace `ROB-181` so it matches the current architecture instead of referencing missing Google Document AI flows.
+- If a future hosted document extraction vendor is introduced, it should come back as a new ticket with an implementation path that matches the actual chosen provider and runtime configuration.

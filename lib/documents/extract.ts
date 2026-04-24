@@ -197,53 +197,6 @@ type ExtractionResult = {
 
 type ExtractDocumentTextOptions = {};
 
-async function extractTextWithAzureDocumentIntelligence(
-  buffer: Buffer,
-  mimeType: string,
-  fileName: string
-): Promise<ExtractionResult | null> {
-  const lowerFileName = fileName.toLowerCase();
-
-  if (
-    mimeType !== "application/pdf" &&
-    mimeType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
-    !lowerFileName.endsWith(".pdf") &&
-    !lowerFileName.endsWith(".docx")
-  ) {
-    return null;
-  }
-
-  const { analyzeDocumentWithAzureDocumentIntelligence, hasAzureDocumentIntelligence } =
-    await import("@/lib/azure-document-intelligence");
-
-  if (!hasAzureDocumentIntelligence()) {
-    return null;
-  }
-
-  const startedAt = Date.now();
-  const response = await analyzeDocumentWithAzureDocumentIntelligence({
-    bytes: buffer,
-    mimeType,
-  });
-
-  return {
-    rawText: response.fullText,
-    normalizedText: normalizeDocumentText(response.fullText),
-    _debug: {
-      parser: `azure-document-intelligence:${response.modelId}`,
-      durationMs: Date.now() - startedAt,
-      fileSizeBytes: buffer.length,
-      extractedChars: response.fullText.length,
-      pageCount: response.pageCount,
-      estimatedCostUsd: null,
-    },
-    _vendor: {
-      processor: response.modelId,
-      payload: response.rawResponse,
-    },
-  };
-}
-
 // fallow-ignore-next-line complexity
 export async function extractDocumentText(
   buffer: Buffer,
@@ -253,7 +206,6 @@ export async function extractDocumentText(
 ): Promise<ExtractionResult> {
   const startedAt = Date.now();
   const fileSizeBytes = buffer.length;
-  const failures: string[] = [];
 
   function debugMeta(parser: string, text: string) {
     const durationMs = Date.now() - startedAt;
@@ -261,15 +213,6 @@ export async function extractDocumentText(
       `[extract] ${parser} | ${fileName} | ${fileSizeBytes} bytes | ${text.length} chars | ${durationMs}ms`
     );
     return { parser, durationMs, fileSizeBytes, extractedChars: text.length };
-  }
-
-  try {
-    const azureResult = await extractTextWithAzureDocumentIntelligence(buffer, mimeType, fileName);
-    if (azureResult) {
-      return azureResult;
-    }
-  } catch (azureError) {
-    failures.push(azureError instanceof Error ? azureError.message : String(azureError));
   }
 
   if (mimeType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
@@ -289,7 +232,7 @@ export async function extractDocumentText(
           _debug: debugMeta("pdf-parse", result.text),
         };
       } catch (pdfParseError) {
-        const messages = [...failures, pdfJsError, pdfParseError]
+        const messages = [pdfJsError, pdfParseError]
           .map((error) => (error instanceof Error ? error.message : String(error)))
           .filter(Boolean)
           .join(" | ");
