@@ -93,3 +93,53 @@ Verification results:
 Follow-up:
 - `ROB-96` should consume the new analytics snapshot options for real filter controls and drill-down entry points.
 - If analytics needs historical accuracy beyond current deal-derived state, the next backend step is persisted snapshots or an event ledger. That should be a deliberate extension, not mixed into the current page work.
+
+### ROB-96
+
+Status: Done locally, ready for review
+
+What is being changed:
+- Add real filter controls to the analytics page.
+- Expose drill-down entry points from analytics into underlying workspace and payment surfaces.
+- Surface a visible pipeline breakdown so the page is more useful than a static metric summary.
+
+Why:
+- `ROB-95` created the analytics snapshot contract, but the page was still mostly a fixed presentation layer.
+- `ROB-96` is where the analytics page becomes navigable and usable: range control, brand/status filters, and links into the underlying records.
+
+What was done:
+- Updated `app/app/analytics/page.tsx` to accept `searchParams` and apply:
+  - range selection
+  - brand filtering
+  - status filtering
+- Added range links for:
+  - 30 days
+  - 90 days
+  - 6 months
+  - 12 months
+  - all time
+- Added select-based filters for brand and status with a reset path.
+- Added explicit drill-down links to:
+  - workspace history
+  - payments
+  - individual workspace detail pages from the top-content list
+- Added a pipeline breakdown panel in the right rail using the analytics snapshot produced by `ROB-95`.
+- Kept the page structure and styling aligned with the existing analytics surface instead of redesigning the route.
+
+Connected work:
+- Depends directly on `ROB-95`.
+- Advances `ROB-70` by making the analytics page meaningfully navigable.
+
+Verification completed:
+- `pnpm exec playwright test tests/e2e/analytics.spec.ts tests/e2e/tier-matrix.spec.ts`
+- `pnpm exec vitest run tests/analytics-service.test.ts`
+
+Verification results:
+- Analytics/tier Playwright coverage passed: `18 passed`
+- Analytics service unit coverage remained green: `3 passed`
+- Targeted type check for the changed analytics page is clean
+- Remaining unrelated compiler issue still present: stale `.next/types/validator.ts` references missing `app/api/inngest/route.js`
+
+Follow-up:
+- The current drill-down links route into existing history/payments/workspace surfaces. If finer-grained filtered drill-down is needed, the next step is to make the destination pages consume compatible query params.
+- If advanced reporting under Premium needs additional sections, it can now build on the same snapshot/filter plumbing rather than adding page-local calculations.

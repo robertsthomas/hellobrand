@@ -10,6 +10,7 @@ import {
   BarChart3,
   CheckCircle2,
   CircleAlert,
+  Filter,
   RefreshCcw,
   Sparkles,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import {
 import { FeatureUpgradeCard } from "@/components/feature-locked-state";
 import { AnalyticsSkeleton } from "@/components/skeletons";
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
-import { getAnalyticsSnapshotForViewer } from "@/lib/analytics/service";
+import { type AnalyticsRange, getAnalyticsSnapshotForViewer } from "@/lib/analytics/service";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { formatCurrency, humanizeToken } from "@/lib/utils";
@@ -27,6 +28,64 @@ import {
   DUMMY_TOP_CONTENT,
   getPlatformStatus,
 } from "./page-helpers";
+
+const ANALYTICS_RANGE_OPTIONS: Array<{ value: AnalyticsRange; label: string }> = [
+  { value: "30d", label: "30 days" },
+  { value: "90d", label: "90 days" },
+  { value: "180d", label: "6 months" },
+  { value: "365d", label: "12 months" },
+  { value: "all", label: "All time" },
+];
+
+function normalizeSearchParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function normalizeRange(value: string): AnalyticsRange {
+  if (
+    value === "30d" ||
+    value === "90d" ||
+    value === "180d" ||
+    value === "365d" ||
+    value === "all"
+  ) {
+    return value;
+  }
+
+  return "180d";
+}
+
+function buildAnalyticsHref(input: {
+  range: AnalyticsRange;
+  brand?: string | null;
+  status?: string | null;
+}) {
+  const searchParams = new URLSearchParams();
+  searchParams.set("range", input.range);
+
+  if (input.brand?.trim()) {
+    searchParams.set("brand", input.brand.trim());
+  }
+
+  if (input.status?.trim()) {
+    searchParams.set("status", input.status.trim());
+  }
+
+  const query = searchParams.toString();
+  return query.length > 0 ? `/app/analytics?${query}` : "/app/analytics";
+}
+
+function drillDownHrefForPipeline(key: string) {
+  if (key === "awaiting_payment") {
+    return "/app/payments";
+  }
+
+  return "/app/p/history";
+}
 
 function AnalyticsPreviewLocked() {
   const maxVal = Math.max(...DUMMY_MONTHS.map((m) => m.value));
@@ -165,23 +224,53 @@ function AnalyticsPreviewLocked() {
   );
 }
 
-export default function AnalyticsPage() {
+export default function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ range?: string; brand?: string; status?: string }>;
+}) {
   return (
     <Suspense fallback={<AnalyticsSkeleton />}>
-      <AnalyticsContent />
+      <AnalyticsContent searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function AnalyticsContent() {
+async function AnalyticsContent({
+  searchParams,
+}: {
+  searchParams?: Promise<{ range?: string; brand?: string; status?: string }>;
+}) {
   const viewer = await requireViewer();
   const entitlements = await getViewerEntitlements(viewer);
   if (!entitlements.features.analytics) {
     return <AnalyticsPreviewLocked />;
   }
 
-  const { formattedTopContent, maxRevenuePoint, metadata, metrics, monthlyRevenue, platformRows } =
-    await getAnalyticsSnapshotForViewer(viewer);
+  const resolvedSearchParams = await (
+    searchParams ??
+    Promise.resolve<{ range?: string; brand?: string; status?: string }>({})
+  );
+  const selectedRange = normalizeRange(normalizeSearchParam(resolvedSearchParams.range));
+  const selectedBrand = normalizeSearchParam(resolvedSearchParams.brand).trim();
+  const selectedStatus = normalizeSearchParam(resolvedSearchParams.status).trim();
+  const resetHref = buildAnalyticsHref({ range: selectedRange });
+
+  const {
+    availableBrands,
+    availableStatuses,
+    formattedTopContent,
+    maxRevenuePoint,
+    metadata,
+    metrics,
+    monthlyRevenue,
+    pipelineBreakdown,
+    platformRows,
+  } = await getAnalyticsSnapshotForViewer(viewer, {
+    range: selectedRange,
+    brandNames: selectedBrand ? [selectedBrand] : undefined,
+    statuses: selectedStatus ? [selectedStatus] : undefined,
+  });
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
@@ -200,9 +289,99 @@ async function AnalyticsContent() {
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 border border-black/8 bg-white px-4 py-3 text-sm font-medium text-foreground">
-            Last 6 months
+          <div className="flex flex-wrap items-center gap-2">
+            {ANALYTICS_RANGE_OPTIONS.map((option) => {
+              const href = buildAnalyticsHref({
+                range: option.value,
+                brand: selectedBrand || null,
+                status: selectedStatus || null,
+              });
+
+              return (
+                <Link
+                  key={option.value}
+                  href={href}
+                  className={`inline-flex items-center gap-2 border px-4 py-3 text-sm font-medium transition-colors ${
+                    selectedRange === option.value
+                      ? "border-black bg-foreground text-background"
+                      : "border-black/8 bg-white text-foreground hover:bg-[#f7f5f1]"
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              );
+            })}
           </div>
+        </section>
+
+        <section className="border-t border-black/8 pt-5">
+          <form
+            action="/app/analytics"
+            method="get"
+            className="flex flex-wrap items-end gap-3"
+          >
+            <input type="hidden" name="range" value={selectedRange} />
+            <div className="flex min-w-[180px] flex-col gap-1">
+              <label
+                htmlFor="analytics-brand-filter"
+                className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground"
+              >
+                Brand
+              </label>
+              <select
+                id="analytics-brand-filter"
+                name="brand"
+                aria-label="Brand filter"
+                defaultValue={selectedBrand}
+                className="border border-black/8 bg-white px-3 py-2.5 text-sm text-foreground"
+              >
+                <option value="">All brands</option>
+                {availableBrands.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex min-w-[180px] flex-col gap-1">
+              <label
+                htmlFor="analytics-status-filter"
+                className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground"
+              >
+                Status
+              </label>
+              <select
+                id="analytics-status-filter"
+                name="status"
+                aria-label="Status filter"
+                defaultValue={selectedStatus}
+                className="border border-black/8 bg-white px-3 py-2.5 text-sm text-foreground"
+              >
+                <option value="">All statuses</option>
+                {availableStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {humanizeToken(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 border border-black/8 bg-white px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-[#f7f5f1]"
+            >
+              <Filter className="h-4 w-4" />
+              Apply filters
+            </button>
+
+            <Link
+              href={resetHref}
+              className="inline-flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Reset filters
+            </Link>
+          </form>
         </section>
 
         <section className="grid gap-10 xl:grid-cols-[minmax(0,1.45fr)_360px]">
@@ -217,7 +396,12 @@ async function AnalyticsContent() {
                     Simplified business metrics derived from your active partnership flow.
                   </p>
                 </div>
-                <div className="text-sm text-muted-foreground">Timeline view</div>
+                <Link
+                  href="/app/p/history"
+                  className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  View all workspaces
+                </Link>
               </div>
 
               <div className="grid gap-4 border-t border-black/8 pt-5 md:grid-cols-2 xl:grid-cols-4">
@@ -249,6 +433,21 @@ async function AnalyticsContent() {
                     <p className="mt-2 text-xs text-muted-foreground">{metric.context}</p>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-black/8 pt-4">
+                <Link
+                  href="/app/p/history"
+                  className="inline-flex items-center gap-2 border border-black/8 bg-white px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[#f7f5f1]"
+                >
+                  View all workspaces
+                </Link>
+                <Link
+                  href="/app/payments"
+                  className="inline-flex items-center gap-2 border border-black/8 bg-white px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[#f7f5f1]"
+                >
+                  Open payments
+                </Link>
               </div>
 
               <div className="mt-8 border-t border-black/8 pt-6">
@@ -300,14 +499,12 @@ async function AnalyticsContent() {
                     analytics into the main product surface.
                   </p>
                 </div>
-                <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="border-b border-black/10 pb-1 text-foreground">
-                    All platforms
-                  </span>
-                  <span>Instagram</span>
-                  <span>TikTok</span>
-                  <span>YouTube</span>
-                </div>
+                <Link
+                  href="/app/p/history"
+                  className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Open workspace history
+                </Link>
               </div>
 
               <div className="divide-y divide-black/8 border-t border-black/8">
@@ -322,7 +519,12 @@ async function AnalyticsContent() {
                       className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_110px_110px_96px]"
                     >
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground">{item.campaignName}</div>
+                        <Link
+                          href={`/app/p/${item.id}`}
+                          className="font-medium text-foreground underline-offset-4 hover:underline"
+                        >
+                          {item.campaignName}
+                        </Link>
                         <div className="mt-1 text-sm text-muted-foreground">
                           {item.brandName} · {item.statusLabel}
                         </div>
@@ -355,6 +557,44 @@ async function AnalyticsContent() {
                 actionLabel="Upgrade for advanced reporting"
               />
             ) : null}
+
+            <section className="border-t border-black/8 pt-6">
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-[24px] font-semibold tracking-[-0.04em] text-foreground">
+                    Pipeline breakdown
+                  </h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Drill into the current workspace mix and payment queue.
+                  </p>
+                </div>
+                <Link
+                  href="/app/p/history"
+                  className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  Open history
+                </Link>
+              </div>
+
+              <div className="divide-y divide-black/8 border-t border-black/8">
+                {pipelineBreakdown.map((entry) => (
+                  <div key={entry.key} className="flex items-start justify-between gap-4 py-4">
+                    <div>
+                      <div className="font-medium text-foreground">{entry.label}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {entry.count} workspaces · {formatCurrency(entry.revenue)}
+                      </div>
+                    </div>
+                    <Link
+                      href={drillDownHrefForPipeline(entry.key)}
+                      className="inline-flex items-center gap-2 border border-black/8 bg-white px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[#f7f5f1]"
+                    >
+                      View
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <section className="border-t border-black/8 pt-6">
               <div className="mb-5 flex items-center justify-between gap-4">
