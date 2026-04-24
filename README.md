@@ -56,8 +56,14 @@ doppler secrets upload .env --project hellobrand --config dev
    - `OPENROUTER_MODEL_SUMMARY` for creator-facing summaries
    - optional `*_FALLBACKS` secrets for per-task failover
    `OPENROUTER_MODEL` overrides the task-specific model secrets when set. If it is unset, the app falls back to the task-specific model for that route. If no provider is configured, the fallback parser is used.
-7. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
-8. For Stripe-backed billing flows, set:
+7. Optional for Azure Document Intelligence-backed text extraction, set:
+   - `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`
+   - `AZURE_DOCUMENT_INTELLIGENCE_API_KEY`
+   - optional `AZURE_DOCUMENT_INTELLIGENCE_MODEL_ID` (defaults to `prebuilt-read`)
+   - optional `AZURE_DOCUMENT_INTELLIGENCE_API_VERSION` (defaults to `2024-11-30`)
+   When configured, HelloBrand uses Azure for PDF and DOCX text/layout extraction before falling back to local parsers.
+8. Fill in `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Doppler if you want document processing to run through Inngest. If omitted, the app falls back to local fire-and-forget processing.
+9. For Stripe-backed billing flows, set:
    - `STRIPE_SECRET_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `STRIPE_PRICE_BASIC_MONTHLY`
@@ -65,9 +71,9 @@ doppler secrets upload .env --project hellobrand --config dev
    - optional `STRIPE_PRICE_BASIC_YEARLY`
    - optional `STRIPE_PRICE_PREMIUM_YEARLY`
    - Free has no Stripe product or price ID
-9. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=free|basic|premium` in a non-production environment to override the effective tier.
-10. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
-11. Install dependencies:
+10. Optional for local packaging QA: set `HELLOBRAND_DEV_PLAN=free|basic|premium` in a non-production environment to override the effective tier.
+11. Optional for Playwright E2E: set `HELLOBRAND_E2E_ENABLED=1` and `HELLOBRAND_E2E_AUTH_SECRET` in a non-production environment to enable the local test-auth cookie flow.
+12. Install dependencies:
 
 ```bash
 pnpm install

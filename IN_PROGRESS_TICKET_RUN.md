@@ -26,7 +26,7 @@ Why fourth:
 This should follow the schema/setup work in `ROB-181` if that ticket is a real dependency rather than just documentation.
 
 Execution note:
-After codebase review, `ROB-177` was completed before `ROB-181` because the repo already had a distinct brief/deck extraction path plus fallback heuristics that could be improved and verified locally. `ROB-181` has now been canceled because the team is not using Google Cloud Document AI and any remaining vendor-specific Document AI code/config has been removed from the repo.
+After codebase review, `ROB-177` was completed before `ROB-181` because the repo already had a distinct brief/deck extraction path plus fallback heuristics that could be improved and verified locally. `ROB-181` has now been canceled because the team is not using Google Cloud Document AI. The existing Azure Document Intelligence integration remains the supported optional vendor path for OCR/layout extraction.
 
 ## Epics
 
@@ -221,8 +221,7 @@ Findings:
 
 What was done:
 - Canceled `ROB-181` because the team is not using Google Cloud Document AI.
-- Removed the optional vendor-specific OCR/document-intelligence code path from the repo so document text extraction now relies on the existing local parsers only.
-- Removed the vendor-specific tests and public config/docs references tied to that code path.
+- Confirmed the repo should keep the existing Azure Document Intelligence integration as the supported optional OCR/layout extraction path.
 
 What needs to happen next:
-- If a future hosted document extraction vendor is introduced, it should come back as a new ticket with an implementation path that matches the actual chosen provider and runtime configuration.
+- If a future Google Document AI integration is introduced, it should come back as a new ticket with an implementation path that matches the actual chosen provider and runtime configuration.
