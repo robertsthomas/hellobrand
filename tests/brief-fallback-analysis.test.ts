@@ -81,4 +81,111 @@ Overview: Create content for the NimbusPM summer push.
     expect(result.extraction.data.brandName).toBe("NimbusPM");
     expect(result.extraction.data.campaignName).toBe("Summer Push");
   });
+
+  test("extracts richer creator-brief workflow fields from a deliverables brief", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Deliverables Brief
+Acme Beauty
+Summer Skin Reset
+
+Deliverables:
+- 1 Instagram Reel
+- 3 Instagram Stories
+
+Posting Schedule:
+Post between June 10 and June 14 after approval.
+
+Approval Requirements:
+Brand must approve draft 48 hours before posting.
+
+Revision Requirements:
+One round of light edits is included.
+
+Competitor Restrictions:
+- Do not feature other retinol products in the same post.
+
+Links and Assets:
+- https://acme.example.com/brief
+- Product imagery folder
+
+Required Claims:
+- Clinically tested
+
+Instagram Handle: @acmebeautycreator
+`,
+      {
+        fileName: "acme-beauty-deliverables-brief.pdf"
+      }
+    );
+
+    expect(result.classification.documentKind).toBe("deliverables_brief");
+    expect(result.extraction.data.briefData).toMatchObject({
+      deliverablesSummary: expect.stringContaining("1 Instagram Reel"),
+      postingSchedule: expect.stringContaining("June 10"),
+      approvalRequirements: expect.stringContaining("48 hours"),
+      revisionRequirements: expect.stringContaining("One round"),
+      creatorHandle: "@acmebeautycreator",
+    });
+    expect(result.extraction.data.briefData?.deliverablePlatforms).toEqual(
+      expect.arrayContaining(["Instagram"])
+    );
+    expect(result.extraction.data.briefData?.competitorRestrictions).toEqual(
+      expect.arrayContaining(["Do not feature other retinol products in the same post."])
+    );
+    expect(result.extraction.data.briefData?.linksAndAssets).toEqual(
+      expect.arrayContaining(["https://acme.example.com/brief", "Product imagery folder"])
+    );
+    expect(result.extraction.data.briefData?.requiredClaims).toEqual(
+      expect.arrayContaining(["Clinically tested"])
+    );
+  });
+
+  test("extracts pitch deck guidance from weakly structured headings", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Pitch Deck
+GlowLab
+Night Repair Serum Launch
+
+Target Audience:
+Women 28-40 who want a quick nighttime routine.
+
+Tone & Style:
+Confident, clean, and dermatologist-adjacent.
+
+Do Not Mention:
+- Prescription-strength claims
+- Medical outcomes
+
+Links and Assets:
+- Campaign deck in Drive
+- Approved product close-up images
+
+Reporting Requirements:
+Share 7-day view, reach, and saves.
+
+Campaign Live Date: July 8, 2026
+`,
+      {
+        fileName: "glowlab-night-repair-pitch-deck.pdf"
+      }
+    );
+
+    expect(result.classification.documentKind).toBe("pitch_deck");
+    expect(result.extraction.data.brandName).toBe("GlowLab");
+    expect(result.extraction.data.campaignName).toBe("Night Repair Serum Launch");
+    expect(result.extraction.data.briefData).toMatchObject({
+      targetAudience: expect.stringContaining("Women 28-40"),
+      toneAndStyle: expect.stringContaining("Confident"),
+      reportingRequirements: expect.stringContaining("7-day view"),
+      campaignLiveDate: "July 8, 2026",
+    });
+    expect(result.extraction.data.briefData?.doNotMention).toEqual(
+      expect.arrayContaining(["Prescription-strength claims", "Medical outcomes"])
+    );
+    expect(result.extraction.data.briefData?.linksAndAssets).toEqual(
+      expect.arrayContaining(["Campaign deck in Drive", "Approved product close-up images"])
+    );
+  });
 });

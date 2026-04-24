@@ -11,9 +11,21 @@ import { getTopDocumentLines, isGenericCampaignName, pushEvidence, sentenceAroun
 
 export function inferBriefBrandName(text: string) {
   for (const line of getTopDocumentLines(text, 4)) {
+    const normalizedLine = line.trim().toLowerCase();
+    if (
+      normalizedLine === "pitch deck" ||
+      normalizedLine === "campaign brief" ||
+      normalizedLine === "deliverables brief" ||
+      normalizedLine === "creative brief" ||
+      normalizedLine === "content brief"
+    ) {
+      continue;
+    }
+
     const candidate = sanitizePartyName(
       line
-        .replace(/\b(influencer|campaign|creative|content)\s+brief\b/gi, "")
+        .replace(/\b(influencer|campaign|creative|content|deliverables)\s+brief\b/gi, "")
+        .replace(/\bpitch\s+deck\b/gi, "")
         .replace(/\bbrief\b/gi, "")
         .replace(/\s{2,}/g, " ")
         .trim(),

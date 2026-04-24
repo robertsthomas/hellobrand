@@ -25,6 +25,9 @@ This is likely the gating setup for the Document AI-backed extraction work and n
 Why fourth:
 This should follow the schema/setup work in `ROB-181` if that ticket is a real dependency rather than just documentation.
 
+Execution note:
+After codebase review, `ROB-177` was completed before `ROB-181` because the repo already had a distinct brief/deck extraction path plus fallback heuristics that could be improved and verified locally. `ROB-181` remains dependent on external Google Cloud processor setup that is not present in this repo or local secret configuration.
+
 ## Epics
 
 `ROB-68`, `ROB-70`, and `ROB-107` are epics. They are not being treated as implementation tickets. They should only move once their remaining child scope is actually resolved or explicitly split further.
@@ -143,3 +146,93 @@ Verification results:
 Follow-up:
 - The current drill-down links route into existing history/payments/workspace surfaces. If finer-grained filtered drill-down is needed, the next step is to make the destination pages consume compatible query params.
 - If advanced reporting under Premium needs additional sections, it can now build on the same snapshot/filter plumbing rather than adding page-local calculations.
+
+### ROB-177
+
+Status: Done locally, ready for review
+
+What is being changed:
+- Strengthen the brief/deck extraction path so campaign guidance documents are handled as brief inputs rather than weak contract-like fallbacks.
+- Expand the fields captured from loosely structured deliverables briefs and pitch decks.
+- Keep the extraction changes inside the existing analysis/pipeline layers without changing any UI.
+
+Why:
+- The existing brief extraction handled only the most basic overview and messaging fields.
+- Real creator briefs and pitch decks often include operational guidance such as approval timing, revisions, required claims, links/assets, posting windows, and reporting expectations.
+- `ROB-177` explicitly requires clear fallback behavior for weakly structured creative materials, and that is something the current repo can improve and verify locally even while the external Document AI setup remains unfinished.
+
+What was done:
+- Expanded `extractBriefData()` in `lib/analysis/summary/index.ts` to capture:
+  - deliverables summary
+  - revision requirements
+  - required claims
+  - disclosure requirements
+  - competitor restrictions
+  - links and assets
+  - posting schedule
+  - campaign live date
+  - draft due date
+  - content due date
+  - payment schedule, requirements, and notes
+  - reporting requirements
+  - creator handle
+  - detected delivery platforms
+- Tightened deliverables section matching so a heading like `Deliverables Brief` is no longer misread as the actual deliverables body.
+- Updated brief brand inference in `lib/analysis/extract/brief.ts` so generic headings like `Pitch Deck` and `Deliverables Brief` are skipped instead of being treated as brand names.
+- Added focused unit coverage for:
+  - richer deliverables-brief extraction
+  - weakly structured pitch deck extraction
+- Verified that the pipeline extraction step still passes against the shared extractor.
+
+Why this approach:
+- The extraction heuristics in `lib/analysis/summary/index.ts` are used by both fallback analysis and the document pipeline heuristics path.
+- Improving that shared extraction layer advances `ROB-177` in a way that is immediately testable and directly useful in the app.
+- This keeps legal-field extraction separate from brief guidance extraction, which is part of the ticket’s acceptance criteria.
+
+Connected work:
+- Supports `ROB-169` by improving workspace-safe brief enrichment.
+- De-risks future vendor-backed extraction because the normalization targets are now clearer even when vendor output is weak or missing.
+- Leaves `ROB-181` as the external processor/schema setup follow-up rather than mixing cloud setup into heuristic extraction work.
+
+Verification completed:
+- `pnpm exec vitest run tests/brief-fallback-analysis.test.ts tests/extract-fields-step.test.ts`
+
+Verification results:
+- Brief fallback and extraction-step coverage passed: `8 passed`
+- Targeted type check for changed files is clean
+- Remaining unrelated compiler issue still present: stale `.next/types/validator.ts` references missing `app/api/inngest/route.js`
+
+Follow-up:
+- When the Google Document AI processors exist, the same normalized brief fields should remain the target contract for vendor-to-app mapping.
+- If richer brief review UX is needed later, it can build on these extracted fields without revisiting the parsing layer first.
+
+### ROB-181
+
+Status: Blocked outside the repo, not ready for review
+
+What was assessed:
+- Checked the current repo for Google Document AI processor integration, verification scripts, and extractor schema documentation.
+- Checked local env key names and Doppler secret names only, without reading secret values.
+
+Findings:
+- The acceptance criteria in `ROB-181` reference `scripts/verify-document-ai-contract.ts` and `scripts/verify-document-ai-brief.ts`, but those files are not present in this repo.
+- The current checked-in document text extraction path uses Azure Document Intelligence for OCR/layout extraction, not Google Document AI custom extractors.
+- `.env.example`, `.env.local` key names, and Doppler secret names do not include Google Document AI processor identifiers or service-account style configuration needed to run the described verification flow.
+- No checked-in documentation currently maps the Google Cloud entity names in the ticket to a live processor configuration.
+
+Why this is blocked:
+- The ticket requires external Google Cloud setup:
+  - defining extractor schemas
+  - uploading labeled training documents
+  - building processor versions
+  - verifying live processor requests from the app
+- None of those acceptance criteria can be completed honestly from this repo alone in its current state.
+
+What needs to happen next:
+- Confirm whether the intended vendor is actually Google Document AI or whether the ticket is stale relative to the current Azure-based extraction path.
+- If Google Document AI is still the target:
+  - add the missing runtime configuration and verification scripts
+  - provision the processors and trained versions in Google Cloud
+  - document the processor/entity mapping in the repo
+- If Azure is the actual target now:
+  - rewrite or replace `ROB-181` so it matches the current architecture instead of referencing missing Google Document AI flows.

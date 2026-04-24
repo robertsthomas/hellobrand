@@ -138,6 +138,27 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     return [];
   }
 
+  function extractHandle() {
+    const match = text.match(/@[a-z0-9._]{2,}/i);
+    return match?.[0] ?? null;
+  }
+
+  function detectPlatforms() {
+    const platformMatchers = [
+      { label: "Instagram", pattern: /\binstagram\b|\big\b|\breel\b|\bstory\b|\bstories\b/i },
+      { label: "TikTok", pattern: /\btik\s?tok\b/i },
+      { label: "YouTube", pattern: /\byoutube\b|\bshorts?\b/i },
+      { label: "Facebook", pattern: /\bfacebook\b/i },
+      { label: "LinkedIn", pattern: /\blinkedin\b/i },
+      { label: "Newsletter", pattern: /\bnewsletter\b/i },
+      { label: "Podcast", pattern: /\bpodcast\b/i },
+    ];
+
+    return platformMatchers
+      .filter((entry) => entry.pattern.test(text))
+      .map((entry) => entry.label);
+  }
+
   const campaignOverview = extractAfterLabel([
     /(?:campaign overview|overview)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i,
     /(?:concept|creative concept)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
@@ -155,12 +176,20 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     /(?:creative concept|concept overview)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
   ]);
 
+  const deliverablesSummary = extractAfterLabel([
+    /(?:^|\n)(?:deliverables summary|required deliverables|content deliverables|deliverables)\s*:\s*\n?([\s\S]{10,500}?)(?:\n{2,}|\n[A-Z][^\n]{0,80}:|$)/i
+  ]);
+
   const brandGuidelines = extractAfterLabel([
     /(?:brand guidelines?|style guide)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
   ]);
 
   const approvalRequirements = extractAfterLabel([
     /(?:approval (?:process|requirements?|workflow))[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const revisionRequirements = extractAfterLabel([
+    /(?:revision requirements?|revisions?)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
   ]);
 
   const targetAudience = extractAfterLabel([
@@ -171,6 +200,57 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     /(?:tone (?:and|&) style|tone|voice)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
   ]);
 
+  const requiredClaims = extractListAfterLabel([
+    /(?:required claims?|mandatory claims?|required messaging)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const disclosureRequirements = extractListAfterLabel([
+    /(?:disclosure requirements?|disclosures?|hashtags?|hashtag requirements?)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const competitorRestrictions = extractListAfterLabel([
+    /(?:competitor restrictions?|competitor exclusions?|avoid competitors?|category exclusivity)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const linksAndAssets = extractListAfterLabel([
+    /(?:links? and assets|assets|links?)[:\s]*\n?([\s\S]{10,800}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const postingSchedule = extractAfterLabel([
+    /(?:posting schedule|posting window|timeline|schedule)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const campaignLiveDate = extractAfterLabel([
+    /(?:campaign live date|go live date|launch date)[:\s]*\n?([^\n]{4,120})/i
+  ]);
+
+  const draftDueDate = extractAfterLabel([
+    /(?:draft due date|draft due)[:\s]*\n?([^\n]{4,120})/i
+  ]);
+
+  const contentDueDate = extractAfterLabel([
+    /(?:content due date|content due)[:\s]*\n?([^\n]{4,120})/i
+  ]);
+
+  const paymentSchedule = extractAfterLabel([
+    /(?:payment schedule|payment timing)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const paymentRequirements = extractAfterLabel([
+    /(?:payment requirements?|billing requirements?)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const paymentNotes = extractAfterLabel([
+    /(?:payment notes?|billing notes?)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const reportingRequirements = extractAfterLabel([
+    /(?:reporting requirements?|performance reporting|reporting)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
+  const creatorHandle = extractHandle();
+  const deliverablePlatforms = detectPlatforms();
+
   const doNotMention = extractListAfterLabel([
     /(?:do not mention|avoid|don't mention|do not include)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
   ]);
@@ -180,10 +260,26 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     messagingPoints.length > 0 ||
     talkingPoints.length > 0 ||
     creativeConceptOverview ||
+    deliverablesSummary ||
     brandGuidelines ||
     approvalRequirements ||
+    revisionRequirements ||
     targetAudience ||
     toneAndStyle ||
+    requiredClaims.length > 0 ||
+    disclosureRequirements.length > 0 ||
+    competitorRestrictions.length > 0 ||
+    linksAndAssets.length > 0 ||
+    postingSchedule ||
+    campaignLiveDate ||
+    draftDueDate ||
+    contentDueDate ||
+    paymentSchedule ||
+    paymentRequirements ||
+    paymentNotes ||
+    reportingRequirements ||
+    creatorHandle ||
+    deliverablePlatforms.length > 0 ||
     doNotMention.length > 0;
 
   if (!hasContent) {
@@ -195,10 +291,26 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     messagingPoints,
     talkingPoints,
     creativeConceptOverview,
+    requiredClaims,
     brandGuidelines,
     approvalRequirements,
+    revisionRequirements,
     targetAudience,
     toneAndStyle,
+    deliverablesSummary,
+    deliverablePlatforms,
+    creatorHandle,
+    postingSchedule,
+    campaignLiveDate,
+    draftDueDate,
+    contentDueDate,
+    paymentSchedule,
+    paymentRequirements,
+    paymentNotes,
+    reportingRequirements,
+    disclosureRequirements,
+    competitorRestrictions,
+    linksAndAssets,
     doNotMention,
     sourceDocumentIds: []
   };
