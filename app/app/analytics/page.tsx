@@ -17,12 +17,11 @@ import {
 import { FeatureUpgradeCard } from "@/components/feature-locked-state";
 import { AnalyticsSkeleton } from "@/components/skeletons";
 import { SocialPlatformIcon } from "@/components/social-platform-icon";
+import { getAnalyticsSnapshotForViewer } from "@/lib/analytics/service";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
-import { getCachedDealAggregates, getCachedProfile } from "@/lib/cached-data";
 import { formatCurrency, humanizeToken } from "@/lib/utils";
 import {
-  buildAnalyticsViewModel,
   DUMMY_METRICS,
   DUMMY_MONTHS,
   DUMMY_TOP_CONTENT,
@@ -181,12 +180,8 @@ async function AnalyticsContent() {
     return <AnalyticsPreviewLocked />;
   }
 
-  const [aggregatesWithConflicts, profile] = await Promise.all([
-    getCachedDealAggregates(viewer),
-    getCachedProfile(viewer),
-  ]);
   const { formattedTopContent, maxRevenuePoint, metadata, metrics, monthlyRevenue, platformRows } =
-    buildAnalyticsViewModel(aggregatesWithConflicts, profile.payoutDetails);
+    await getAnalyticsSnapshotForViewer(viewer);
 
   return (
     <div className="px-5 py-6 lg:px-8 lg:py-8">
