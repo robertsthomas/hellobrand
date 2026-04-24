@@ -2,6 +2,12 @@
  * This file sends transactional welcome emails after account creation.
  * It keeps Resend-specific delivery details out of webhook route handlers.
  */
+import { createElement } from "react";
+import { render } from "react-email";
+
+import { resolveEmailLocale } from "@/emails/shared/locale";
+import WelcomeEmailTemplate from "@/emails/transactional/welcome-email";
+import { getAppBaseUrl } from "@/lib/email/config";
 import {
   canSendNotificationEmailInCurrentMode,
   getNotificationEmailConfig,
@@ -12,42 +18,29 @@ type WelcomeEmailInput = {
   userId: string;
   email: string;
   firstName?: string | null;
+  locale?: string | null;
 };
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 function normalizeFirstName(value: string | null | undefined) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
 
-function buildWelcomeEmail(input: WelcomeEmailInput) {
+async function buildWelcomeEmail(input: WelcomeEmailInput) {
   const firstName = normalizeFirstName(input.firstName);
-  const greeting = firstName ? `Hi ${escapeHtml(firstName)},` : "Hi there,";
-  const textGreeting = firstName ? `Hi ${firstName},` : "Hi there,";
+  const locale = resolveEmailLocale(input.locale);
+  const startWorkspaceUrl = new URL("/app/intake/new", `${getAppBaseUrl()}/`).toString();
+  const react = createElement(WelcomeEmailTemplate, {
+    firstName,
+    locale,
+    startWorkspaceUrl,
+  });
+  const text = await render(react, { plainText: true });
 
   return {
-    subject: "Welcome to HelloBrand",
-    html: `
-      <div style="font-family: Arial, sans-serif; background: #f6f3ee; padding: 32px;">
-        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 0; border: 1px solid #e7dfd3;">
-          <div style="border-top: 2px solid #1f1a14; padding: 32px;">
-            <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">Welcome to HelloBrand</h1>
-            <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #4a4034;">${greeting}</p>
-            <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #4a4034;">Thanks for creating your HelloBrand account. You can now start intake, upload partnership docs, and keep creator deals organized in one workspace.</p>
-            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #7f6f5a;">We're glad you're here.</p>
-          </div>
-        </div>
-      </div>
-    `.trim(),
-    text: `${textGreeting}\n\nThanks for creating your HelloBrand account. You can now start intake, upload partnership docs, and keep creator deals organized in one workspace.\n\nWe're glad you're here.`,
+    subject: "Hello!",
+    react,
+    text,
   };
 }
 
@@ -70,16 +63,16 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput) {
   }
 
   const resend = await createResendClient(config.apiKey);
-  const email = buildWelcomeEmail(input);
+  const email = await buildWelcomeEmail(input);
   const response = await resend.emails.send(
     {
       from: config.fromEmail,
       to: [input.email],
       subject: email.subject,
-      html: email.html,
+      react: email.react,
       text: email.text,
     },
-    { idempotencyKey: `welcome-email/${input.userId}` }
+    { idempotencyKey: `welcome-email/${input.userId}` },
   );
 
   if (response.error) {

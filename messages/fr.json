@@ -258,5 +258,18 @@
       "riskAlertsWarnings": "{count, plural, one {# alerte croisée} other {# alertes croisées}}",
       "riskAlertsClear": "Aucun chevauchement actif"
     }
+  },
+  "emails": {
+    "welcome": {
+      "preview": "Téléchargez votre premier document de marque et démarrez votre espace HelloBrand.",
+      "heading": "Bienvenue sur HelloBrand",
+      "greetingNamed": "Bonjour {firstName},",
+      "greetingGeneric": "Bonjour,",
+      "intro": "Merci d'avoir créé votre compte HelloBrand. Vous pouvez maintenant lancer l'intake, téléverser vos documents de partenariat et garder vos contrats organisés dans un seul espace.",
+      "firstStep": "Votre première étape consiste à téléverser un document de marque comme un contrat, un brief ou un e-mail de campagne afin que HelloBrand puisse extraire les détails importants dans votre espace.",
+      "cta": "Télécharger votre premier document de marque",
+      "fallbackLinkLabel": "Si le bouton ne fonctionne pas, ouvrez ce lien :",
+      "closing": "Nous sommes ravis de vous compter parmi nous."
+    }
   }
 }

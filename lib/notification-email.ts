@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { render } from "react-email";
+
+import NotificationEmailTemplate from "@/emails/transactional/notification-email";
 import { getAppSettings } from "@/lib/admin-settings";
 import { getAppBaseUrl } from "@/lib/email/config";
 import { resolveEmailNotificationsEnabled } from "@/lib/email-notification-preference";
@@ -203,15 +207,6 @@ export function canSendNotificationEmailInCurrentMode(input: {
 function toAbsoluteHref(href: string) {
   const baseUrl = getAppBaseUrl();
   return new URL(href, `${baseUrl}/`).toString();
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 }
 
 function truncateEntityName(name: string, maxLength: number): string {
@@ -469,7 +464,7 @@ export function resolveNotificationEmailCopy(input: {
   };
 }
 
-export function buildNotificationEmailPayload(input: {
+export async function buildNotificationEmailPayload(input: {
   eventType: string;
   title: string;
   body: string;
@@ -481,33 +476,22 @@ export function buildNotificationEmailPayload(input: {
     body: input.body,
   });
   const absoluteHref = toAbsoluteHref(input.href);
-  const escapedPreview = escapeHtml(copy.preview);
-  const escapedHeadline = escapeHtml(copy.headline);
-  const escapedBody = escapeHtml(copy.body);
-  const escapedCtaLabel = escapeHtml(copy.ctaLabel);
-
   const settingsHref = toAbsoluteHref("/app/settings/notifications");
+  const react = createElement(NotificationEmailTemplate, {
+    preview: copy.preview,
+    headline: copy.headline,
+    body: copy.body,
+    ctaLabel: copy.ctaLabel,
+    href: absoluteHref,
+    settingsHref,
+  });
+  const text = await render(react, { plainText: true });
 
   return {
     subject: copy.subject,
-    html: `
-      <div style="font-family: Arial, sans-serif; background: #f6f3ee; padding: 32px;">
-        <div style="display: none; overflow: hidden; line-height: 1px; opacity: 0; max-height: 0; max-width: 0; mso-hide: all;">
-          ${escapedPreview}
-        </div>
-        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; padding: 0; border: 1px solid #e7dfd3;">
-          <div style="border-top: 2px solid #1f1a14; padding: 32px;">
-            <h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; color: #1f1a14;">${escapedHeadline}</h1>
-            <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4a4034;">${escapedBody}</p>
-            <a href="${absoluteHref}" style="display: inline-block; background: #1f1a14; color: #ffffff; text-decoration: none; padding: 12px 18px; font-size: 14px;">${escapedCtaLabel}</a>
-          </div>
-          <div style="padding: 16px 32px; border-top: 1px solid #e7dfd3;">
-            <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #7f6f5a;">You're receiving this because you have email notifications enabled in <a href="${settingsHref}" style="color: #7f6f5a;">HelloBrand</a>.</p>
-          </div>
-        </div>
-      </div>
-    `.trim(),
-    text: `${copy.headline}\n\n${copy.body}\n\n${copy.ctaLabel}: ${absoluteHref}\n\nYou're receiving this because you have email notifications enabled in HelloBrand.`,
+    react,
+    html: await render(react),
+    text,
   };
 }
 
@@ -762,7 +746,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
   }
 
   const resend = await createResendClient(config.apiKey);
-  const email = buildNotificationEmailPayload({
+  const email = await buildNotificationEmailPayload({
     eventType: notification.eventType,
     title: notification.title,
     body: notification.body,
@@ -773,7 +757,7 @@ export async function sendNotificationEmailDelivery(appNotificationId: string) {
     from: config.fromEmail,
     to: [delivery.recipientEmail],
     subject: email.subject,
-    html: email.html,
+    react: email.react,
     text: email.text,
   });
 

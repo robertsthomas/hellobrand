@@ -166,6 +166,16 @@ const { notifications, deliveries, auditEvents, inngestSend, resendSend, prismaM
         ),
       },
       appSettings: {
+        findUnique: vi.fn(async () => ({
+          id: "primary",
+          appAccessEnabled: true,
+          publicSiteEnabled: true,
+          signUpsEnabled: true,
+          emailDeliveryEnabled: true,
+          updatedByAdminUsername: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
         upsert: vi.fn(async () => ({
           id: "primary",
           appAccessEnabled: true,
@@ -677,8 +687,8 @@ describe("notification email HTML rendering", () => {
     process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3011";
   });
 
-  it("renders the CTA label in the HTML and plain text", () => {
-    const payload = buildNotificationEmailPayload({
+  it("renders the CTA label in the HTML and plain text", async () => {
+    const payload = await buildNotificationEmailPayload({
       eventType: "workspace.ready_for_review",
       title: "Nimbus workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
@@ -690,8 +700,8 @@ describe("notification email HTML rendering", () => {
     expect(payload.html).not.toContain("Open in HelloBrand");
   });
 
-  it("does not render the HELLOBRAND header text", () => {
-    const payload = buildNotificationEmailPayload({
+  it("does not render the HELLOBRAND header text", async () => {
+    const payload = await buildNotificationEmailPayload({
       eventType: "workspace.ready_for_review",
       title: "Nimbus workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",
@@ -701,8 +711,8 @@ describe("notification email HTML rendering", () => {
     expect(payload.html).not.toMatch(/text-transform:\s*uppercase[^>]*>HelloBrand<\/p>/);
   });
 
-  it("includes a footer with notification settings link", () => {
-    const payload = buildNotificationEmailPayload({
+  it("includes a footer with notification settings link", async () => {
+    const payload = await buildNotificationEmailPayload({
       eventType: "workspace.ready_for_review",
       title: "Test",
       body: "Test body",
@@ -713,8 +723,8 @@ describe("notification email HTML rendering", () => {
     expect(payload.html).toContain("email notifications enabled");
   });
 
-  it("renders preview text ahead of the main email content", () => {
-    const payload = buildNotificationEmailPayload({
+  it("renders preview text ahead of the main email content", async () => {
+    const payload = await buildNotificationEmailPayload({
       eventType: "invoice.generate_prompt",
       title: "Nimbus invoice is ready to generate",
       body: "Today is the final posting milestone for Summer Campaign. Generate the workspace invoice now.",
@@ -727,8 +737,8 @@ describe("notification email HTML rendering", () => {
     expect(payload.html).toContain("Generate your invoice");
   });
 
-  it("does not contain em dashes or en dashes", () => {
-    const payload = buildNotificationEmailPayload({
+  it("does not contain em dashes or en dashes", async () => {
+    const payload = await buildNotificationEmailPayload({
       eventType: "workspace.ready_for_review",
       title: "Test workspace is ready for review",
       body: "Your workspace has been analyzed and is ready for review.",

@@ -19,6 +19,7 @@ type ClerkUserData = {
   email_addresses?: ClerkUserEmail[];
   first_name?: string | null;
   last_name?: string | null;
+  locale?: string | null;
 };
 
 type ClerkWaitlistData = {
@@ -49,6 +50,7 @@ async function handleUserCreated(data: ClerkUserData) {
     userId: data.id,
     email,
     firstName: data.first_name,
+    locale: data.locale,
   });
 
   await capturePostHogServerEvent({

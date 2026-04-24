@@ -20,6 +20,7 @@ describe("welcome email sending", () => {
     process.env.RESEND_API_KEY = "re_test";
     process.env.RESEND_FROM_EMAIL = "HelloBrand <onboarding@hellobrand.com>";
     process.env.RESEND_TEST_TO_EMAIL = "";
+    process.env.NEXT_PUBLIC_APP_URL = "https://hellobrand.test";
   });
 
   it("sends a welcome email with an idempotency key", async () => {
@@ -35,10 +36,40 @@ describe("welcome email sending", () => {
       expect.objectContaining({
         from: "HelloBrand <onboarding@hellobrand.com>",
         to: ["creator@example.com"],
-        subject: "Welcome to HelloBrand",
+        subject: "Hello!",
+        react: expect.anything(),
         text: expect.stringContaining("Hi Taylor,"),
       }),
       { idempotencyKey: "welcome-email/user_123" }
+    );
+
+    expect(resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringMatching(
+          /Your first step is to upload a brand document like a contract, brief, or campaign email[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
+        ),
+      }),
+      { idempotencyKey: "welcome-email/user_123" }
+    );
+  });
+
+  it("normalizes BCP-47 locales to the app-supported email locale", async () => {
+    resendSend.mockResolvedValue({ data: { id: "email-2" }, error: null });
+
+    await sendWelcomeEmail({
+      userId: "user_456",
+      email: "creator@example.com",
+      firstName: "Taylor",
+      locale: "es-ES",
+    });
+
+    expect(resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringMatching(
+          /Hola Taylor,[\s\S]*Tu primer paso es subir un documento de marca[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
+        ),
+      }),
+      { idempotencyKey: "welcome-email/user_456" }
     );
   });
 

@@ -258,5 +258,18 @@
       "riskAlertsWarnings": "{count, plural, one {# cross-partnership warning} other {# cross-partnership warnings}}",
       "riskAlertsClear": "No active overlaps"
     }
+  },
+  "emails": {
+    "welcome": {
+      "preview": "Upload your first brand document and start your HelloBrand workspace.",
+      "heading": "Welcome to HelloBrand",
+      "greetingNamed": "Hi {firstName},",
+      "greetingGeneric": "Hi there,",
+      "intro": "Thanks for creating your HelloBrand account. You can now start intake, upload partnership docs, and keep creator deals organized in one workspace.",
+      "firstStep": "Your first step is to upload a brand document like a contract, brief, or campaign email so HelloBrand can pull the important details into your workspace.",
+      "cta": "Upload your first brand document",
+      "fallbackLinkLabel": "If the button does not work, open this link:",
+      "closing": "We're glad you're here."
+    }
   }
 }

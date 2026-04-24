@@ -62,6 +62,7 @@ A unified platform for creator partnership management that enables users to:
 
 - **Stripe** for billing, checkout, subscriptions, invoices, and customer portal
 - **Resend** for transactional email
+- **React Email** for authoring email templates in `emails/` and uploading them to Resend
 - **LaunchDarkly** for feature flags
 - **PostHog** for analytics and feature flags (secondary)
 - **Sentry** for error tracking and performance monitoring
@@ -70,6 +71,7 @@ A unified platform for creator partnership management that enables users to:
 ### Build System & Development
 
 - **pnpm** as package manager
+- **React Email CLI** for local email preview/build workflows (`pnpm run email:dev`, `pnpm run email:build`)
 - **Biome** for linting and formatting (replaces ESLint + Prettier)
 - **Vitest** for unit tests (Node environment)
 - **Playwright** for E2E tests with tier matrix (free/basic/premium)
@@ -93,6 +95,7 @@ The codebase is a single Next.js application (not a monorepo) with a clear layer
 ```
 app/              # Next.js route tree (API routes, pages, layouts, server actions)
 components/       # Reusable UI components (feature components + shadcn primitives)
+emails/           # React Email templates, organized by email category (e.g. transactional/)
 lib/              # Domain logic, orchestration, data access, shared utilities
 prisma/           # Prisma schema (multi-file) and migrations
 hooks/            # Shared React hooks
@@ -118,6 +121,7 @@ tmp/, supabase/.temp/, tests/e2e/.auth/, public/vendor/
 | Document processing / extraction   | `lib/analysis/`, `lib/pipeline/`, `lib/documents/`                            |
 | Partnership / deal workspace       | `lib/deals.ts`, `lib/deals/`, `app/app/p/`, `app/api/p/`                      |
 | Smart inbox / email                | `lib/email/`, `components/inbox-workspace/`, `components/inbox-workspace.tsx`  |
+| Email templates                    | `emails/marketing/`, `emails/transactional/`, `emails/shared/`, `lib/welcome-email.ts`, `lib/waitlist-email.ts`, `lib/notification-email.ts`, `lib/feedback.ts`, `messages/*.json` |
 | Billing / subscriptions / Stripe   | `lib/billing/`, `app/app/billing/`, `app/api/stripe/`                         |
 | AI assistant                       | `lib/assistant/`, `components/assistant-*.tsx`                                |
 | Risk analysis / conflict intel     | `lib/analysis/risks/`, `lib/conflict-intelligence.ts`, `lib/conflict-categories.ts` |
