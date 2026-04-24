@@ -4,7 +4,6 @@
  * This file renders the signed-in app shell.
  * It connects navigation, shell-level interactions, and shared frame UI for the authenticated product experience.
  */
-import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { CSSProperties, ReactNode } from "react";
@@ -13,6 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bot, ChevronRight, Hand, Menu, MessageSquareMore, Search } from "lucide-react";
 
 import { PostHogActionLink } from "@/components/posthog-action-link";
+import { AppFrameSignOutButton } from "@/components/app-frame-sign-out-button";
 import { SidebarMilestonesCard } from "@/components/sidebar-milestones-card";
 import { buttonVariants } from "@/components/ui/button";
 import { AssistantProvider, useAssistant } from "@/components/assistant-provider";
@@ -124,7 +124,6 @@ export function AppFrame({
   const router = useRouter();
   const searchParams = useSearchParams();
   const mainRef = useRef<HTMLDivElement | null>(null);
-  const { signOut } = useClerk();
   const t = useTranslations("appShell");
 
   const meta = useMemo(() => getAppRouteMeta(pathname), [pathname]);
@@ -633,16 +632,12 @@ export function AppFrame({
               >
                 <span>{t("newWorkspace")}</span>
               </PostHogActionLink>
-              <button
-                type="button"
-                onClick={() => {
-                  closeSidebar?.();
-                  signOut({ redirectUrl: "/login" });
-                }}
+              <AppFrameSignOutButton
+                onBeforeSignOut={closeSidebar}
                 className="text-left text-sm font-medium text-black/60 underline underline-offset-4 transition hover:text-black dark:text-white/60 dark:hover:text-white"
               >
                 {t("logOut")}
-              </button>
+              </AppFrameSignOutButton>
             </div>
           )}
         </SidebarFooter>

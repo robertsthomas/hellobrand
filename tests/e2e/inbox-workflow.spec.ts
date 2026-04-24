@@ -43,6 +43,9 @@ test.describe("inbox workflow fixture", () => {
     });
 
     await gotoAuthed(page, "/app/test/inbox-fixture");
+    await expect(page.getByText("Thread brief", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rate negotiation", { exact: true })).toBeVisible();
+    await expect(page.getByText("Creator to respond", { exact: true })).toBeVisible();
     const replyComposer = page.getByPlaceholder(
       'Type a reply or click "AI Reply" to generate one...'
     );
@@ -62,29 +65,33 @@ test.describe("inbox workflow fixture", () => {
       source: "manual"
     });
 
-    const notesSection = page.locator("section").filter({
-      has: page.getByText("Private notes")
-    });
-    const noteTextarea = notesSection.getByPlaceholder(
+    await page.getByRole("button", { name: "Thread actions" }).click();
+    await page.getByRole("button", { name: /Private notes/ }).click();
+    const noteTextarea = page.getByPlaceholder(
       "Capture guidance, risks, or follow-up notes for yourself..."
     );
     await expect(noteTextarea).toBeVisible();
     await noteTextarea.fill("  Confirm usage timing before sending.  ");
     await expect(noteTextarea).toHaveValue("  Confirm usage timing before sending.  ");
-    const saveNoteButton = notesSection.getByRole("button", { name: "Save note" });
+    const saveNoteButton = page.getByRole("button", { name: "Save note" });
     await expect(saveNoteButton).toBeEnabled({ timeout: 10000 });
     await saveNoteButton.click();
     await expect.poll(() => notePayload).not.toBeNull();
     expect(notePayload).toEqual({
       body: "Confirm usage timing before sending."
     });
-    await page.waitForLoadState("networkidle");
+    await page
+      .getByRole("dialog", { name: "Private notes" })
+      .getByRole("button", { name: "Close" })
+      .first()
+      .click();
+    await expect(page.getByRole("dialog", { name: "Private notes" })).not.toBeVisible();
 
-    await page.getByRole("button", { name: "Import to workspace" }).first().click();
+    await page.getByRole("button", { name: /updated-brief\.pdf/ }).click();
+    await page.getByRole("button", { name: "Import to workspace" }).click();
     await expect.poll(() => importPayload).not.toBeNull();
     expect(importPayload).toEqual({
       dealId: "deal-1"
     });
-    await page.waitForLoadState("networkidle");
   });
 });

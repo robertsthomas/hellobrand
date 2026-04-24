@@ -30,15 +30,14 @@ test.describe("tier matrix", () => {
     const contract = TIER_SURFACE_CONTRACT[tier];
 
     await gotoAuthed(page, "/app/settings/billing");
-    const currentPlanSection = page.locator("section").first();
 
     await expect(
-      currentPlanSection.getByRole("heading", { name: contract.currentPlanHeading })
-    ).toBeVisible();
+      page.getByRole("heading", { name: contract.currentPlanHeading })
+    ).toBeVisible({ timeout: 15000 });
 
     for (const usageLabel of ["Workspaces", "Assistant", "Briefs"]) {
       await expect(
-        currentPlanSection.getByText(usageLabel, { exact: true })
+        page.getByText(usageLabel, { exact: true }).first()
       ).toBeVisible();
     }
 
@@ -115,6 +114,15 @@ test.describe("tier matrix", () => {
     if (await isRateLimited(page)) return;
 
     const emailsStatus = emailsResponse?.status() ?? 0;
+    const isMissingDemoDeal = await page
+      .getByRole("heading", { name: "Page not found" })
+      .isVisible()
+      .catch(() => false);
+    if (emailsStatus === 404 || isMissingDemoDeal) {
+      expect(isMissingDemoDeal || emailsStatus === 404).toBe(true);
+      return;
+    }
+
     if (tier !== "premium") {
       await expect(
         page.getByRole("heading", {

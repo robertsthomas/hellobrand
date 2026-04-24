@@ -37,6 +37,49 @@ export type EmailThreadWorkflowState =
   | "closed";
 type EmailThreadDraftStatus = "in_progress" | "ready";
 type EmailThreadDraftSource = "manual" | "ai";
+export type EmailThreadConversationMode =
+  | "initial_offer"
+  | "rate_negotiation"
+  | "decline_affiliate"
+  | "follow_up_decision"
+  | "revision_cycle"
+  | "go_live"
+  | "invoice_closeout"
+  | "unsubscribe_or_ignore"
+  | "low_signal_follow_up";
+export type EmailThreadCompensationType =
+  | "guaranteed_paid"
+  | "affiliate"
+  | "hybrid"
+  | "gifted"
+  | "unclear";
+export type EmailThreadNextMoveOwner = "creator" | "brand" | "none";
+export type EmailThreadSpamConfidence = "none" | "low" | "medium" | "high";
+export type EmailThreadPhase = "early" | "mid" | "late";
+
+export interface EmailThreadActiveTerms {
+  compensation: string | null;
+  deliverables: string | null;
+  deadlines: string | null;
+  usageRights: string | null;
+  exclusivity: string | null;
+  paymentTiming: string | null;
+}
+
+export interface EmailThreadBriefRecord {
+  mode: EmailThreadConversationMode;
+  compensationType: EmailThreadCompensationType;
+  latestInboundAsk: string | null;
+  lastCreatorPosition: string | null;
+  nextMoveOwner: EmailThreadNextMoveOwner;
+  activeTerms: EmailThreadActiveTerms;
+  openQuestions: string[];
+  blockers: string[];
+  risks: string[];
+  spamConfidence: EmailThreadSpamConfidence;
+  brandName: string | null;
+  threadPhase: EmailThreadPhase;
+}
 
 export interface EmailParticipant {
   name: string | null;
@@ -283,6 +326,7 @@ export interface EmailThreadDetail {
   actionItems: EmailActionItemRecord[];
   promiseDiscrepancies: PromiseDiscrepancy[];
   crossDealConflicts: ConflictResult[];
+  threadBrief: EmailThreadBriefRecord | null;
   savedDraft: EmailThreadDraftRecord | null;
   notes: EmailThreadNoteRecord[];
   noteCount: number;

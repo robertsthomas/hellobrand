@@ -1,6 +1,6 @@
 /**
- * Document pipeline, upload, and direct-upload operations for deals.
- * Pipeline processing, file registration, and completion live here.
+ * Document upload, direct-upload, and Inngest-enqueued processing for deals.
+ * All pipeline processing goes through Inngest — there is no local fallback.
  */
 import { randomUUID } from "node:crypto";
 
@@ -9,37 +9,22 @@ import { getRepository } from "@/lib/repository";
 import {
   createDocumentProcessingRunState
 } from "@/lib/document-pipeline-shared";
-import {
-  DocumentRunSupersededError,
-  failDocumentProcessingRun,
-  getDocumentPipelineFailedStep,
-  runDocumentPipelineSteps
-} from "@/lib/pipeline-steps";
+import { failDocumentProcessingRun } from "@/lib/pipeline-steps";
 import {
   createSignedUploadTarget,
   storeUploadedBytes,
   supportsDirectStorageUploads
 } from "@/lib/storage";
 import type {
-  DealAggregate,
   DocumentKind,
   DocumentRecord,
   Viewer
 } from "@/lib/types";
 import {
-  getViewerById,
   inferPastedTextFileName,
   logDocumentPipeline,
   queueAssistantSnapshotRefresh,
 } from "./shared";
-
-async function processDocumentPipeline(
-  _viewer: Viewer,
-  document: DocumentRecord,
-  runId: string
-) {
-  return runDocumentPipelineSteps(document.id, runId);
-}
 
 async function startDocumentProcessingRun(documentId: string) {
   const repository = getRepository();
@@ -121,46 +106,6 @@ export async function enqueueDocumentProcessing(documentId: string) {
       message
     });
     throw new Error(message);
-  }
-}
-
-async function processDocumentById(documentId: string, runId?: string) {
-  const repository = getRepository();
-  const document = await repository.getDocument(documentId);
-
-  if (!document) {
-    throw new Error("Document not found.");
-  }
-
-  const activeRunId = runId ?? document.processingRunId ?? (await startDocumentProcessingRun(documentId)).runId;
-  const viewer = await getViewerById(document.userId);
-
-  logDocumentPipeline("info", "process_document_requested", {
-    documentId,
-    dealId: document.dealId,
-    fileName: document.fileName,
-    runId: activeRunId
-  });
-
-  try {
-    return await processDocumentPipeline(viewer, document, activeRunId);
-  } catch (error) {
-    if (error instanceof DocumentRunSupersededError) {
-      return repository.getDealAggregate(viewer.id, document.dealId);
-    }
-
-    const message =
-      error instanceof Error
-        ? error.message
-        : "We could not reliably process this document.";
-
-    await failDocumentProcessingRun({
-      documentId,
-      runId: activeRunId,
-      message,
-      failedStep: getDocumentPipelineFailedStep(error)
-    });
-    throw error;
   }
 }
 

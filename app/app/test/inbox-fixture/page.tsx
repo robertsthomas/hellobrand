@@ -321,7 +321,7 @@ function buildSelectedThread(): EmailThreadDetail {
         bcc: [],
         subject: "Spring launch usage terms",
         textBody:
-          "We can move quickly once the reply confirms timing, budget, and the approved attachment set.",
+          "We can move quickly once the reply confirms timing, the $4,500 budget, and the approved attachment set.",
         htmlBody: null,
         sentAt: null,
         receivedAt: "2026-04-02T09:00:00.000Z",
@@ -384,6 +384,28 @@ function buildSelectedThread(): EmailThreadDetail {
     ],
     promiseDiscrepancies: [],
     crossDealConflicts: [],
+    threadBrief: {
+      mode: "rate_negotiation",
+      compensationType: "guaranteed_paid",
+      latestInboundAsk:
+        "We can move quickly once the reply confirms timing, the $4,500 budget, and the approved attachment set.",
+      lastCreatorPosition: null,
+      nextMoveOwner: "creator",
+      activeTerms: {
+        compensation: "$4,500",
+        deliverables: null,
+        deadlines: null,
+        usageRights: null,
+        exclusivity: null,
+        paymentTiming: null
+      },
+      openQuestions: ["Compensation amount not yet agreed"],
+      blockers: [],
+      risks: [],
+      spamConfidence: "none",
+      brandName: "Glossier",
+      threadPhase: "early"
+    },
     savedDraft: null,
     notes: [
       {

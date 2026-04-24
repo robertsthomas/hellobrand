@@ -14,6 +14,53 @@ import { providerLabel, workflowStateLabel, workflowBadgeClass } from "./formatt
 import type { RiskSuggestion, DocumentSuggestion } from "./helpers";
 import { MessageStrip } from "./InboxMessageView";
 
+const THREAD_MODE_LABELS: Record<NonNullable<EmailThreadDetail["threadBrief"]>["mode"], string> = {
+  initial_offer: "Initial offer",
+  rate_negotiation: "Rate negotiation",
+  decline_affiliate: "Affiliate or gifted",
+  follow_up_decision: "Decision follow-up",
+  revision_cycle: "Revision cycle",
+  go_live: "Go live",
+  invoice_closeout: "Invoice closeout",
+  unsubscribe_or_ignore: "Do not engage",
+  low_signal_follow_up: "Low-signal follow-up",
+};
+
+const NEXT_MOVE_LABELS: Record<
+  NonNullable<EmailThreadDetail["threadBrief"]>["nextMoveOwner"],
+  string
+> = {
+  creator: "Creator to respond",
+  brand: "Brand owes next step",
+  none: "No action needed",
+};
+
+const COMPENSATION_LABELS: Record<
+  NonNullable<EmailThreadDetail["threadBrief"]>["compensationType"],
+  string
+> = {
+  guaranteed_paid: "Guaranteed paid",
+  affiliate: "Affiliate",
+  hybrid: "Hybrid",
+  gifted: "Gifted",
+  unclear: "Comp unclear",
+};
+
+const THREAD_PHASE_LABELS: Record<
+  NonNullable<EmailThreadDetail["threadBrief"]>["threadPhase"],
+  string
+> = {
+  early: "Early thread",
+  mid: "Mid thread",
+  late: "Late thread",
+};
+
+const SPAM_LABELS: Record<"low" | "medium" | "high", string> = {
+  low: "Low-signal risk",
+  medium: "Medium low-signal risk",
+  high: "High low-signal risk",
+};
+
 type InboxThreadDetailProps = {
   selectedThread: EmailThreadDetail;
   isThreadLoading: boolean;
@@ -74,6 +121,12 @@ export function InboxThreadDetail({
 }: InboxThreadDetailProps) {
   const [expandedMessageIds, setExpandedMessageIds] = useState<Set<string>>(new Set());
   const [isSyncing, setIsSyncing] = useState(false);
+  const threadBrief = selectedThread.threadBrief;
+  const threadBriefTerms = threadBrief
+    ? Object.entries(threadBrief.activeTerms).filter(
+        (entry): entry is [string, string] => Boolean(entry[1])
+      )
+    : [];
 
   const toggleMessageExpand = (messageId: string) => {
     setExpandedMessageIds((prev) => {
@@ -280,6 +333,100 @@ export function InboxThreadDetail({
               <div className="border border-black/8 px-5 py-4 text-[12px] text-muted-foreground">
                 Loading thread...
               </div>
+            ) : null}
+
+            {threadBrief ? (
+              <section className="border border-black/6 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                    Thread brief
+                  </p>
+                  <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-foreground">
+                    {THREAD_MODE_LABELS[threadBrief.mode]}
+                  </span>
+                  <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                    {NEXT_MOVE_LABELS[threadBrief.nextMoveOwner]}
+                  </span>
+                  <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                    {COMPENSATION_LABELS[threadBrief.compensationType]}
+                  </span>
+                  <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                    {THREAD_PHASE_LABELS[threadBrief.threadPhase]}
+                  </span>
+                  {threadBrief.spamConfidence !== "none" ? (
+                    <span className="bg-secondary/40 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                      {SPAM_LABELS[threadBrief.spamConfidence]}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Latest ask
+                    </p>
+                    <p className="mt-1 text-[12px] text-foreground">
+                      {threadBrief.latestInboundAsk ?? "No direct ask captured yet."}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Last creator position
+                    </p>
+                    <p className="mt-1 text-[12px] text-foreground">
+                      {threadBrief.lastCreatorPosition ?? "No creator reply captured yet."}
+                    </p>
+                  </div>
+                </div>
+
+                {threadBriefTerms.length > 0 ? (
+                  <div className="mt-3 border-t border-black/6 pt-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Active terms
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {threadBriefTerms.map(([label, value]) => (
+                        <div key={label} className="border-l-2 border-black/8 pl-3">
+                          <p className="text-[12px] font-medium capitalize text-foreground">
+                            {label.replace(/([A-Z])/g, " $1").trim()}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {threadBrief.openQuestions.length > 0 ? (
+                  <div className="mt-3 border-t border-black/6 pt-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Open questions
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {threadBrief.openQuestions.map((question) => (
+                        <div key={question} className="border-l-2 border-black/8 pl-3">
+                          <p className="text-[12px] text-foreground">{question}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {threadBrief.risks.length > 0 ? (
+                  <div className="mt-3 border-t border-black/6 pt-3">
+                    <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                      Risks
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      {threadBrief.risks.map((risk) => (
+                        <div key={risk} className="border-l-2 border-black/8 pl-3">
+                          <p className="text-[12px] text-foreground">{risk}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
             ) : null}
 
             {selectedThread.actionItems.length > 0 ? (

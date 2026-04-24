@@ -26,6 +26,10 @@ function isSitePasswordProtected(): boolean {
   return (process.env.SITE_PASSWORD?.trim()?.length ?? 0) > 0;
 }
 
+function isE2EAuthEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.HELLOBRAND_E2E_ENABLED === "1";
+}
+
 function skipSitePassword(pathname: string): boolean {
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/site-password")) return true;
@@ -128,7 +132,7 @@ function isMaintenanceAllowedPath(pathname: string) {
   );
 }
 
-const authProxy = clerkMiddleware(async (auth, request: NextRequest) => {
+async function handleProxyRequest(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if ((await isMaintenanceModeEnabled()) && !isMaintenanceAllowedPath(pathname)) {
@@ -195,6 +199,10 @@ const authProxy = clerkMiddleware(async (auth, request: NextRequest) => {
   }
 
   return NextResponse.next();
+}
+
+const authProxy = clerkMiddleware(async (_auth, request: NextRequest) => {
+  return handleProxyRequest(request);
 });
 
 export default async function proxy(request: NextRequest, event: unknown) {
@@ -204,6 +212,10 @@ export default async function proxy(request: NextRequest, event: unknown) {
 
   const passwordRedirect = await checkSitePassword(request);
   if (passwordRedirect) return passwordRedirect;
+
+  if (isE2EAuthEnabled()) {
+    return handleProxyRequest(request);
+  }
 
   return authProxy(request, event as never);
 }

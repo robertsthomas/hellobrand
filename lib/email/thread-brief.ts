@@ -1,48 +1,13 @@
 import type {
   DealAggregate,
+  EmailThreadBriefRecord,
+  EmailThreadCompensationType,
   EmailMessageRecord,
+  EmailThreadConversationMode,
   EmailThreadDetail,
+  EmailThreadNextMoveOwner,
   ProfileRecord,
 } from "@/lib/types";
-
-type ThreadConversationMode =
-  | "initial_offer"
-  | "rate_negotiation"
-  | "decline_affiliate"
-  | "follow_up_decision"
-  | "revision_cycle"
-  | "go_live"
-  | "invoice_closeout"
-  | "unsubscribe_or_ignore"
-  | "low_signal_follow_up";
-
-type CompensationType = "guaranteed_paid" | "affiliate" | "hybrid" | "gifted" | "unclear";
-
-type NextMoveOwner = "creator" | "brand" | "none";
-
-interface ActiveTerms {
-  compensation: string | null;
-  deliverables: string | null;
-  deadlines: string | null;
-  usageRights: string | null;
-  exclusivity: string | null;
-  paymentTiming: string | null;
-}
-
-interface ThreadBrief {
-  mode: ThreadConversationMode;
-  compensationType: CompensationType;
-  latestInboundAsk: string | null;
-  lastCreatorPosition: string | null;
-  nextMoveOwner: NextMoveOwner;
-  activeTerms: ActiveTerms;
-  openQuestions: string[];
-  blockers: string[];
-  risks: string[];
-  spamConfidence: "none" | "low" | "medium" | "high";
-  brandName: string | null;
-  threadPhase: "early" | "mid" | "late";
-}
 
 const UNSUBSCRIBE_PATTERNS: RegExp[] = [
   /\bremove\s+me\b/i,
@@ -242,7 +207,7 @@ function recentMessages(messages: EmailMessageRecord[], count: number) {
 function detectConversationMode(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null
-): ThreadConversationMode {
+): EmailThreadConversationMode {
   const messages = thread.messages;
   if (messages.length === 0) return "low_signal_follow_up";
 
@@ -320,7 +285,7 @@ function detectConversationMode(
   return "low_signal_follow_up";
 }
 
-function detectCompensationType(threadText: string): CompensationType {
+function detectCompensationType(threadText: string): EmailThreadCompensationType {
   const lower = threadText.toLowerCase();
   const hasAffiliate = matchesAny(lower, AFFILIATE_PATTERNS);
   const hasDollar = /\$\s*[\d,]+/.test(lower);
@@ -337,8 +302,8 @@ function detectCompensationType(threadText: string): CompensationType {
 
 function determineNextMoveOwner(
   thread: EmailThreadDetail,
-  mode: ThreadConversationMode
-): NextMoveOwner {
+  mode: EmailThreadConversationMode
+): EmailThreadNextMoveOwner {
   if (mode === "unsubscribe_or_ignore") return "none";
   if (mode === "low_signal_follow_up") return "none";
 
@@ -510,7 +475,7 @@ function extractOpenQuestions(
 function extractRisks(
   threadText: string,
   partnership: DealAggregate | null,
-  compensationType: CompensationType
+  compensationType: EmailThreadCompensationType
 ): string[] {
   const risks: string[] = [];
 
@@ -603,7 +568,7 @@ function determineThreadPhase(thread: EmailThreadDetail): "early" | "mid" | "lat
 export function buildThreadBrief(
   thread: EmailThreadDetail,
   partnership: DealAggregate | null
-): ThreadBrief {
+): EmailThreadBriefRecord {
   const threadText = fullThreadText(thread.messages);
   const rawText = thread.messages.map(messageText).join(" ");
 
@@ -639,7 +604,7 @@ export function buildThreadBrief(
 }
 
 // fallow-ignore-next-line complexity
-export function threadBriefForPrompt(brief: ThreadBrief): string {
+export function threadBriefForPrompt(brief: EmailThreadBriefRecord): string {
   const lines: string[] = [
     `Conversation mode: ${brief.mode}`,
     `Compensation type: ${brief.compensationType}`,
@@ -680,7 +645,7 @@ export function threadBriefForPrompt(brief: ThreadBrief): string {
   return lines.join("\n");
 }
 
-const MODE_DRAFT_GUIDANCE: Record<ThreadConversationMode, string> = {
+const MODE_DRAFT_GUIDANCE: Record<EmailThreadConversationMode, string> = {
   decline_affiliate:
     "This thread involves a commission, affiliate, or gifted offer that may be presented as a paid deal. " +
     "Do not accept commission-only, affiliate, or product-gifting arrangements as if they were guaranteed paid deals. " +
@@ -735,8 +700,8 @@ const MODE_DRAFT_GUIDANCE: Record<ThreadConversationMode, string> = {
 };
 
 export function modeSpecificDraftGuidance(
-  mode: ThreadConversationMode,
-  brief: ThreadBrief
+  mode: EmailThreadConversationMode,
+  brief: EmailThreadBriefRecord
 ): string {
   const base = MODE_DRAFT_GUIDANCE[mode];
 
@@ -766,7 +731,7 @@ export function modeSpecificDraftGuidance(
   return [base, ...extras].join("\n\n");
 }
 
-const MODE_SUMMARY_GUIDANCE: Record<ThreadConversationMode, string> = {
+const MODE_SUMMARY_GUIDANCE: Record<EmailThreadConversationMode, string> = {
   decline_affiliate:
     "Identify the compensation structure as affiliate, commission, or gifted, not guaranteed pay. " +
     "State whether the creator has responded or this is still pending.",
@@ -802,13 +767,13 @@ const MODE_SUMMARY_GUIDANCE: Record<ThreadConversationMode, string> = {
     "Recommend whether to respond or ignore.",
 };
 
-export function modeSpecificSummaryGuidance(mode: ThreadConversationMode): string {
+export function modeSpecificSummaryGuidance(mode: EmailThreadConversationMode): string {
   return MODE_SUMMARY_GUIDANCE[mode];
 }
 
 export function modeSpecificFallbackDraft(
   thread: EmailThreadDetail,
-  brief: ThreadBrief,
+  brief: EmailThreadBriefRecord,
   profile: ProfileRecord,
   partnership: DealAggregate | null,
   currentDraft?: { subject: string; body: string } | null
@@ -918,8 +883,8 @@ export function modeSpecificFallbackDraft(
 }
 
 export function modeSpecificSuggestions(
-  mode: ThreadConversationMode,
-  brief: ThreadBrief
+  mode: EmailThreadConversationMode,
+  brief: EmailThreadBriefRecord
 ): Array<{ label: string; prompt: string }> {
   switch (mode) {
     case "decline_affiliate":

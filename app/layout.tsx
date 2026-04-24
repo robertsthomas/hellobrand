@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 
 import "@/app/globals.css";
 import { PostHogProvider } from "@/app/providers";
+import { AuthProvider } from "@/components/auth-provider";
 import { HtmlLangSync } from "@/components/html-lang-sync";
 import { PostHogPageView } from "@/components/posthog-pageview";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -56,17 +56,7 @@ export const viewport: Viewport = {
 
 function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <ClerkProvider
-      signInFallbackRedirectUrl="/app"
-      signUpFallbackRedirectUrl="/app"
-      afterSignOutUrl="/login"
-      waitlistUrl="/waitlist"
-      appearance={{
-        layout: {
-          showOptionalFields: false,
-        },
-      }}
-    >
+    <AuthProvider>
       <PostHogProvider>
         <ThemeProvider>
           <Suspense fallback={null}>
@@ -76,7 +66,7 @@ function AppProviders({ children }: { children: ReactNode }) {
           <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </PostHogProvider>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }
 

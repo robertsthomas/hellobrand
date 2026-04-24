@@ -7,8 +7,22 @@ import {
   E2E_PROJECTS
 } from "./tests/e2e/runtime";
 
-process.loadEnvFile?.();
-process.loadEnvFile?.(".env.local");
+function loadOptionalEnvFile(path?: string) {
+  try {
+    if (path) {
+      process.loadEnvFile?.(path);
+    } else {
+      process.loadEnvFile?.();
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+loadOptionalEnvFile();
+loadOptionalEnvFile(".env.local");
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -46,6 +60,7 @@ export default defineConfig({
       CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? "sk_test_ZXhhbXBsZQ",
       HELLOBRAND_DEV_PLAN: "free",
       HELLOBRAND_E2E_ENABLED: "1",
+      NEXT_PUBLIC_HELLOBRAND_E2E_AUTH: "1",
       HELLOBRAND_E2E_AUTH_SECRET: E2E_LOCAL_AUTH_SECRET
     }
   }

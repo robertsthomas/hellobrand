@@ -6,6 +6,11 @@
       "sourceType": "github",
       "computedHash": "65085998d643c3b64ff323ca74d76496b47484046b030730c00c03a0208bf410"
     },
+    "agent-email-inbox": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "computedHash": "25ffa798578026fcfdc5bdbe5b10ec2d2cd1784f8a94344c0ac055f3a82b57d4"
+    },
     "audit": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",
@@ -52,9 +57,9 @@
       "computedHash": "678136e0e89e9befc3f38911aa9647c5bab29197d9464dc5b00d32433b3c57dd"
     },
     "email-best-practices": {
-      "source": "resend/email-best-practices",
+      "source": "resend/resend-skills",
       "sourceType": "github",
-      "computedHash": "6a88d51e8c8ffd7d5b70831c303878ad29a3734792db9b56456269c4d70c2ff8"
+      "computedHash": "73502c047040e1d55b1c90c86b661784279f0956de06d7dc74738c904d122c22"
     },
     "email-sequence": {
       "source": "coreyhaines31/marketingskills",
@@ -146,10 +151,20 @@
       "sourceType": "github",
       "computedHash": "53ca5b03a78c3d0c8117eaf330b73d83d06ed0d66789490ca8a263ce92849d22"
     },
+    "react-email": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "computedHash": "d1fe70541c06ebf1cc58b774d35634399c466e55684776cfba6768a2079ad79b"
+    },
     "resend": {
       "source": "resend/resend-skills",
       "sourceType": "github",
       "computedHash": "936851c3e22e6de1d416134a9cd170d7540ddebe5a1c0113eef66537c843c6ed"
+    },
+    "resend-cli": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "computedHash": "8253f110ec3cbaac56153fc9051eeb7d3e8dbba03c31b49981aeb4d6f036d6d7"
     },
     "seo-audit": {
       "source": "coreyhaines31/marketingskills",

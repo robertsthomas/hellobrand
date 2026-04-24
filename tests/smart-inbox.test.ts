@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { detectImportantEmailEvents, isLikelyBrandDealEmail } from "@/lib/email/smart-inbox";
+import {
+  detectImportantEmailEvents,
+  isLikelyBrandDealEmail,
+  scoreThreadAgainstDeal,
+} from "@/lib/email/smart-inbox";
 import type {
+  DealAggregate,
   EmailAttachmentRecord,
   EmailMessageRecord,
   EmailThreadListItem,
@@ -126,6 +131,91 @@ function createThreadListItem(overrides: ThreadListItemOverrides = {}): EmailThr
   };
 }
 
+function createDealAggregate(overrides: Partial<DealAggregate> = {}): DealAggregate {
+  return {
+    deal: {
+      id: "deal-1",
+      userId: "user-1",
+      brandName: "BrightHome",
+      campaignName: "Holiday Campaign",
+      status: "negotiating",
+      paymentStatus: "awaiting_payment",
+      countersignStatus: "pending",
+      summary: null,
+      legalDisclaimer: "",
+      nextDeliverableDate: null,
+      createdAt: "2026-04-18T12:00:00.000Z",
+      updatedAt: "2026-04-18T12:00:00.000Z",
+      analyzedAt: null,
+      confirmedAt: null,
+      statusBeforeArchive: null,
+    },
+    latestDocument: null,
+    documents: [],
+    terms: {
+      id: "terms-1",
+      dealId: "deal-1",
+      brandName: "BrightHome",
+      agencyName: "Target Agency",
+      creatorName: null,
+      campaignName: "Holiday Campaign",
+      paymentAmount: null,
+      currency: null,
+      paymentTerms: null,
+      paymentStructure: null,
+      netTermsDays: null,
+      paymentTrigger: null,
+      deliverables: [],
+      usageRights: null,
+      usageRightsOrganicAllowed: null,
+      usageRightsPaidAllowed: null,
+      whitelistingAllowed: null,
+      usageDuration: null,
+      usageTerritory: null,
+      usageChannels: [],
+      exclusivity: null,
+      exclusivityApplies: null,
+      exclusivityCategory: null,
+      exclusivityDuration: null,
+      exclusivityRestrictions: null,
+      brandCategory: null,
+      competitorCategories: [],
+      restrictedCategories: [],
+      campaignDateWindow: null,
+      disclosureObligations: [],
+      revisions: null,
+      revisionRounds: null,
+      termination: null,
+      terminationAllowed: null,
+      terminationNotice: null,
+      terminationConditions: null,
+      governingLaw: null,
+      notes: null,
+      manuallyEditedFields: [],
+      briefData: null,
+      pendingExtraction: null,
+      createdAt: "2026-04-18T12:00:00.000Z",
+      updatedAt: "2026-04-18T12:00:00.000Z",
+    },
+    riskFlags: [],
+    conflictResults: [],
+    paymentRecord: null,
+    invoiceRecord: null,
+    jobs: [],
+    documentSections: [],
+    documentRuns: [],
+    documentArtifacts: [],
+    documentFieldEvidence: [],
+    documentReviewItems: [],
+    extractionResults: [],
+    extractionEvidence: [],
+    summaries: [],
+    currentSummary: null,
+    intakeSession: null,
+    ...overrides,
+  };
+}
+
 describe("smart inbox event detection", () => {
   test("does not classify attachment OCR as message-level inbox updates", () => {
     const message = createMessage({
@@ -191,5 +281,43 @@ describe("isLikelyBrandDealEmail", () => {
     });
 
     expect(isLikelyBrandDealEmail(item)).toBe(true);
+  });
+});
+
+describe("scoreThreadAgainstDeal", () => {
+  test("returns a strong match when brand and campaign signals align", () => {
+    const thread = createThreadListItem({
+      thread: {
+        subject: "Holiday Campaign Collaboration - BrightHome x Target",
+        snippet:
+          "Hi Thomas, Target Agency wants to confirm BrightHome deliverables and campaign timing.",
+        isContractRelated: true,
+      },
+      links: [],
+    });
+
+    const result = scoreThreadAgainstDeal(thread, createDealAggregate());
+
+    expect(result).not.toBeNull();
+    expect(result?.confidence).toBeGreaterThanOrEqual(0.8);
+    expect(result?.reasons.join(" ")).toContain("Campaign name matched");
+    expect(result?.evidence).toMatchObject({
+      exactMatches: expect.arrayContaining(["Holiday Campaign", "BrightHome", "Target Agency"]),
+    });
+  });
+
+  test("returns null when a thread has no meaningful partnership overlap", () => {
+    const thread = createThreadListItem({
+      thread: {
+        subject: "Dinner reservation confirmation",
+        snippet: "Your table for two is booked for Friday night.",
+        participants: [{ name: "Restaurant", email: "host@bistro.com" }],
+        isContractRelated: false,
+      },
+    });
+
+    const result = scoreThreadAgainstDeal(thread, createDealAggregate());
+
+    expect(result).toBeNull();
   });
 });

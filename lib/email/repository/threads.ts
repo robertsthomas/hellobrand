@@ -522,6 +522,7 @@ export async function getEmailThreadDetailForUser(userId: string, threadId: stri
     actionItems: row.actionItems.map(toActionItemRecord),
     promiseDiscrepancies: [],
     crossDealConflicts: [],
+    threadBrief: null,
     savedDraft: row.drafts[0] ? toDraftRecord(row.drafts[0]) : null,
     notes: row.notes.map(toNoteRecord),
     noteCount: row._count.notes

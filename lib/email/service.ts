@@ -12,6 +12,7 @@ import type {
 } from "@/lib/types";
 import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
 import { detectPromiseDiscrepancies } from "@/lib/email/smart-inbox";
+import { buildThreadBrief } from "@/lib/email/thread-brief";
 import { smartInboxEnabled } from "@/flags";
 import { fetchGmailAttachment, sendGmailThreadReply } from "@/lib/email/providers/gmail";
 import { fetchOutlookAttachment, sendOutlookThreadReply } from "@/lib/email/providers/outlook";
@@ -229,15 +230,26 @@ export async function getEmailThreadForViewer(viewer: Viewer, threadId: string) 
   }
 
   const detail = await getEmailThreadDetailForUser(viewer.id, threadId);
-  const primaryLink = detail ? primaryThreadLink(detail) : null;
-  if (!detail || !primaryLink) {
-    return detail;
+  if (!detail) {
+    return null;
   }
 
-  const { getCachedDealAggregates } = await import("@/lib/cached-data");
-  const allAggregates = await getCachedDealAggregates(viewer);
-  const aggregate = allAggregates.find((item) => item.deal.id === primaryLink.dealId);
-  if (!aggregate) {
+  let aggregate: Awaited<ReturnType<typeof import("@/lib/cached-data").getCachedDealAggregates>>[number] | null =
+    null;
+  let allAggregates:
+    | Awaited<ReturnType<typeof import("@/lib/cached-data").getCachedDealAggregates>>
+    | null = null;
+
+  const primaryLink = primaryThreadLink(detail);
+  if (primaryLink) {
+    const { getCachedDealAggregates } = await import("@/lib/cached-data");
+    allAggregates = await getCachedDealAggregates(viewer);
+    aggregate = allAggregates.find((item) => item.deal.id === primaryLink.dealId) ?? null;
+  }
+
+  detail.threadBrief = buildThreadBrief(detail, aggregate);
+
+  if (!aggregate || !allAggregates) {
     return detail;
   }
 
