@@ -217,6 +217,7 @@ import {
   enqueueNotificationEmailDelivery,
   getNotificationEmailLocalSendDelayMs,
   resolveNotificationEmailCopy,
+  resolveNotificationEmailVariant,
   resolveNotificationRecipient,
   sendNotificationEmailDelivery,
 } from "@/lib/notification-email";
@@ -456,6 +457,44 @@ describe("notification email sending", () => {
     expect(resendSend).toHaveBeenCalledWith(
       expect.objectContaining({
         from: "HelloBrand <onboarding@resend.dev>",
+        react: expect.anything(),
+        text: expect.stringContaining("Review workspace"),
+      })
+    );
+  });
+
+  it("sends no-document workspace reminder emails created by the sweep", async () => {
+    seedWorkspaceNotification({
+      eventType: "workspace.no_documents_uploaded",
+      title: "Summer Campaign has no documents yet",
+      body: "Upload the brand documents so HelloBrand can start tracking this workspace.",
+      href: "/app/p/deal-1/documents",
+    });
+    deliveries.set("notification-1", {
+      id: "delivery-1",
+      appNotificationId: "notification-1",
+      userId: "user-1",
+      recipientEmail: "owner@example.com",
+      provider: "resend",
+      providerMessageId: null,
+      status: "pending",
+      errorMessage: null,
+      sentAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    resendSend.mockResolvedValue({
+      data: { id: "email-123" },
+      error: null,
+    });
+
+    const result = await sendNotificationEmailDelivery("notification-1");
+
+    expect(result?.status).toBe("sent");
+    expect(resendSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Summer Campaign needs documents uploaded",
+        text: expect.stringContaining("Upload documents"),
       })
     );
   });
@@ -680,6 +719,18 @@ describe("notification email copy", () => {
       expect(copy.ctaLabel).not.toBe("Open in HelloBrand");
     }
   });
+
+  it("maps notification event types to email status variants", () => {
+    expect(resolveNotificationEmailVariant("workspace.ready_for_review")).toBe("success");
+    expect(resolveNotificationEmailVariant("workspace.failed")).toBe("critical");
+    expect(resolveNotificationEmailVariant("email.resync_required")).toBe("critical");
+    expect(resolveNotificationEmailVariant("workspace.missing_payment")).toBe("warning");
+    expect(resolveNotificationEmailVariant("workspace.missing_deliverables")).toBe("warning");
+    expect(resolveNotificationEmailVariant("workspace.missing_usage_rights")).toBe("warning");
+    expect(resolveNotificationEmailVariant("invoice.generate_prompt")).toBe("warning");
+    expect(resolveNotificationEmailVariant("invoice.send_prompt")).toBe("warning");
+    expect(resolveNotificationEmailVariant("workspace.deleted")).toBe("neutral");
+  });
 });
 
 describe("notification email HTML rendering", () => {
@@ -700,7 +751,7 @@ describe("notification email HTML rendering", () => {
     expect(payload.html).not.toContain("Open in HelloBrand");
   });
 
-  it("does not render the HELLOBRAND header text", async () => {
+  it("renders the shared HelloBrand email header", async () => {
     const payload = await buildNotificationEmailPayload({
       eventType: "workspace.ready_for_review",
       title: "Nimbus workspace is ready for review",
@@ -708,7 +759,7 @@ describe("notification email HTML rendering", () => {
       href: "/app/intake/session-1/review",
     });
 
-    expect(payload.html).not.toMatch(/text-transform:\s*uppercase[^>]*>HelloBrand<\/p>/);
+    expect(payload.html).toContain("HelloBrand");
   });
 
   it("includes a footer with notification settings link", async () => {

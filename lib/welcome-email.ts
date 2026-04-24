@@ -3,9 +3,9 @@
  * It keeps Resend-specific delivery details out of webhook route handlers.
  */
 import { createElement } from "react";
-import { render } from "react-email";
 
 import { resolveEmailLocale } from "@/emails/shared/locale";
+import { renderEmailText } from "@/emails/shared/render";
 import WelcomeEmailTemplate from "@/emails/transactional/welcome-email";
 import { getAppBaseUrl } from "@/lib/email/config";
 import {
@@ -35,7 +35,7 @@ async function buildWelcomeEmail(input: WelcomeEmailInput) {
     locale,
     startWorkspaceUrl,
   });
-  const text = await render(react, { plainText: true });
+  const text = await renderEmailText(react);
 
   return {
     subject: "Hello!",
@@ -72,7 +72,7 @@ export async function sendWelcomeEmail(input: WelcomeEmailInput) {
       react: email.react,
       text: email.text,
     },
-    { idempotencyKey: `welcome-email/${input.userId}` },
+    { idempotencyKey: `welcome-email/${input.userId}` }
   );
 
   if (response.error) {

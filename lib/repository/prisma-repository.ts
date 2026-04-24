@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { buildAggregate } from "@/lib/repository/file-store";
 import {
   getCurrentWorkspaceSummary,
   getLatestSummaryByType as getLatestSummaryByTypeFromHistory,
@@ -76,6 +77,25 @@ import {
 } from "@/lib/repository/mappers/prisma-documents";
 import { toIntakeSessionRecord } from "@/lib/repository/mappers/prisma-intake";
 import { iso, toJsonValue, toNullableJsonValue } from "@/lib/repository/mappers/prisma-shared";
+import { createSeedStore } from "@/lib/repository/seed";
+
+function getSeedDeals(userId: string) {
+  if (userId !== "demo-user") {
+    return [];
+  }
+
+  return createSeedStore().deals.filter((deal) => deal.userId === userId);
+}
+
+function getSeedAggregate(userId: string, dealId: string): DealAggregate | null {
+  if (userId !== "demo-user") {
+    return null;
+  }
+
+  const store = createSeedStore();
+  const deal = store.deals.find((entry) => entry.id === dealId && entry.userId === userId);
+  return deal ? buildAggregate(store, deal) : null;
+}
 
 function sortNewestFirst<T extends { updatedAt?: string; createdAt?: string }>(items: T[]) {
   return [...items].sort((left, right) =>
@@ -92,6 +112,10 @@ export class PrismaRepository {
       },
       orderBy: { updatedAt: "desc" },
     });
+
+    if (deals.length === 0) {
+      return getSeedDeals(userId);
+    }
 
     return deals.map(toDealRecord);
   }
@@ -114,7 +138,7 @@ export class PrismaRepository {
     });
 
     if (!deal) {
-      return null;
+      return getSeedAggregate(userId, dealId);
     }
 
     const documentIds = deal.documents.map((document) => document.id);

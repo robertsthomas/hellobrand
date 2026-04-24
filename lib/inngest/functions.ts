@@ -1,5 +1,40 @@
 import { inngest } from "@/lib/inngest/client";
 
+export const resendAudienceContactSyncFunction = inngest.createFunction(
+  {
+    id: "resend-audience-contact-sync",
+    idempotency: "event.data.contactKey",
+    triggers: [{ event: "resend/audience.contact.sync.requested" }],
+  },
+  async ({ event, step }) => {
+    const kind = String(event.data.kind ?? "");
+    const email = String(event.data.email ?? "");
+    const source = String(event.data.source ?? "");
+
+    if (kind !== "users" && kind !== "waitlist") {
+      throw new Error("Missing or invalid Resend audience kind.");
+    }
+
+    if (!email) {
+      throw new Error("Missing Resend audience contact email.");
+    }
+
+    const result = await step.run("add-resend-audience-contact", async () => {
+      const { addResendAudienceContact } = await import("@/lib/resend-audience");
+      return addResendAudienceContact({
+        kind,
+        email,
+        source,
+        firstName: typeof event.data.firstName === "string" ? event.data.firstName : null,
+        lastName: typeof event.data.lastName === "string" ? event.data.lastName : null,
+        userId: typeof event.data.userId === "string" ? event.data.userId : null,
+      });
+    });
+
+    return { ok: true, ...result };
+  }
+);
+
 export const notificationEmailSendFunction = inngest.createFunction(
   {
     id: "notification-email-send",

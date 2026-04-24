@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 
 import { getClerkMetadataDisplayName } from "@/lib/clerk-profile";
-import { DEFAULT_E2E_VIEWER, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
+import {
+  DEFAULT_E2E_VIEWER,
+  isE2EAuthEnabled,
+  resolveE2EViewerFromCookies
+} from "@/lib/e2e-auth";
 import { prisma } from "@/lib/prisma";
 import type { Viewer } from "@/lib/types";
 
@@ -242,9 +246,9 @@ async function upsertViewerFromSession() {
 }
 
 const getCurrentViewerCached = cache(async (): Promise<Viewer | null> => {
-  const e2eViewer = await resolveE2EViewerFromCookies();
-  if (e2eViewer) {
-    return ensureViewerRecord(e2eViewer);
+  if (isE2EAuthEnabled()) {
+    const e2eViewer = await resolveE2EViewerFromCookies();
+    return ensureViewerRecord(e2eViewer ?? DEFAULT_E2E_VIEWER);
   }
 
   const sessionViewer = await upsertViewerFromSession();

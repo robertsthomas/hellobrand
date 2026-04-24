@@ -1,6 +1,7 @@
 import { createElement } from "react";
-import { render } from "react-email";
 
+import type { EmailStatusVariant } from "@/emails/shared/components";
+import { renderEmailHtml, renderEmailText } from "@/emails/shared/render";
 import NotificationEmailTemplate from "@/emails/transactional/notification-email";
 import { getAppSettings } from "@/lib/admin-settings";
 import { getAppBaseUrl } from "@/lib/email/config";
@@ -464,6 +465,24 @@ export function resolveNotificationEmailCopy(input: {
   };
 }
 
+export function resolveNotificationEmailVariant(eventType: string): EmailStatusVariant {
+  switch (eventType) {
+    case "workspace.ready_for_review":
+      return "success";
+    case "workspace.failed":
+    case "email.resync_required":
+      return "critical";
+    case "workspace.missing_payment":
+    case "workspace.missing_deliverables":
+    case "workspace.missing_usage_rights":
+    case "invoice.generate_prompt":
+    case "invoice.send_prompt":
+      return "warning";
+    default:
+      return "neutral";
+  }
+}
+
 export async function buildNotificationEmailPayload(input: {
   eventType: string;
   title: string;
@@ -484,13 +503,14 @@ export async function buildNotificationEmailPayload(input: {
     ctaLabel: copy.ctaLabel,
     href: absoluteHref,
     settingsHref,
+    variant: resolveNotificationEmailVariant(input.eventType),
   });
-  const text = await render(react, { plainText: true });
+  const text = await renderEmailText(react);
 
   return {
     subject: copy.subject,
     react,
-    html: await render(react),
+    html: await renderEmailHtml(react),
     text,
   };
 }
@@ -532,7 +552,8 @@ function shouldSendNotificationEmail(notification: NotificationWithEmailContext)
       notification.eventType === "workspace.failed" ||
       notification.eventType === "workspace.missing_payment" ||
       notification.eventType === "workspace.missing_deliverables" ||
-      notification.eventType === "workspace.missing_usage_rights"
+      notification.eventType === "workspace.missing_usage_rights" ||
+      notification.eventType === "workspace.no_documents_uploaded"
     );
   }
 

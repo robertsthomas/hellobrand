@@ -8,13 +8,27 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 import { sendWaitlistConfirmationEmail } from "@/lib/waitlist-email";
 
+function getWaitlistEntryId(value: unknown) {
+  return typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string"
+    ? value.id
+    : null;
+}
+
 export async function joinWaitlist(emailAddress: string) {
   try {
     const client = await clerkClient();
-    await client.waitlistEntries.create({ emailAddress });
+    const waitlistEntry = await client.waitlistEntries.create({ emailAddress });
+    const waitlistEntryId = getWaitlistEntryId(waitlistEntry);
 
     // Send confirmation email (non-blocking, don't fail the waitlist join if email fails)
-    sendWaitlistConfirmationEmail(emailAddress).catch((err) => {
+    sendWaitlistConfirmationEmail(emailAddress, {
+      idempotencyKey: waitlistEntryId
+        ? `waitlist-confirmation/${waitlistEntryId}`
+        : `waitlist-confirmation/${emailAddress.trim().toLowerCase()}`,
+    }).catch((err) => {
       console.error("Waitlist confirmation email error:", err);
     });
 

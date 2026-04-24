@@ -1,13 +1,13 @@
 import { createElement, type ReactElement } from "react";
-import { render } from "react-email";
 
+import { renderEmailText } from "@/emails/shared/render";
 import FeedbackFollowUpEmailTemplate from "@/emails/transactional/feedback-follow-up-email";
 import FeedbackSupportEmailTemplate from "@/emails/transactional/feedback-support-email";
 import { getProfileForViewer } from "@/lib/profile";
 import { getAppBaseUrl } from "@/lib/email/config";
 import {
   canSendNotificationEmailInCurrentMode,
-  getNotificationEmailConfig
+  getNotificationEmailConfig,
 } from "@/lib/notification-email";
 import { captureHandledError } from "@/lib/monitoring/sentry";
 import { capturePostHogServerEvent } from "@/lib/posthog/server";
@@ -93,7 +93,7 @@ async function sendFeedbackEmail(input: {
     !canSendNotificationEmailInCurrentMode({
       fromEmail: config.fromEmail,
       testToEmail: config.testToEmail,
-      recipientEmail: input.to
+      recipientEmail: input.to,
     })
   ) {
     return { messageId: null, sentAt: null } satisfies SendEmailResult;
@@ -106,7 +106,7 @@ async function sendFeedbackEmail(input: {
     subject: input.subject,
     react: input.react,
     text: input.text,
-    ...(input.replyTo ? { replyTo: input.replyTo } : {})
+    ...(input.replyTo ? { replyTo: input.replyTo } : {}),
   });
 
   if (response.error) {
@@ -115,7 +115,7 @@ async function sendFeedbackEmail(input: {
 
   return {
     messageId: response.data?.id ?? null,
-    sentAt: new Date()
+    sentAt: new Date(),
   } satisfies SendEmailResult;
 }
 
@@ -142,22 +142,18 @@ async function buildSupportEmail(input: {
     requestedFollowUp: input.requestedFollowUp,
     message: messageText,
     feedbackId: input.feedbackId,
-    pageUrl
+    pageUrl,
   });
-  const text = await render(react, { plainText: true });
+  const text = await renderEmailText(react);
 
   return {
     subject: `Product feedback from ${input.viewer.displayName} (${input.score}/5)`,
     react,
-    text
+    text,
   };
 }
 
-async function buildFollowUpEmail(input: {
-  viewer: Viewer;
-  score: number;
-  pageTitle: string;
-}) {
+async function buildFollowUpEmail(input: { viewer: Viewer; score: number; pageTitle: string }) {
   const tone =
     input.score <= LOW_SCORE_SUPPORT_THRESHOLD
       ? "Thanks for flagging that something felt off."
@@ -165,21 +161,18 @@ async function buildFollowUpEmail(input: {
   const react = createElement(FeedbackFollowUpEmailTemplate, {
     displayName: input.viewer.displayName,
     tone,
-    supportEmail: SUPPORT_EMAIL
+    supportEmail: SUPPORT_EMAIL,
   });
-  const text = await render(react, { plainText: true });
+  const text = await renderEmailText(react);
 
   return {
     subject: "Thanks for your HelloBrand feedback",
     react,
-    text
+    text,
   };
 }
 
-export async function createFeedbackSubmission(
-  viewer: Viewer,
-  input: FeedbackSubmissionInput
-) {
+export async function createFeedbackSubmission(viewer: Viewer, input: FeedbackSubmissionInput) {
   const profile = await getProfileForViewer(viewer);
   const contactEmail = normalizeNullableString(profile.contactEmail) ?? viewer.email;
   const message = normalizeNullableString(input.message);
@@ -195,12 +188,11 @@ export async function createFeedbackSubmission(
       pageTitle: input.pageTitle,
       dealId,
       requestedFollowUp,
-      contactEmail
-    }
+      contactEmail,
+    },
   });
 
-  const shouldNotifySupport =
-    requestedFollowUp || input.score <= LOW_SCORE_SUPPORT_THRESHOLD;
+  const shouldNotifySupport = requestedFollowUp || input.score <= LOW_SCORE_SUPPORT_THRESHOLD;
 
   if (shouldNotifySupport) {
     const supportEmail = await buildSupportEmail({
@@ -212,7 +204,7 @@ export async function createFeedbackSubmission(
       pagePath: input.pagePath,
       pageTitle: input.pageTitle,
       dealId,
-      requestedFollowUp
+      requestedFollowUp,
     });
 
     try {
@@ -221,7 +213,7 @@ export async function createFeedbackSubmission(
         subject: supportEmail.subject,
         react: supportEmail.react,
         text: supportEmail.text,
-        replyTo: contactEmail
+        replyTo: contactEmail,
       });
 
       if (result.sentAt) {
@@ -229,8 +221,8 @@ export async function createFeedbackSubmission(
           where: { id: submission.id },
           data: {
             supportEmailMessageId: result.messageId,
-            supportEmailSentAt: result.sentAt
-          }
+            supportEmailSentAt: result.sentAt,
+          },
         });
       }
     } catch (error) {
@@ -242,8 +234,8 @@ export async function createFeedbackSubmission(
         extras: {
           feedbackId: submission.id,
           score: input.score,
-          requestedFollowUp
-        }
+          requestedFollowUp,
+        },
       });
     }
   }
@@ -252,7 +244,7 @@ export async function createFeedbackSubmission(
     const followUpEmail = await buildFollowUpEmail({
       viewer,
       score: input.score,
-      pageTitle: input.pageTitle
+      pageTitle: input.pageTitle,
     });
 
     try {
@@ -261,7 +253,7 @@ export async function createFeedbackSubmission(
         subject: followUpEmail.subject,
         react: followUpEmail.react,
         text: followUpEmail.text,
-        replyTo: SUPPORT_EMAIL
+        replyTo: SUPPORT_EMAIL,
       });
 
       if (result.sentAt) {
@@ -269,8 +261,8 @@ export async function createFeedbackSubmission(
           where: { id: submission.id },
           data: {
             userFollowUpEmailMessageId: result.messageId,
-            userFollowUpEmailSentAt: result.sentAt
-          }
+            userFollowUpEmailSentAt: result.sentAt,
+          },
         });
       }
     } catch (error) {
@@ -281,8 +273,8 @@ export async function createFeedbackSubmission(
         captureExpected: true,
         extras: {
           feedbackId: submission.id,
-          score: input.score
-        }
+          score: input.score,
+        },
       });
     }
   }
@@ -298,8 +290,8 @@ export async function createFeedbackSubmission(
       pageGroup: resolveFeedbackPageGroup(input.pagePath),
       hasDeal: Boolean(dealId),
       requestedFollowUp,
-      messageProvided: Boolean(message)
-    }
+      messageProvided: Boolean(message),
+    },
   }).catch((error) => {
     captureHandledError(error, {
       area: "feedback",
@@ -307,12 +299,12 @@ export async function createFeedbackSubmission(
       viewerId: viewer.id,
       captureExpected: true,
       extras: {
-        feedbackId: submission.id
-      }
+        feedbackId: submission.id,
+      },
     });
   });
 
   return {
-    id: submission.id
+    id: submission.id,
   };
 }

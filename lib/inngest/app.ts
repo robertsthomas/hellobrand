@@ -10,12 +10,14 @@ import {
   invoiceReminderSweepFunction,
   noDocumentsUploadedSweepFunction,
   notificationEmailSendFunction,
+  resendAudienceContactSyncFunction,
   workspaceNudgeSweepFunction,
   workspaceReminderSweepFunction,
 } from "@/lib/inngest/functions";
 
 export const inngestFunctions = [
   documentProcessingFunction,
+  resendAudienceContactSyncFunction,
   notificationEmailSendFunction,
   invoiceReminderSweepFunction,
   workspaceReminderSweepFunction,

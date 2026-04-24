@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { PublicUploadWorkspace } from "@/components/public-upload-workspace";
 import { RuntimeStatusPage } from "@/components/runtime-status-page";
 import { getAppSettings } from "@/lib/admin-settings";
+import { isE2EAuthEnabled, resolveE2EViewerFromCookies } from "@/lib/e2e-auth";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 const uploadTitle = "Upload a Brand Deal Contract — Free Analysis | HelloBrand";
@@ -32,12 +33,13 @@ export const metadata: Metadata = {
 };
 
 export default async function PublicUploadPage() {
-  const [session, appSettings] = await Promise.all([
-    auth(),
+  const [session, e2eViewer, appSettings] = await Promise.all([
+    isE2EAuthEnabled() ? Promise.resolve(null) : auth(),
+    resolveE2EViewerFromCookies(),
     getAppSettings()
   ]);
 
-  if (session.userId) {
+  if (session?.userId || e2eViewer) {
     redirect("/app/intake/new");
   }
 

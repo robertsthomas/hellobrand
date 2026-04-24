@@ -27,7 +27,7 @@ const {
   canSendNotificationEmailInCurrentModeMock,
   resendSend,
   capturePostHogServerEventMock,
-  captureHandledErrorMock
+  captureHandledErrorMock,
 } = vi.hoisted(() => {
   const feedbackRecords = new Map<string, FeedbackRecord>();
   const requireViewerMock = vi.fn();
@@ -40,43 +40,60 @@ const {
 
   const prismaMock = {
     feedbackSubmission: {
-      create: vi.fn(async ({ data }: { data: Omit<FeedbackRecord, "id" | "createdAt" | "updatedAt" | "userFollowUpEmailMessageId" | "userFollowUpEmailSentAt" | "supportEmailMessageId" | "supportEmailSentAt"> }) => {
-        const record: FeedbackRecord = {
-          id: `feedback-${feedbackRecords.size + 1}`,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          userFollowUpEmailMessageId: null,
-          userFollowUpEmailSentAt: null,
-          supportEmailMessageId: null,
-          supportEmailSentAt: null,
-          ...data
-        };
-        feedbackRecords.set(record.id, record);
-        return {
-          ...record,
-          createdAt: new Date(record.createdAt),
-          updatedAt: new Date(record.updatedAt)
-        };
-      }),
-      update: vi.fn(async ({ where, data }: { where: { id: string }; data: Partial<FeedbackRecord> }) => {
-        const existing = feedbackRecords.get(where.id);
-        if (!existing) {
-          throw new Error("Feedback submission not found");
+      create: vi.fn(
+        async ({
+          data,
+        }: {
+          data: Omit<
+            FeedbackRecord,
+            | "id"
+            | "createdAt"
+            | "updatedAt"
+            | "userFollowUpEmailMessageId"
+            | "userFollowUpEmailSentAt"
+            | "supportEmailMessageId"
+            | "supportEmailSentAt"
+          >;
+        }) => {
+          const record: FeedbackRecord = {
+            id: `feedback-${feedbackRecords.size + 1}`,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            userFollowUpEmailMessageId: null,
+            userFollowUpEmailSentAt: null,
+            supportEmailMessageId: null,
+            supportEmailSentAt: null,
+            ...data,
+          };
+          feedbackRecords.set(record.id, record);
+          return {
+            ...record,
+            createdAt: new Date(record.createdAt),
+            updatedAt: new Date(record.updatedAt),
+          };
         }
+      ),
+      update: vi.fn(
+        async ({ where, data }: { where: { id: string }; data: Partial<FeedbackRecord> }) => {
+          const existing = feedbackRecords.get(where.id);
+          if (!existing) {
+            throw new Error("Feedback submission not found");
+          }
 
-        const updated: FeedbackRecord = {
-          ...existing,
-          ...data,
-          updatedAt: new Date()
-        };
-        feedbackRecords.set(updated.id, updated);
-        return {
-          ...updated,
-          createdAt: new Date(updated.createdAt),
-          updatedAt: new Date(updated.updatedAt)
-        };
-      })
-    }
+          const updated: FeedbackRecord = {
+            ...existing,
+            ...data,
+            updatedAt: new Date(),
+          };
+          feedbackRecords.set(updated.id, updated);
+          return {
+            ...updated,
+            createdAt: new Date(updated.createdAt),
+            updatedAt: new Date(updated.updatedAt),
+          };
+        }
+      ),
+    },
   };
 
   return {
@@ -88,41 +105,41 @@ const {
     canSendNotificationEmailInCurrentModeMock,
     resendSend,
     capturePostHogServerEventMock,
-    captureHandledErrorMock
+    captureHandledErrorMock,
   };
 });
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: prismaMock
+  prisma: prismaMock,
 }));
 
 vi.mock("@/lib/auth", () => ({
-  requireViewer: requireViewerMock
+  requireViewer: requireViewerMock,
 }));
 
 vi.mock("@/lib/profile", () => ({
-  getProfileForViewer: getProfileForViewerMock
+  getProfileForViewer: getProfileForViewerMock,
 }));
 
 vi.mock("@/lib/notification-email", () => ({
   getNotificationEmailConfig: getNotificationEmailConfigMock,
-  canSendNotificationEmailInCurrentMode: canSendNotificationEmailInCurrentModeMock
+  canSendNotificationEmailInCurrentMode: canSendNotificationEmailInCurrentModeMock,
 }));
 
 vi.mock("@/lib/posthog/server", () => ({
-  capturePostHogServerEvent: capturePostHogServerEventMock
+  capturePostHogServerEvent: capturePostHogServerEventMock,
 }));
 
 vi.mock("@/lib/monitoring/sentry", () => ({
-  captureHandledError: captureHandledErrorMock
+  captureHandledError: captureHandledErrorMock,
 }));
 
 vi.mock("resend", () => ({
   Resend: vi.fn().mockImplementation(() => ({
     emails: {
-      send: resendSend
-    }
-  }))
+      send: resendSend,
+    },
+  })),
 }));
 
 import { submitFeedbackAction } from "@/app/server-actions/feedback-actions";
@@ -130,27 +147,26 @@ import { submitFeedbackAction } from "@/app/server-actions/feedback-actions";
 const INITIAL_STATE = {
   status: "idle" as const,
   message: null,
-  submissionId: null
+  submissionId: null,
 };
 
-function buildFormData(input?: Partial<{
-  score: string;
-  message: string;
-  pagePath: string;
-  pageTitle: string;
-  dealId: string;
-  requestedFollowUp: boolean;
-}>) {
+function buildFormData(
+  input?: Partial<{
+    score: string;
+    message: string;
+    pagePath: string;
+    pageTitle: string;
+    dealId: string;
+    requestedFollowUp: boolean;
+  }>
+) {
   const formData = new FormData();
   formData.set("score", input?.score ?? "4");
   formData.set("message", input?.message ?? "Helpful product flow.");
   formData.set("pagePath", input?.pagePath ?? "/app");
   formData.set("pageTitle", input?.pageTitle ?? "Dashboard");
   formData.set("dealId", input?.dealId ?? "deal-1");
-  formData.set(
-    "requestedFollowUp",
-    input?.requestedFollowUp ? "true" : "false"
-  );
+  formData.set("requestedFollowUp", input?.requestedFollowUp ? "true" : "false");
   return formData;
 }
 
@@ -163,34 +179,32 @@ describe("submitFeedbackAction", () => {
       id: "user-1",
       email: "owner@example.com",
       displayName: "Taylor",
-      mode: "clerk"
+      mode: "clerk",
     });
     getProfileForViewerMock.mockResolvedValue({
-      contactEmail: "creator@example.com"
+      contactEmail: "creator@example.com",
     });
     getNotificationEmailConfigMock.mockReturnValue({
       apiKey: "resend-key",
       fromEmail: "team@hellobrand.com",
       testToEmail: null,
-      testMode: false
+      testMode: false,
     });
     canSendNotificationEmailInCurrentModeMock.mockReturnValue(true);
     resendSend.mockImplementation(async ({ to }: { to: string[] }) => ({
       data: { id: `email-${to[0]}` },
-      error: null
+      error: null,
     }));
     capturePostHogServerEventMock.mockResolvedValue(true);
   });
 
   it("rejects unauthenticated submissions", async () => {
     requireViewerMock.mockRejectedValue({
-      digest: "NEXT_REDIRECT;/login"
+      digest: "NEXT_REDIRECT;/login",
     });
 
-    await expect(
-      submitFeedbackAction(INITIAL_STATE, buildFormData())
-    ).rejects.toMatchObject({
-      digest: expect.stringContaining("NEXT_REDIRECT")
+    await expect(submitFeedbackAction(INITIAL_STATE, buildFormData())).rejects.toMatchObject({
+      digest: expect.stringContaining("NEXT_REDIRECT"),
     });
   });
 
@@ -219,7 +233,7 @@ describe("submitFeedbackAction", () => {
         message: "Fast and clear.",
         pagePath: "/app/inbox",
         pageTitle: "Inbox",
-        dealId: "deal-9"
+        dealId: "deal-9",
       })
     );
 
@@ -235,7 +249,7 @@ describe("submitFeedbackAction", () => {
       pageTitle: "Inbox",
       dealId: "deal-9",
       requestedFollowUp: false,
-      contactEmail: "creator@example.com"
+      contactEmail: "creator@example.com",
     });
   });
 
@@ -246,9 +260,7 @@ describe("submitFeedbackAction", () => {
     );
 
     expect(
-      resendSend.mock.calls.some(
-        ([payload]) => payload.to?.[0] === "creator@example.com"
-      )
+      resendSend.mock.calls.some(([payload]) => payload.to?.[0] === "creator@example.com")
     ).toBe(false);
 
     resendSend.mockClear();
@@ -259,9 +271,7 @@ describe("submitFeedbackAction", () => {
     );
 
     expect(
-      resendSend.mock.calls.some(
-        ([payload]) => payload.to?.[0] === "creator@example.com"
-      )
+      resendSend.mock.calls.some(([payload]) => payload.to?.[0] === "creator@example.com")
     ).toBe(true);
   });
 
@@ -272,9 +282,7 @@ describe("submitFeedbackAction", () => {
     );
 
     expect(
-      resendSend.mock.calls.some(
-        ([payload]) => payload.to?.[0] === "support@hellobrand.com"
-      )
+      resendSend.mock.calls.some(([payload]) => payload.to?.[0] === "support@hellobrand.com")
     ).toBe(true);
 
     resendSend.mockClear();
@@ -285,10 +293,49 @@ describe("submitFeedbackAction", () => {
     );
 
     expect(
-      resendSend.mock.calls.filter(
-        ([payload]) => payload.to?.[0] === "support@hellobrand.com"
-      )
+      resendSend.mock.calls.filter(([payload]) => payload.to?.[0] === "support@hellobrand.com")
     ).toHaveLength(1);
+  });
+
+  it("sends React feedback emails with plain text, reply-to, and metadata", async () => {
+    await submitFeedbackAction(
+      INITIAL_STATE,
+      buildFormData({
+        score: "2",
+        message: "The deliverables section is confusing.",
+        pagePath: "/app/p/deal-9",
+        pageTitle: "Partnership workspace",
+        dealId: "deal-9",
+        requestedFollowUp: true,
+      })
+    );
+
+    const supportPayload = resendSend.mock.calls.find(
+      ([payload]) => payload.to?.[0] === "support@hellobrand.com"
+    )?.[0];
+    const followUpPayload = resendSend.mock.calls.find(
+      ([payload]) => payload.to?.[0] === "creator@example.com"
+    )?.[0];
+
+    expect(supportPayload).toEqual(
+      expect.objectContaining({
+        react: expect.anything(),
+        replyTo: "creator@example.com",
+        text: expect.stringContaining("The deliverables section is confusing."),
+      })
+    );
+    expect(supportPayload?.text).toContain("Score");
+    expect(supportPayload?.text).toContain("2/5");
+    expect(supportPayload?.text).toContain("Deal ID");
+    expect(supportPayload?.text).toContain("deal-9");
+
+    expect(followUpPayload).toEqual(
+      expect.objectContaining({
+        react: expect.anything(),
+        replyTo: "support@hellobrand.com",
+        text: expect.stringContaining("support@hellobrand.com"),
+      })
+    );
   });
 
   it("emits a server-side PostHog event without raw feedback text", async () => {
@@ -296,7 +343,7 @@ describe("submitFeedbackAction", () => {
       INITIAL_STATE,
       buildFormData({
         score: "3",
-        message: "This page felt confusing in the middle."
+        message: "This page felt confusing in the middle.",
       })
     );
 
@@ -309,8 +356,8 @@ describe("submitFeedbackAction", () => {
         pagePath: "/app",
         pageGroup: "dashboard",
         requestedFollowUp: false,
-        messageProvided: true
-      })
+        messageProvided: true,
+      }),
     });
 
     const properties = capturePostHogServerEventMock.mock.calls[0][0].properties;
