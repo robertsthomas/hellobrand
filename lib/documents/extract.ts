@@ -249,8 +249,10 @@ async function extractTextWithAzureDocumentIntelligence(
   if (
     mimeType !== "application/pdf" &&
     mimeType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document" &&
+    mimeType !== "application/vnd.openxmlformats-officedocument.presentationml.presentation" &&
     !lowerFileName.endsWith(".pdf") &&
-    !lowerFileName.endsWith(".docx")
+    !lowerFileName.endsWith(".docx") &&
+    !lowerFileName.endsWith(".pptx")
   ) {
     return null;
   }
