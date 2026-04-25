@@ -9,7 +9,9 @@ import {
   EmailShell,
   EmailText,
   EmailTitle,
+  emailSharedStyles,
 } from "@/emails/shared/components";
+import { Link } from "react-email";
 
 export type WaitlistConfirmationEmailTemplateProps = {
   unsubscribeUrl: string;
@@ -20,7 +22,15 @@ export default function WaitlistConfirmationEmailTemplate(
 ) {
   return (
     <EmailShell
-      footer={<EmailFooter unsubscribeHref={input.unsubscribeUrl} />}
+      footer={
+        <EmailFooter>
+          Prefer not to get future HelloBrand product updates?{" "}
+          <Link href={input.unsubscribeUrl} style={emailSharedStyles.link}>
+            Unsubscribe
+          </Link>
+          .
+        </EmailFooter>
+      }
       preview="You're on the HelloBrand waitlist."
     >
       <EmailHeader />
@@ -32,7 +42,7 @@ export default function WaitlistConfirmationEmailTemplate(
           you in.
         </EmailText>
         <EmailText muted style={{ margin: 0 }}>
-          Stay tuned, we&apos;ll be in touch soon.
+          We&apos;ll email you when access opens.
         </EmailText>
       </EmailContent>
     </EmailShell>

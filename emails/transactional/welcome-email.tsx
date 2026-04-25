@@ -8,6 +8,7 @@ import { Link } from "react-email";
 import { resolveEmailLocale, type EmailLocale } from "@/emails/shared/locale";
 import { emailMessagesByLocale } from "@/emails/shared/messages";
 import {
+  EmailBulletList,
   EmailButton,
   EmailContent,
   EmailHeader,
@@ -50,7 +51,13 @@ export default function WelcomeEmailTemplate(input: WelcomeEmailTemplateProps) {
           {greetingName ? t("greetingNamed", { firstName: greetingName }) : t("greetingGeneric")}
         </EmailText>
         <EmailText>{t("intro")}</EmailText>
-        <EmailText>{t("firstStep")}</EmailText>
+        <EmailBulletList
+          items={[
+            t("workspaceBenefitSummary"),
+            t("workspaceBenefitTasks"),
+            t("workspaceBenefitInbox"),
+          ]}
+        />
         <EmailButton href={input.startWorkspaceUrl}>{t("cta")}</EmailButton>
         <EmailText muted>
           {t("fallbackLinkLabel")}{" "}

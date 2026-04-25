@@ -27,9 +27,12 @@ type EmailEligibleEventType =
 type NotificationEmailCopy = {
   subject: string;
   preview: string;
+  eyebrow?: string;
   headline: string;
   body: string;
   ctaLabel: string;
+  issueItems?: string[];
+  issueMoreCount?: number;
 };
 
 type NotificationWithEmailContext = {
@@ -415,6 +418,55 @@ function isEmailEligibleEventType(eventType: string): eventType is EmailEligible
   return EMAIL_ELIGIBLE_EVENT_TYPES.has(eventType);
 }
 
+function resolveNotificationEmailEyebrow(eventType: EmailEligibleEventType) {
+  switch (eventType) {
+    case "workspace.ready_for_review":
+      return "Workspace is ready";
+    case "workspace.failed":
+    case "workspace.missing_payment":
+    case "workspace.missing_deliverables":
+    case "workspace.missing_usage_rights":
+    case "workspace.no_documents_uploaded":
+    case "email.resync_required":
+    case "invoice.generate_prompt":
+    case "invoice.send_prompt":
+      return "Action required";
+    case "workspace.deleted":
+      return undefined;
+  }
+}
+
+function resolveNotificationIssueItems(eventType: EmailEligibleEventType) {
+  switch (eventType) {
+    case "workspace.failed":
+      return ["Workspace processing failed"];
+    case "workspace.missing_payment":
+      return ["Payment amount is missing"];
+    case "workspace.missing_deliverables":
+      return ["Deliverables are missing"];
+    case "workspace.missing_usage_rights":
+      return ["Usage rights are missing"];
+    case "workspace.no_documents_uploaded":
+      return ["Brand documents have not been uploaded"];
+    case "email.resync_required":
+      return ["Inbox connection needs to be reconnected"];
+    case "invoice.generate_prompt":
+      return ["Invoice has not been generated yet"];
+    case "invoice.send_prompt":
+      return ["Invoice has not been sent yet"];
+    case "workspace.ready_for_review":
+    case "workspace.deleted":
+      return [];
+  }
+}
+
+function limitNotificationIssueItems(items: string[]) {
+  return {
+    issueItems: items.slice(0, 3),
+    issueMoreCount: Math.max(0, items.length - 3),
+  };
+}
+
 /**
  * Resolves email-specific copy (subject, headline, body, CTA) for a notification.
  *
@@ -439,20 +491,41 @@ export function resolveNotificationEmailCopy(input: {
   body: string;
 }): NotificationEmailCopy {
   if (isEmailEligibleEventType(input.eventType)) {
+    const eyebrow = resolveNotificationEmailEyebrow(input.eventType);
+    const issueDetails = limitNotificationIssueItems(
+      resolveNotificationIssueItems(input.eventType)
+    );
+
     const invoiceCopy = resolveInvoiceEmailCopy(input.eventType, input.title, input.body);
     if (invoiceCopy) {
       return {
         ...invoiceCopy,
+        eyebrow,
         ctaLabel: resolveCtaLabel(input.eventType),
+        ...issueDetails,
+      };
+    }
+
+    if (input.eventType === "workspace.ready_for_review") {
+      return {
+        subject: buildSubjectForEvent(input.eventType, input.title),
+        preview: "Your workspace summary, deliverables, payment terms, and risks are ready.",
+        eyebrow,
+        headline: input.title,
+        body: "Your summary, deliverables, payment terms, and risks are ready to review.",
+        ctaLabel: resolveCtaLabel(input.eventType),
+        ...issueDetails,
       };
     }
 
     return {
       subject: buildSubjectForEvent(input.eventType, input.title),
       preview: truncatePreviewText(input.body),
+      eyebrow,
       headline: input.title,
       body: input.body,
       ctaLabel: resolveCtaLabel(input.eventType),
+      ...issueDetails,
     };
   }
 
@@ -475,6 +548,7 @@ export function resolveNotificationEmailVariant(eventType: string): EmailStatusV
     case "workspace.missing_payment":
     case "workspace.missing_deliverables":
     case "workspace.missing_usage_rights":
+    case "workspace.no_documents_uploaded":
     case "invoice.generate_prompt":
     case "invoice.send_prompt":
       return "warning";
@@ -498,12 +572,15 @@ export async function buildNotificationEmailPayload(input: {
   const settingsHref = toAbsoluteHref("/app/settings/notifications");
   const react = createElement(NotificationEmailTemplate, {
     preview: copy.preview,
+    eyebrow: copy.eyebrow,
     headline: copy.headline,
     body: copy.body,
     ctaLabel: copy.ctaLabel,
     href: absoluteHref,
     settingsHref,
     variant: resolveNotificationEmailVariant(input.eventType),
+    issueItems: copy.issueItems,
+    issueMoreCount: copy.issueMoreCount,
   });
   const text = await renderEmailText(react);
 

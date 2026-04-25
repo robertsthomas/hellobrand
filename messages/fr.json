@@ -265,8 +265,11 @@
       "heading": "Bienvenue sur HelloBrand",
       "greetingNamed": "Bonjour {firstName},",
       "greetingGeneric": "Bonjour,",
-      "intro": "Merci d'avoir créé votre compte HelloBrand. Vous pouvez maintenant lancer l'intake, téléverser vos documents de partenariat et garder vos contrats organisés dans un seul espace.",
+      "intro": "Commencez par téléverser un document de marque. HelloBrand le transformera en espace que vous pourrez consulter et gérer.",
       "firstStep": "Votre première étape consiste à téléverser un document de marque comme un contrat, un brief ou un e-mail de campagne afin que HelloBrand puisse extraire les détails importants dans votre espace.",
+      "workspaceBenefitSummary": "Un résumé clair du partenariat.",
+      "workspaceBenefitTasks": "Livrables, paiements, dates et droits d'utilisation au même endroit.",
+      "workspaceBenefitInbox": "Un espace auquel revenir quand l'accord avance.",
       "cta": "Télécharger votre premier document de marque",
       "fallbackLinkLabel": "Si le bouton ne fonctionne pas, ouvrez ce lien :",
       "closing": "Nous sommes ravis de vous compter parmi nous."

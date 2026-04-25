@@ -265,8 +265,11 @@
       "heading": "Welcome to HelloBrand",
       "greetingNamed": "Hi {firstName},",
       "greetingGeneric": "Hi there,",
-      "intro": "Thanks for creating your HelloBrand account. You can now start intake, upload partnership docs, and keep creator deals organized in one workspace.",
+      "intro": "Start by uploading a brand document. HelloBrand will turn it into a workspace you can review and manage.",
       "firstStep": "Your first step is to upload a brand document like a contract, brief, or campaign email so HelloBrand can pull the important details into your workspace.",
+      "workspaceBenefitSummary": "A plain-English summary of the partnership.",
+      "workspaceBenefitTasks": "Deliverables, payment terms, dates, and usage rights in one place.",
+      "workspaceBenefitInbox": "A workspace you can come back to when the deal moves forward.",
       "cta": "Upload your first brand document",
       "fallbackLinkLabel": "If the button does not work, open this link:",
       "closing": "We're glad you're here."

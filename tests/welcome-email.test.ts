@@ -46,7 +46,7 @@ describe("welcome email sending", () => {
     expect(resendSend).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringMatching(
-          /Your first step is to upload a brand document like a contract, brief, or campaign email[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
+          /Start by uploading a brand document[\s\S]*A plain-English summary of the partnership[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
         ),
       }),
       { idempotencyKey: "welcome-email/user_123" }
@@ -66,7 +66,7 @@ describe("welcome email sending", () => {
     expect(resendSend).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringMatching(
-          /Hola Taylor,[\s\S]*Tu primer paso es subir un documento de marca[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
+          /Hola Taylor,[\s\S]*Empieza subiendo un documento de marca[\s\S]*Un resumen en lenguaje claro[\s\S]*https:\/\/hellobrand\.test\/app\/intake\/new/
         ),
       }),
       { idempotencyKey: "welcome-email/user_456" }

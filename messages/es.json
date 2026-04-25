@@ -265,8 +265,11 @@
       "heading": "Bienvenido a HelloBrand",
       "greetingNamed": "Hola {firstName},",
       "greetingGeneric": "Hola,",
-      "intro": "Gracias por crear tu cuenta de HelloBrand. Ahora puedes empezar el intake, subir documentos de colaboraciones y mantener tus acuerdos organizados en un solo espacio.",
+      "intro": "Empieza subiendo un documento de marca. HelloBrand lo convertirá en un espacio que puedes revisar y gestionar.",
       "firstStep": "Tu primer paso es subir un documento de marca como un contrato, brief o correo de campaña para que HelloBrand pueda extraer los detalles importantes en tu espacio.",
+      "workspaceBenefitSummary": "Un resumen en lenguaje claro de la colaboración.",
+      "workspaceBenefitTasks": "Entregables, pagos, fechas y derechos de uso en un solo lugar.",
+      "workspaceBenefitInbox": "Un espacio al que puedes volver cuando el acuerdo avance.",
       "cta": "Sube tu primer documento de marca",
       "fallbackLinkLabel": "Si el botón no funciona, abre este enlace:",
       "closing": "Nos alegra tenerte aquí."

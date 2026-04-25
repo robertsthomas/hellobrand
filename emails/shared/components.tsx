@@ -65,6 +65,10 @@ type EmailDetailPanelProps = {
   variant?: EmailStatusVariant;
 };
 
+type EmailBulletListProps = {
+  items: ReactNode[];
+};
+
 export type { EmailStatusVariant };
 
 const styles = {
@@ -156,6 +160,28 @@ const styles = {
   },
   detailValue: {
     color: emailColors.ink,
+    fontSize: emailType.body,
+    lineHeight: emailType.lineHeight.body,
+    margin: 0,
+  },
+  bulletList: {
+    margin: `${emailSpacing.xl} 0`,
+    padding: 0,
+  },
+  bulletRow: {
+    margin: `0 0 ${emailSpacing.md}`,
+  },
+  bulletMark: {
+    color: emailColors.primary,
+    fontSize: emailType.body,
+    fontWeight: "700",
+    lineHeight: emailType.lineHeight.body,
+    paddingRight: emailSpacing.sm,
+    verticalAlign: "top",
+    width: "14px",
+  },
+  bulletText: {
+    color: emailColors.body,
     fontSize: emailType.body,
     lineHeight: emailType.lineHeight.body,
     margin: 0,
@@ -266,6 +292,27 @@ export function EmailDetailPanel({
         </Section>
       ))}
       {children}
+    </Section>
+  );
+}
+
+export function EmailBulletList({ items }: EmailBulletListProps) {
+  return (
+    <Section style={styles.bulletList}>
+      {items.map((item, index) => (
+        <Section key={String(index)} style={styles.bulletRow}>
+          <table cellPadding="0" cellSpacing="0" role="presentation" width="100%">
+            <tbody>
+              <tr>
+                <td style={styles.bulletMark}>&bull;</td>
+                <td>
+                  <Text style={styles.bulletText}>{item}</Text>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </Section>
+      ))}
     </Section>
   );
 }
