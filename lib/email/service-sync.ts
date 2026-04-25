@@ -2,28 +2,26 @@
  * This file runs connected inbox sync and subscription renewal.
  * It keeps provider polling, incremental batching, and webhook-triggered sync orchestration out of the viewer-facing email service code.
  */
-import { inngest } from "@/lib/inngest/client";
+
 import { getViewerById } from "@/lib/auth";
-import { startServerDebug } from "@/lib/server-debug";
-import type { ConnectedEmailAccountRecord } from "@/lib/types";
 import {
   fetchGmailThreadsByIds,
   getGoogleProfile,
   listGmailHistoryThreadIds,
   listRecentGmailThreads,
-  registerGmailWatch
+  registerGmailWatch,
 } from "@/lib/email/providers/gmail";
 import {
   createOutlookSubscription,
   fetchOutlookMessage,
   fetchOutlookThreadsByConversationIds,
   listRecentOutlookThreads,
-  renewOutlookSubscription
+  renewOutlookSubscription,
 } from "@/lib/email/providers/outlook";
 import {
   isYahooAppPasswordAccount,
   listRecentYahooThreads,
-  listYahooThreadsSinceCursor
+  listYahooThreadsSinceCursor,
 } from "@/lib/email/providers/yahoo";
 import {
   acquireConnectedEmailAccountSyncLease,
@@ -32,12 +30,14 @@ import {
   listAccountsNeedingRenewal,
   listExistingEmailMessageProviderIdsForAccount,
   updateConnectedEmailAccount,
-  upsertEmailSyncState
+  upsertEmailSyncState,
 } from "@/lib/email/repository";
 import {
+  clearEmailResyncRequiredNotification,
   compareHistoryIds,
   EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE,
   EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW,
+  emitEmailResyncRequiredNotification,
   ensureActiveEmailCredentials,
   getEmailSyncState as getSharedEmailSyncState,
   isGmailResyncRequiredError,
@@ -45,9 +45,10 @@ import {
   refreshEmailDealSuggestionsForViewer,
   saveNonTransactionalSyncedThread,
   YAHOO_POLL_INTERVAL_MS,
-  clearEmailResyncRequiredNotification,
-  emitEmailResyncRequiredNotification
 } from "@/lib/email/service-shared";
+import { inngest } from "@/lib/inngest/client";
+import { startServerDebug } from "@/lib/server-debug";
+import type { ConnectedEmailAccountRecord } from "@/lib/types";
 
 function hasInngestEventKey() {
   return Boolean(process.env.INNGEST_EVENT_KEY);
@@ -59,9 +60,7 @@ type IncrementalEmailSyncRequest = {
   outlookMessageIds?: string[];
 };
 
-export function coalesceIncrementalEmailSyncRequests(
-  requests: IncrementalEmailSyncRequest[]
-) {
+export function coalesceIncrementalEmailSyncRequests(requests: IncrementalEmailSyncRequest[]) {
   const accountId = String(requests[0]?.accountId ?? "");
   const filtered = requests.filter((request) => String(request.accountId) === accountId);
 
@@ -91,14 +90,14 @@ export function coalesceIncrementalEmailSyncRequests(
             )
           : []
       )
-    )
+    ),
   ];
 
   return {
     accountId,
     gmailHistoryId,
     outlookMessageIds,
-    batchSize: filtered.length
+    batchSize: filtered.length,
   };
 }
 
@@ -108,13 +107,11 @@ export function getIncrementalEmailSyncBatchConfig(): {
 } {
   return {
     maxSize: EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE,
-    timeout: EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW
+    timeout: EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW,
   };
 }
 
-export async function runIncrementalEmailSync(
-  requests: IncrementalEmailSyncRequest[]
-) {
+export async function runIncrementalEmailSync(requests: IncrementalEmailSyncRequest[]) {
   const merged = coalesceIncrementalEmailSyncRequests(requests);
   if (!merged.accountId) {
     throw new Error("Missing accountId.");
@@ -127,7 +124,7 @@ export async function runIncrementalEmailSync(
       accountId: merged.accountId,
       status: "skipped" as const,
       reason: "account_unavailable" as const,
-      batchSize: merged.batchSize
+      batchSize: merged.batchSize,
     };
   }
 
@@ -144,7 +141,7 @@ export async function runIncrementalEmailSync(
       accountId: account.id,
       status: "skipped" as const,
       reason: "stale_history_id" as const,
-      batchSize: merged.batchSize
+      batchSize: merged.batchSize,
     };
   }
 
@@ -153,9 +150,7 @@ export async function runIncrementalEmailSync(
     const existingMessageIds = new Set(
       await listExistingEmailMessageProviderIdsForAccount(account.id, outlookMessageIds)
     );
-    outlookMessageIds = outlookMessageIds.filter(
-      (messageId) => !existingMessageIds.has(messageId)
-    );
+    outlookMessageIds = outlookMessageIds.filter((messageId) => !existingMessageIds.has(messageId));
 
     if (outlookMessageIds.length === 0) {
       return {
@@ -163,7 +158,7 @@ export async function runIncrementalEmailSync(
         accountId: account.id,
         status: "skipped" as const,
         reason: "known_message_ids" as const,
-        batchSize: merged.batchSize
+        batchSize: merged.batchSize,
       };
     }
   }
@@ -171,7 +166,7 @@ export async function runIncrementalEmailSync(
   const syncedAccount = await syncEmailAccount(account.id, {
     mode: "incremental",
     gmailHistoryId: merged.gmailHistoryId,
-    outlookMessageIds
+    outlookMessageIds,
   });
 
   if (syncedAccount?.status === "syncing") {
@@ -180,7 +175,7 @@ export async function runIncrementalEmailSync(
       accountId: account.id,
       status: "skipped" as const,
       reason: "sync_in_progress" as const,
-      batchSize: merged.batchSize
+      batchSize: merged.batchSize,
     };
   }
 
@@ -190,34 +185,32 @@ export async function runIncrementalEmailSync(
     status: "synced" as const,
     batchSize: merged.batchSize,
     gmailHistoryId: merged.gmailHistoryId,
-    outlookMessageCount: outlookMessageIds.length
+    outlookMessageCount: outlookMessageIds.length,
   };
 }
 
 export async function enqueueEmailEvent(name: string, data: Record<string, unknown>) {
   if (!hasInngestEventKey()) {
     if (process.env.NODE_ENV === "production") {
-      throw new Error(`Inngest email processing is required but INNGEST_EVENT_KEY is not configured for ${name}.`);
+      throw new Error(
+        `Inngest email processing is required but INNGEST_EVENT_KEY is not configured for ${name}.`
+      );
     }
 
     if (name === "email/account.initial_sync.requested") {
       await syncEmailAccount(String(data.accountId), {
         mode: "initial",
-        recentLimit:
-          typeof data.recentLimit === "number" ? data.recentLimit : undefined
+        recentLimit: typeof data.recentLimit === "number" ? data.recentLimit : undefined,
       });
     } else if (name === "email/account.incremental_sync.requested") {
       await runIncrementalEmailSync([
         {
           accountId: String(data.accountId),
-          gmailHistoryId:
-            typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
+          gmailHistoryId: typeof data.gmailHistoryId === "string" ? data.gmailHistoryId : null,
           outlookMessageIds: Array.isArray(data.outlookMessageIds)
-            ? data.outlookMessageIds.filter(
-                (entry): entry is string => typeof entry === "string"
-              )
-            : []
-        }
+            ? data.outlookMessageIds.filter((entry): entry is string => typeof entry === "string")
+            : [],
+        },
       ]);
     }
 
@@ -246,7 +239,7 @@ export async function enqueueEmailEvent(name: string, data: Record<string, unkno
     await inngest.send({
       id: eventIdParts.filter(Boolean).join(":"),
       name,
-      data
+      data,
     });
 
     return { mode: "inngest" as const };
@@ -262,7 +255,7 @@ async function syncGmailAccount(
 ) {
   const debug = startServerDebug("email_gmail_sync", {
     accountId: account.id,
-    mode
+    mode,
   });
 
   try {
@@ -286,7 +279,7 @@ async function syncGmailAccount(
     ) {
       debug.complete({
         threadCount: 0,
-        skipped: "stale_history_id"
+        skipped: "stale_history_id",
       });
       return;
     }
@@ -306,17 +299,14 @@ async function syncGmailAccount(
     } else {
       let history;
       try {
-        history = await listGmailHistoryThreadIds(
-          accessToken,
-          syncState.lastHistoryId
-        );
+        history = await listGmailHistoryThreadIds(accessToken, syncState.lastHistoryId);
       } catch (error) {
         const isStaleHistory =
           error instanceof Error &&
           error.message.includes("Gmail request failed (404)") &&
           (error.message.includes("Requested entity was not found") ||
-            error.message.includes("\"reason\":\"notFound\"") ||
-            error.message.includes("\"reason\": \"notFound\""));
+            error.message.includes('"reason":"notFound"') ||
+            error.message.includes('"reason": "notFound"'));
         if (isStaleHistory) {
           throw new Error("GMAIL_RESYNC_REQUIRED");
         }
@@ -348,7 +338,7 @@ async function syncGmailAccount(
       status: "connected",
       lastSyncAt: new Date().toISOString(),
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
     await upsertEmailSyncState(account.id, {
       lastHistoryId: lastHistoryId ?? undefined,
@@ -357,20 +347,20 @@ async function syncGmailAccount(
       lastSuccessfulSyncAt: new Date().toISOString(),
       lastErrorAt: null,
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
     await clearEmailResyncRequiredNotification(account.userId, account.id);
 
     const viewer = await getViewerById(account.userId);
     if (viewer && threadIds.length > 0) {
       await refreshEmailDealSuggestionsForViewer(viewer, {
-        threadIds
+        threadIds,
       });
       await processLinkedThreadUpdates(viewer, threadIds);
     }
 
     debug.complete({
-      threadCount: threadIds.length
+      threadCount: threadIds.length,
     });
   } catch (error) {
     const requiresResync = isGmailResyncRequiredError(error);
@@ -379,7 +369,7 @@ async function syncGmailAccount(
         userId: account.userId,
         accountId: account.id,
         provider: "gmail",
-        emailAddress: account.emailAddress
+        emailAddress: account.emailAddress,
       });
     }
 
@@ -390,7 +380,7 @@ async function syncGmailAccount(
         ? "Gmail inbox history expired and needs a fresh resync. Reconnect this inbox to start over."
         : error instanceof Error
           ? error.message
-          : "Gmail sync failed."
+          : "Gmail sync failed.",
     });
     await upsertEmailSyncState(account.id, {
       lastErrorAt: new Date().toISOString(),
@@ -399,7 +389,7 @@ async function syncGmailAccount(
         ? "Gmail inbox history expired and needs a fresh resync. Reconnect this inbox to start over."
         : error instanceof Error
           ? error.message
-          : "Gmail sync failed."
+          : "Gmail sync failed.",
     });
     debug.fail(error);
     throw error;
@@ -415,7 +405,7 @@ async function syncOutlookAccount(
 ) {
   const debug = startServerDebug("email_outlook_sync", {
     accountId: account.id,
-    mode
+    mode,
   });
 
   try {
@@ -434,9 +424,7 @@ async function syncOutlookAccount(
         outlookMessageIds.map((messageId) => fetchOutlookMessage(accessToken, messageId))
       );
       const conversationIds = [
-        ...new Set(
-          messagePayloads.map((message) => message.conversationId).filter(Boolean)
-        )
+        ...new Set(messagePayloads.map((message) => message.conversationId).filter(Boolean)),
       ];
       threads = await fetchOutlookThreadsByConversationIds(
         accessToken,
@@ -459,7 +447,7 @@ async function syncOutlookAccount(
       status: "connected",
       lastSyncAt: new Date().toISOString(),
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
     await upsertEmailSyncState(account.id, {
       providerSubscriptionId: subscription.id,
@@ -467,30 +455,30 @@ async function syncOutlookAccount(
       lastSuccessfulSyncAt: new Date().toISOString(),
       lastErrorAt: null,
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
 
     const viewer = await getViewerById(account.userId);
     if (viewer && savedThreadIds.length > 0) {
       await refreshEmailDealSuggestionsForViewer(viewer, {
-        threadIds: savedThreadIds
+        threadIds: savedThreadIds,
       });
       await processLinkedThreadUpdates(viewer, savedThreadIds);
     }
 
     debug.complete({
-      threadCount: threads.length
+      threadCount: threads.length,
     });
   } catch (error) {
     await updateConnectedEmailAccount(account.id, {
       status: String(error).toLowerCase().includes("reconnect") ? "reconnect_required" : "error",
       lastErrorCode: "outlook_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Outlook sync failed."
+      lastErrorMessage: error instanceof Error ? error.message : "Outlook sync failed.",
     });
     await upsertEmailSyncState(account.id, {
       lastErrorAt: new Date().toISOString(),
       lastErrorCode: "outlook_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Outlook sync failed."
+      lastErrorMessage: error instanceof Error ? error.message : "Outlook sync failed.",
     });
     debug.fail(error);
     throw error;
@@ -505,15 +493,13 @@ async function syncYahooAccount(
 ) {
   const debug = startServerDebug("email_yahoo_sync", {
     accountId: account.id,
-    mode
+    mode,
   });
 
   try {
     const credentials = await ensureActiveEmailCredentials(account);
     const appPassword = isYahooAppPasswordAccount(account.scopes);
-    const yahooCredential = appPassword
-      ? credentials.mailPassword
-      : credentials.accessToken;
+    const yahooCredential = appPassword ? credentials.mailPassword : credentials.accessToken;
 
     if (!yahooCredential) {
       throw new Error(appPassword ? "Missing Yahoo app password." : "Missing Yahoo access token.");
@@ -522,7 +508,12 @@ async function syncYahooAccount(
     const syncState = await getSharedEmailSyncState(account.id);
     const result =
       mode === "initial" || !syncState?.providerCursor
-        ? await listRecentYahooThreads(account.emailAddress, yahooCredential, recentLimit, appPassword)
+        ? await listRecentYahooThreads(
+            account.emailAddress,
+            yahooCredential,
+            recentLimit,
+            appPassword
+          )
         : await listYahooThreadsSinceCursor(
             account.emailAddress,
             yahooCredential,
@@ -543,7 +534,7 @@ async function syncYahooAccount(
       status: "connected",
       lastSyncAt: new Date().toISOString(),
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
     await upsertEmailSyncState(account.id, {
       providerCursor: result.cursor,
@@ -552,30 +543,30 @@ async function syncYahooAccount(
       lastSuccessfulSyncAt: new Date().toISOString(),
       lastErrorAt: null,
       lastErrorCode: null,
-      lastErrorMessage: null
+      lastErrorMessage: null,
     });
 
     const viewer = await getViewerById(account.userId);
     if (viewer && savedThreadIds.length > 0) {
       await refreshEmailDealSuggestionsForViewer(viewer, {
-        threadIds: savedThreadIds
+        threadIds: savedThreadIds,
       });
       await processLinkedThreadUpdates(viewer, savedThreadIds);
     }
 
     debug.complete({
-      threadCount: savedThreadIds.length
+      threadCount: savedThreadIds.length,
     });
   } catch (error) {
     await updateConnectedEmailAccount(account.id, {
       status: String(error).toLowerCase().includes("reconnect") ? "reconnect_required" : "error",
       lastErrorCode: "yahoo_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Yahoo sync failed."
+      lastErrorMessage: error instanceof Error ? error.message : "Yahoo sync failed.",
     });
     await upsertEmailSyncState(account.id, {
       lastErrorAt: new Date().toISOString(),
       lastErrorCode: "yahoo_sync_failed",
-      lastErrorMessage: error instanceof Error ? error.message : "Yahoo sync failed."
+      lastErrorMessage: error instanceof Error ? error.message : "Yahoo sync failed.",
     });
     debug.fail(error);
     throw error;
@@ -620,11 +611,7 @@ export async function syncEmailAccount(
       options?.recentLimit ?? 20
     );
   } else if (account.provider === "yahoo") {
-    await syncYahooAccount(
-      account,
-      mode,
-      options?.recentLimit ?? 100
-    );
+    await syncYahooAccount(account, mode, options?.recentLimit ?? 100);
   } else {
     return getConnectedEmailAccount(account.id);
   }
@@ -638,46 +625,54 @@ export async function renewExpiringEmailSubscriptions() {
   );
 
   for (const account of accounts) {
-    if (account.provider === "gmail") {
+    try {
+      if (account.provider === "gmail") {
+        const tokens = await ensureActiveEmailCredentials(account);
+        const accessToken = tokens.accessToken;
+        if (!accessToken) {
+          continue;
+        }
+
+        const watch = await registerGmailWatch(accessToken);
+        await upsertEmailSyncState(account.id, {
+          subscriptionExpiresAt: watch?.expiration
+            ? new Date(Number(watch.expiration)).toISOString()
+            : null,
+        });
+        continue;
+      }
+
+      if (account.provider === "yahoo") {
+        await syncEmailAccount(account.id, {
+          mode: "incremental",
+          recentLimit: 100,
+        });
+        continue;
+      }
+
       const tokens = await ensureActiveEmailCredentials(account);
       const accessToken = tokens.accessToken;
       if (!accessToken) {
         continue;
       }
 
-      const watch = await registerGmailWatch(accessToken);
+      const state = await getEmailSyncState(account.id);
+      if (!state?.providerSubscriptionId) {
+        continue;
+      }
+
+      const renewed = await renewOutlookSubscription(accessToken, state.providerSubscriptionId);
       await upsertEmailSyncState(account.id, {
-        subscriptionExpiresAt: watch?.expiration
-          ? new Date(Number(watch.expiration)).toISOString()
-          : null
+        providerSubscriptionId: renewed.id,
+        subscriptionExpiresAt: renewed.expirationDateTime,
       });
-      continue;
-    }
+    } catch (error) {
+      if (error instanceof Error && error.message === "Reconnect required.") {
+        continue;
+      }
 
-    if (account.provider === "yahoo") {
-      await syncEmailAccount(account.id, {
-        mode: "incremental",
-        recentLimit: 100
-      });
-      continue;
+      throw error;
     }
-
-    const tokens = await ensureActiveEmailCredentials(account);
-    const accessToken = tokens.accessToken;
-    if (!accessToken) {
-      continue;
-    }
-
-    const state = await getEmailSyncState(account.id);
-    if (!state?.providerSubscriptionId) {
-      continue;
-    }
-
-    const renewed = await renewOutlookSubscription(accessToken, state.providerSubscriptionId);
-    await upsertEmailSyncState(account.id, {
-      providerSubscriptionId: renewed.id,
-      subscriptionExpiresAt: renewed.expirationDateTime
-    });
   }
 
   return accounts.length;

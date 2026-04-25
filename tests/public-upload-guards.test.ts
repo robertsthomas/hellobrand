@@ -4,7 +4,7 @@ import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config
 import {
   ALLOWED_PUBLIC_UPLOAD_DOCUMENT_KINDS,
   getUnsupportedPublicUploadDocumentMessage,
-  isAllowedPublicUploadDocumentKind
+  isAllowedPublicUploadDocumentKind,
 } from "@/lib/public-upload-document-kind";
 import { validateAnonymousUploadFile } from "@/lib/public-upload-guards";
 import type { DocumentKind } from "@/lib/types";
@@ -15,7 +15,7 @@ describe("public upload document kind rules", () => {
       "contract",
       "campaign_brief",
       "deliverables_brief",
-      "pitch_deck"
+      "pitch_deck",
     ]);
 
     for (const documentKind of ALLOWED_PUBLIC_UPLOAD_DOCUMENT_KINDS) {
@@ -45,8 +45,8 @@ describe("public upload file validation", () => {
   test("accepts supported document files within the size limit", () => {
     expect(() =>
       validateAnonymousUploadFile({
-        name: "creator-brief.docx",
-        size: ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES
+        name: "creator-brief.pptx",
+        size: ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES,
       })
     ).not.toThrow();
   });
@@ -55,16 +55,16 @@ describe("public upload file validation", () => {
     expect(() =>
       validateAnonymousUploadFile({
         name: "deal-preview.png",
-        size: 1024
+        size: 1024,
       })
-    ).toThrow("Please upload a PDF, DOC, DOCX, or TXT document.");
+    ).toThrow("Please upload a PDF, DOC, DOCX, PPTX, or TXT document.");
   });
 
   test("rejects files over 10 MB", () => {
     expect(() =>
       validateAnonymousUploadFile({
         name: "creator-brief.pdf",
-        size: ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES + 1
+        size: ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES + 1,
       })
     ).toThrow("Please upload a document smaller than 10 MB.");
   });

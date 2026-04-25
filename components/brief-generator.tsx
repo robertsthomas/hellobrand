@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import { ClipboardCopy, Loader2, Printer, RefreshCw, Sparkles } from "lucide-react";
+import { useCallback, useState } from "react";
 
 import { ProseText } from "@/components/prose-text";
 import type { BriefData, GeneratedBrief, GeneratedBriefSection } from "@/lib/types";
@@ -46,11 +46,28 @@ function formatBriefAsText(sections: GeneratedBriefSection[]) {
     .join("\n\n---\n\n");
 }
 
+function normalizeGeneratedBrief(value: GeneratedBrief | null | undefined) {
+  if (!value || !Array.isArray(value.sections)) {
+    return null;
+  }
+
+  return {
+    ...value,
+    sections: value.sections.filter(
+      (section) =>
+        section &&
+        typeof section.id === "string" &&
+        typeof section.title === "string" &&
+        typeof section.content === "string"
+    ),
+  };
+}
+
 // fallow-ignore-next-line complexity
 export function BriefGenerator({ dealId, briefData }: BriefGeneratorProps) {
   const hasUploadedBrief = Boolean(briefData);
   const [brief, setBrief] = useState<GeneratedBrief | null>(
-    hasUploadedBrief ? briefData?.generatedSummary ?? null : null
+    hasUploadedBrief ? normalizeGeneratedBrief(briefData?.generatedSummary) : null
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -67,16 +84,14 @@ export function BriefGenerator({ dealId, briefData }: BriefGeneratorProps) {
         body: JSON.stringify({ mode: hasUploadedBrief ? "summary" : "brief" }),
       });
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(payload?.error ?? "Failed to generate brief");
+        throw new Error("Brief generation failed.");
       }
 
-      const data = await response.json();
-      setBrief(data.brief as GeneratedBrief);
+      const data = (await response.json()) as { brief?: GeneratedBrief };
+      setBrief(normalizeGeneratedBrief(data.brief));
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not generate the campaign brief."
-      );
+      console.error("[brief-generator] generate failed", error);
+      setErrorMessage("Could not generate the campaign brief. Try again in a moment.");
     } finally {
       setIsGenerating(false);
     }
@@ -91,7 +106,7 @@ export function BriefGenerator({ dealId, briefData }: BriefGeneratorProps) {
       return;
     }
 
-    await navigator.clipboard.writeText(formatBriefAsText(brief.sections));
+    await navigator.clipboard.writeText(formatBriefAsText(brief.sections ?? []));
     setCopyFeedback(true);
     setTimeout(() => setCopyFeedback(false), 2000);
   }, [brief]);
@@ -187,7 +202,7 @@ export function BriefGenerator({ dealId, briefData }: BriefGeneratorProps) {
         </div>
 
         <div data-print-brief className="grid gap-3">
-          {brief.sections.map((section) => (
+          {(brief.sections ?? []).map((section) => (
             <SectionCard key={section.id} section={section} />
           ))}
         </div>

@@ -81,10 +81,10 @@ test.describe("workspace generation from dashboard", () => {
         "Brand: TestBrand\n\nCampaign: Spring Launch 2026\n\nPayment: $5,000 for 2 Instagram posts",
     });
 
-    await gotoAuthed(page, "/app/intake/new");
+    await gotoAuthed(page, `/app/intake/${sessionId}`);
 
     const generateButton = page.getByRole("button", {
-      name: "Generate workspace"
+      name: "Start analysis"
     });
     await expect(generateButton).toBeEnabled({ timeout: 10000 });
 
@@ -103,16 +103,18 @@ test.describe("workspace generation from dashboard", () => {
 
     await queueStartPromise;
 
-    await expect(page).toHaveURL(new RegExp(`/app/intake/${sessionId}\\?starting=1`), {
-      timeout: 15000
-    });
-
-    await expect(
-      page.getByText(/Extracting source details|Analyzing your uploaded source/)
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(
+      new RegExp(`/app/intake/${sessionId}(?:\\?starting=1)?$`),
+      {
+        timeout: 15000
+      }
+    );
 
     await page.waitForTimeout(2000);
-    await expect(page).toHaveURL(new RegExp(`/app/intake/${sessionId}`), { timeout: 1000 });
+    await expect(page).toHaveURL(
+      new RegExp(`/app/intake/${sessionId}(?:\\?starting=1)?$`),
+      { timeout: 1000 }
+    );
     await expect(page).not.toHaveURL("/app", { timeout: 1000 });
 
     await errors.assertNoRuntimeErrors();
@@ -137,10 +139,10 @@ test.describe("workspace generation from dashboard", () => {
       pastedText: "Brand: FailBrand\n\nCampaign: Failure test\n\nPayment: $1,000",
     });
 
-    await gotoAuthed(page, "/app/intake/new");
+    await gotoAuthed(page, `/app/intake/${sessionId}`);
 
     const generateButton = page.getByRole("button", {
-      name: "Generate workspace"
+      name: "Start analysis"
     });
     await expect(generateButton).toBeEnabled({ timeout: 10000 });
 

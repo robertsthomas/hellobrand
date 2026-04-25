@@ -10,7 +10,7 @@ import { requireApiViewer } from "@/lib/auth";
 import {
   assertViewerHasFeature,
   assertViewerWithinUsageLimit,
-  recordViewerUsage
+  recordViewerUsage,
 } from "@/lib/billing/entitlements";
 import { getDealForViewer, saveGeneratedBriefSummaryForViewer } from "@/lib/deals";
 import { fail, ok } from "@/lib/http";
@@ -32,9 +32,14 @@ export async function POST(
 
     const body = (await request.json().catch(() => null)) as { mode?: string } | null;
     const mode = body?.mode === "summary" ? "summary" : "brief";
-    const brief = hasLlmKey()
+    const generatedBrief = hasLlmKey()
       ? await generateBriefWithLlm(aggregate, { mode })
       : buildFallbackBrief(aggregate);
+    const fallbackBrief = buildFallbackBrief(aggregate);
+    const brief =
+      Array.isArray(generatedBrief.sections) && generatedBrief.sections.length > 0
+        ? generatedBrief
+        : fallbackBrief;
 
     if (mode === "summary" && aggregate.terms?.briefData) {
       await saveGeneratedBriefSummaryForViewer(viewer, dealId, brief);
@@ -45,6 +50,14 @@ export async function POST(
     return ok({ brief });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not generate brief.";
-    return fail(message, message === "Unauthorized" ? 401 : 500);
+    if (message === "Unauthorized") {
+      return fail(message, 401);
+    }
+
+    return fail("Could not generate brief. Try again in a moment.", 500, {
+      error,
+      area: "brief",
+      name: "generate",
+    });
   }
 }

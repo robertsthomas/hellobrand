@@ -21,10 +21,10 @@ describe("intake status transitions", () => {
       documentsCount: number;
       hasPending: boolean;
       hasFailed: boolean;
+      hasReady: boolean;
       allReady: boolean;
     }): string {
-      const { currentStatus, documentsCount, hasPending, hasFailed, allReady } =
-        input;
+      const { currentStatus, documentsCount, hasPending, hasFailed, hasReady, allReady } = input;
 
       if (currentStatus === "completed" || currentStatus === "expired") {
         return currentStatus;
@@ -38,16 +38,16 @@ describe("intake status transitions", () => {
         return "queued";
       }
 
-      if (hasFailed) {
-        return "failed";
-      }
-
       if (hasPending) {
         return "processing";
       }
 
-      if (allReady) {
+      if (allReady || (hasReady && hasFailed)) {
         return "ready_for_confirmation";
+      }
+
+      if (hasFailed) {
+        return "failed";
       }
 
       return "draft";
@@ -60,7 +60,8 @@ describe("intake status transitions", () => {
           documentsCount: 1,
           hasPending: false,
           hasFailed: false,
-          allReady: true
+          hasReady: true,
+          allReady: true,
         })
       ).toBe("completed");
     });
@@ -72,7 +73,8 @@ describe("intake status transitions", () => {
           documentsCount: 1,
           hasPending: false,
           hasFailed: false,
-          allReady: true
+          hasReady: true,
+          allReady: true,
         })
       ).toBe("expired");
     });
@@ -84,7 +86,8 @@ describe("intake status transitions", () => {
           documentsCount: 0,
           hasPending: false,
           hasFailed: false,
-          allReady: false
+          hasReady: false,
+          allReady: false,
         })
       ).toBe("draft");
     });
@@ -96,7 +99,8 @@ describe("intake status transitions", () => {
           documentsCount: 2,
           hasPending: true,
           hasFailed: false,
-          allReady: false
+          hasReady: false,
+          allReady: false,
         })
       ).toBe("queued");
     });
@@ -108,9 +112,23 @@ describe("intake status transitions", () => {
           documentsCount: 2,
           hasPending: false,
           hasFailed: true,
-          allReady: false
+          hasReady: false,
+          allReady: false,
         })
       ).toBe("failed");
+    });
+
+    test("failed upload does not block review when another document is ready", () => {
+      expect(
+        deriveStatus({
+          currentStatus: "processing",
+          documentsCount: 2,
+          hasPending: false,
+          hasFailed: true,
+          hasReady: true,
+          allReady: false,
+        })
+      ).toBe("ready_for_confirmation");
     });
 
     test("pending documents is processing", () => {
@@ -120,7 +138,8 @@ describe("intake status transitions", () => {
           documentsCount: 2,
           hasPending: true,
           hasFailed: false,
-          allReady: false
+          hasReady: false,
+          allReady: false,
         })
       ).toBe("processing");
     });
@@ -132,7 +151,8 @@ describe("intake status transitions", () => {
           documentsCount: 2,
           hasPending: false,
           hasFailed: false,
-          allReady: true
+          hasReady: true,
+          allReady: true,
         })
       ).toBe("ready_for_confirmation");
     });
@@ -144,7 +164,8 @@ describe("intake status transitions", () => {
           documentsCount: 3,
           hasPending: true,
           hasFailed: false,
-          allReady: false
+          hasReady: true,
+          allReady: false,
         })
       ).toBe("processing");
     });
@@ -159,7 +180,8 @@ describe("intake status transitions", () => {
           documentsCount: 1,
           hasPending: true,
           hasFailed: false,
-          allReady: false
+          hasReady: false,
+          allReady: false,
         })
       ).toBe("processing");
     });
@@ -171,7 +193,8 @@ describe("intake status transitions", () => {
           documentsCount: 1,
           hasPending: false,
           hasFailed: false,
-          allReady: true
+          hasReady: true,
+          allReady: true,
         })
       ).toBe("ready_for_confirmation");
     });
@@ -188,36 +211,24 @@ describe("intake status transitions", () => {
     });
 
     test("ready_for_confirmation redirects to review", () => {
-      const shouldRedirectToReview = [
-        "ready_for_confirmation",
-        "failed"
-      ].includes("ready_for_confirmation");
+      const shouldRedirectToReview = ["ready_for_confirmation", "failed"].includes(
+        "ready_for_confirmation"
+      );
       expect(shouldRedirectToReview).toBe(true);
     });
 
     test("failed redirects to review", () => {
-      const shouldRedirectToReview = [
-        "ready_for_confirmation",
-        "failed"
-      ].includes("failed");
+      const shouldRedirectToReview = ["ready_for_confirmation", "failed"].includes("failed");
       expect(shouldRedirectToReview).toBe(true);
     });
 
     test("queued stays on processing page", () => {
-      const shouldStay = ![
-        "completed",
-        "ready_for_confirmation",
-        "failed"
-      ].includes("queued");
+      const shouldStay = !["completed", "ready_for_confirmation", "failed"].includes("queued");
       expect(shouldStay).toBe(true);
     });
 
     test("processing stays on processing page", () => {
-      const shouldStay = ![
-        "completed",
-        "ready_for_confirmation",
-        "failed"
-      ].includes("processing");
+      const shouldStay = !["completed", "ready_for_confirmation", "failed"].includes("processing");
       expect(shouldStay).toBe(true);
     });
   });

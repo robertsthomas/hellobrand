@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { init } from "@launchdarkly/node-server-sdk";
+import { basicLogger, init } from "@launchdarkly/node-server-sdk";
 
 let client: ReturnType<typeof init> | null = null;
 
@@ -17,7 +17,9 @@ export function getLaunchDarklyClient() {
     if (!key) {
       return null;
     }
-    client = init(key);
+    client = init(key, {
+      logger: basicLogger({ level: "warn" }),
+    });
   }
   return client;
 }

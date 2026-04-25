@@ -30,7 +30,7 @@ Required Elements:
 describe("brief fallback analysis", () => {
   test("infers brand, campaign title, deliverables, and summary for creator briefs", () => {
     const result = fallbackAnalyzeDocument(AMAZON_KIDS_BRIEF, {
-      fileName: "Amazon Kids Influencer Brief_ Stories with Alexa.docx"
+      fileName: "Amazon Kids Influencer Brief_ Stories with Alexa.docx",
     });
 
     expect(result.classification.documentKind).toBe("campaign_brief");
@@ -39,7 +39,7 @@ describe("brief fallback analysis", () => {
     expect(result.extraction.data.deliverables).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ title: "IG Reel or TikTok" }),
-        expect.objectContaining({ title: "IG Story" })
+        expect.objectContaining({ title: "IG Story" }),
       ])
     );
     expect(result.summary.body).toContain("Amazon Kids");
@@ -56,7 +56,7 @@ Summer Push
 Overview: Create content for the NimbusPM summer push.
 `,
       {
-        fileName: "campaign_brief_nimbuspm.pdf"
+        fileName: "campaign_brief_nimbuspm.pdf",
       }
     );
 
@@ -74,7 +74,7 @@ Summer Push
 Overview: Create content for the NimbusPM summer push.
 `,
       {
-        fileName: "nimbuspm_brief.pdf"
+        fileName: "nimbuspm_brief.pdf",
       }
     );
 
@@ -115,7 +115,7 @@ Required Claims:
 Instagram Handle: @acmebeautycreator
 `,
       {
-        fileName: "acme-beauty-deliverables-brief.pdf"
+        fileName: "acme-beauty-deliverables-brief.pdf",
       }
     );
 
@@ -168,7 +168,7 @@ Share 7-day view, reach, and saves.
 Campaign Live Date: July 8, 2026
 `,
       {
-        fileName: "glowlab-night-repair-pitch-deck.pdf"
+        fileName: "glowlab-night-repair-pitch-deck.pdf",
       }
     );
 
@@ -186,6 +186,52 @@ Campaign Live Date: July 8, 2026
     );
     expect(result.extraction.data.briefData?.linksAndAssets).toEqual(
       expect.arrayContaining(["Campaign deck in Drive", "Approved product close-up images"])
+    );
+  });
+
+  test("extracts operational payment, amplification, and reporting details from campaign briefs", () => {
+    const result = fallbackAnalyzeDocument(
+      `
+Campaign Brief
+Velvet Kitchen
+Spring Recipe Sprint
+
+Campaign Flight:
+April 1, 2026 through May 15, 2026
+
+Payment Schedule:
+50% on signature and 50% after final post goes live.
+
+Payment Requirements:
+Creator must submit invoice and W-9 through the brand portal.
+
+Amplification Period:
+Brand may amplify approved posts for 30 days after go-live.
+
+Reporting Requirements:
+Share 7-day impressions, saves, and click-through rate.
+
+Do Not Mention:
+- Competing cookware brands
+- Medical or weight-loss claims
+`,
+      {
+        fileName: "velvet-kitchen-spring-recipe-brief.pdf",
+      }
+    );
+
+    expect(result.classification.documentKind).toBe("campaign_brief");
+    expect(result.extraction.data.brandName).toBe("Velvet Kitchen");
+    expect(result.extraction.data.campaignName).toBe("Spring Recipe Sprint");
+    expect(result.extraction.data.briefData).toMatchObject({
+      campaignFlight: expect.stringContaining("April 1"),
+      paymentSchedule: expect.stringContaining("50% on signature"),
+      paymentRequirements: expect.stringContaining("invoice and W-9"),
+      amplificationPeriod: expect.stringContaining("30 days"),
+      reportingRequirements: expect.stringContaining("7-day impressions"),
+    });
+    expect(result.extraction.data.briefData?.doNotMention).toEqual(
+      expect.arrayContaining(["Competing cookware brands", "Medical or weight-loss claims"])
     );
   });
 });

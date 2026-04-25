@@ -126,6 +126,7 @@ const DELIVERABLE_PATTERNS: RegExp[] = [
 
 const DEADLINE_PATTERNS: RegExp[] = [
   /\bby\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i,
+  /\b(?:tomorrow|today)\b/i,
   /\bby\s+(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i,
   /\bdeadline[:\s]+/i,
   /\bdue\s+(?:by|date|on)\s*/i,

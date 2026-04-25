@@ -317,4 +317,46 @@ describe("analytics service", () => {
     });
     expect(snapshot.monthlyRevenue).toHaveLength(2);
   });
+
+  test("excludes archived workspaces from metrics unless explicitly included", () => {
+    const aggregates = [
+      createAggregate("deal-1", {
+        deal: {
+          brandName: "Active Brand",
+          status: "signed",
+          updatedAt: "2026-04-18T00:00:00.000Z",
+        },
+        terms: { paymentAmount: 2500 },
+      }),
+      createAggregate("deal-2", {
+        deal: {
+          brandName: "Archived Brand",
+          status: "archived",
+          updatedAt: "2026-04-18T00:00:00.000Z",
+        },
+        terms: { paymentAmount: 7500 },
+      }),
+    ];
+
+    const defaultSnapshot = buildAnalyticsSnapshot(aggregates, null, {
+      now: new Date("2026-04-20T00:00:00.000Z"),
+    });
+    const includedSnapshot = buildAnalyticsSnapshot(aggregates, null, {
+      includeArchived: true,
+      now: new Date("2026-04-20T00:00:00.000Z"),
+    });
+
+    expect(defaultSnapshot.totalDeals).toBe(1);
+    expect(defaultSnapshot.metrics[0]).toMatchObject({
+      label: "Tracked revenue",
+      value: "$2,500",
+    });
+    expect(includedSnapshot.totalDeals).toBe(2);
+    expect(
+      includedSnapshot.pipelineBreakdown.find((entry) => entry.key === "archived")
+    ).toMatchObject({
+      count: 1,
+      revenue: 7500,
+    });
+  });
 });

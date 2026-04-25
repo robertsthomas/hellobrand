@@ -1,13 +1,12 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
-
+import type { FormEvent } from "react";
+import { useMemo, useState } from "react";
+import type { EmailProviderFlagState } from "@/lib/email/config";
 import { captureAppEvent } from "@/lib/posthog/events";
 import type { ConnectedEmailAccountRecord } from "@/lib/types";
-import type { EmailProviderFlagState } from "@/lib/email/config";
 import { formatDate } from "@/lib/utils";
 
 type SafeEmailAccount = Omit<
@@ -82,6 +81,30 @@ function providerDescription(provider: SafeEmailAccount["provider"]) {
     default:
       return null;
   }
+}
+
+function accountNeedsReconnect(account: SafeEmailAccount) {
+  const message = account.lastErrorMessage?.toLowerCase() ?? "";
+  const code = account.lastErrorCode?.toLowerCase() ?? "";
+
+  return (
+    account.status === "reconnect_required" ||
+    code.includes("refresh") ||
+    code.includes("missing_refresh_token") ||
+    message.includes("invalid_grant") ||
+    message.includes("token refresh failed") ||
+    message.includes("expired") ||
+    message.includes("revoked") ||
+    message.includes("reconnect required")
+  );
+}
+
+function reconnectNote(account: SafeEmailAccount) {
+  if (account.provider === "yahoo" && account.scopes.includes("app_password")) {
+    return "Needs a fresh app password to resume sync.";
+  }
+
+  return "Needs reconnect to resume sync.";
 }
 
 export function EmailConnectionsPanel({
@@ -194,6 +217,10 @@ export function EmailConnectionsPanel({
     const records = grouped[provider];
     const isProviderFlagOn = providerFlags[provider];
     const connectPath = providerConnectPath(provider);
+    const providerNeedsReconnect = records.some(accountNeedsReconnect);
+    const reconnectButtonClass = providerNeedsReconnect
+      ? "border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400"
+      : "border-black/10 text-foreground hover:border-black/20";
 
     return (
       <div key={provider} className="border border-border bg-white p-5">
@@ -223,7 +250,7 @@ export function EmailConnectionsPanel({
                         surface: "settings_email_connections",
                       })
                     }
-                    className="border border-black/10 px-4 py-2 text-center text-sm font-semibold text-foreground transition hover:border-black/20"
+                    className={`border px-4 py-2 text-center text-sm font-semibold transition ${reconnectButtonClass}`}
                   >
                     {records.some((record) =>
                       ["connected", "syncing", "error", "reconnect_required"].includes(
@@ -245,7 +272,7 @@ export function EmailConnectionsPanel({
                     surface: "settings_email_connections",
                   })
                 }
-                className="self-start border border-black/10 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-black/20"
+                className={`self-start border px-4 py-2 text-sm font-semibold transition ${reconnectButtonClass}`}
               >
                 {records.some((record) =>
                   ["connected", "syncing", "error", "reconnect_required"].includes(record.status)
@@ -361,51 +388,90 @@ export function EmailConnectionsPanel({
               ) : null}
             </div>
           ) : (
-            records.map((account) => (
-              <div key={account.id} className="border border-border px-4 py-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">
-                      {account.displayName || account.emailAddress}
+            records.map((account) => {
+              const needsReconnect = accountNeedsReconnect(account);
+
+              return (
+                <div key={account.id} className="border border-border px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {account.displayName || account.emailAddress}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">{account.emailAddress}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`border px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] ${
+                          needsReconnect
+                            ? "border-amber-300 bg-amber-50 text-amber-900"
+                            : "border-border text-muted-foreground"
+                        }`}
+                      >
+                        {statusLabel(account.status)}
+                      </span>
+                      {needsReconnect &&
+                      account.provider === "yahoo" &&
+                      providerFlags.yahooAppPassword ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsYahooCredentialsOpen(true)}
+                          className="border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900 transition hover:border-amber-400"
+                        >
+                          Reconnect
+                        </button>
+                      ) : needsReconnect && connectPath ? (
+                        <a
+                          href={connectPath}
+                          onClick={() =>
+                            captureAppEvent(posthog, "email_connection_started", {
+                              provider,
+                              hasExistingAccount: true,
+                              surface: "settings_email_connections_account_row",
+                            })
+                          }
+                          className="border border-amber-300 bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900 transition hover:border-amber-400"
+                        >
+                          Reconnect
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => disconnectAccount(account.id)}
+                        disabled={pendingAccountId === account.id}
+                        className="text-sm font-medium text-foreground underline-offset-4 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {pendingAccountId === account.id ? "Disconnecting..." : "Disconnect"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                    <p>Last sync: {formatDate(account.lastSyncAt) || "Not yet synced"}</p>
+                    <p>
+                      {account.provider === "yahoo" && account.scopes.includes("app_password")
+                        ? "Auth: Yahoo app password"
+                        : `Token expiry: ${formatDate(account.tokenExpiresAt) || "Unknown"}`}
                     </p>
-                    <p className="mt-1 text-sm text-muted-foreground">{account.emailAddress}</p>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="border border-border px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      {statusLabel(account.status)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => disconnectAccount(account.id)}
-                      disabled={pendingAccountId === account.id}
-                      className="text-sm font-medium text-foreground underline-offset-4 transition hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {pendingAccountId === account.id ? "Disconnecting..." : "Disconnect"}
-                    </button>
-                  </div>
+                  {account.provider === "yahoo" && !account.mailAuthConfigured ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Reconnect Yahoo with OAuth or an app password to start inbox sync.
+                    </p>
+                  ) : null}
+
+                  {needsReconnect ? (
+                    <p className="mt-3 text-sm text-amber-800">{reconnectNote(account)}</p>
+                  ) : null}
+
+                  {account.lastErrorMessage && !needsReconnect ? (
+                    <p className="mt-3 text-sm text-red-600">{account.lastErrorMessage}</p>
+                  ) : null}
                 </div>
-
-                <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                  <p>Last sync: {formatDate(account.lastSyncAt) || "Not yet synced"}</p>
-                  <p>
-                    {account.provider === "yahoo" && account.scopes.includes("app_password")
-                      ? "Auth: Yahoo app password"
-                      : `Token expiry: ${formatDate(account.tokenExpiresAt) || "Unknown"}`}
-                  </p>
-                </div>
-
-                {account.provider === "yahoo" && !account.mailAuthConfigured ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    Reconnect Yahoo with OAuth or an app password to start inbox sync.
-                  </p>
-                ) : null}
-
-                {account.lastErrorMessage ? (
-                  <p className="mt-3 text-sm text-red-600">{account.lastErrorMessage}</p>
-                ) : null}
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

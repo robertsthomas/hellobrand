@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import JSZip from "jszip";
 import mammoth from "mammoth";
 import pdfParse from "pdf-parse";
 
@@ -88,7 +89,7 @@ export function normalizeDocumentText(value: string) {
 
   if (normalized.length < 120) {
     throw new UnreadableDocumentError(
-      "We could not reliably parse this file. Try a text-based PDF, DOCX, or pasted text instead."
+      "We could not reliably parse this file. Try a text-based PDF, DOCX, PPTX, or pasted text instead."
     );
   }
 
@@ -97,6 +98,47 @@ export function normalizeDocumentText(value: string) {
 
 function pdfJsStandardFontDataUrl() {
   return `${path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts")}/`;
+}
+
+function decodeXmlText(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function pptxPartSortKey(name: string) {
+  const match = name.match(/(\d+)\.xml$/);
+  return match ? Number.parseInt(match[1] ?? "0", 10) : Number.MAX_SAFE_INTEGER;
+}
+
+async function extractPptxText(buffer: Buffer) {
+  const archive = await JSZip.loadAsync(buffer);
+  const slideParts = Object.values(archive.files)
+    .filter(
+      (file) =>
+        !file.dir &&
+        (/^ppt\/slides\/slide\d+\.xml$/i.test(file.name) ||
+          /^ppt\/notesSlides\/notesSlide\d+\.xml$/i.test(file.name))
+    )
+    .sort((left, right) => pptxPartSortKey(left.name) - pptxPartSortKey(right.name));
+
+  const slides: string[] = [];
+
+  for (const file of slideParts) {
+    const xml = await file.async("text");
+    const textRuns = [...xml.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)]
+      .map((match) => decodeXmlText(match[1] ?? "").trim())
+      .filter(Boolean);
+
+    if (textRuns.length > 0) {
+      slides.push(textRuns.join("\n"));
+    }
+  }
+
+  return slides.join("\n\n");
 }
 
 let pdfJsMainThreadWorkerPromise: Promise<void> | null = null;
@@ -311,6 +353,18 @@ export async function extractDocumentText(
     };
   }
 
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    fileName.toLowerCase().endsWith(".pptx")
+  ) {
+    const rawText = await extractPptxText(buffer);
+    return {
+      rawText,
+      normalizedText: normalizeDocumentText(rawText),
+      _debug: debugMeta("pptx-xml", rawText),
+    };
+  }
+
   if (mimeType === "text/plain" || fileName.toLowerCase().endsWith(".txt")) {
     const rawText = buffer.toString("utf8");
     return {
@@ -320,7 +374,9 @@ export async function extractDocumentText(
     };
   }
 
-  throw new UnreadableDocumentError("Only PDF, DOCX, and pasted text are supported in this beta.");
+  throw new UnreadableDocumentError(
+    "Only PDF, DOCX, PPTX, and pasted text are supported in this beta."
+  );
 }
 
 async function persistExtractedText(dealId: string, fileName: string, text: string) {

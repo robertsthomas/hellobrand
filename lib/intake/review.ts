@@ -91,18 +91,19 @@ export async function startQueuedIntakeAnalysisForViewer(
     sessionId?: string;
   }
 ) {
-  const startedSessionId = input?.sessionId
+  const startedSession = input?.sessionId
     ? await startQueuedIntakeSessionById(viewer.id, input.sessionId)
     : await startNextQueuedIntakeSessionForUser(viewer.id, input?.sessionIds);
 
-  if (!startedSessionId) {
+  if (!startedSession) {
     throw new Error("There are no queued workspaces ready to analyze.");
   }
 
-  const sessionId =
-    typeof startedSessionId === "string" ? startedSessionId : startedSessionId.id;
+  if (typeof startedSession !== "string") {
+    return startedSession;
+  }
 
-  const payload = await getIntakeSessionForViewer(viewer, sessionId);
+  const payload = await getIntakeSessionForViewer(viewer, startedSession);
   return payload.session;
 }
 

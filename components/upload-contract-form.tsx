@@ -1,18 +1,18 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { FileText, LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { usePostHog } from "posthog-js/react";
+import { useMemo, useRef, useState } from "react";
 
 import { reprocessDocumentAction } from "@/app/actions";
-import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
-import { getDocumentDisplayStatus } from "@/lib/document-status";
-import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
-import { cn, humanizeToken } from "@/lib/utils";
-import { captureAppEvent } from "@/lib/posthog/events";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { uploadDocumentsViaDirectStorage } from "@/lib/browser/direct-document-upload";
+import { getDocumentDisplayStatus } from "@/lib/document-status";
+import { captureAppEvent } from "@/lib/posthog/events";
+import type { DocumentRecord, DocumentReviewItemRecord, JobRecord } from "@/lib/types";
+import { cn, humanizeToken } from "@/lib/utils";
 
 // fallow-ignore-next-line complexity
 export function UploadContractForm({
@@ -73,7 +73,9 @@ export function UploadContractForm({
 
     captureAppEvent(
       posthog,
-      selectedFiles.length > 0 ? "workspace_documents_submitted" : "workspace_pasted_context_submitted",
+      selectedFiles.length > 0
+        ? "workspace_documents_submitted"
+        : "workspace_pasted_context_submitted",
       {
         surface: "deal_upload_form",
         dealId,
@@ -133,7 +135,7 @@ export function UploadContractForm({
             type="file"
             name="documents"
             multiple
-            accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+            accept=".pdf,.docx,.pptx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain"
             onChange={(event) => setSelectedFiles(Array.from(event.currentTarget.files ?? []))}
           />
 
@@ -157,7 +159,8 @@ export function UploadContractForm({
             }}
             className={cn(
               "flex cursor-pointer items-center gap-3 border border-dashed border-black/12 p-4 transition hover:border-black/20 hover:bg-black/[0.01] dark:border-white/12 dark:hover:border-white/20 dark:hover:bg-white/[0.02]",
-              selectedFiles.length > 0 && "border-solid border-black/10 bg-black/[0.015] dark:border-white/10 dark:bg-white/[0.02]"
+              selectedFiles.length > 0 &&
+                "border-solid border-black/10 bg-black/[0.015] dark:border-white/10 dark:bg-white/[0.02]"
             )}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-black/8 text-black/55 dark:border-white/10 dark:text-white/60">
@@ -166,7 +169,7 @@ export function UploadContractForm({
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">{selectedFilesLabel}</p>
               <p className="text-xs text-black/45 dark:text-white/45">
-                PDFs, DOCX, and TXT · click to browse
+                PDFs, DOCX, PPTX, and TXT · click to browse
               </p>
             </div>
           </div>

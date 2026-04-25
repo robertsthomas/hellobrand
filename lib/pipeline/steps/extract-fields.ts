@@ -20,6 +20,7 @@ import {
   finalizeDocumentExtraction,
   getPreferredCreatorNameForViewer,
   logDocumentPipeline,
+  writeExtractionDebugSnapshot,
 } from "@/lib/document-pipeline-shared";
 import { resolveDocumentRoutingDecision } from "@/lib/document-routing";
 import { sanitizeCampaignName } from "@/lib/party-labels";
@@ -328,6 +329,27 @@ export async function runExtractFieldsStep(documentId: string, runId: string) {
       });
 
       await repository.replaceDocumentReviewItems(document.id, runId, reviewItems);
+
+      const debugSnapshotPath = writeExtractionDebugSnapshot({
+        runId,
+        document,
+        routing,
+        sections,
+        sectionInputs,
+        extraction: sanitizedExtraction,
+        extractionEvidence,
+        reviewItems,
+        normalizedArtifactId: normalizedArtifact.id,
+      });
+      if (debugSnapshotPath) {
+        logDocumentPipeline("info", "extraction_debug_snapshot_written", {
+          dealId: document.dealId,
+          documentId: document.id,
+          fileName: document.fileName,
+          path: debugSnapshotPath,
+          runId,
+        });
+      }
 
       await saveObservabilityArtifact({
         documentId: document.id,

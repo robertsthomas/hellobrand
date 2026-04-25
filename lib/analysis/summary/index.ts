@@ -6,7 +6,6 @@ import type {
   DealAggregate,
   DocumentAnalysisResult,
   DocumentKind,
-  DocumentSectionInput,
   ExtractionPipelineResult,
   GeneratedBrief,
   GeneratedBriefSection,
@@ -224,6 +223,10 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     /(?:campaign live date|go live date|launch date)[:\s]*\n?([^\n]{4,120})/i
   ]);
 
+  const campaignFlight = extractAfterLabel([
+    /(?:campaign flight|flight dates?|campaign dates?)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
   const draftDueDate = extractAfterLabel([
     /(?:draft due date|draft due)[:\s]*\n?([^\n]{4,120})/i
   ]);
@@ -244,6 +247,10 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     /(?:payment notes?|billing notes?)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
   ]);
 
+  const amplificationPeriod = extractAfterLabel([
+    /(?:amplification period|paid amplification period|amplification window)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
+  ]);
+
   const reportingRequirements = extractAfterLabel([
     /(?:reporting requirements?|performance reporting|reporting)[:\s]*\n?([\s\S]{10,300}?)(?:\n\n|\n[A-Z])/i
   ]);
@@ -252,7 +259,7 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
   const deliverablePlatforms = detectPlatforms();
 
   const doNotMention = extractListAfterLabel([
-    /(?:do not mention|avoid|don't mention|do not include)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z])/i
+    /(?:do not mention|avoid|don't mention|do not include)[:\s]*\n?([\s\S]{10,500}?)(?:\n\n|\n[A-Z]|$)/i
   ]);
 
   const hasContent =
@@ -272,11 +279,13 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     linksAndAssets.length > 0 ||
     postingSchedule ||
     campaignLiveDate ||
+    campaignFlight ||
     draftDueDate ||
     contentDueDate ||
     paymentSchedule ||
     paymentRequirements ||
     paymentNotes ||
+    amplificationPeriod ||
     reportingRequirements ||
     creatorHandle ||
     deliverablePlatforms.length > 0 ||
@@ -302,11 +311,13 @@ export function extractBriefData(text: string, documentKind: DocumentKind): Brie
     creatorHandle,
     postingSchedule,
     campaignLiveDate,
+    campaignFlight,
     draftDueDate,
     contentDueDate,
     paymentSchedule,
     paymentRequirements,
     paymentNotes,
+    amplificationPeriod,
     reportingRequirements,
     disclosureRequirements,
     competitorRestrictions,

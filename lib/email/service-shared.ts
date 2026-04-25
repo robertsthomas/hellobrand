@@ -2,6 +2,43 @@
  * This file holds the shared helpers behind the email service modules.
  * It keeps access checks, thread-scoring logic, credential refresh, and linked-deal updates in one place so the smaller service files can stay focused.
  */
+
+import { smartInboxEnabled } from "@/flags";
+import { assertViewerHasFeature } from "@/lib/billing/entitlements";
+import { extractActionItemsFromMessage } from "@/lib/email/action-items";
+import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
+import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
+import { refreshGoogleAccessToken } from "@/lib/email/providers/gmail";
+import { refreshOutlookAccessToken } from "@/lib/email/providers/outlook";
+import type { ProviderThreadPayload } from "@/lib/email/providers/types";
+import { isYahooAppPasswordAccount, refreshYahooAccessToken } from "@/lib/email/providers/yahoo";
+import {
+  deleteSyncedEmailThread,
+  getEmailCandidateMatchForDealThread,
+  getEmailSyncState,
+  getEmailThreadDetailForUser,
+  listEmailCandidateMatchesForUser,
+  listEmailThreadsForUser,
+  replaceEmailDealEventsForMessage,
+  saveEmailActionItem,
+  saveEmailDealTermSuggestion,
+  saveEmailRiskFlag,
+  saveSyncedEmailThread,
+  updateConnectedEmailAccount,
+  upsertBrandContact,
+  upsertEmailCandidateMatch,
+} from "@/lib/email/repository";
+import {
+  buildEmailTermSuggestion,
+  detectImportantEmailEvents,
+  detectPromiseDiscrepancies,
+  scoreThreadAgainstDeal,
+} from "@/lib/email/smart-inbox";
+import {
+  clearEmailResyncRequiredNotification,
+  emitEmailResyncRequiredNotification,
+} from "@/lib/notification-service";
+import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
 import { getRepository } from "@/lib/repository";
 import type {
   ConnectedEmailAccountRecord,
@@ -12,45 +49,6 @@ import type {
   PendingExtractionData,
   Viewer,
 } from "@/lib/types";
-import { decryptSecret, encryptSecret } from "@/lib/email/crypto";
-import {
-  buildEmailTermSuggestion,
-  detectImportantEmailEvents,
-  detectPromiseDiscrepancies,
-  scoreThreadAgainstDeal,
-} from "@/lib/email/smart-inbox";
-import { smartInboxEnabled } from "@/flags";
-import { extractActionItemsFromMessage } from "@/lib/email/action-items";
-import { checkCrossDealConflicts } from "@/lib/email/conflict-bridge";
-import { refreshGoogleAccessToken } from "@/lib/email/providers/gmail";
-import { refreshOutlookAccessToken } from "@/lib/email/providers/outlook";
-import { isYahooAppPasswordAccount, refreshYahooAccessToken } from "@/lib/email/providers/yahoo";
-import type { ProviderThreadPayload } from "@/lib/email/providers/types";
-import { assertViewerHasFeature } from "@/lib/billing/entitlements";
-import { coalesceExtractions, hasMeaningfulChanges } from "@/lib/pending-changes";
-import {
-  clearEmailResyncRequiredNotification,
-  emitEmailResyncRequiredNotification,
-} from "@/lib/notification-service";
-import {
-  createEmailThreadNoteForUser,
-  deleteSyncedEmailThread,
-  getConnectedEmailAccount,
-  getEmailCandidateMatchForDealThread,
-  getEmailSyncState,
-  getEmailThreadDetailForUser,
-  listEmailCandidateMatchesForUser,
-  listEmailThreadsForUser,
-  replaceEmailDealEventsForMessage,
-  saveConnectedEmailAccount,
-  saveEmailActionItem,
-  saveEmailDealTermSuggestion,
-  saveEmailRiskFlag,
-  saveSyncedEmailThread,
-  upsertBrandContact,
-  updateConnectedEmailAccount,
-  upsertEmailCandidateMatch,
-} from "@/lib/email/repository";
 
 const DEFAULT_TRANSACTIONAL_MAILBOX_SENDER = "onboarding@resend.dev";
 const HELLOBRAND_TRANSACTIONAL_MARKERS = [
@@ -68,6 +66,19 @@ export const EMAIL_DISCOVERY_INITIAL_THREAD_LIMIT = 25;
 export const OUTLOOK_WEBHOOK_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
 export const EMAIL_INCREMENTAL_SYNC_BATCH_WINDOW = "5s";
 export const EMAIL_INCREMENTAL_SYNC_BATCH_MAX_SIZE = 5;
+
+function emailProviderDisplayName(provider: ConnectedEmailAccountRecord["provider"]) {
+  switch (provider) {
+    case "gmail":
+      return "Gmail";
+    case "outlook":
+      return "Outlook";
+    case "yahoo":
+      return "Yahoo";
+    default:
+      return provider;
+  }
+}
 
 export function redirectTarget(
   pathname: string,
@@ -385,12 +396,27 @@ export async function ensureActiveEmailCredentials(account: ConnectedEmailAccoun
     throw new Error("Reconnect required.");
   }
 
-  const refreshed =
-    account.provider === "gmail"
-      ? await refreshGoogleAccessToken(refreshToken)
-      : account.provider === "outlook"
-        ? await refreshOutlookAccessToken(refreshToken)
-        : await refreshYahooAccessToken(refreshToken);
+  let refreshed: {
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  try {
+    refreshed =
+      account.provider === "gmail"
+        ? await refreshGoogleAccessToken(refreshToken)
+        : account.provider === "outlook"
+          ? await refreshOutlookAccessToken(refreshToken)
+          : await refreshYahooAccessToken(refreshToken);
+  } catch (error) {
+    const provider = emailProviderDisplayName(account.provider);
+    await updateConnectedEmailAccount(account.id, {
+      status: "reconnect_required",
+      lastErrorCode: `${account.provider}_token_refresh_failed`,
+      lastErrorMessage: `${provider} needs to be reconnected before inbox sync can continue.`,
+    });
+    throw new Error("Reconnect required.");
+  }
 
   const nextAccessToken = refreshed.access_token;
   const nextRefreshToken =

@@ -1,3 +1,8 @@
+/**
+ * Intake queue claiming and processing kickoff.
+ * This file moves sessions from queued to processing and starts document work
+ * without blocking the HTTP request on downstream Inngest availability.
+ */
 import { emitWorkspaceNotificationForSession } from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
 import { safeRevalidateTag } from "@/lib/safe-revalidate";
@@ -20,6 +25,52 @@ async function enqueuePendingDocumentsForDeal(dealId: string) {
   }
 
   return documents.length;
+}
+
+function startPendingDocumentsForDeal(dealId: string) {
+  void enqueuePendingDocumentsForDeal(dealId).catch((error) => {
+    console.error("[intake-queue] Could not enqueue pending documents:", error);
+  });
+}
+
+function toIntakeSessionRecord(session: {
+  id: string;
+  userId: string;
+  dealId: string;
+  status: string;
+  errorMessage: string | null;
+  inputSource: string | null;
+  draftBrandName: string | null;
+  draftCampaignName: string | null;
+  draftNotes: string | null;
+  draftPastedText: string | null;
+  draftPastedTextTitle: string | null;
+  duplicateCheckStatus: string | null;
+  duplicateMatchJson: unknown | null;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
+  expiresAt: Date | null;
+}) {
+  return {
+    id: session.id,
+    userId: session.userId,
+    dealId: session.dealId,
+    status: session.status as IntakeSessionRecord["status"],
+    errorMessage: session.errorMessage,
+    inputSource: session.inputSource as IntakeSessionRecord["inputSource"],
+    draftBrandName: session.draftBrandName,
+    draftCampaignName: session.draftCampaignName,
+    draftNotes: session.draftNotes,
+    draftPastedText: session.draftPastedText,
+    draftPastedTextTitle: session.draftPastedTextTitle,
+    duplicateCheckStatus: session.duplicateCheckStatus as IntakeSessionRecord["duplicateCheckStatus"],
+    duplicateMatchJson: session.duplicateMatchJson,
+    createdAt: session.createdAt.toISOString(),
+    updatedAt: session.updatedAt.toISOString(),
+    completedAt: session.completedAt?.toISOString() ?? null,
+    expiresAt: session.expiresAt?.toISOString() ?? null
+  } satisfies IntakeSessionRecord;
 }
 
 async function claimQueuedSession(where: {
@@ -103,53 +154,17 @@ export async function startQueuedIntakeSessionById(
       return null;
     }
 
-    return {
-      id: session.id,
-      userId: session.userId,
-      dealId: session.dealId,
-      status: session.status as IntakeSessionRecord["status"],
-      errorMessage: session.errorMessage,
-      inputSource: session.inputSource as IntakeSessionRecord["inputSource"],
-      draftBrandName: session.draftBrandName,
-      draftCampaignName: session.draftCampaignName,
-      draftNotes: session.draftNotes,
-      draftPastedText: session.draftPastedText,
-      draftPastedTextTitle: session.draftPastedTextTitle,
-      duplicateCheckStatus: (session.duplicateCheckStatus ?? null) as IntakeSessionRecord["duplicateCheckStatus"],
-      duplicateMatchJson: session.duplicateMatchJson ?? null,
-      createdAt: session.createdAt.toISOString(),
-      updatedAt: session.updatedAt.toISOString(),
-      completedAt: session.completedAt?.toISOString() ?? null,
-      expiresAt: session.expiresAt?.toISOString() ?? null
-    };
+    return toIntakeSessionRecord(session);
   }
 
-  await enqueuePendingDocumentsForDeal(claimed.dealId);
+  startPendingDocumentsForDeal(claimed.dealId);
 
   // Invalidate cache so the "workspace generating" notification appears immediately
   safeRevalidateTag(`user-${claimed.userId}-deals`);
   safeRevalidateTag(`user-${claimed.userId}-notifications`);
   await emitWorkspaceNotificationForSession(claimed.id, "workspace.processing_started");
 
-  return {
-    id: claimed.id,
-    userId: claimed.userId,
-    dealId: claimed.dealId,
-    status: claimed.status as IntakeSessionRecord["status"],
-    errorMessage: claimed.errorMessage,
-    inputSource: claimed.inputSource as IntakeSessionRecord["inputSource"],
-    draftBrandName: claimed.draftBrandName,
-    draftCampaignName: claimed.draftCampaignName,
-    draftNotes: claimed.draftNotes,
-    draftPastedText: claimed.draftPastedText,
-    draftPastedTextTitle: claimed.draftPastedTextTitle,
-    duplicateCheckStatus: (claimed.duplicateCheckStatus ?? null) as IntakeSessionRecord["duplicateCheckStatus"],
-    duplicateMatchJson: claimed.duplicateMatchJson ?? null,
-    createdAt: claimed.createdAt.toISOString(),
-    updatedAt: claimed.updatedAt.toISOString(),
-    completedAt: claimed.completedAt?.toISOString() ?? null,
-    expiresAt: claimed.expiresAt?.toISOString() ?? null
-  };
+  return toIntakeSessionRecord(claimed);
 }
 
 export async function startNextQueuedIntakeSessionForUser(
@@ -172,7 +187,7 @@ export async function startNextQueuedIntakeSessionForUser(
         "Another workspace is already analyzing. Wait for it to finish before starting a different queue."
       );
     }
-    return processingSession.id;
+    return toIntakeSessionRecord(processingSession);
   }
 
   const claimed = await claimQueuedSession({
@@ -184,9 +199,9 @@ export async function startNextQueuedIntakeSessionForUser(
     return null;
   }
 
-  await enqueuePendingDocumentsForDeal(claimed.dealId);
+  startPendingDocumentsForDeal(claimed.dealId);
   safeRevalidateTag(`user-${claimed.userId}-deals`);
   safeRevalidateTag(`user-${claimed.userId}-notifications`);
   await emitWorkspaceNotificationForSession(claimed.id, "workspace.processing_started");
-  return claimed.id;
+  return toIntakeSessionRecord(claimed);
 }

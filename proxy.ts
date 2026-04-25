@@ -26,6 +26,11 @@ function isSitePasswordProtected(): boolean {
   return (process.env.SITE_PASSWORD?.trim()?.length ?? 0) > 0;
 }
 
+function isLocalRequest(request: NextRequest): boolean {
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
 function isE2EAuthEnabled(): boolean {
   return process.env.NODE_ENV !== "production" && process.env.HELLOBRAND_E2E_ENABLED === "1";
 }
@@ -41,6 +46,7 @@ function skipSitePassword(pathname: string): boolean {
 
 async function checkSitePassword(request: NextRequest): Promise<NextResponse | null> {
   if (!isSitePasswordProtected()) return null;
+  if (isLocalRequest(request)) return null;
   if (skipSitePassword(request.nextUrl.pathname)) return null;
 
   const cookie = request.cookies.get("dev-site-auth")?.value;

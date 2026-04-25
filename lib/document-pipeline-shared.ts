@@ -22,6 +22,7 @@ import type {
   DealRecord,
   DealTermsRecord,
   DocumentRecord,
+  DocumentReviewItemRecord,
   DocumentSectionRecord,
   ExtractionEvidenceRecord,
   ExtractionPipelineResult,
@@ -372,6 +373,91 @@ export function writeGenerationSnapshot(input: {
       2
     )
   );
+}
+
+function shouldWriteExtractionDebugArtifacts() {
+  if (process.env.HELLOBRAND_EXTRACTION_DEBUG_ARTIFACTS === "0") {
+    return false;
+  }
+
+  return (
+    process.env.HELLOBRAND_EXTRACTION_DEBUG_ARTIFACTS === "1" ||
+    process.env.NODE_ENV !== "production"
+  );
+}
+
+function safeDebugFileSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/_+/g, "_").slice(0, 120);
+}
+
+export function writeExtractionDebugSnapshot(input: {
+  runId: string;
+  document: DocumentRecord;
+  routing: unknown;
+  sections: DocumentSectionRecord[];
+  sectionInputs: Array<{
+    title: string;
+    content: string;
+    chunkIndex: number;
+    pageRange: string | null;
+  }>;
+  extraction: ExtractionPipelineResult;
+  extractionEvidence: ExtractionPipelineResult["evidence"];
+  reviewItems: Omit<
+    DocumentReviewItemRecord,
+    "id" | "documentId" | "runId" | "createdAt" | "updatedAt"
+  >[];
+  normalizedArtifactId: string | null;
+}) {
+  if (!shouldWriteExtractionDebugArtifacts()) {
+    return null;
+  }
+
+  const dir =
+    process.env.HELLOBRAND_EXTRACTION_DEBUG_DIR ??
+    join(process.cwd(), "tmp", "document-extractions");
+
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch {
+    return null;
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const fileName = [
+    timestamp,
+    safeDebugFileSegment(input.runId),
+    safeDebugFileSegment(input.document.id),
+    safeDebugFileSegment(input.document.fileName)
+  ].join("_");
+  const filePath = join(dir, `${fileName}.json`);
+
+  try {
+    writeFileSync(
+      filePath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          event: "extract_fields_debug_snapshot",
+          runId: input.runId,
+          document: input.document,
+          routing: input.routing,
+          sections: input.sections,
+          sectionInputs: input.sectionInputs,
+          extraction: input.extraction,
+          extractionEvidence: input.extractionEvidence,
+          reviewItems: input.reviewItems,
+          normalizedArtifactId: input.normalizedArtifactId
+        },
+        null,
+        2
+      )
+    );
+  } catch {
+    return null;
+  }
+
+  return filePath;
 }
 
 export function reconstructExtractionPipelineResult(input: {

@@ -11,7 +11,7 @@ export const ANONYMOUS_UPLOAD_MAX_COUNT = 1;
 const ANONYMOUS_UPLOAD_REDIRECT_PATH = "/upload/claim";
 export const ANONYMOUS_UPLOAD_LIMIT_ERROR_CODE = "ANONYMOUS_UPLOAD_LIMIT_REACHED";
 
-const SUPPORTED_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".txt"]);
+const SUPPORTED_EXTENSIONS = new Set([".pdf", ".doc", ".docx", ".pptx", ".txt"]);
 
 function normalizeIp(value: string | null | undefined) {
   if (!value) {
@@ -39,15 +39,11 @@ export function hashBuffer(value: Buffer) {
 }
 
 export function getAnonymousUploadSignUpHref() {
-  return `/login?mode=sign-up&redirect=${encodeURIComponent(
-    ANONYMOUS_UPLOAD_REDIRECT_PATH
-  )}`;
+  return `/login?mode=sign-up&redirect=${encodeURIComponent(ANONYMOUS_UPLOAD_REDIRECT_PATH)}`;
 }
 
 export function getAnonymousUploadSignInHref() {
-  return `/login?mode=sign-in&redirect=${encodeURIComponent(
-    ANONYMOUS_UPLOAD_REDIRECT_PATH
-  )}`;
+  return `/login?mode=sign-in&redirect=${encodeURIComponent(ANONYMOUS_UPLOAD_REDIRECT_PATH)}`;
 }
 
 function createAnonymousVisitorId() {
@@ -55,22 +51,20 @@ function createAnonymousVisitorId() {
 }
 
 export function resolveAnonymousVisitorIdentity(request: NextRequest) {
-  const cookieVisitorId =
-    request.cookies.get(ANONYMOUS_VISITOR_COOKIE_NAME)?.value?.trim() || null;
+  const cookieVisitorId = request.cookies.get(ANONYMOUS_VISITOR_COOKIE_NAME)?.value?.trim() || null;
   const visitorId = cookieVisitorId || createAnonymousVisitorId();
   const forwardedFor = request.headers.get("x-forwarded-for");
   const rawIp =
     normalizeIp(forwardedFor?.split(",")[0]) ??
     normalizeIp(request.headers.get("x-real-ip")) ??
     normalizeIp(request.headers.get("cf-connecting-ip")) ??
-
     normalizeIp(parseForwardedHeader(request.headers.get("forwarded")));
   const ipHash = hashValue(rawIp ? `ip:${rawIp}` : `visitor-fallback:${visitorId}`);
 
   return {
     visitorId,
     ipHash,
-    shouldSetVisitorCookie: !cookieVisitorId
+    shouldSetVisitorCookie: !cookieVisitorId,
   };
 }
 
@@ -78,7 +72,7 @@ export function validateAnonymousUploadFile(file: Pick<File, "name" | "size">) {
   const extension = path.extname(file.name).toLowerCase();
 
   if (!SUPPORTED_EXTENSIONS.has(extension)) {
-    throw new Error("Please upload a PDF, DOC, DOCX, or TXT document.");
+    throw new Error("Please upload a PDF, DOC, DOCX, PPTX, or TXT document.");
   }
 
   if (file.size > ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES) {

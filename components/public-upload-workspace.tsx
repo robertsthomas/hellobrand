@@ -1,13 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, FileUp, Loader2, LockKeyhole, ShieldAlert, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { useRef, useState } from "react";
 
 import { PostHogActionLink } from "@/components/posthog-action-link";
 import { PublicContractBreakdown } from "@/components/public-contract-breakdown";
-import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config";
 import { trackPublicFunnelEvent } from "@/lib/public-funnel-events";
+import { ANONYMOUS_UPLOAD_MAX_FILE_SIZE_BYTES } from "@/lib/public-upload-config";
 import type { AnonymousDealBreakdown } from "@/lib/types";
 
 type UploadState = "idle" | "uploading" | "done";
@@ -20,7 +20,7 @@ type UploadLimitGate = {
 const PROCESSING_STEPS = [
   "Extracting key clauses",
   "Summarizing creator terms",
-  "Flagging watchouts"
+  "Flagging watchouts",
 ] as const;
 
 function buildAuthHref(mode: "sign-in" | "sign-up", redirectTo: string) {
@@ -53,7 +53,7 @@ export function PublicUploadWorkspace() {
     }
   }
 
-// fallow-ignore-next-line complexity
+  // fallow-ignore-next-line complexity
   async function handleUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -75,7 +75,7 @@ export function PublicUploadWorkspace() {
     setErrorMessage(null);
     setUploadLimitGate(null);
     trackPublicFunnelEvent("anonymous_upload_started", {
-      fileName: selectedFile.name
+      fileName: selectedFile.name,
     });
 
     try {
@@ -84,15 +84,12 @@ export function PublicUploadWorkspace() {
 
       const response = await fetch("/api/public/intake/upload", {
         method: "POST",
-        body: formData
+        body: formData,
       });
       const payload = await response.json();
 
       if (!response.ok) {
-        if (
-          response.status === 429 &&
-          payload.code === "ANONYMOUS_UPLOAD_LIMIT_REACHED"
-        ) {
+        if (response.status === 429 && payload.code === "ANONYMOUS_UPLOAD_LIMIT_REACHED") {
           setUploadLimitGate({
             message:
               typeof payload.error === "string"
@@ -105,7 +102,7 @@ export function PublicUploadWorkspace() {
             signInHref:
               typeof payload.signInHref === "string"
                 ? payload.signInHref
-                : buildAuthHref("sign-in", "/upload/claim")
+                : buildAuthHref("sign-in", "/upload/claim"),
           });
           setUploadState("idle");
           return;
@@ -117,9 +114,7 @@ export function PublicUploadWorkspace() {
       setBreakdown(payload.breakdown as AnonymousDealBreakdown);
       setUploadState("done");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Could not analyze that document."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Could not analyze that document.");
       setUploadState("idle");
     }
   }
@@ -131,7 +126,7 @@ export function PublicUploadWorkspace() {
 
     setIsClaiming(true);
     trackPublicFunnelEvent("anonymous_create_free_workspace_clicked", {
-      hasAccount: false
+      hasAccount: false,
     });
     window.location.href = buildAuthHref("sign-up", "/upload/claim");
   }
@@ -207,10 +202,16 @@ export function PublicUploadWorkspace() {
     <div className="min-h-screen bg-[#fcfaf7] text-foreground dark:bg-[#0f1115]">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-sm font-medium text-muted-foreground transition hover:text-foreground">
+          <Link
+            href="/"
+            className="text-sm font-medium text-muted-foreground transition hover:text-foreground"
+          >
             Back to home
           </Link>
-          <Link href="/sample" className="text-sm font-medium text-primary transition hover:text-primary/80">
+          <Link
+            href="/sample"
+            className="text-sm font-medium text-primary transition hover:text-primary/80"
+          >
             Try sample contract
           </Link>
         </div>
@@ -225,7 +226,8 @@ export function PublicUploadWorkspace() {
             </h1>
             <p className="mx-auto mt-5 max-w-[58ch] text-[1rem] leading-relaxed text-muted-foreground sm:text-[1.08rem]">
               Upload a contract, brief, or concept document. We’ll analyze it, explain what matters,
-              and pull out the deliverables and payment context. No card required to save your first workspace.
+              and pull out the deliverables and payment context. No card required to save your first
+              workspace.
             </p>
           </div>
 
@@ -267,7 +269,10 @@ export function PublicUploadWorkspace() {
 
                 <div className="mt-6 text-sm text-muted-foreground">
                   Want to explore first?{" "}
-                  <Link href="/sample" className="font-medium text-primary transition hover:text-primary/80">
+                  <Link
+                    href="/sample"
+                    className="font-medium text-primary transition hover:text-primary/80"
+                  >
                     Try the sample contract
                   </Link>
                 </div>
@@ -296,7 +301,7 @@ export function PublicUploadWorkspace() {
                   {selectedFile ? selectedFile.name : "Drop your document here"}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  PDF, DOCX, DOC, TXT up to 10 MB. Contracts, briefs, and concept documents.
+                  PDF, DOCX, DOC, PPTX, TXT up to 10 MB. Contracts, briefs, and concept documents.
                 </p>
                 <div className="mt-6 inline-flex h-11 items-center justify-center border border-black/8 bg-white px-5 text-sm font-semibold text-foreground transition group-hover:bg-secondary dark:border-white/10 dark:bg-white/[0.03]">
                   {uploadState === "uploading"
@@ -310,7 +315,7 @@ export function PublicUploadWorkspace() {
               <input
                 ref={inputRef}
                 type="file"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.doc,.docx,.pptx,.txt"
                 className="hidden"
                 onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
               />

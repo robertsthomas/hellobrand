@@ -1,11 +1,11 @@
+import { startNextQueuedIntakeSessionForUser } from "@/lib/intake-queue";
 import {
   emitWorkspaceNotificationForCurrentState,
   emitWorkspaceNotificationForSession,
-  supersedeWorkspaceNotificationEvents
+  supersedeWorkspaceNotificationEvents,
 } from "@/lib/notification-service";
 import { prisma } from "@/lib/prisma";
 import { safeRevalidateTag } from "@/lib/safe-revalidate";
-import { startNextQueuedIntakeSessionForUser } from "@/lib/intake-queue";
 import type { IntakeSessionRecord, IntakeSessionStatus, PaymentStatus } from "@/lib/types";
 
 function iso(value: Date | null | undefined) {
@@ -43,12 +43,13 @@ function toIntakeSessionRecord(session: {
     draftNotes: session.draftNotes ?? null,
     draftPastedText: session.draftPastedText ?? null,
     draftPastedTextTitle: session.draftPastedTextTitle ?? null,
-    duplicateCheckStatus: (session.duplicateCheckStatus ?? null) as IntakeSessionRecord["duplicateCheckStatus"],
+    duplicateCheckStatus: (session.duplicateCheckStatus ??
+      null) as IntakeSessionRecord["duplicateCheckStatus"],
     duplicateMatchJson: session.duplicateMatchJson ?? null,
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
     completedAt: iso(session.completedAt),
-    expiresAt: iso(session.expiresAt)
+    expiresAt: iso(session.expiresAt),
   };
 }
 
@@ -73,6 +74,7 @@ function deriveIntakeStatus(input: {
   documentsCount: number;
   hasPending: boolean;
   hasFailed: boolean;
+  hasReady: boolean;
   allReady: boolean;
 }) {
   if (input.currentStatus === "completed" || input.currentStatus === "expired") {
@@ -87,16 +89,16 @@ function deriveIntakeStatus(input: {
     return "queued" satisfies IntakeSessionStatus;
   }
 
-  if (input.hasFailed) {
-    return "failed" satisfies IntakeSessionStatus;
-  }
-
   if (input.hasPending) {
     return "processing" satisfies IntakeSessionStatus;
   }
 
-  if (input.allReady) {
+  if (input.allReady || (input.hasReady && input.hasFailed)) {
     return "ready_for_confirmation" satisfies IntakeSessionStatus;
+  }
+
+  if (input.hasFailed) {
+    return "failed" satisfies IntakeSessionStatus;
   }
 
   return "draft" satisfies IntakeSessionStatus;
@@ -109,10 +111,10 @@ export async function syncIntakeSessionForDealId(dealId: string) {
       deal: {
         include: {
           documents: true,
-          paymentRecord: true
-        }
-      }
-    }
+          paymentRecord: true,
+        },
+      },
+    },
   });
 
   if (!session) {
@@ -127,22 +129,19 @@ export async function syncIntakeSessionForDealId(dealId: string) {
       ["pending", "processing"].includes(document.processingStatus)
     ),
     hasFailed: documents.some((document) => document.processingStatus === "failed"),
+    hasReady: documents.some((document) => document.processingStatus === "ready"),
     allReady:
-      documents.length > 0 &&
-      documents.every((document) => document.processingStatus === "ready")
+      documents.length > 0 && documents.every((document) => document.processingStatus === "ready"),
   });
 
   const errorMessage =
     nextStatus === "failed"
-      ? documents.find((document) => document.errorMessage)?.errorMessage ??
-        "At least one document could not be processed."
+      ? (documents.find((document) => document.errorMessage)?.errorMessage ??
+        "At least one document could not be processed.")
       : null;
 
   const paymentStatus = session.deal.paymentRecord
-    ? derivePaymentStatus(
-        session.deal.paymentRecord.status,
-        session.deal.paymentRecord.dueDate
-      )
+    ? derivePaymentStatus(session.deal.paymentRecord.status, session.deal.paymentRecord.dueDate)
     : null;
 
   await prisma.$transaction([
@@ -151,21 +150,21 @@ export async function syncIntakeSessionForDealId(dealId: string) {
       data: {
         status: nextStatus,
         errorMessage,
-        completedAt: nextStatus === "completed" ? new Date() : null
-      }
+        completedAt: nextStatus === "completed" ? new Date() : null,
+      },
     }),
     ...(paymentStatus
       ? [
           prisma.paymentRecord.update({
             where: { dealId },
-            data: { status: paymentStatus }
+            data: { status: paymentStatus },
           }),
           prisma.deal.update({
             where: { id: dealId },
-            data: { paymentStatus }
-          })
+            data: { paymentStatus },
+          }),
         ]
-      : [])
+      : []),
   ]);
 
   if (["ready_for_confirmation", "failed", "completed"].includes(nextStatus)) {
@@ -187,7 +186,7 @@ export async function syncIntakeSessionForDealId(dealId: string) {
     void triggerDuplicateCheck({
       dealId,
       userId: session.userId,
-      sessionId: session.id
+      sessionId: session.id,
     });
   }
 
@@ -200,32 +199,25 @@ export async function syncIntakeSessionForDealId(dealId: string) {
 
 async function getIntakeSessionRecord(sessionId: string) {
   const session = await prisma.intakeSession.findUnique({
-    where: { id: sessionId }
+    where: { id: sessionId },
   });
 
   return session ? toIntakeSessionRecord(session) : null;
 }
 
-async function triggerDuplicateCheck(input: {
-  dealId: string;
-  userId: string;
-  sessionId: string;
-}) {
+async function triggerDuplicateCheck(input: { dealId: string; userId: string; sessionId: string }) {
   try {
     const { findDuplicateDeals } = await import("@/lib/duplicate-detection");
 
     await prisma.intakeSession.update({
       where: { id: input.sessionId },
-      data: { duplicateCheckStatus: "checking" }
+      data: { duplicateCheckStatus: "checking" },
     });
-    await emitWorkspaceNotificationForSession(
-      input.sessionId,
-      "workspace.duplicate_checking"
-    );
+    await emitWorkspaceNotificationForSession(input.sessionId, "workspace.duplicate_checking");
 
     const documents = await prisma.document.findMany({
       where: { dealId: input.dealId },
-      select: { rawText: true, normalizedText: true, fileName: true }
+      select: { rawText: true, normalizedText: true, fileName: true },
     });
 
     const rawTexts = documents
@@ -236,44 +228,44 @@ async function triggerDuplicateCheck(input: {
     if (rawTexts.length === 0) {
       await prisma.intakeSession.update({
         where: { id: input.sessionId },
-        data: { duplicateCheckStatus: "clean" }
+        data: { duplicateCheckStatus: "clean" },
       });
       await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
-        "workspace.duplicate_checking"
+        "workspace.duplicate_checking",
       ]);
       return;
     }
 
-    const matches = (await findDuplicateDeals(input.userId, { rawTexts, fileNames }))
-      .filter((match) => match.dealId !== input.dealId);
+    const matches = (await findDuplicateDeals(input.userId, { rawTexts, fileNames })).filter(
+      (match) => match.dealId !== input.dealId
+    );
 
     await prisma.intakeSession.update({
       where: { id: input.sessionId },
       data: {
         duplicateCheckStatus: matches.length > 0 ? "duplicates_found" : "clean",
-        duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined
-      }
+        duplicateMatchJson: matches.length > 0 ? JSON.parse(JSON.stringify(matches)) : undefined,
+      },
     });
 
     // Revalidate so duplicate notification appears on dashboard
     safeRevalidateTag(`user-${input.userId}-deals`);
     safeRevalidateTag(`user-${input.userId}-notifications`);
     if (matches.length > 0) {
-      await emitWorkspaceNotificationForSession(
-        input.sessionId,
-        "workspace.duplicates_found"
-      );
+      await emitWorkspaceNotificationForSession(input.sessionId, "workspace.duplicates_found");
     } else {
       await supersedeWorkspaceNotificationEvents(input.userId, input.sessionId, [
-        "workspace.duplicate_checking"
+        "workspace.duplicate_checking",
       ]);
     }
   } catch (error) {
     console.error("[triggerDuplicateCheck] Failed:", error);
     // Non-fatal: don't block workspace flow if duplicate check fails
-    await prisma.intakeSession.update({
-      where: { id: input.sessionId },
-      data: { duplicateCheckStatus: "clean" }
-    }).catch(() => {});
+    await prisma.intakeSession
+      .update({
+        where: { id: input.sessionId },
+        data: { duplicateCheckStatus: "clean" },
+      })
+      .catch(() => {});
   }
 }

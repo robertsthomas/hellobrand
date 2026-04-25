@@ -275,4 +275,60 @@ describe("thread brief archetypes", () => {
     expect(brief.nextMoveOwner).toBe("none");
     expect(brief.spamConfidence).toBe("high");
   });
+
+  test("detects revision-cycle threads and keeps the brand as next owner after creator updates", () => {
+    const thread = createThread([
+      createMessage(
+        "message-1",
+        "inbound",
+        "We have feedback below from content review. Please make the requested caption edits by Friday."
+      ),
+      createMessage(
+        "message-2",
+        "outbound",
+        "Thanks, I sent the updated draft and made the requested caption changes."
+      ),
+    ]);
+
+    const brief = buildThreadBrief(thread, createAggregate());
+
+    expect(brief.mode).toBe("revision_cycle");
+    expect(brief.nextMoveOwner).toBe("brand");
+    expect(brief.activeTerms.deadlines).toContain("by Friday");
+    expect(brief.lastCreatorPosition).toContain("Thanks");
+  });
+
+  test("detects go-live threads without reopening negotiation state", () => {
+    const thread = createThread([
+      createMessage(
+        "message-1",
+        "inbound",
+        "Your video is approved and you can go live via the campaign link tomorrow. Please use the approved caption."
+      ),
+    ]);
+
+    const brief = buildThreadBrief(thread, createAggregate());
+
+    expect(brief.mode).toBe("go_live");
+    expect(brief.nextMoveOwner).toBe("creator");
+    expect(brief.activeTerms.deadlines).toContain("tomorrow");
+    expect(brief.compensationType).toBe("unclear");
+  });
+
+  test("detects invoice closeout threads and preserves payment timing", () => {
+    const thread = createThread([
+      createMessage(
+        "message-1",
+        "inbound",
+        "Please send your final invoice and W-9. Payment is processed within 30 days after receipt."
+      ),
+    ]);
+
+    const brief = buildThreadBrief(thread, createAggregate());
+
+    expect(brief.mode).toBe("invoice_closeout");
+    expect(brief.nextMoveOwner).toBe("creator");
+    expect(brief.activeTerms.paymentTiming).toBe("within 30 days");
+    expect(brief.latestInboundAsk).toContain("Please send your final invoice");
+  });
 });
