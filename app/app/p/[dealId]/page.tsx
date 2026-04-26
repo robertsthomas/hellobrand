@@ -26,14 +26,12 @@ import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
-import { dealCategoryLabel } from "@/lib/conflict-intelligence";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
 import {
   buildNextAction,
   buildWorkspaceAttentionItems,
   buildWorkspaceDisplayState,
   loadWorkspaceRouteData,
-  nextActionToneClass,
   resolveWorkspaceTab,
 } from "./page-helpers";
 
@@ -42,7 +40,7 @@ export default function WorkspaceDealDetailPage({
   searchParams,
 }: {
   params: Promise<{ dealId: string }>;
-  searchParams?: Promise<{ tab?: string }>;
+  searchParams?: Promise<{ documentId?: string; tab?: string }>;
 }) {
   return (
     <Suspense fallback={<DealDetailSkeleton />}>
@@ -57,7 +55,7 @@ async function DealDetailContent({
   searchParams,
 }: {
   params: Promise<{ dealId: string }>;
-  searchParams?: Promise<{ tab?: string }>;
+  searchParams?: Promise<{ documentId?: string; tab?: string }>;
 }) {
   const [{ dealId }, resolvedSearchParams, viewer] = await Promise.all([
     params,
@@ -274,7 +272,7 @@ async function DealDetailContent({
             {briefSourceDocument ? (
               <div className="flex items-center">
                 <Link
-                  href={`/api/documents/${briefSourceDocument.id}/content`}
+                  href={`/app/p/${deal.id}?tab=documents&documentId=${briefSourceDocument.id}`}
                   className="inline-flex items-center gap-2 border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-foreground transition hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
                 >
                   View brief document
@@ -412,6 +410,7 @@ async function DealDetailContent({
               documents={documents}
               jobs={jobs}
               reviewItems={documentReviewItems}
+              initialDocumentId={resolvedSearchParams?.documentId}
             />
           </TabsContent>
         </WorkspaceTabs>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, FileText, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 
@@ -30,16 +30,26 @@ export function DocumentsPanel({
   dealId,
   documents,
   jobs,
+  initialDocumentId,
   reviewItems,
 }: {
   dealId: string;
   documents: DocumentRecord[];
   jobs: JobRecord[];
+  initialDocumentId?: string;
   reviewItems: DocumentReviewItemRecord[];
 }) {
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    documents[0]?.id ?? null
+    documents.some((document) => document.id === initialDocumentId)
+      ? (initialDocumentId ?? null)
+      : (documents[0]?.id ?? null)
   );
+
+  useEffect(() => {
+    if (initialDocumentId && documents.some((document) => document.id === initialDocumentId)) {
+      setSelectedDocumentId(initialDocumentId);
+    }
+  }, [documents, initialDocumentId]);
 
   const selectedDocument = useMemo(
     () => documents.find((document) => document.id === selectedDocumentId) ?? documents[0] ?? null,
