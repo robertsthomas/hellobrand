@@ -309,6 +309,24 @@ export function AppFrame({
     [guideOpenedMobileMenu]
   );
 
+  const MobileMenuButton = () => {
+    const { setOpenMobile } = useSidebar();
+
+    return (
+      <button
+        type="button"
+        className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
+        onClick={() => {
+          setMobileMenuOpen(true);
+          setOpenMobile(true);
+        }}
+        aria-label={t("openMenuAriaLabel")}
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+    );
+  };
+
   const renderNavItem = (
     item: (typeof primaryAppNavItems)[number],
     options?: { onClick?: () => void; collapsed?: boolean }
@@ -423,14 +441,7 @@ export function AppFrame({
     <header className="fixed inset-x-0 top-0 z-30 border-b border-border bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/90 lg:absolute dark:border-white/8 dark:bg-[#111318]/95 dark:supports-[backdrop-filter]:bg-[#111318]/90">
       <div className="flex h-16 items-center justify-between px-6 lg:h-[72px] lg:px-8">
         <div className="flex min-w-0 items-center">
-          <button
-            type="button"
-            className="mr-2 inline-flex h-10 w-10 items-center justify-center lg:hidden"
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label={t("openMenuAriaLabel")}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          <MobileMenuButton />
           <div className="min-w-0">
             <div className="truncate text-sm text-foreground lg:hidden">
               {t(`routes.${meta.titleKey}`)}
@@ -486,27 +497,28 @@ export function AppFrame({
     </>
   );
 
-  const SidebarStateSync = () => {
+  const SidebarGuideStateSync = () => {
     const { openMobile, setOpenMobile } = useSidebar();
 
     useEffect(() => {
-      if (openMobile !== mobileMenuOpen) {
-        setOpenMobile(mobileMenuOpen);
+      if (guideOpenedMobileMenu && !openMobile) {
+        setOpenMobile(true);
       }
-    }, [mobileMenuOpen, openMobile, setOpenMobile]);
-
-    useEffect(() => {
-      handleMobileMenuOpenChange(openMobile);
-    }, [handleMobileMenuOpenChange, openMobile]);
+    }, [guideOpenedMobileMenu, openMobile, setOpenMobile]);
 
     return null;
   };
 
   const AppSidebarContainer = () => {
-    const { isMobile, state } = useSidebar();
+    const { isMobile, setOpenMobile, state } = useSidebar();
     const compactSidebar = !isMobile && state === "collapsed";
     const navigationLabel = t(isMobile ? "mobileNavigationAriaLabel" : "mainNavigationAriaLabel");
-    const closeSidebar = isMobile ? () => handleMobileMenuOpenChange(false) : undefined;
+    const closeSidebar = isMobile
+      ? () => {
+          handleMobileMenuOpenChange(false);
+          setOpenMobile(false);
+        }
+      : undefined;
 
     return (
       <Sidebar
@@ -660,7 +672,7 @@ export function AppFrame({
             } as CSSProperties
           }
         >
-          <SidebarStateSync />
+          <SidebarGuideStateSync />
           <AppSidebarContainer />
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-[#111318]">
             {renderHeader()}

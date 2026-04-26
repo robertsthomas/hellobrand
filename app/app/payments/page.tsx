@@ -76,7 +76,7 @@ async function PaymentsContent() {
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="hidden gap-4 border border-black/8 bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px]">
+            <div className="hidden gap-4 border border-black/8 bg-[#f8f8f6] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px] dark:border-white/10 dark:bg-white/[0.04]">
               <span>Workspace</span>
               <span>Payment status</span>
               <span>Invoice</span>
@@ -84,7 +84,7 @@ async function PaymentsContent() {
               <span>Total</span>
             </div>
 
-            <div className="border-t border-black/8">
+            <div className="border-t border-black/8 dark:border-white/10">
               {rows.map(({ deal, payment, invoice, invoiceDocuments }) => {
                 const invoiceState =
                   invoiceDocuments.length > 0
@@ -97,7 +97,7 @@ async function PaymentsContent() {
                   <Link
                     key={deal.id}
                     href={`/app/payments/${deal.id}`}
-                    className="block border-b border-black/8 bg-white px-4 py-5 transition hover:bg-[#fbfbfa] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px] md:items-center md:gap-4 md:py-6"
+                    className="block border-b border-black/8 bg-white px-4 py-5 transition hover:bg-[#fbfbfa] md:grid md:grid-cols-[minmax(0,1.5fr)_140px_150px_130px_120px] md:items-center md:gap-4 md:py-6 dark:border-white/10 dark:bg-[#121419] dark:hover:bg-[#171a20]"
                   >
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
