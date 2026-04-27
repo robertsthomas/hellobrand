@@ -7,12 +7,13 @@
 import { startTransition, useDeferredValue, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Pause, Play, RotateCcw, Trash2, X } from "lucide-react";
 
 import {
   AdminCacheCleanerDialog,
   type AdminCacheTargetKey,
 } from "@/components/admin/admin-cache-cleaner-dialog";
+import { ConfirmDestructiveDialog } from "@/components/confirm-destructive-dialog";
 import type {
   AdminDashboardSnapshot,
   AdminManagedUser,
@@ -128,6 +129,8 @@ function UserDetailModal({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [planForm, setPlanForm] = useState({ tier: "free", status: "active" });
   const [trialForm, setTrialForm] = useState({ tier: "basic", days: "14" });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteDealDialogOpen, setDeleteDealDialogOpen] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -418,13 +421,7 @@ function UserDetailModal({
                         variant="outline"
                         className="shrink-0 gap-1 text-red-600 hover:bg-red-50 hover:text-red-700"
                         disabled={actionLoading === `delete_deal_${deal.id}`}
-                        onClick={() => {
-                          if (
-                            !window.confirm(`Delete "${deal.campaignName}"? This cannot be undone.`)
-                          )
-                            return;
-                          void runAction({ action: "delete_deal", dealId: deal.id });
-                        }}
+                        onClick={() => setDeleteDealDialogOpen(deal.id)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
@@ -467,8 +464,109 @@ function UserDetailModal({
                   : "Reset onboarding and tooltips"}
               </Button>
             </div>
+
+            {/* Danger zone */}
+            <div className="border-t border-clay/30 bg-clay/[0.03] px-5 py-4 -mx-5 mt-5">
+              <h3 className="text-sm font-semibold text-clay">Danger zone</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pause, resume, or permanently delete this user and all their data.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(detail?.billing?.currentSubscriptionStatus === "active" ||
+                  detail?.billing?.currentSubscriptionStatus === "trialing") &&
+                  !detail?.billing?.currentSubscriptionStatus?.includes("cancel") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                      disabled={actionLoading === "pause_user"}
+                      onClick={() =>
+                        void runAction({ action: "pause_user" }, "Subscription set to cancel at period end.")
+                      }
+                    >
+                      <Pause className="h-3.5 w-3.5" />
+                      {actionLoading === "pause_user" ? "Pausing..." : "Pause subscription"}
+                    </Button>
+                  )}
+                {(detail?.billing?.currentSubscriptionStatus === "active" ||
+                  detail?.billing?.currentSubscriptionStatus === "trialing") &&
+                  (detail?.billing as { cancelAtPeriodEnd?: boolean } | null)?.cancelAtPeriodEnd && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1 border-ocean/40 text-ocean hover:bg-ocean/5"
+                      disabled={actionLoading === "resume_user"}
+                      onClick={() =>
+                        void runAction({ action: "resume_user" }, "Subscription resumed.")
+                      }
+                    >
+                      <Play className="h-3.5 w-3.5" />
+                      {actionLoading === "resume_user" ? "Resuming..." : "Resume subscription"}
+                    </Button>
+                  )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1 border-clay/40 text-clay hover:bg-clay/10"
+                  disabled={actionLoading === "delete_user"}
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {actionLoading === "delete_user" ? "Deleting..." : "Delete user and all data"}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
+
+        <ConfirmDestructiveDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title={`Delete ${user.displayName}?`}
+          description={
+            <>
+              <p>
+                Permanently delete <strong>{user.displayName}</strong> ({user.email}) and ALL their
+                data, including workspaces, documents, stored files, Stripe subscriptions, and the
+                Clerk account.
+              </p>
+              <p>This cannot be undone.</p>
+            </>
+          }
+          confirmLabel="Delete permanently"
+          onConfirm={() => {
+            void runAction({ action: "delete_user" }).then(() => {
+              setDeleteDialogOpen(false);
+              onClose();
+            });
+          }}
+          confirmLoading={actionLoading === "delete_user"}
+          alternative={{
+            label: "Pause subscription instead",
+            onClick: () =>
+              void runAction({ action: "pause_user" }, "Subscription set to cancel at period end."),
+          }}
+        />
+
+        <ConfirmDestructiveDialog
+          open={deleteDealDialogOpen !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteDealDialogOpen(null);
+          }}
+          title={`Delete "${detail?.deals.find((d) => d.id === deleteDealDialogOpen)?.campaignName ?? "workspace"}"?`}
+          description={
+            <p>
+              This workspace and all its data will be permanently deleted. This cannot be undone.
+            </p>
+          }
+          confirmLabel="Delete workspace"
+          onConfirm={() => {
+            if (deleteDealDialogOpen) {
+              void runAction({ action: "delete_deal", dealId: deleteDealDialogOpen });
+              setDeleteDealDialogOpen(null);
+            }
+          }}
+        />
       </div>
     </div>
   );

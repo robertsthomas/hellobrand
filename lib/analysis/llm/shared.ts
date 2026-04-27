@@ -311,7 +311,7 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
   });
 
   try {
-    const temperature = task === "analyze_risks" ? 0.2 : task === "generate_concepts" ? 0.55 : 0.1;
+    const temperature = task === "analyze_risks" ? 0.2 : task === "generate_concepts" ? 0.7 : 0.1;
     const response = await runStructuredOpenRouterTask({
       context: {
         featureKey: task === "generate_brief" ? "brief_generation" : task === "generate_concepts" ? "concept_generation" : "document_analysis",

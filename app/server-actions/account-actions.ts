@@ -9,10 +9,13 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireViewer } from "@/lib/auth";
+import { deleteAccount } from "@/lib/account-deletion";
 import {
   cancelCurrentSubscriptionForViewer,
   createBillingPortalSessionForViewer,
-  createCheckoutSessionForViewer
+  createCheckoutSessionForViewer,
+  pauseCurrentSubscriptionForViewer,
+  resumePausedSubscriptionForViewer
 } from "@/lib/billing/service";
 import { captureHandledError } from "@/lib/monitoring/sentry";
 import { updatePaymentForViewer } from "@/lib/payments";
@@ -154,11 +157,9 @@ export async function cancelSubscriptionAction() {
     updateTag(`user-${viewer.id}-payments`);
 
     const message =
-      result.mode === "trial_scheduled"
-        ? `Your trial will stay active until ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the end of the trial"}. You will not be charged after it ends.`
-        : result.mode === "scheduled"
-          ? `Your trial is already set to end on ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the trial end date"}.`
-          : "Your subscription has been canceled and access has ended.";
+      result.mode === "already_scheduled"
+        ? `Your subscription is already set to end on ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the period end date"}.`
+        : `Your subscription will remain active until ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, billing stops but your data stays safe. You can resume anytime.`;
 
     redirect(`/app/settings/billing?billing_notice=${encodeURIComponent(message)}`);
   } catch (error) {
@@ -176,5 +177,89 @@ export async function cancelSubscriptionAction() {
     const message =
       error instanceof Error ? error.message : "Could not cancel the subscription.";
     redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function pauseSubscriptionAction() {
+  const viewer = await requireViewer();
+
+  try {
+    const result = await pauseCurrentSubscriptionForViewer(viewer);
+    revalidatePath("/app/settings/billing");
+    revalidatePath("/app");
+    updateTag(`user-${viewer.id}-deals`);
+    updateTag(`user-${viewer.id}-payments`);
+
+    const message =
+      result.mode === "already_scheduled"
+        ? `Your subscription is already set to end on ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the period end date"}.`
+        : `Your subscription will remain active until ${result.endsAt ? new Date(result.endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "the end of your billing period"}. After that, billing stops but your data stays safe. You can resume anytime.`;
+
+    redirect(`/app/settings/billing?billing_notice=${encodeURIComponent(message)}`);
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
+    captureHandledError(error, {
+      area: "billing",
+      name: "pause_subscription",
+      viewerId: viewer.id,
+      captureExpected: true
+    });
+
+    const message =
+      error instanceof Error ? error.message : "Could not pause the subscription.";
+    redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function resumeSubscriptionAction() {
+  const viewer = await requireViewer();
+
+  try {
+    await resumePausedSubscriptionForViewer(viewer);
+    revalidatePath("/app/settings/billing");
+    revalidatePath("/app");
+    updateTag(`user-${viewer.id}-deals`);
+    updateTag(`user-${viewer.id}-payments`);
+
+    redirect(
+      `/app/settings/billing?billing_notice=${encodeURIComponent("Your subscription has been resumed. Billing will continue as normal.")}`
+    );
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
+    captureHandledError(error, {
+      area: "billing",
+      name: "resume_subscription",
+      viewerId: viewer.id,
+      captureExpected: true
+    });
+
+    const message =
+      error instanceof Error ? error.message : "Could not resume the subscription.";
+    redirect(`/app/settings/billing?billing_error=${encodeURIComponent(message)}`);
+  }
+}
+
+export async function deleteAccountAction() {
+  const viewer = await requireViewer();
+
+  try {
+    await deleteAccount(viewer.id);
+  } catch (error) {
+    captureHandledError(error, {
+      area: "account",
+      name: "delete_account",
+      viewerId: viewer.id,
+      captureExpected: true
+    });
+
+    redirect(
+      `/app/settings/billing?billing_error=${encodeURIComponent(error instanceof Error ? error.message : "Could not delete account.")}`
+    );
   }
 }

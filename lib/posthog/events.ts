@@ -25,6 +25,8 @@ const appActionEventNames = [
   "billing_portal_clicked",
   "billing_checkout_started",
   "billing_cancel_clicked",
+  "billing_resume_clicked",
+  "billing_pause_clicked",
   "email_connection_started",
   "email_disconnect_clicked",
   "intake_confirmation_submitted",

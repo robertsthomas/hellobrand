@@ -6,6 +6,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import {
+  deleteUser,
   deleteUserDeal,
   getAdminUserDetail,
   grantUserTrial,
@@ -13,7 +14,46 @@ import {
   updateUserPlan
 } from "@/lib/admin-dashboard";
 import { requireApiAdminViewer } from "@/lib/admin-auth";
+import {
+  pauseCurrentSubscriptionForViewer,
+  resumePausedSubscriptionForViewer
+} from "@/lib/billing/service";
 import { fail, ok } from "@/lib/http";
+
+type AdminSubscriptionAction =
+  | { action: "pause_user" }
+  | { action: "resume_user" };
+
+async function handleSubscriptionAction(userId: string, input: AdminSubscriptionAction) {
+  const user = await import("@/lib/prisma").then((m) =>
+    m.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, displayName: true },
+    })
+  );
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  const viewer = { id: user.id, email: user.email, displayName: user.displayName, mode: "clerk" as const };
+
+  if (input.action === "pause_user") {
+    const result = await pauseCurrentSubscriptionForViewer(viewer);
+    return ok({
+      message: result.mode === "already_scheduled"
+        ? "Subscription was already set to cancel at period end."
+        : `Subscription set to cancel at period end.${result.endsAt ? ` Ends: ${new Date(result.endsAt).toLocaleDateString()}.` : ""}`,
+    });
+  }
+
+  const result = await resumePausedSubscriptionForViewer(viewer);
+  return ok({
+    message: result.mode === "already_active"
+      ? "Subscription is already active."
+      : "Subscription resumed successfully.",
+  });
+}
 
 const actionSchema = z.discriminatedUnion("action", [
   z.object({
@@ -25,6 +65,15 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("delete_deal"),
     dealId: z.string().min(1)
+  }),
+  z.object({
+    action: z.literal("delete_user")
+  }),
+  z.object({
+    action: z.literal("pause_user")
+  }),
+  z.object({
+    action: z.literal("resume_user")
   }),
   z.object({
     action: z.literal("update_plan"),
@@ -67,6 +116,28 @@ export async function POST(
         revalidatePath("/app", "layout");
         revalidatePath("/admin");
         return ok({ message: "Workspace deleted." });
+      }
+
+      case "delete_user": {
+        const result = await deleteUser(userId);
+        revalidatePath("/admin");
+        return ok({
+          message: `User deleted. ${result.deletedFiles} storage files removed.${result.storageErrors.length > 0 ? ` ${result.storageErrors.length} file errors.` : ""}`
+        });
+      }
+
+      case "pause_user": {
+        const result = await handleSubscriptionAction(userId, input);
+        revalidatePath("/app", "layout");
+        revalidatePath("/admin");
+        return result;
+      }
+
+      case "resume_user": {
+        const result = await handleSubscriptionAction(userId, input);
+        revalidatePath("/app", "layout");
+        revalidatePath("/admin");
+        return result;
       }
 
       case "update_plan": {

@@ -103,6 +103,10 @@ export async function createBillingPortalSessionForViewer(viewer: Viewer) {
 }
 
 export async function cancelCurrentSubscriptionForViewer(viewer: Viewer) {
+  return pauseCurrentSubscriptionForViewer(viewer);
+}
+
+export async function pauseCurrentSubscriptionForViewer(viewer: Viewer) {
   const billingAccount = await findBillingAccountWithHistory(viewer.id);
 
   if (!billingAccount) {
@@ -115,35 +119,49 @@ export async function cancelCurrentSubscriptionForViewer(viewer: Viewer) {
     throw new Error("No active Stripe subscription found.");
   }
 
-  if (current.status === BillingSubscriptionStatus.trialing) {
-    if (current.cancelAtPeriodEnd) {
-      return {
-        mode: "scheduled" as const,
-        endsAt: current.currentPeriodEnd?.toISOString() ?? current.trialEndsAt?.toISOString() ?? null
-      };
-    }
-
-    const subscription = await getStripeClient().subscriptions.update(
-      current.stripeSubscriptionId,
-      {
-        cancel_at_period_end: true
-      }
-    );
-    const saved = await reconcileStripeSubscription(subscription);
-
+  if (current.cancelAtPeriodEnd) {
     return {
-      mode: "trial_scheduled" as const,
-      endsAt: saved.currentPeriodEnd?.toISOString() ?? saved.trialEndsAt?.toISOString() ?? null
+      mode: "already_scheduled" as const,
+      endsAt: current.currentPeriodEnd?.toISOString() ?? current.trialEndsAt?.toISOString() ?? null
     };
   }
 
-  const canceled = await getStripeClient().subscriptions.cancel(current.stripeSubscriptionId);
-  await reconcileStripeSubscription(canceled);
+  const subscription = await getStripeClient().subscriptions.update(
+    current.stripeSubscriptionId,
+    { cancel_at_period_end: true }
+  );
+  const saved = await reconcileStripeSubscription(subscription);
 
   return {
-    mode: "canceled_now" as const,
-    endsAt: canceled.ended_at ? new Date(canceled.ended_at * 1000).toISOString() : null
+    mode: "scheduled" as const,
+    endsAt: saved.currentPeriodEnd?.toISOString() ?? saved.trialEndsAt?.toISOString() ?? null
   };
+}
+
+export async function resumePausedSubscriptionForViewer(viewer: Viewer) {
+  const billingAccount = await findBillingAccountWithHistory(viewer.id);
+
+  if (!billingAccount) {
+    throw new Error("No billing account found.");
+  }
+
+  const current = selectCurrentSubscription(billingAccount.subscriptions);
+
+  if (!current?.stripeSubscriptionId) {
+    throw new Error("No active Stripe subscription found.");
+  }
+
+  if (!current.cancelAtPeriodEnd) {
+    return { mode: "already_active" as const };
+  }
+
+  const subscription = await getStripeClient().subscriptions.update(
+    current.stripeSubscriptionId,
+    { cancel_at_period_end: false }
+  );
+  await reconcileStripeSubscription(subscription);
+
+  return { mode: "resumed" as const };
 }
 
 export function getStripeWebhookEvent(payload: string, signature: string) {

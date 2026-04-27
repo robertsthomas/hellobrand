@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import type { AppSettingsRecord } from "@/lib/admin-settings";
 import { getAppSettings } from "@/lib/admin-settings";
+import { deleteAccount } from "@/lib/account-deletion";
 import { buildClerkProfileSyncPayload } from "@/lib/clerk-profile";
 import { prisma } from "@/lib/prisma";
 import type { ProfileRecord } from "@/lib/types";
@@ -612,6 +613,10 @@ export async function deleteUserDeal(userId: string, dealId: string) {
   }
 
   await prisma.deal.delete({ where: { id: dealId } });
+}
+
+export async function deleteUser(userId: string) {
+  return deleteAccount(userId);
 }
 
 export async function updateUserPlan(

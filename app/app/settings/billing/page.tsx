@@ -7,6 +7,7 @@ import {
   openBillingPortalAction,
   startCheckoutAction,
 } from "@/app/actions";
+import { BillingControls } from "@/components/billing-controls";
 import { InfoTooltip } from "@/components/app-tooltip";
 import { BillingUpgradePanel } from "@/components/billing-upgrade-panel";
 import { PostHogSubmitButton } from "@/components/posthog-submit-button";
@@ -125,18 +126,6 @@ export default async function BillingSettingsPage({
                     Manage in Stripe
                   </PostHogSubmitButton>
                 </form>
-                {!overview.cancelAtPeriodEnd && (
-                  <form action={cancelSubscriptionAction}>
-                    <PostHogSubmitButton
-                      eventName="billing_cancel_clicked"
-                      payload={{ source: "billing_overview" }}
-                      pendingLabel="Canceling…"
-                      className="inline-flex items-center justify-center rounded-lg border border-destructive/25 bg-white px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/5"
-                    >
-                      Cancel plan
-                    </PostHogSubmitButton>
-                  </form>
-                )}
               </div>
             )}
           </div>
@@ -514,6 +503,12 @@ export default async function BillingSettingsPage({
           The goal is simple: protect more value than your plan costs.
         </p>
       </section>
+
+      <BillingControls
+        hasActiveSubscription={overview.hasActiveSubscription}
+        cancelAtPeriodEnd={overview.cancelAtPeriodEnd}
+        currentPeriodEnd={overview.currentPeriodEnd}
+      />
     </div>
   );
 }

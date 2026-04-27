@@ -77,6 +77,7 @@ export async function performWorkspaceDelete(
   revalidatePath("/app/inbox");
   revalidatePath("/app/analytics");
   revalidatePath("/app/settings/notifications");
+  revalidatePath("/admin");
   invalidateDeals(viewer.id, dealId);
   updateTag(`user-${viewer.id}-payments`);
   updateTag(`user-${viewer.id}-notifications`);

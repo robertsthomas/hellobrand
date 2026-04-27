@@ -155,7 +155,7 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                   ) : null}
                 </div>
 
-                <div className="mt-auto pt-6">
+                <div className="mt-auto space-y-3 pt-6">
                   <SheetClose asChild>
                     {returning ? (
                       <Link
@@ -178,6 +178,16 @@ export function MarketingNav({ showWaitlist = false }: { showWaitlist?: boolean 
                       </Link>
                     )}
                   </SheetClose>
+                  {!returning ? (
+                    <SheetClose asChild>
+                      <Link
+                        href="/login"
+                        className="inline-flex h-12 w-full items-center justify-center rounded-none border border-black/10 bg-white px-5 text-base font-semibold text-[#1a2634] transition hover:bg-black/[0.03] dark:border-white/12 dark:bg-white/[0.03] dark:text-[#eef2f5] dark:hover:bg-white/[0.06]"
+                      >
+                        Login
+                      </Link>
+                    </SheetClose>
+                  ) : null}
                 </div>
               </div>
             </SheetContent>

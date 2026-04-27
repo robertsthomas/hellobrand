@@ -70,6 +70,7 @@ export async function archiveDealAction(dealId: string) {
   revalidatePath("/app/p/history");
   revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app/payments");
+  revalidatePath("/admin");
   invalidateDeals(viewer.id, dealId);
 }
 
@@ -96,5 +97,6 @@ export async function unarchiveDealAction(dealId: string) {
   revalidatePath("/app/p/history");
   revalidatePath(`/app/p/${dealId}`);
   revalidatePath("/app/payments");
+  revalidatePath("/admin");
   invalidateDeals(viewer.id, dealId);
 }

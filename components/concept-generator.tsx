@@ -216,7 +216,7 @@ export function ConceptGenerator({ dealId, deliverables }: ConceptGeneratorProps
                   key={`${deliverable.id}-${index}`}
                   type="button"
                   onClick={() => setSelectedDeliverable(index)}
-                  className={`inline-flex items-center gap-1.5 border px-3 py-2 text-xs font-medium transition ${
+                  className={`inline-flex items-center gap-1.5 border px-3 py-2.5 text-xs font-medium transition min-h-[44px] sm:py-2 ${
                     index === selectedDeliverable
                       ? "border-primary/40 bg-primary/5 text-foreground dark:border-primary/30 dark:bg-primary/10"
                       : "border-black/10 bg-white text-muted-foreground hover:border-black/20 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
@@ -234,21 +234,23 @@ export function ConceptGenerator({ dealId, deliverables }: ConceptGeneratorProps
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div>
             <button
               type="button"
               onClick={handleGenerate}
               disabled={isGenerating}
-              className="inline-flex items-center gap-2 border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:opacity-50 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20"
+              className="inline-flex items-center gap-2 border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-foreground transition hover:border-black/20 disabled:opacity-50 dark:border-white/12 dark:bg-white/[0.03] dark:hover:border-white/20 sm:px-5"
             >
               {isGenerating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
               ) : (
-                <Sparkles className="h-4 w-4" />
+                <Sparkles className="h-4 w-4 shrink-0" />
               )}
-              {isGenerating
-                ? t("generating")
-                : t("generateButton", { deliverable: deliverableLabel })}
+              <span className="line-clamp-2 text-left sm:line-clamp-1">
+                {isGenerating
+                  ? t("generating")
+                  : t("generateButton", { deliverable: deliverableLabel })}
+              </span>
             </button>
           </div>
 

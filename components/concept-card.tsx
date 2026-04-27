@@ -35,7 +35,7 @@ function CopyButton({ text, t }: { text: string; t: ReturnType<typeof useTransla
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+      className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground"
     >
       {copied ? t("card.copied") : t("card.copy")}
       <ClipboardCopy className="h-3.5 w-3.5" />
@@ -78,7 +78,7 @@ function FieldSection({
           <button
             type="button"
             onClick={onStartEdit}
-            className="text-[10px] font-medium text-muted-foreground opacity-0 transition hover:text-foreground group-hover/concept:opacity-100"
+            className="text-[10px] font-medium text-muted-foreground opacity-60 transition hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover/concept:opacity-100"
           >
             {t("card.edit")}
           </button>
@@ -181,15 +181,15 @@ export function ConceptCard({
 
   return (
     <div
-      className={`border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${
+      className={`group/concept border border-black/8 bg-white dark:border-white/10 dark:bg-white/[0.03] ${
         concept.isFavorite ? "ring-1 ring-primary/30" : ""
       }`}
     >
       <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2 sm:gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h4 className="text-base font-semibold tracking-[-0.02em] text-foreground">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4 className="text-base font-semibold tracking-[-0.02em] text-foreground line-clamp-1">
                 {concept.title}
               </h4>
               {concept.isVariation ? (
@@ -198,7 +198,7 @@ export function ConceptCard({
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 text-sm leading-6 text-foreground/80">
+            <p className="mt-1 text-sm leading-6 text-foreground/80 line-clamp-2">
               {concept.summary}
             </p>
           </div>
@@ -206,8 +206,8 @@ export function ConceptCard({
             <button
               type="button"
               onClick={() => onFavorite(concept.id, !concept.isFavorite)}
-              className="rounded-sm p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10"
-              title={concept.isFavorite ? t("card.removeFavorite") : t("card.markFavorite")}
+              className="min-h-[44px] min-w-[44px] rounded-sm p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+              aria-label={concept.isFavorite ? t("card.removeFavorite") : t("card.markFavorite")}
             >
               <Heart
                 className={`h-4 w-4 ${
@@ -220,8 +220,8 @@ export function ConceptCard({
             <button
               type="button"
               onClick={() => setExpanded(!expanded)}
-              className="rounded-sm p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10"
-              title={expanded ? t("card.collapse") : t("card.expand")}
+              className="min-h-[44px] min-w-[44px] rounded-sm p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10"
+              aria-label={expanded ? t("card.collapse") : t("card.expand")}
             >
               {expanded ? (
                 <Minimize2 className="h-4 w-4 text-muted-foreground" />
@@ -285,12 +285,12 @@ export function ConceptCard({
           </div>
         )}
 
-        <div className="mt-4 flex items-center gap-3 border-t border-black/5 pt-3 dark:border-white/8">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-black/5 pt-3 dark:border-white/8">
           <button
             type="button"
             onClick={handleVariations}
             disabled={isGeneratingVariations}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-50"
+            className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-muted-foreground transition hover:text-foreground disabled:opacity-50"
           >
             {isGeneratingVariations ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
