@@ -62,10 +62,12 @@ export function resolveWorkspaceTab(input: {
   hasInvoice: boolean;
   rawTab: string;
   hasPendingExtraction: boolean;
+  hasConceptGeneration: boolean;
 }) {
   const validTabs = input.hasInvoice
     ? ["overview", "terms", "deliverables", "invoices", "emails", "documents"]
     : ["overview", "terms", "deliverables", "emails", "documents"];
+  const resolvedValidTabs = input.hasConceptGeneration ? [...validTabs, "concepts"] : validTabs;
   const tabRedirects: Record<string, string> = {
     ...(input.hasInvoice ? {} : { invoices: "deliverables" }),
     risks: "terms",
@@ -74,7 +76,7 @@ export function resolveWorkspaceTab(input: {
   };
   const resolvedTab = tabRedirects[input.rawTab] ?? input.rawTab;
 
-  return validTabs.includes(resolvedTab)
+  return resolvedValidTabs.includes(resolvedTab)
     ? resolvedTab
     : input.hasPendingExtraction
       ? "terms"

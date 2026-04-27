@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { usePostHog } from "posthog-js/react";
-import { ArrowUp, MessageSquareMore, X } from "lucide-react";
+import { ArrowUp, Check, MessageSquareMore, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { submitFeedbackAction } from "@/app/actions";
 import type { FeedbackActionState } from "@/app/server-actions/feedback-actions";
@@ -136,7 +137,8 @@ function FeedbackFields({
   pagePath,
   pageTitle,
   dealId,
-  errorMessage
+  errorMessage,
+  t
 }: {
   selectedScore: number | null;
   onSelectScore: (value: number) => void;
@@ -148,6 +150,7 @@ function FeedbackFields({
   pageTitle: string;
   dealId: string | null;
   errorMessage: string | null;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <>
@@ -158,7 +161,7 @@ function FeedbackFields({
       <input type="hidden" name="requestedFollowUp" value={requestedFollowUp ? "true" : "false"} />
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-foreground">Rate HelloBrand</p>
+        <p className="text-sm font-medium text-foreground">{t("rateLabel")}</p>
         <div className="grid grid-cols-5 gap-2">
           {[1, 2, 3, 4, 5].map((value) => (
             <button
@@ -184,7 +187,7 @@ function FeedbackFields({
           htmlFor="feedback-message"
           className="text-sm font-medium text-foreground"
         >
-          Notes
+          {t("notesLabel")}
         </label>
         <Textarea
           id="feedback-message"
@@ -192,18 +195,18 @@ function FeedbackFields({
           value={message}
           onChange={(event) => onMessageChange(event.currentTarget.value)}
           maxLength={2000}
-          placeholder="Optional context"
+          placeholder={t("notesPlaceholder")}
           className="min-h-24"
         />
       </div>
 
-      <label className="flex items-start gap-3 text-sm text-muted-foreground">
+      <label className="flex items-start gap-3 pb-4 text-sm text-muted-foreground">
         <Checkbox
           checked={requestedFollowUp}
           onCheckedChange={(checked) => onRequestedFollowUpChange(checked === true)}
           className="mt-0.5"
         />
-        <span>Email me for follow-up.</span>
+        <span>{t("followUpLabel")}</span>
       </label>
 
       {errorMessage ? (
@@ -215,20 +218,22 @@ function FeedbackFields({
 
 function FeedbackSuccess({
   message,
-  onClose
+  onClose,
+  t
 }: {
   message: string;
   onClose: () => void;
+  t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <>
       <div className="space-y-2">
-        <p className="text-base font-medium text-foreground">Thanks for the feedback.</p>
+        <p className="text-base font-medium text-foreground">{t("thanksTitle")}</p>
         <p className="text-sm leading-6 text-muted-foreground">{message}</p>
       </div>
       <div className="flex justify-end">
         <Button type="button" onClick={onClose}>
-          Close
+          {t("closeButton")}
         </Button>
       </div>
     </>
@@ -252,6 +257,7 @@ export function FeedbackWidget({
   onDismissedChange?: (dismissed: boolean) => void;
 }) {
   const posthog = usePostHog();
+  const t = useTranslations("feedbackWidget");
   const [state, formAction] = useActionState(submitFeedbackAction, INITIAL_STATE);
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
   const [message, setMessage] = useState("");
@@ -463,13 +469,13 @@ export function FeedbackWidget({
               <CardHeader className="border-b border-black/8 px-5 pt-5 pb-3 dark:border-white/10">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <CardTitle className="text-lg font-semibold">Feedback</CardTitle>
+                    <CardTitle className="text-lg font-semibold">{t("cardTitle")}</CardTitle>
                   </div>
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
                     className="inline-flex h-9 w-9 items-center justify-center border border-black/8 text-muted-foreground transition hover:text-foreground dark:border-white/10"
-                    aria-label="Close feedback form"
+                    aria-label={t("closeFormAriaLabel")}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -479,8 +485,9 @@ export function FeedbackWidget({
                 <CardContent className="space-y-4 pt-5">
                   {isSubmitted ? (
                     <FeedbackSuccess
-                      message={state.message ?? "Thanks for the feedback."}
+                      message={state.message ?? t("thanksFallback")}
                       onClose={handleCloseAfterSuccess}
+                      t={t}
                     />
                   ) : (
                     <FeedbackFields
@@ -494,26 +501,27 @@ export function FeedbackWidget({
                       pageTitle={pageTitle}
                       dealId={dealId ?? null}
                       errorMessage={state.status === "error" ? state.message : null}
+                      t={t}
                     />
                   )}
                 </CardContent>
                 {!isSubmitted ? (
-                  <CardFooter className="justify-between border-t border-black/8 pt-3 pb-4 dark:border-white/10">
-                    <div className="flex items-center gap-2">
-                      <Button type="button" variant="ghost" onClick={snoozeFeedbackPrompt}>
-                        Not now
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={dismissPermanently}>
-                        Don&apos;t show again
-                      </Button>
-                    </div>
+                  <CardFooter className="flex-col items-stretch gap-3 border-t border-black/8 pt-3 pb-4 dark:border-white/10 sm:flex-row sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="ghost" onClick={snoozeFeedbackPrompt} className="rounded-sm">
+                      {t("notNow")}
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={dismissPermanently} className="rounded-sm">
+                      {t("dontShowAgain")}
+                    </Button>
+                  </div>
                     <SubmitButton
-                      pendingLabel="Sending feedback..."
+                      pendingLabel={t("sending")}
                       showSpinner
                       disabled={selectedScore === null}
-                      className={cn(buttonVariants(), selectedScore === null ? "opacity-60" : "")}
+                      className={cn(buttonVariants({ variant: "ghost" }), "h-9 rounded-sm px-3")}
                     >
-                      Send feedback
+                      <Check className="h-4 w-4" />
                     </SubmitButton>
                   </CardFooter>
                 ) : null}
@@ -524,7 +532,7 @@ export function FeedbackWidget({
               <CardContent className="flex items-center gap-3 px-4 py-3">
                 <MessageSquareMore className="h-4.5 w-4.5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground">App feedback</p>
+                  <p className="text-sm font-medium text-foreground">{t("launcherTitle")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -533,7 +541,7 @@ export function FeedbackWidget({
                     size="icon"
                     onClick={handleOpen}
                     className="h-9 w-9 text-emerald-700 hover:bg-transparent hover:text-emerald-800 dark:text-emerald-300 dark:hover:bg-transparent dark:hover:text-emerald-200"
-                    aria-label="Open feedback form"
+                    aria-label={t("openFormAriaLabel")}
                   >
                     <ArrowUp className="h-4 w-4" />
                   </Button>
@@ -541,7 +549,7 @@ export function FeedbackWidget({
                     type="button"
                     onClick={dismissForSession}
                     className="inline-flex h-9 w-9 items-center justify-center border border-black/8 text-muted-foreground transition hover:text-foreground dark:border-white/10"
-                    aria-label="Dismiss feedback launcher"
+                    aria-label={t("dismissLauncherAriaLabel")}
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -562,7 +570,7 @@ export function FeedbackWidget({
           >
             <Button type="button" onClick={handleOpen} className="shadow-[var(--shadow-floating)]">
               <MessageSquareMore className="h-4 w-4" />
-              Feedback
+              {t("mobileButton")}
             </Button>
           </div>
         ) : null}
@@ -571,13 +579,14 @@ export function FeedbackWidget({
       <Sheet open={isMobileViewport && open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="border-border p-0 lg:hidden">
           <SheetHeader className="border-b border-black/8 px-5 py-3 text-left dark:border-white/10">
-            <SheetTitle className="text-lg">Feedback</SheetTitle>
+            <SheetTitle className="text-lg">{t("sheetTitle")}</SheetTitle>
           </SheetHeader>
           <form action={formAction} className="space-y-4 px-5 py-4">
             {isSubmitted ? (
               <FeedbackSuccess
-                message={state.message ?? "Thanks for the feedback."}
+                message={state.message ?? t("thanksFallback")}
                 onClose={handleCloseAfterSuccess}
+                t={t}
               />
             ) : (
               <>
@@ -592,24 +601,25 @@ export function FeedbackWidget({
                   pageTitle={pageTitle}
                   dealId={dealId ?? null}
                   errorMessage={state.status === "error" ? state.message : null}
+                  t={t}
                 />
                 <div className="flex items-center justify-between gap-3 border-t border-black/8 pt-4 pb-1 dark:border-white/10">
                   <div className="flex items-center gap-2">
                     <Button type="button" variant="ghost" onClick={snoozeFeedbackPrompt}>
-                      Not now
+                      {t("notNow")}
                     </Button>
                     <Button type="button" variant="ghost" onClick={dismissPermanently}>
-                      Don&apos;t show again
+                      {t("dontShowAgain")}
                     </Button>
                   </div>
                   <SubmitButton
-                    pendingLabel="Sending feedback..."
-                    showSpinner
-                    disabled={selectedScore === null}
-                    className={cn(buttonVariants(), selectedScore === null ? "opacity-60" : "")}
-                  >
-                    Send feedback
-                  </SubmitButton>
+                      pendingLabel={t("sending")}
+                      showSpinner
+                      disabled={selectedScore === null}
+                      className={cn(buttonVariants({ variant: "ghost" }), "h-9 rounded-sm px-3")}
+                    >
+                      <Check className="h-4 w-4" />
+                    </SubmitButton>
                 </div>
               </>
             )}

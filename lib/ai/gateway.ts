@@ -11,6 +11,7 @@ export type AiTaskKey =
   | "generate_summary"
   | "generate_brief"
   | "consolidate_clauses"
+  | "generate_concepts"
   | "email_summary"
   | "email_draft"
   | "email_suggestions"
@@ -221,6 +222,18 @@ const TASK_POLICIES: Record<AiTaskKey, AiRoutePolicy> = {
     cacheTtlSeconds: 60 * 60 * 24 * 30,
     cachePromptVersion: "clause-consolidation.v1",
     routeVersion: "clause-consolidation.route.v1",
+    throttle: true,
+  },
+  generate_concepts: {
+    taskKey: "generate_concepts",
+    featureKey: "concept_generation",
+    routeClass: "balanced",
+    primary: "google/gemini-3-flash-preview",
+    fallbacks: ["openai/gpt-5-mini"],
+    maxTokens: 4096,
+    cacheTtlSeconds: 60 * 60 * 24,
+    cachePromptVersion: "concept-generation.v1",
+    routeVersion: "concept-generation.route.v1",
     throttle: true,
   },
   email_summary: {

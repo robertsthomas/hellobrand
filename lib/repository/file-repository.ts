@@ -18,6 +18,7 @@ import type {
   AssistantMessageRecord,
   AssistantThreadRecord,
   AppStore,
+  ConceptRecord,
   DealAggregate,
   DealRecord,
   DealTermsRecord,
@@ -1052,5 +1053,50 @@ export class FileRepository {
 
   async updateBatchStatus(_batchId: string, _status: string) {
     // no-op in file mode
+  }
+
+  async listConceptsForDeal(_dealId: string): Promise<ConceptRecord[]> {
+    return [];
+  }
+
+  async saveConcepts(
+    _dealId: string,
+    _concepts: Array<{
+      deliverableIndex: number;
+      title: string;
+      hook: string;
+      summary: string;
+      structure: string;
+      messagingIntegration: string;
+      ctaApproach: string;
+      platformNotes: string | null;
+      moodAndTone: string;
+      rationale: string;
+      isVariation: boolean;
+      parentConceptId: string | null;
+      generationBatch: string;
+      modelVersion: string | null;
+    }>
+  ): Promise<ConceptRecord[]> {
+    throw new Error("Concept operations require a database.");
+  }
+
+  async toggleConceptFavorite(
+    _conceptId: string,
+    _isFavorite: boolean
+  ): Promise<ConceptRecord | null> {
+    throw new Error("Concept operations require a database.");
+  }
+
+  async updateConcept(
+    _conceptId: string,
+    _patch: Partial<
+      Pick<
+        ConceptRecord,
+        "title" | "hook" | "summary" | "structure" | "messagingIntegration" | "ctaApproach" | "platformNotes" | "moodAndTone" | "rationale"
+      >
+    >
+  ): Promise<ConceptRecord | null> {
+    throw new Error("Concept operations require a database.");
   }
 }

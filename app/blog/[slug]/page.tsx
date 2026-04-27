@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { BlogSummarizeButton } from "@/components/blog-summarize-button";
-import { blogSummarizeEnabled } from "@/flags";
+import { FeatureGate } from "@/components/FeatureGate";
 import { MarketingNav } from "@/components/marketing-nav";
 import {
   getBlogPostBySlug,
@@ -188,14 +188,14 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               <span aria-hidden="true">&middot;</span>
               <span>{post.readingTime}</span>
             </div>
-            {(await blogSummarizeEnabled()) === true ? (
+            <FeatureGate flagKey="blog-summarize-enabled" defaultValue={false}>
               <BlogSummarizeButton
                 cacheKey={post.slug}
                 title={post.title}
                 description={post.description}
                 articleText={articlePlainText}
               />
-            ) : null}
+            </FeatureGate>
           </div>
           <figure className="mt-8 overflow-hidden rounded-[1.8rem] border border-[#ececec] bg-[#f4f1eb] dark:border-[#222]">
             <div className="relative aspect-[16/9]">

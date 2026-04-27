@@ -6,6 +6,7 @@ import "@/app/globals.css";
 import { PostHogProvider } from "@/app/providers";
 import { AuthProvider } from "@/components/auth-provider";
 import { HtmlLangSync } from "@/components/html-lang-sync";
+import { LaunchDarklyProvider } from "@/components/launchdarkly-provider";
 import { PostHogPageView } from "@/components/posthog-pageview";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
@@ -57,15 +58,17 @@ export const viewport: Viewport = {
 function AppProviders({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <PostHogProvider>
-        <ThemeProvider>
-          <Suspense fallback={null}>
-            <PostHogPageView />
-          </Suspense>
-          {children}
-          <Toaster position="bottom-right" richColors closeButton />
-        </ThemeProvider>
-      </PostHogProvider>
+      <LaunchDarklyProvider>
+        <PostHogProvider>
+          <ThemeProvider>
+            <Suspense fallback={null}>
+              <PostHogPageView />
+            </Suspense>
+            {children}
+            <Toaster position="bottom-right" richColors closeButton />
+          </ThemeProvider>
+        </PostHogProvider>
+      </LaunchDarklyProvider>
     </AuthProvider>
   );
 }

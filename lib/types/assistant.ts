@@ -15,6 +15,7 @@ export type AssistantDealTab =
   | "deliverables"
   | "brief"
   | "emails"
+  | "concepts"
   | "documents"
   | "invoices"
   | "notes";

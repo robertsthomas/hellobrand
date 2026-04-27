@@ -89,7 +89,13 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   setRequestLocale(locale);
 
   const t = await getTranslations("homepage");
-  const [session, appSettings] = await Promise.all([auth(), getAppSettings()]);
+  let session: { userId: string | null } = { userId: null };
+  try {
+    [session] = await Promise.all([auth()]);
+  } catch {
+    // Clerk middleware unavailable (e.g. missing key during local dev)
+  }
+  const appSettings = await getAppSettings();
 
   if (session.userId) {
     redirect("/app");

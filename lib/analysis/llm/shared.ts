@@ -12,7 +12,8 @@ type LlmTask =
   | "analyze_risks"
   | "generate_summary"
   | "generate_brief"
-  | "consolidate_clauses";
+  | "consolidate_clauses"
+  | "generate_concepts";
 
 type LlmRoute = {
   primary: string;
@@ -138,6 +139,24 @@ export const clauseConsolidationResponseSchema = z.object({
   notes: z.string().trim().nullable().optional(),
 });
 
+export const conceptGenerationResponseSchema = z.object({
+  concepts: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1),
+        hook: z.string().trim().min(1),
+        summary: z.string().trim().min(1),
+        structure: z.string().trim().min(1),
+        messagingIntegration: z.string().trim().min(1),
+        ctaApproach: z.string().trim().min(1),
+        platformNotes: z.string().trim().nullable().optional(),
+        moodAndTone: z.string().trim().min(1),
+        rationale: z.string().trim().min(1),
+      })
+    )
+    .default([]),
+});
+
 export interface ClauseConsolidationResult {
   usageRights: string | null;
   exclusivity: string | null;
@@ -187,6 +206,7 @@ function taskSpecificModel(task: LlmTask) {
     case "generate_summary":
     case "generate_brief":
     case "consolidate_clauses":
+    case "generate_concepts":
       return process.env.OPENROUTER_MODEL_CONTENT || null;
     default:
       return null;
@@ -202,6 +222,7 @@ function taskSpecificFallbacks(task: LlmTask) {
     case "generate_summary":
     case "generate_brief":
     case "consolidate_clauses":
+    case "generate_concepts":
       return parseModelList(process.env.OPENROUTER_MODEL_CONTENT_FALLBACKS);
     default:
       return [];
@@ -231,6 +252,10 @@ export function getLlmRoute(task: LlmTask = "extract_section"): LlmRoute {
       fallbacks: ["openai/gpt-5-mini"],
     },
     consolidate_clauses: {
+      primary: "google/gemini-3-flash-preview",
+      fallbacks: ["openai/gpt-5-mini"],
+    },
+    generate_concepts: {
       primary: "google/gemini-3-flash-preview",
       fallbacks: ["openai/gpt-5-mini"],
     },
@@ -286,10 +311,10 @@ export async function requestStructured<TSchema extends z.ZodTypeAny>(
   });
 
   try {
-    const temperature = task === "analyze_risks" ? 0.2 : 0.1;
+    const temperature = task === "analyze_risks" ? 0.2 : task === "generate_concepts" ? 0.55 : 0.1;
     const response = await runStructuredOpenRouterTask({
       context: {
-        featureKey: task === "generate_brief" ? "brief_generation" : "document_analysis",
+        featureKey: task === "generate_brief" ? "brief_generation" : task === "generate_concepts" ? "concept_generation" : "document_analysis",
         taskKey: task,
         metadata: debugMeta,
       },

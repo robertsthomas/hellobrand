@@ -51,6 +51,7 @@ export const assistantDealTabs: AssistantDealTab[] = [
   "deliverables",
   "brief",
   "emails",
+  "concepts",
   "documents",
   "notes"
 ];
@@ -67,6 +68,10 @@ const assistantDealTabAliases = new Map<string, AssistantDealTab>([
   ["briefs", "brief"],
   ["email", "emails"],
   ["emails", "emails"],
+  ["concept", "concepts"],
+  ["concepts", "concepts"],
+  ["ideas", "concepts"],
+  ["creative", "concepts"],
   ["document", "documents"],
   ["documents", "documents"],
   ["note", "notes"],
@@ -103,13 +108,14 @@ const pageContextRegistry: Record<string, AssistantPageContext> = {
     ]
   },
   "/app/p/[dealId]": {
-    purpose: "The partnership workspace for a specific deal, with tabs for overview, terms, deliverables, invoices, emails, and documents.",
+    purpose: "The partnership workspace for a specific deal, with tabs for overview, terms, deliverables, invoices, emails, concepts, and documents.",
     availableActions: [
       "Overview tab: view partnership summary, next action, attention items, conflicts, and disclosure obligations",
       "Terms tab: review extracted terms, risk flags, and evidence",
       "Deliverables tab: view deliverable tracker, deliverables list, brief overview, and brief generation",
       "Invoices tab: view invoice details, status, due dates, and download PDFs (only when an invoice exists)",
       "Emails tab: view linked email threads and negotiation communication (requires premium inbox)",
+      "Concepts tab: generate AI-powered creative concepts for each deliverable, view saved concepts, and generate variations",
       "Documents tab: upload and manage contract documents",
       "Delete the partnership from the workspace footer"
     ],
@@ -120,6 +126,7 @@ const pageContextRegistry: Record<string, AssistantPageContext> = {
       "Deliverables shows the deliverable tracker, list, and brief sections",
       "Invoices tab only appears when the workspace has an invoice record",
       "Emails require premium inbox entitlement to show linked threads",
+      "Concepts tab lets creators generate branded creative concepts per deliverable using campaign brief context",
       "Documents panel shows uploaded files and an upload form"
     ]
   },

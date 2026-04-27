@@ -21,7 +21,8 @@ function makeMilestones(
         analytics: false,
         analytics_advanced: false,
         premium_inbox: false,
-        email_connections: false
+        email_connections: false,
+        concept_generation: false
       }
     },
     emailAccounts: [],
@@ -53,7 +54,8 @@ describe("buildSidebarMilestones", () => {
           analytics: true,
           analytics_advanced: true,
           premium_inbox: true,
-          email_connections: true
+          email_connections: true,
+          concept_generation: true
         }
       }
     });
@@ -92,7 +94,8 @@ describe("buildSidebarMilestones", () => {
           analytics: true,
           analytics_advanced: true,
           premium_inbox: true,
-          email_connections: true
+          email_connections: true,
+          concept_generation: true
         }
       },
       emailAccounts: [
@@ -113,7 +116,8 @@ describe("buildSidebarMilestones", () => {
           analytics: true,
           analytics_advanced: true,
           premium_inbox: true,
-          email_connections: true
+          email_connections: true,
+          concept_generation: true
         }
       },
       emailAccounts: [
@@ -144,7 +148,8 @@ describe("buildSidebarMilestones", () => {
           analytics: true,
           analytics_advanced: true,
           premium_inbox: true,
-          email_connections: true
+          email_connections: true,
+          concept_generation: true
         }
       },
       emailAccounts: [

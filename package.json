@@ -63,6 +63,7 @@
     "inngest": "^4.2.4",
     "jspdf": "^4.2.1",
     "jszip": "3.10.1",
+    "launchdarkly-react-client-sdk": "^3.9.0",
     "lucide-react": "^0.511.0",
     "mailparser": "^3.9.6",
     "mammoth": "^1.9.0",

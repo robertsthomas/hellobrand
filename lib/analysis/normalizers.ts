@@ -12,7 +12,8 @@ import type {
   FieldEvidence,
   GeneratedBrief,
   GeneratedBriefSection,
-  RiskFlagRecord
+  RiskFlagRecord,
+  DeliverableItem,
 } from "@/lib/types";
 
 type TermsData = Omit<
@@ -729,6 +730,118 @@ export function buildBriefContext(aggregate: import("@/lib/types").DealAggregate
       detail: f.detail,
       severity: f.severity
     }))
+  };
+
+  return JSON.stringify(context, null, 2);
+}
+
+export function buildConceptContext(
+  aggregate: import("@/lib/types").DealAggregate,
+  deliverableIndex: number
+) {
+  const { deal, terms, riskFlags, currentSummary, documents } = aggregate;
+  const brief = terms?.briefData ?? null;
+  const deliverables = (terms?.deliverables ?? []) as DeliverableItem[];
+  const deliverable = deliverables[deliverableIndex] ?? null;
+  const textSnippet = (value: string | null, maxLength = 900) => {
+    if (typeof value !== "string") {
+      return null;
+    }
+    const normalized = value.replace(/\s+/g, " ").trim();
+    if (normalized.length === 0) {
+      return null;
+    }
+    return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+  };
+  const documentReferences = documents.slice(0, 6).map((document) => ({
+    id: document.id,
+    fileName: document.fileName,
+    documentKind: document.documentKind,
+    mimeType: document.mimeType,
+    sourceType: document.sourceType,
+    processingStatus: document.processingStatus,
+    looksLikeVisualReference:
+      document.mimeType.startsWith("image/") || document.documentKind === "pitch_deck",
+    textExcerpt: textSnippet(document.normalizedText ?? document.rawText, 650),
+  }));
+  const visualReferences = [
+    ...(brief?.linksAndAssets ?? []).map((asset) => ({ type: "brief_asset", value: asset })),
+    ...documentReferences
+      .filter((reference) => reference.looksLikeVisualReference)
+      .map((reference) => ({
+        type: reference.mimeType.startsWith("image/") ? "image_upload" : "deck_or_visual_doc",
+        value: reference.fileName,
+        textExcerpt: reference.textExcerpt,
+      })),
+  ];
+
+  const context: Record<string, unknown> = {
+    brandName: terms?.brandName ?? deal.brandName,
+    campaignName: terms?.campaignName ?? deal.campaignName,
+    status: deal.status,
+    workspaceSummary: currentSummary?.body ?? deal.summary ?? null,
+    campaignOverview: brief?.campaignOverview ?? null,
+    campaignObjective: brief?.campaignObjective ?? null,
+    product: brief?.productName || brief?.productDescription
+      ? { name: brief.productName, description: brief.productDescription }
+      : null,
+    dealTerms: terms
+      ? {
+          paymentAmount: terms.paymentAmount,
+          currency: terms.currency,
+          paymentTerms: terms.paymentTerms,
+          paymentStructure: terms.paymentStructure,
+          paymentTrigger: terms.paymentTrigger,
+          revisions: terms.revisions,
+          usageRights: terms.usageRights,
+          usageDuration: terms.usageDuration,
+          usageTerritory: terms.usageTerritory,
+          usageChannels: terms.usageChannels,
+          exclusivity: terms.exclusivity,
+          exclusivityDuration: terms.exclusivityDuration,
+          exclusivityRestrictions: terms.exclusivityRestrictions,
+          restrictedCategories: terms.restrictedCategories,
+          competitorCategories: terms.competitorCategories,
+          notes: textSnippet(terms.notes, 500),
+        }
+      : null,
+    targetAudience: brief?.targetAudience ?? null,
+    toneAndStyle: brief?.toneAndStyle ?? null,
+    visualDirection: brief?.visualDirection ?? null,
+    brandGuidelines: brief?.brandGuidelines ?? null,
+    messagingPoints: brief?.messagingPoints ?? [],
+    talkingPoints: brief?.talkingPoints ?? [],
+    contentPillars: brief?.contentPillars ?? [],
+    requiredElements: brief?.requiredElements ?? [],
+    requiredClaims: brief?.requiredClaims ?? [],
+    doNotMention: brief?.doNotMention ?? [],
+    competitorRestrictions: brief?.competitorRestrictions ?? [],
+    disclosureRequirements: brief?.disclosureRequirements ?? [],
+    approvalRequirements: brief?.approvalRequirements ?? null,
+    creativeConceptOverview: brief?.creativeConceptOverview ?? null,
+    deliverable,
+    allDeliverables: deliverables.map((d, index) => ({
+      index,
+      title: d.title,
+      channel: d.channel,
+      quantity: d.quantity,
+      description: d.description ?? null,
+      dueDate: d.dueDate,
+    })),
+    conceptDueDate: brief?.conceptDueDate ?? null,
+    draftDueDate: brief?.draftDueDate ?? null,
+    contentDueDate: brief?.contentDueDate ?? null,
+    campaignLiveDate: brief?.campaignLiveDate ?? null,
+    disclosureObligations: terms?.disclosureObligations ?? [],
+    riskFlags: riskFlags.map((f) => ({
+      category: f.category,
+      title: f.title,
+      severity: f.severity,
+      detail: f.detail,
+      suggestedAction: f.suggestedAction,
+    })),
+    uploadedDocuments: documentReferences,
+    visualReferences,
   };
 
   return JSON.stringify(context, null, 2);

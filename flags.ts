@@ -31,4 +31,5 @@ export const smartInboxEnabled = () => ldFlag("smart-inbox-enabled", false);
 export const invoiceRemindersEnabled = () => ldFlag("invoice-reminders-enabled", false);
 export const sidebarMilestonesEnabled = () => ldFlag("sidebar-milestones-enabled", true);
 export const blogSummarizeEnabled = () => ldFlag("blog-summarize-enabled", false);
+export const conceptGenerationEnabled = () => ldFlag("concept-generation-enabled", true);
 export const maintenanceMode = () => ldFlag("maintenance-mode", false);

@@ -133,6 +133,29 @@ export function buildAssistantSuggestedPrompts(
     ];
   }
 
+  if (context.tab === "concepts") {
+    return [
+      {
+        id: "concepts-brainstorm",
+        label: "Brainstorm concepts",
+        description: "Get help brainstorming creative directions for this campaign.",
+        prompt: "Based on the campaign brief and brand context, what creative directions should I explore for my content?"
+      },
+      {
+        id: "concepts-platform",
+        label: "Platform strategy",
+        description: "Adapt your concepts for specific platforms and formats.",
+        prompt: "How should my creative concepts differ across platforms (TikTok, Instagram, YouTube) based on the deliverables in this deal?"
+      },
+      {
+        id: "concepts-messaging",
+        label: "Messaging fit",
+        description: "Check how brand messaging can integrate naturally into your content.",
+        prompt: "How can I weave the brand's key messaging points into my content in a way that feels authentic and not like an ad read?"
+      }
+    ];
+  }
+
   if (context.pathname.startsWith("/app/inbox")) {
     return [
       {

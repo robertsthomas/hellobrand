@@ -13,3 +13,4 @@ export type * from "./types/intake";
 export type * from "./types/profile";
 export type * from "./types/public";
 export type * from "./types/aggregates";
+export type * from "./types/concepts";

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
 
 import { BriefGenerator } from "@/components/brief-generator";
+import { ConceptGenerator } from "@/components/concept-generator";
 import { ConflictWarnings } from "@/components/conflict-warnings";
 import { DealEmailPanel } from "@/components/deal-email-panel";
 import { DealNotesDrawer } from "@/components/deal-notes-drawer";
@@ -14,6 +15,7 @@ import { DeliverablesList } from "@/components/deliverables-list";
 import { DeliverableTracker } from "@/components/deliverable-tracker";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
+import { FeatureGate } from "@/components/FeatureGate";
 import { FeatureUpgradeCard } from "@/components/feature-locked-state";
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { RiskFlags } from "@/components/risk-flags";
@@ -24,6 +26,7 @@ import { UploadContractForm } from "@/components/upload-contract-form";
 import { WorkspaceTabButton, WorkspaceTabs } from "@/components/workspace-tabs";
 import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { conceptGenerationEnabled } from "@/flags";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -74,6 +77,8 @@ async function DealDetailContent({
     notFound();
   }
   const hasBriefGeneration = entitlements.features.brief_generation;
+  const hasConceptGeneration =
+    (await conceptGenerationEnabled()) && entitlements.features.concept_generation;
 
   const {
     deal,
@@ -108,6 +113,7 @@ async function DealDetailContent({
     hasInvoice,
     rawTab,
     hasPendingExtraction,
+    hasConceptGeneration,
   });
 
   const nextAction = buildNextAction({
@@ -182,6 +188,16 @@ async function DealDetailContent({
               >
                 Emails
               </TabsTrigger>
+              <FeatureGate flagKey="concept-generation-enabled" defaultValue={true}>
+                {hasConceptGeneration ? (
+                  <TabsTrigger
+                    value="concepts"
+                    className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
+                  >
+                    Concepts
+                  </TabsTrigger>
+                ) : null}
+              </FeatureGate>
               <TabsTrigger
                 value="documents"
                 className="shrink-0 px-3 py-2 text-[13px] sm:px-4 sm:text-sm"
@@ -396,6 +412,28 @@ async function DealDetailContent({
               />
             )}
           </TabsContent>
+
+          {/* ── Concepts ── */}
+          <FeatureGate flagKey="concept-generation-enabled" defaultValue={true}>
+            <TabsContent value="concepts" className="mt-0 space-y-6">
+              {hasConceptGeneration ? (
+                <ConceptGenerator
+                  dealId={deal.id}
+                  deliverables={terms?.deliverables ?? []}
+                />
+              ) : (
+                <FeatureUpgradeCard
+                  eyebrow="Basic concepts"
+                  title="AI concept generation unlocks on Basic"
+                  description="Generate branded creative concepts tailored to each deliverable from your campaign brief and brand context."
+                  requiredTier={PlanTier.basic}
+                  currentTier={entitlements.effectiveTier}
+                  hasActiveSubscription={entitlements.hasActiveSubscription}
+                  actionLabel="Upgrade for concept generation"
+                />
+              )}
+            </TabsContent>
+          </FeatureGate>
 
           {/* ── Documents ── */}
           <TabsContent value="documents" className="mt-0 space-y-6">

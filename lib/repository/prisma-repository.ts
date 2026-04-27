@@ -20,6 +20,7 @@ import type {
   AssistantContextSnapshotRecord,
   AssistantMessageRecord,
   AssistantThreadRecord,
+  ConceptRecord,
   DealAggregate,
   DealRecord,
   DealTermsRecord,
@@ -76,6 +77,7 @@ import {
   toSummaryRecord,
 } from "@/lib/repository/mappers/prisma-documents";
 import { toIntakeSessionRecord } from "@/lib/repository/mappers/prisma-intake";
+import { mapPrismaConceptToRecord } from "@/lib/repository/mappers/prisma-concepts";
 import { iso, toJsonValue, toNullableJsonValue } from "@/lib/repository/mappers/prisma-shared";
 import { createSeedStore } from "@/lib/repository/seed";
 
@@ -1395,5 +1397,82 @@ export class PrismaRepository {
       where: { id: batchId },
       data: { status },
     });
+  }
+
+  async listConceptsForDeal(dealId: string): Promise<ConceptRecord[]> {
+    const rows = await prisma.concept.findMany({
+      where: { dealId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(mapPrismaConceptToRecord);
+  }
+
+  async saveConcepts(
+    dealId: string,
+    concepts: Array<{
+      deliverableIndex: number;
+      title: string;
+      hook: string;
+      summary: string;
+      structure: string;
+      messagingIntegration: string;
+      ctaApproach: string;
+      platformNotes: string | null;
+      moodAndTone: string;
+      rationale: string;
+      isVariation: boolean;
+      parentConceptId: string | null;
+      generationBatch: string;
+      modelVersion: string | null;
+    }>
+  ): Promise<ConceptRecord[]> {
+    const rows = await prisma.$transaction(
+      concepts.map((concept) =>
+        prisma.concept.create({
+          data: {
+            dealId,
+            deliverableIndex: concept.deliverableIndex,
+            title: concept.title,
+            hook: concept.hook,
+            summary: concept.summary,
+            structure: concept.structure,
+            messagingIntegration: concept.messagingIntegration,
+            ctaApproach: concept.ctaApproach,
+            platformNotes: concept.platformNotes,
+            moodAndTone: concept.moodAndTone,
+            rationale: concept.rationale,
+            isVariation: concept.isVariation,
+            parentConceptId: concept.parentConceptId,
+            generationBatch: concept.generationBatch,
+            modelVersion: concept.modelVersion,
+          },
+        })
+      )
+    );
+    return rows.map(mapPrismaConceptToRecord);
+  }
+
+  async toggleConceptFavorite(conceptId: string, isFavorite: boolean): Promise<ConceptRecord | null> {
+    const row = await prisma.concept.update({
+      where: { id: conceptId },
+      data: { isFavorite },
+    });
+    return mapPrismaConceptToRecord(row);
+  }
+
+  async updateConcept(
+    conceptId: string,
+    patch: Partial<
+      Pick<
+        ConceptRecord,
+        "title" | "hook" | "summary" | "structure" | "messagingIntegration" | "ctaApproach" | "platformNotes" | "moodAndTone" | "rationale"
+      >
+    >
+  ): Promise<ConceptRecord | null> {
+    const row = await prisma.concept.update({
+      where: { id: conceptId },
+      data: patch,
+    });
+    return mapPrismaConceptToRecord(row);
   }
 }

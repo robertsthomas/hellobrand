@@ -9,6 +9,36 @@ import { prisma } from "@/lib/prisma";
 import { getRepository } from "@/lib/repository";
 import type { Viewer } from "@/lib/types";
 
+export class EntitlementFeatureError extends Error {
+  readonly feature: string;
+  readonly tier: PlanTier;
+
+  constructor(feature: string, tier: PlanTier, message: string) {
+    super(message);
+    this.name = "EntitlementFeatureError";
+    this.feature = feature;
+    this.tier = tier;
+  }
+}
+
+export class EntitlementUsageError extends Error {
+  readonly key: string;
+  readonly tier: PlanTier;
+  readonly limit: number;
+
+  constructor(key: string, tier: PlanTier, limit: number, message: string) {
+    super(message);
+    this.name = "EntitlementUsageError";
+    this.key = key;
+    this.tier = tier;
+    this.limit = limit;
+  }
+}
+
+export function isEntitlementError(error: unknown): error is EntitlementFeatureError | EntitlementUsageError {
+  return error instanceof EntitlementFeatureError || error instanceof EntitlementUsageError;
+}
+
 const FEATURE_KEYS = [
   "workspace_creation",
   "assistant_chat",
@@ -18,12 +48,14 @@ const FEATURE_KEYS = [
   "analytics_advanced",
   "premium_inbox",
   "email_connections",
+  "concept_generation",
 ] as const;
 
 const USAGE_LIMIT_KEYS = [
   "active_workspaces",
   "assistant_messages_monthly",
   "brief_generations_monthly",
+  "concept_generations_monthly",
 ] as const;
 
 type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -63,6 +95,7 @@ const FEATURE_MATRIX: FeatureMatrix = {
     analytics_advanced: false,
     premium_inbox: false,
     email_connections: false,
+    concept_generation: false,
   },
   basic: {
     workspace_creation: true,
@@ -73,6 +106,7 @@ const FEATURE_MATRIX: FeatureMatrix = {
     analytics_advanced: false,
     premium_inbox: false,
     email_connections: false,
+    concept_generation: true,
   },
   premium: {
     workspace_creation: true,
@@ -83,6 +117,7 @@ const FEATURE_MATRIX: FeatureMatrix = {
     analytics_advanced: true,
     premium_inbox: true,
     email_connections: true,
+    concept_generation: true,
   },
 };
 
@@ -91,16 +126,19 @@ const USAGE_LIMIT_MATRIX: UsageLimitMatrix = {
     active_workspaces: 1,
     assistant_messages_monthly: 10,
     brief_generations_monthly: 0,
+    concept_generations_monthly: 0,
   },
   basic: {
     active_workspaces: 8,
     assistant_messages_monthly: 250,
     brief_generations_monthly: 20,
+    concept_generations_monthly: 20,
   },
   premium: {
     active_workspaces: null,
     assistant_messages_monthly: null,
     brief_generations_monthly: null,
+    concept_generations_monthly: null,
   },
 };
 
@@ -154,6 +192,8 @@ function featureErrorMessage(feature: FeatureKey, effectiveTier: PlanTier) {
       return "Advanced reporting is available on Premium.";
     case "brief_generation":
       return "AI brief generation is available on Basic and Premium.";
+    case "concept_generation":
+      return "AI concept generation is available on Basic and Premium.";
     default:
       return `This feature is not available on the ${effectiveTier} plan.`;
   }
@@ -167,6 +207,8 @@ function usageErrorMessage(key: UsageLimitKey, limit: number, effectiveTier: Pla
       return `You have used all ${limit} assistant messages included in your ${effectiveTier} plan this month.`;
     case "brief_generations_monthly":
       return `You have used all ${limit} AI brief generations included in your ${effectiveTier} plan this month.`;
+    case "concept_generations_monthly":
+      return `You have used all ${limit} AI concept generations included in your ${effectiveTier} plan this month.`;
     default:
       return "This usage limit has been reached.";
   }
@@ -284,7 +326,11 @@ export async function getViewerEntitlements(viewer: Viewer): Promise<ViewerEntit
 export async function assertViewerHasFeature(viewer: Viewer, feature: FeatureKey) {
   const entitlements = await getViewerEntitlements(viewer);
   if (!entitlements.features[feature]) {
-    throw new Error(featureErrorMessage(feature, entitlements.effectiveTier));
+    throw new EntitlementFeatureError(
+      feature,
+      entitlements.effectiveTier,
+      featureErrorMessage(feature, entitlements.effectiveTier),
+    );
   }
 
   return entitlements;
@@ -298,7 +344,12 @@ export async function assertViewerWithinUsageLimit(
   const entitlements = await getViewerEntitlements(viewer);
   const usage = entitlements.usage[key];
   if (usage.limit !== null && usage.current + increment > usage.limit) {
-    throw new Error(usageErrorMessage(key, usage.limit, entitlements.effectiveTier));
+    throw new EntitlementUsageError(
+      key,
+      entitlements.effectiveTier,
+      usage.limit,
+      usageErrorMessage(key, usage.limit, entitlements.effectiveTier),
+    );
   }
 
   return entitlements;

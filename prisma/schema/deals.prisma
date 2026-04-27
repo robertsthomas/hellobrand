@@ -49,6 +49,7 @@ model Deal {
   appNotifications           AppNotification[]
   invoiceDeliveryRecords     InvoiceDeliveryRecord[]
   invoiceReminderTouchpoints InvoiceReminderTouchpoint[]
+  concepts                   Concept[]
 }
 
 model Summary {
@@ -136,4 +137,32 @@ model RiskFlag {
   deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@index([dealId])
+}
+
+model Concept {
+  id                    String    @id @default(uuid())
+  dealId                String
+  deal                  Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deliverableIndex      Int
+  title                 String
+  hook                  String
+  summary               String
+  structure             String
+  messagingIntegration  String
+  ctaApproach           String
+  platformNotes         String?
+  moodAndTone           String
+  rationale             String
+  isFavorite            Boolean   @default(false)
+  isVariation           Boolean   @default(false)
+  parentConceptId       String?
+  parentConcept         Concept?  @relation("ConceptVariations", fields: [parentConceptId], references: [id], onDelete: Cascade)
+  variations            Concept[] @relation("ConceptVariations")
+  generationBatch       String
+  modelVersion          String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([dealId])
+  @@index([dealId, deliverableIndex])
 }
