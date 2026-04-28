@@ -31,6 +31,7 @@ export function UploadContractForm({
   const posthog = usePostHog();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [retryingDocumentId, setRetryingDocumentId] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const latestDocument = documents[0] ?? null;
   const latestStatus = latestDocument
@@ -108,6 +109,25 @@ export function UploadContractForm({
       setSubmitError(error instanceof Error ? error.message : "Could not upload documents.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function handleRetry(documentId: string) {
+    setRetryingDocumentId(documentId);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.set("dealId", dealId);
+      formData.set("documentId", documentId);
+      await reprocessDocumentAction(formData);
+      router.refresh();
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Could not retry document processing."
+      );
+    } finally {
+      setRetryingDocumentId(null);
     }
   }
 
@@ -235,13 +255,17 @@ export function UploadContractForm({
                 </p>
               </div>
               {status.state === "failed" ? (
-                <form action={reprocessDocumentAction}>
-                  <input type="hidden" name="dealId" value={dealId} />
-                  <input type="hidden" name="documentId" value={document.id} />
-                  <Button type="submit" size="sm" variant="outline">
-                    Retry
-                  </Button>
-                </form>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={retryingDocumentId === document.id}
+                  onClick={() => {
+                    void handleRetry(document.id);
+                  }}
+                >
+                  {retryingDocumentId === document.id ? "Retrying..." : "Retry"}
+                </Button>
               ) : null}
             </div>
           ))}

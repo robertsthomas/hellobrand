@@ -50,6 +50,10 @@ model Deal {
   invoiceDeliveryRecords     InvoiceDeliveryRecord[]
   invoiceReminderTouchpoints InvoiceReminderTouchpoint[]
   concepts                   Concept[]
+
+  esignEnvelopeId String?
+  esignStatus     String?
+  esignUpdatedAt  DateTime?
 }
 
 model Summary {

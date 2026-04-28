@@ -17,6 +17,7 @@ export type DealStatus =
   | "archived";
 
 type CountersignStatus = "unknown" | "pending" | "signed";
+export type ESignatureStatus = "DRAFT" | "PENDING" | "COMPLETED" | "REJECTED";
 
 export interface DeliverableItem {
   id: string;
@@ -164,6 +165,9 @@ export interface DealRecord {
   analyzedAt: string | null;
   confirmedAt: string | null;
   statusBeforeArchive: string | null;
+  esignEnvelopeId: string | null;
+  esignStatus: ESignatureStatus | null;
+  esignUpdatedAt: string | null;
 }
 
 export interface DealTermsRecord {

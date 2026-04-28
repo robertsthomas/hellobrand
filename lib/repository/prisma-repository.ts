@@ -269,6 +269,9 @@ export class PrismaRepository {
         countersignStatus: "unknown",
         summary: null,
         legalDisclaimer: "",
+        esignEnvelopeId: null,
+        esignStatus: null,
+        esignUpdatedAt: null,
         confirmedAt:
           options?.confirmedAt === undefined
             ? new Date()
@@ -306,6 +309,14 @@ export class PrismaRepository {
         nextDeliverableDate: patch.nextDeliverableDate
           ? new Date(patch.nextDeliverableDate)
           : patch.nextDeliverableDate === null
+            ? null
+            : undefined,
+        esignEnvelopeId:
+          patch.esignEnvelopeId !== undefined ? patch.esignEnvelopeId : undefined,
+        esignStatus: patch.esignStatus !== undefined ? patch.esignStatus : undefined,
+        esignUpdatedAt: patch.esignUpdatedAt
+          ? new Date(patch.esignUpdatedAt)
+          : patch.esignUpdatedAt === null
             ? null
             : undefined,
         analyzedAt: patch.analyzedAt

@@ -12,6 +12,7 @@ export {
   getDealForViewer,
   createDealForViewer,
   updateDealForViewer,
+  sendDealForESignature,
   deleteDealForViewer,
   activateSummaryVariantForViewer,
   saveGeneratedBriefSummaryForViewer,

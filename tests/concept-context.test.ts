@@ -21,6 +21,9 @@ function makeAggregate(): DealAggregate {
       analyzedAt: null,
       confirmedAt: null,
       statusBeforeArchive: null,
+      esignEnvelopeId: null,
+      esignStatus: null,
+      esignUpdatedAt: null,
     },
     latestDocument: null,
     documents: [

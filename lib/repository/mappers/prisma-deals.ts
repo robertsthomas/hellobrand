@@ -24,6 +24,9 @@ export function toDealRecord(deal: {
   updatedAt: Date;
   analyzedAt: Date | null;
   confirmedAt: Date | null;
+  esignEnvelopeId: string | null;
+  esignStatus: string | null;
+  esignUpdatedAt: Date | null;
 }): DealRecord {
   return {
     ...deal,
@@ -32,6 +35,7 @@ export function toDealRecord(deal: {
     updatedAt: iso(deal.updatedAt) ?? new Date().toISOString(),
     analyzedAt: iso(deal.analyzedAt),
     confirmedAt: iso(deal.confirmedAt),
+    esignUpdatedAt: iso(deal.esignUpdatedAt),
   } as DealRecord;
 }
 

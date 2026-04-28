@@ -105,6 +105,9 @@ export class FileRepository {
       analyzedAt: null,
       confirmedAt: options?.confirmedAt ?? now,
       statusBeforeArchive: null,
+      esignEnvelopeId: null,
+      esignStatus: null,
+      esignUpdatedAt: null,
     };
 
     store.deals.unshift(deal);

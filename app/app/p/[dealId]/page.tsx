@@ -1,8 +1,8 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { AlertTriangle, ArrowRight, Trash2 } from "lucide-react";
-import { Suspense } from "react";
 import { PlanTier } from "@prisma/client";
+import { AlertTriangle, ArrowRight, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { BriefGenerator } from "@/components/brief-generator";
 import { ConceptGenerator } from "@/components/concept-generator";
@@ -11,22 +11,23 @@ import { DealEmailPanel } from "@/components/deal-email-panel";
 import { DealNotesDrawer } from "@/components/deal-notes-drawer";
 import { DealSummaryPanel } from "@/components/deal-summary-panel";
 import { DeleteDealDialog } from "@/components/delete-deal-dialog";
-import { DeliverablesList } from "@/components/deliverables-list";
 import { DeliverableTracker } from "@/components/deliverable-tracker";
+import { DeliverablesList } from "@/components/deliverables-list";
 import { DisclosureObligations } from "@/components/disclosure-obligations";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { FeatureGate } from "@/components/FeatureGate";
 import { FeatureUpgradeCard } from "@/components/feature-locked-state";
+import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { PendingChangesBanner } from "@/components/pending-changes-banner";
 import { RiskFlags } from "@/components/risk-flags";
 import { ScrollableTabsList } from "@/components/scrollable-tabs-list";
 import { DealDetailSkeleton } from "@/components/skeletons";
 import { TermsEditor } from "@/components/terms-editor";
-import { UploadContractForm } from "@/components/upload-contract-form";
-import { WorkspaceTabButton, WorkspaceTabs } from "@/components/workspace-tabs";
-import { WorkspaceDetailHeader } from "@/components/patterns/workspace";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { conceptGenerationEnabled } from "@/flags";
+import { UploadContractForm } from "@/components/upload-contract-form";
+import { WorkspaceESignAction } from "@/components/workspace-esign-action";
+import { WorkspaceTabButton, WorkspaceTabs } from "@/components/workspace-tabs";
+import { conceptGenerationEnabled, esignatureEnabled } from "@/flags";
 import { requireViewer } from "@/lib/auth";
 import { getViewerEntitlements } from "@/lib/billing/entitlements";
 import { formatCurrency, formatDate, humanizeToken } from "@/lib/utils";
@@ -79,6 +80,7 @@ async function DealDetailContent({
   const hasBriefGeneration = entitlements.features.brief_generation;
   const hasConceptGeneration =
     (await conceptGenerationEnabled()) && entitlements.features.concept_generation;
+  const hasESignature = await esignatureEnabled();
 
   const {
     deal,
@@ -131,7 +133,14 @@ async function DealDetailContent({
         <WorkspaceDetailHeader
           backHref="/app/p/history"
           backLabel="All Partnerships"
-          action={<DealNotesDrawer dealId={deal.id} notes={terms?.notes ?? null} />}
+          action={
+            <div className="flex items-center gap-2">
+              {hasESignature ? (
+                <WorkspaceESignAction dealId={deal.id} esignStatus={deal.esignStatus} />
+              ) : null}
+              <DealNotesDrawer dealId={deal.id} notes={terms?.notes ?? null} />
+            </div>
+          }
           campaignName={displayCampaignName}
           brandName={displayBrandName}
           status={deal.status}
@@ -296,10 +305,7 @@ async function DealDetailContent({
               </div>
             ) : null}
             {hasBriefGeneration ? (
-              <BriefGenerator
-                dealId={deal.id}
-                briefData={terms?.briefData ?? null}
-              />
+              <BriefGenerator dealId={deal.id} briefData={terms?.briefData ?? null} />
             ) : (
               <FeatureUpgradeCard
                 eyebrow="Basic briefs"
@@ -417,10 +423,7 @@ async function DealDetailContent({
           <FeatureGate flagKey="concept-generation-enabled" defaultValue={true}>
             <TabsContent value="concepts" className="mt-0 space-y-6">
               {hasConceptGeneration ? (
-                <ConceptGenerator
-                  dealId={deal.id}
-                  deliverables={terms?.deliverables ?? []}
-                />
+                <ConceptGenerator dealId={deal.id} deliverables={terms?.deliverables ?? []} />
               ) : (
                 <FeatureUpgradeCard
                   eyebrow="Basic concepts"

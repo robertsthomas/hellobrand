@@ -6,26 +6,26 @@
  */
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-import { normalizeDealCategory } from "@/lib/conflict-intelligence";
+import {
+  parseNullableBoolean,
+  parseNullableNumber,
+  parseNullableString,
+} from "@/app/action-helpers";
 import { requireViewer } from "@/lib/auth";
+import { normalizeDealCategory } from "@/lib/conflict-intelligence";
 import {
   confirmTermsFieldForViewer,
   createDealForViewer as createDealFromDeals,
   reprocessDocumentForViewer as reprocessDocumentFromDeals,
-  updateDealNotesForViewer as updateDealNotesFromDeals,
+  sendDealForESignature as sendDealForESignatureFromDeals,
   updateDealForViewer as updateDealFromDeals,
+  updateDealNotesForViewer as updateDealNotesFromDeals,
   updateTermsForViewer as updateTermsFromDeals,
   uploadDocumentsForViewer as uploadDocumentsFromDeals,
 } from "@/lib/deals";
 import { startServerDebug } from "@/lib/server-debug";
 import { sanitizePlainTextInput } from "@/lib/utils";
 import { createDealSchema, dealTermsInputSchema, updateDealSchema } from "@/lib/validation";
-import {
-  parseNullableBoolean,
-  parseNullableNumber,
-  parseNullableString,
-} from "@/app/action-helpers";
 
 import { invalidateDeals, invalidateDealWorkspace } from "./deal-shared";
 
@@ -83,6 +83,20 @@ export async function reprocessDocumentAction(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   await reprocessDocumentFromDeals(viewer, documentId);
   invalidateDealWorkspace(viewer.id, dealId);
+}
+
+export async function sendForESignatureAction(formData: FormData) {
+  const viewer = await requireViewer();
+  const dealId = String(formData.get("dealId") ?? "");
+
+  const result = await sendDealForESignatureFromDeals(viewer, dealId);
+  invalidateDealWorkspace(viewer.id, dealId);
+
+  return {
+    ok: true,
+    message: "Sent for eSignature.",
+    envelopeId: result.envelopeId,
+  };
 }
 
 async function saveDealMetaAction(formData: FormData) {

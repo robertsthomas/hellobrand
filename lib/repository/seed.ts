@@ -109,6 +109,9 @@ export function createSeedStore(): AppStore {
         analyzedAt: now,
         confirmedAt: now,
         statusBeforeArchive: null,
+        esignEnvelopeId: null,
+        esignStatus: null,
+        esignUpdatedAt: null,
       },
     ],
     documents: [

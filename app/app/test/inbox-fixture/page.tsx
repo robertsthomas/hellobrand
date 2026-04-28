@@ -26,7 +26,10 @@ function buildDeal(id: string, brandName: string, campaignName: string): DealRec
     updatedAt: "2026-04-02T09:00:00.000Z",
     analyzedAt: null,
     confirmedAt: null,
-    statusBeforeArchive: null
+    statusBeforeArchive: null,
+    esignEnvelopeId: null,
+    esignStatus: null,
+    esignUpdatedAt: null
   };
 }
 

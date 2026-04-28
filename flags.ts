@@ -33,3 +33,4 @@ export const sidebarMilestonesEnabled = () => ldFlag("sidebar-milestones-enabled
 export const blogSummarizeEnabled = () => ldFlag("blog-summarize-enabled", false);
 export const conceptGenerationEnabled = () => ldFlag("concept-generation-enabled", true);
 export const maintenanceMode = () => ldFlag("maintenance-mode", false);
+export const esignatureEnabled = () => ldFlag("esignature-enabled", false);

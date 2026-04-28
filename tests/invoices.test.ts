@@ -24,6 +24,9 @@ function makeDeal(): DealRecord {
     analyzedAt: null,
     confirmedAt: "2026-03-01T00:00:00.000Z",
     statusBeforeArchive: null,
+    esignEnvelopeId: null,
+    esignStatus: null,
+    esignUpdatedAt: null,
   };
 }
 

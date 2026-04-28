@@ -4,11 +4,18 @@
  */
 
 export {
-  reprocessDocumentAction,
-  saveTermsAction,
-  saveDealNotesAction,
-  confirmTermsReviewAction,
-} from "./deal-workspace-actions";
+  deleteInvoiceAction,
+  finalizeInvoiceAction,
+  generateInvoiceDraftAction,
+  regenerateInvoiceDraftAction,
+  saveInvoiceDraftAction,
+  voidInvoiceAction,
+} from "./deal-invoice-actions";
+export {
+  archiveDealAction,
+  deleteWorkspaceConfirmedAction,
+  unarchiveDealAction,
+} from "./deal-lifecycle-actions";
 export {
   activateSummaryVariantAction,
   applyPendingChangesAction,
@@ -16,15 +23,9 @@ export {
   updateDeliverablesAction,
 } from "./deal-summary-actions";
 export {
-  deleteWorkspaceConfirmedAction,
-  archiveDealAction,
-  unarchiveDealAction,
-} from "./deal-lifecycle-actions";
-export {
-  generateInvoiceDraftAction,
-  regenerateInvoiceDraftAction,
-  saveInvoiceDraftAction,
-  finalizeInvoiceAction,
-  voidInvoiceAction,
-  deleteInvoiceAction,
-} from "./deal-invoice-actions";
+  confirmTermsReviewAction,
+  reprocessDocumentAction,
+  saveDealNotesAction,
+  saveTermsAction,
+  sendForESignatureAction,
+} from "./deal-workspace-actions";
