@@ -143,7 +143,11 @@ function buildCounterpartyRecipient(aggregate: DealAggregate) {
   };
 }
 
-export async function sendDealForESignature(viewer: Viewer, dealId: string) {
+export async function sendDealForESignature(
+  viewer: Viewer,
+  dealId: string,
+  options?: { appUrl?: string | null }
+) {
   if (!(await esignatureEnabled())) {
     throw new Error("eSignature is not enabled.");
   }
@@ -177,7 +181,11 @@ export async function sendDealForESignature(viewer: Viewer, dealId: string) {
   const creatorName =
     profile.creatorLegalName?.trim() || profile.displayName?.trim() || viewer.displayName;
   const pdfBuffer = await readStoredBytes(document.storagePath);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.INTEGRATIONS_APP_URL ?? "";
+  const appUrl =
+    options?.appUrl?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.INTEGRATIONS_APP_URL ||
+    "";
 
   const envelope = await createAndSendSigningRequest({
     dealId,

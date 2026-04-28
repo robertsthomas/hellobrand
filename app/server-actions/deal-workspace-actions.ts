@@ -1,10 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 /**
  * Deal workspace mutation actions.
  * This file handles deal creation, document uploads, metadata updates, term updates, and draft generation for a single workspace.
  */
-import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   parseNullableBoolean,
@@ -28,6 +29,16 @@ import { sanitizePlainTextInput } from "@/lib/utils";
 import { createDealSchema, dealTermsInputSchema, updateDealSchema } from "@/lib/validation";
 
 import { invalidateDeals, invalidateDealWorkspace } from "./deal-shared";
+
+async function getRequestOrigin() {
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const proto =
+    requestHeaders.get("x-forwarded-proto") ??
+    (host?.includes("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https");
+
+  return host ? `${proto}://${host}` : null;
+}
 
 async function createDealAction(formData: FormData) {
   const viewer = await requireViewer();
@@ -88,8 +99,9 @@ export async function reprocessDocumentAction(formData: FormData) {
 export async function sendForESignatureAction(formData: FormData) {
   const viewer = await requireViewer();
   const dealId = String(formData.get("dealId") ?? "");
+  const appUrl = await getRequestOrigin();
 
-  const result = await sendDealForESignatureFromDeals(viewer, dealId);
+  const result = await sendDealForESignatureFromDeals(viewer, dealId, { appUrl });
   invalidateDealWorkspace(viewer.id, dealId);
 
   return {
